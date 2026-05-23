@@ -1,0 +1,317 @@
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  MapPin, Navigation, Phone, MessageCircle, CheckCircle2,
+  Loader2, ChevronLeft, Camera, DollarSign,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { apiClient } from '@/lib/api';
+import { realtimeService } from '@/services/realtime';
+import { useJobChat } from '@/hooks/useRealtime';
+import InAppChat from '@/components/chat/InAppChat';
+import { getCurrentPosition } from '@/lib/gps';
+
+type Job = {
+  id: string;
+  title: string;
+  description: string;
+  category?: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  status: string;
+  estimatedPrice?: number | null;
+  finalPrice?: number | null;
+};
+
+function openGoogleMaps(lat: number, lng: number) {
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank', 'noopener,noreferrer');
+}
+
+export default function FundiJob() {
+  const { jobId: jobIdParam } = useParams();
+  const navigate = useNavigate();
+  const token = useMemo(() => localStorage.getItem('auth_token'), []);
+
+  const [resolvedJobId, setResolvedJobId] = useState<string | null>(null);
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [finalPrice, setFinalPrice] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [completing, setCompleting] = useState(false);
+  const [otpConfirmed, setOtpConfirmed] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const { messages, sendMessage } = useJobChat(resolvedJobId);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Resolve "active" to the real active job ID
+  useEffect(() => {
+    if (jobIdParam && jobIdParam !== 'active') {
+      setResolvedJobId(jobIdParam);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await apiClient.getFundiActiveJob() as { job?: { id: string } };
+        if (res?.job?.id) setResolvedJobId(res.job.id);
+        else { toast.error('No active job found'); navigate('/fundi'); }
+      } catch {
+        navigate('/fundi');
+      }
+    })();
+  }, [jobIdParam, navigate]);
+
+  useEffect(() => {
+    if (!token) return;
+    realtimeService.connect(token);
+    return () => realtimeService.disconnect();
+  }, [token]);
+
+  useEffect(() => {
+    if (!resolvedJobId) return;
+    (async () => {
+      try {
+        const res = await apiClient.getJob(resolvedJobId) as { job?: Job };
+        setJob(res.job ?? null);
+      } catch { toast.error('Failed to load job'); }
+      finally { setLoading(false); }
+    })();
+  }, [resolvedJobId]);
+
+  useEffect(() => {
+    if (!resolvedJobId) return;
+    const onStatus = (payload: Record<string, unknown>) => {
+      if (!payload || payload.jobId !== resolvedJobId) return;
+      setJob((prev) => prev ? { ...prev, status: payload.status as string } : prev);
+    };
+    const onConfirmed = (payload: Record<string, unknown>) => {
+      if (!payload || payload.jobId !== resolvedJobId) return;
+      setOtpConfirmed(true);
+      toast.success('Customer confirmed completion!');
+    };
+    realtimeService.on('job:status', onStatus);
+    realtimeService.on('job:completion:confirmed', onConfirmed);
+    return () => {
+      realtimeService.off('job:status', onStatus);
+      realtimeService.off('job:completion:confirmed', onConfirmed);
+    };
+  }, [resolvedJobId]);
+
+  const step = async (nextStatus: 'on_the_way' | 'arrived' | 'in_progress') => {
+    if (!resolvedJobId) return;
+    try {
+      const pos = await getCurrentPosition();
+      await apiClient.checkInToJob(resolvedJobId, pos.coords.latitude, pos.coords.longitude, nextStatus);
+      setJob((prev) => prev ? { ...prev, status: nextStatus } : prev);
+      const labels = { on_the_way: 'On the way!', arrived: 'Arrived!', in_progress: 'Work started!' };
+      toast.success(labels[nextStatus]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to update status');
+    }
+  };
+
+  const onComplete = async () => {
+    if (!resolvedJobId || !finalPrice) { toast.error('Enter final price before completing'); return; }
+    setCompleting(true);
+    try {
+      await apiClient.completeJob(resolvedJobId, finalPrice, photos);
+      toast.success('Job completed. Waiting for customer OTP confirmation.');
+      setJob((prev) => prev ? { ...prev, status: 'completed' } : prev);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to complete job');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading job...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-hero">
+        <p className="text-muted-foreground">Job not found.</p>
+        <Button onClick={() => navigate('/fundi')}>Back to Dashboard</Button>
+      </div>
+    );
+  }
+
+  const canNavigate = job.latitude != null && job.longitude != null;
+  const status = job.status.toLowerCase();
+
+  return (
+    <div className="min-h-screen bg-gradient-hero">
+      {/* Chat overlay */}
+      {showChat && resolvedJobId && (
+        <InAppChat
+          jobId={resolvedJobId}
+          messages={messages}
+          onSend={sendMessage}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
+        <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
+          <button onClick={() => navigate('/fundi')} className="p-2 hover:bg-muted rounded-xl transition-colors">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1">
+            <h1 className="font-display font-bold">Active Job</h1>
+            <p className="text-xs text-muted-foreground capitalize">{status.replace(/_/g, ' ')}</p>
+          </div>
+          <button onClick={() => setShowChat(true)} className="p-2 hover:bg-muted rounded-xl transition-colors relative">
+            <MessageCircle className="w-5 h-5 text-muted-foreground" />
+            {messages.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+        {/* Job details */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-5 border border-border/50">
+          <p className="font-bold text-lg">{job.title}</p>
+          <p className="text-muted-foreground text-sm mt-1">{job.description}</p>
+          <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="w-4 h-4" />
+              <span className="truncate">{job.location}</span>
+            </div>
+            {job.estimatedPrice != null && (
+              <div className="flex items-center gap-1.5 text-sm ml-auto shrink-0">
+                <DollarSign className="w-4 h-4 text-primary" />
+                <span className="font-semibold text-primary">KES {Number(job.estimatedPrice).toFixed(0)}</span>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Navigation */}
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => canNavigate ? openGoogleMaps(Number(job.latitude), Number(job.longitude)) : toast.error('No GPS location for this job')}
+            disabled={!canNavigate}
+            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
+          >
+            <Navigation className="w-5 h-5 text-primary" />
+            <span className="text-xs font-medium">Navigate</span>
+          </button>
+          <button
+            onClick={() => setShowChat(true)}
+            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
+          >
+            <MessageCircle className="w-5 h-5 text-blue-500" />
+            <span className="text-xs font-medium">Chat</span>
+          </button>
+          <button
+            onClick={() => toast.info('Call feature via customer phone — coming soon')}
+            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
+          >
+            <Phone className="w-5 h-5 text-green-500" />
+            <span className="text-xs font-medium">Call</span>
+          </button>
+        </div>
+
+        {/* Status controls */}
+        {status !== 'completed' && (
+          <div className="bg-card rounded-2xl p-5 border border-border/50 space-y-4">
+            <h3 className="font-semibold">Job Controls</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'En Route', nextStatus: 'on_the_way' as const, active: status === 'on_the_way' },
+                { label: 'Arrived', nextStatus: 'arrived' as const, active: status === 'arrived' },
+                { label: 'Start Work', nextStatus: 'in_progress' as const, active: status === 'in_progress' },
+              ].map(({ label, nextStatus, active }) => (
+                <button
+                  key={nextStatus}
+                  onClick={() => step(nextStatus)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all ${
+                    active ? 'bg-primary text-white shadow-glow' : 'bg-muted text-foreground hover:bg-primary/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Complete form */}
+            {status === 'in_progress' && (
+              <div className="space-y-3 pt-2 border-t border-border/50">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Final Price (KES)</label>
+                  <input
+                    type="number"
+                    value={finalPrice}
+                    onChange={(e) => setFinalPrice(e.target.value)}
+                    placeholder="Enter total amount charged"
+                    className="w-full h-11 px-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                    inputMode="decimal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Completion Photos</label>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:bg-muted transition-colors w-full justify-center"
+                  >
+                    <Camera className="w-4 h-4" />
+                    {photos.length > 0 ? `${photos.length} photo(s) selected` : 'Add Photos (optional)'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+                  />
+                </div>
+
+                <Button
+                  onClick={onComplete}
+                  disabled={completing || !finalPrice}
+                  className="w-full bg-gradient-primary"
+                >
+                  {completing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completing...</> : 'Complete Job'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Completion status */}
+        {status === 'completed' && (
+          <div className={`rounded-2xl p-5 border ${otpConfirmed ? 'bg-green-50 border-green-200' : 'bg-muted/50 border-border/50'}`}>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className={`w-6 h-6 ${otpConfirmed ? 'text-green-600' : 'text-muted-foreground'}`} />
+              <div>
+                <p className="font-semibold text-sm">
+                  {otpConfirmed ? 'Customer confirmed completion!' : 'Waiting for customer OTP'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {otpConfirmed
+                    ? 'Payment will be released to your wallet after the dispute window.'
+                    : 'The customer must enter their OTP to confirm the job is done.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
