@@ -378,6 +378,30 @@ class ApiClient {
     });
   }
 
+  async uploadDisputeEvidence(disputeId: string, formData: FormData) {
+    if (!isApiConfigured()) throw new ApiError(UNCONFIGURED_MSG, 0);
+    const url = `${env.API_URL}/disputes/${disputeId}/evidence`;
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 60_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.token ?? ''}` },
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') throw new ApiError('Upload timed out.', 0);
+      throw new ApiError('Upload failed. Check your connection.', 0);
+    } finally { clearTimeout(t); }
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new ApiError(err.message || 'Upload failed', response.status);
+    }
+    return response.json();
+  }
+
   // ── Admin ────────────────────────────────────────────────────────────────
   async getBypassAlerts(page = 1, limit = 20) {
     return this.request(`/admin/bypass-alerts?page=${page}&limit=${limit}`, { includeAuth: true });

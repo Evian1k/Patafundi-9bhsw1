@@ -6,7 +6,7 @@ import { realtimeService } from "@/services/realtime";
 import { useJobRequest } from "@/hooks/useRealtime";
 import {
   BarChart3, Wallet, AlertCircle, TrendingUp, MapPin, LogOut,
-  Wifi, WifiOff, Star, ChevronRight, RefreshCw, Scale,
+  Wifi, WifiOff, Star, ChevronRight, RefreshCw, Scale, ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -298,15 +298,16 @@ export function FundiDashboard() {
 
         {/* Wallet & Rating */}
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => navigate("/fundi/wallet")} className="bg-card rounded-2xl p-4 border border-border/50 text-left hover:shadow-md transition-all">
+          <button onClick={() => navigate("/fundi/wallet")} className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-200 text-left hover:shadow-md transition-all">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-primary" />
-                <p className="text-xs text-muted-foreground">Wallet</p>
+                <Wallet className="w-4 h-4 text-green-600" />
+                <p className="text-xs text-green-700 font-medium">Wallet</p>
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-green-500" />
             </div>
-            <p className="font-bold text-xl">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</p>
+            <p className="font-bold text-xl text-green-800">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</p>
+            <p className="text-xs text-green-600 mt-0.5">Available balance</p>
           </button>
 
           <div className="bg-card rounded-2xl p-4 border border-border/50">
@@ -335,6 +336,23 @@ export function FundiDashboard() {
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
           )}
+
+          {/* Wallet shortcut */}
+          <button onClick={() => navigate("/fundi/wallet")} className="w-full bg-card rounded-2xl p-4 border border-border/50 flex items-center justify-between hover:bg-muted transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-green-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">My Wallet</p>
+                <p className="text-xs text-muted-foreground">Earnings, withdrawals & history</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-green-700">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</span>
+              <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </button>
 
           <button onClick={() => navigate("/fundi/disputes")} className="w-full bg-card rounded-2xl p-4 border border-border/50 flex items-center justify-between hover:bg-muted transition-colors">
             <div className="flex items-center gap-3">

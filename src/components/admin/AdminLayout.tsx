@@ -3,16 +3,28 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Users, Shield, TrendingUp, BarChart3,
-  Settings, LogOut, Menu, X, Briefcase, CreditCard,
+  Settings, LogOut, Menu, Briefcase, CreditCard,
   AlertTriangle, FileText, Scale, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { realtimeService } from "@/services/realtime";
 import { toast } from "sonner";
 
-interface AdminLayoutProps { children: React.ReactNode }
+interface AdminLayoutProps {
+  children: React.ReactNode;
+  /** Optional badge count to show on the Disputes menu item */
+  disputeBadge?: number;
+}
 
-const menuItems = [
+interface MenuItem {
+  icon: React.ElementType;
+  label: string;
+  path: string;
+  color: string;
+}
+
+const MENU_ITEMS: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard", color: "text-blue-500" },
   { icon: Shield, label: "Fundi Verification", path: "/admin/fundis", color: "text-green-500" },
   { icon: Users, label: "Customers", path: "/admin/customers", color: "text-purple-500" },
@@ -25,11 +37,47 @@ const menuItems = [
   { icon: FileText, label: "Audit Logs", path: "/admin/audit-logs", color: "text-indigo-500" },
 ];
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [localDisputeBadge, setLocalDisputeBadge] = useState(disputeBadge ?? 0);
+
+  // Sync external badge prop
+  useEffect(() => {
+    if (disputeBadge != null) setLocalDisputeBadge(disputeBadge);
+  }, [disputeBadge]);
+
+  // Real-time: show badge whenever a new dispute is opened from any admin page
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (token) realtimeService.connect(token);
+
+    const onDispute = () => {
+      // Only show badge if not already on disputes page
+      if (!location.pathname.includes("/admin/disputes")) {
+        setLocalDisputeBadge((n) => n + 1);
+        toast("New dispute opened", {
+          description: "A user has filed a dispute requiring attention.",
+          action: {
+            label: "View",
+            onClick: () => { navigate("/admin/disputes"); setLocalDisputeBadge(0); },
+          },
+        });
+      }
+    };
+
+    realtimeService.on("dispute:opened", onDispute);
+    return () => realtimeService.off("dispute:opened", onDispute);
+  }, [navigate, location.pathname]);
+
+  // Clear badge when navigating to disputes page
+  useEffect(() => {
+    if (location.pathname.includes("/admin/disputes")) {
+      setLocalDisputeBadge(0);
+    }
+  }, [location.pathname]);
 
   // Server-side auth verification
   useEffect(() => {
@@ -54,6 +102,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       await apiClient.logout();
       toast.success("Logged out successfully");
     } catch { /* ignore */ }
+    realtimeService.disconnect();
     navigate("/admin/login");
   }, [navigate]);
 
@@ -62,7 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 h-14 border-b border-slate-700/50 ${!sidebarOpen && 'justify-center'}`}>
+      <div className={`flex items-center gap-3 px-4 h-14 border-b border-slate-700/50 ${!sidebarOpen ? "justify-center" : ""}`}>
         <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0">
           <span className="text-white font-bold text-sm">P</span>
         </div>
@@ -76,24 +125,49 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Menu */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {menuItems.map((item) => {
+        {MENU_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
+          const isDisputes = item.path === "/admin/disputes";
+          const showBadge = isDisputes && localDisputeBadge > 0;
+
           return (
             <Link
               key={item.path}
               to={item.path}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm ${
+              onClick={() => {
+                setMobileOpen(false);
+                if (isDisputes) setLocalDisputeBadge(0);
+              }}
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm ${
                 active
                   ? "bg-primary/20 border border-primary/30 text-white"
                   : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
-              } ${!sidebarOpen && 'justify-center'}`}
+              } ${!sidebarOpen ? "justify-center" : ""}`}
               title={!sidebarOpen ? item.label : undefined}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-primary' : item.color}`} />
-              {sidebarOpen && <span className="truncate">{item.label}</span>}
-              {sidebarOpen && active && <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />}
+              <div className="relative shrink-0">
+                <Icon className={`w-4 h-4 ${active ? "text-primary" : item.color}`} />
+                {showBadge && !sidebarOpen && (
+                  <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-red-500 flex items-center justify-center text-white text-[9px] font-bold">
+                    {localDisputeBadge > 9 ? "9+" : localDisputeBadge}
+                  </span>
+                )}
+              </div>
+
+              {sidebarOpen && (
+                <>
+                  <span className="truncate flex-1">{item.label}</span>
+                  {showBadge && (
+                    <span className="inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold px-1">
+                      {localDisputeBadge > 9 ? "9+" : localDisputeBadge}
+                    </span>
+                  )}
+                  {active && !showBadge && (
+                    <ChevronRight className="w-3.5 h-3.5 ml-auto text-primary/60" />
+                  )}
+                </>
+              )}
             </Link>
           );
         })}
@@ -103,7 +177,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="px-2 pb-4">
         <button
           onClick={handleLogout}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-700/50 hover:text-white transition-all text-sm ${!sidebarOpen && 'justify-center'}`}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-700/50 hover:text-white transition-all text-sm ${!sidebarOpen ? "justify-center" : ""}`}
         >
           <LogOut className="w-4 h-4 shrink-0" />
           {sidebarOpen && <span>Logout</span>}
@@ -115,7 +189,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className={`hidden lg:flex flex-col bg-slate-900 transition-all duration-300 ${sidebarOpen ? 'w-56' : 'w-16'} shrink-0`}>
+      <aside
+        className={`hidden lg:flex flex-col bg-slate-900 transition-all duration-300 ${sidebarOpen ? "w-56" : "w-16"} shrink-0`}
+      >
         <SidebarContent />
       </aside>
 
@@ -142,9 +218,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </button>
           <div className="flex-1">
             <p className="font-semibold text-gray-800 text-sm">
-              {menuItems.find((m) => m.path === location.pathname)?.label || 'Admin Panel'}
+              {MENU_ITEMS.find((m) => m.path === location.pathname)?.label || "Admin Panel"}
             </p>
           </div>
+          {localDisputeBadge > 0 && !location.pathname.includes("/admin/disputes") && (
+            <Link
+              to="/admin/disputes"
+              onClick={() => setLocalDisputeBadge(0)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-medium hover:bg-red-100 transition-colors"
+            >
+              <Scale className="w-3.5 h-3.5" />
+              {localDisputeBadge} dispute{localDisputeBadge > 1 ? "s" : ""}
+            </Link>
+          )}
           <button
             onClick={handleLogout}
             className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
