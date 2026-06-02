@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import NetworkReconnectBanner from "@/components/system/NetworkReconnectBanner";
+import { PushNotificationProvider } from "@/components/system/PushNotificationProvider";
 
 // Pages
 import Index from "./pages/Index";
@@ -51,6 +52,8 @@ import ReportsAnalytics from "./pages/admin/ReportsAnalytics";
 import AdminSettings from "./pages/admin/SettingsPage";
 import AuditLogs from "./pages/admin/AuditLogs";
 import AdminDisputeManagement from "./pages/admin/DisputeManagement";
+import TrustScoresPanel from "./pages/admin/TrustScoresPanel";
+import BypassDetection from "./pages/admin/BypassDetection";
 
 /** Fast client-side admin gate — AdminLayout does server-side verification. */
 const isAdmin = () => {
@@ -90,6 +93,7 @@ const App = () => {
         <Toaster />
         <Sonner richColors position="top-center" />
         <BrowserRouter>
+          <PushNotificationProvider>
           {/* Network status banner — shown app-wide */}
           <NetworkReconnectBanner />
 
@@ -159,10 +163,13 @@ const App = () => {
             <Route path="/admin/settings" element={<ProtectedAdminRoute element={<AdminSettings />} />} />
             <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
             <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
+            <Route path="/admin/trust-scores" element={<ProtectedAdminRoute element={<TrustScoresPanel />} />} />
+            <Route path="/admin/bypass-detection" element={<ProtectedAdminRoute element={<BypassDetection />} />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </PushNotificationProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
