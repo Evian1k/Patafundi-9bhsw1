@@ -2,6 +2,17 @@
  * Real-time Socket Service (Socket.IO)
  * Production-hardened: graceful degradation, no duplicate sockets,
  * correct event names aligned with backend, clean teardown.
+ *
+ * Backend-aligned events:
+ * job:accepted, job:request:declined, job:search:failed, job:matching,
+ * job:matched, job:status, job:cancelled, job:completed,
+ * fundi:location, payment:confirmed, payment:failed,
+ * payout:processing, payout:completed,
+ * dispute:opened, dispute:resolved,
+ * trust:updated, review:submitted,
+ * subscription:active,
+ * fundi:response:ok, fundi:response:failed,
+ * chat:message
  */
 
 import { io, Socket } from 'socket.io-client';
@@ -12,11 +23,12 @@ class RealtimeService {
   token: string | null = null;
   listeners: Map<string, Set<Function>> = new Map();
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-  private locationWatchActive = false;
 
   connect(token: string) {
+    // If already connected with the same token — do nothing
     if (this.socket?.connected && this.token === token) return;
 
+    // Disconnect stale socket
     if (this.socket) {
       this.socket.offAny();
       this.socket.disconnect();
@@ -70,6 +82,7 @@ class RealtimeService {
       if (this.token) this.socket!.emit('auth:token', this.token);
     });
 
+    // Forward all server events to local listeners
     this.socket.onAny((event: string, ...args: unknown[]) => {
       this._emit(event, ...args);
     });
@@ -126,25 +139,6 @@ class RealtimeService {
 
   sendMessage(jobId: string, content: string) {
     this.send('chat:send', { jobId, content });
-  }
-
-  /** Subscribe to fundi location updates for a specific job */
-  onFundiLocation(jobId: string, callback: (loc: { latitude: number; longitude: number; accuracy?: number }) => void) {
-    const handler = (payload: Record<string, unknown>) => {
-      if (payload?.jobId && payload.jobId !== jobId) return;
-      const lat = Number(payload?.latitude);
-      const lng = Number(payload?.longitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        callback({ latitude: lat, longitude: lng, accuracy: payload?.accuracy as number | undefined });
-      }
-    };
-    this.on('fundi:location:update', handler);
-    return () => this.off('fundi:location:update', handler);
-  }
-
-  /** Emit payout request from fundi wallet */
-  requestPayout(amount: number, mpesaNumber: string) {
-    this.send('payout:request', { amount, mpesaNumber });
   }
 }
 

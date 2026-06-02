@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   X, ShieldCheck, Star, Wrench, MessageCircle,
   Smartphone, CheckCircle, Loader2, AlertCircle,
-  Lock, ArrowRight, RefreshCw, MapPin, Navigation,
+  Lock, ArrowRight, RefreshCw,
 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { apiClient } from "@/lib/api";
@@ -12,9 +12,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/comp
 import { toast } from "sonner";
 import InAppChat from "@/components/chat/InAppChat";
 import TrustBadge from "@/components/ui/TrustBadge";
-import GoogleMapTracker from "@/components/maps/GoogleMapTracker";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string | undefined;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
 
 interface FundiInfo {
   id: string;
@@ -25,8 +24,6 @@ interface FundiInfo {
   avatarUrl?: string;
   trustScore?: number;
 }
-
-interface LatLng { lat: number; lng: number }
 
 type Status =
   | "searching" | "matching" | "matched" | "accepted"
@@ -66,11 +63,6 @@ export default function FundiTracker({
   const [searchRadiusKm, setSearchRadiusKm] = useState<number | null>(null);
   const [hasAuth, setHasAuth] = useState<boolean>(true);
 
-  // Live tracking
-  const [fundiLatLng, setFundiLatLng] = useState<LatLng | null>(null);
-  const [customerLatLng, setCustomerLatLng] = useState<LatLng | null>(null);
-  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
-
   // OTP state
   const [completionOtp, setCompletionOtp] = useState("");
   const [confirmingOtp, setConfirmingOtp] = useState(false);
@@ -96,26 +88,12 @@ export default function FundiTracker({
   const blockBackRef = useRef<boolean>(false);
   const paymentPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load current user
+  // Load current user for chat
   useEffect(() => {
     apiClient.getCurrentUser().then((res) => {
-      const u = res?.user as { id: string; latitude?: number; longitude?: number } | undefined;
-      if (u) {
-        setCurrentUser(u);
-        if (u.latitude && u.longitude) {
-          setCustomerLatLng({ lat: u.latitude, lng: u.longitude });
-        }
-      }
+      const u = res?.user as { id: string } | undefined;
+      if (u) setCurrentUser(u);
     }).catch(() => {});
-
-    // Try to get customer GPS location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setCustomerLatLng({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {},
-        { enableHighAccuracy: false, timeout: 5000 }
-      );
-    }
   }, []);
 
   useEffect(() => {
@@ -123,6 +101,7 @@ export default function FundiTracker({
     if (!token || !jobId) setHasAuth(false);
   }, [jobId]);
 
+  // Prevent back during active search
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (blockBackRef.current) { e.preventDefault(); e.returnValue = ""; }
@@ -132,6 +111,7 @@ export default function FundiTracker({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [status]);
 
+  // Stop payment polling on unmount
   useEffect(() => {
     return () => { if (paymentPollRef.current) clearInterval(paymentPollRef.current); };
   }, []);
@@ -158,12 +138,19 @@ export default function FundiTracker({
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => { socket.emit("auth:token", token); });
-    socket.on("auth:ok", () => { setProgressMsg("Searching for nearby fundis..."); });
+    socket.on("connect", () => {
+      socket.emit("auth:token", token);
+    });
+
+    socket.on("auth:ok", () => {
+      setProgressMsg("Searching for nearby fundis...");
+    });
+
     socket.on("auth:error", () => {
       setJobStatusRaw("failed");
       setProgressMsg("Authentication failed. Please refresh.");
     });
+
     socket.on("connect_error", (err: Error) => {
       console.warn("[FundiTracker] Connection error:", err.message);
       setProgressMsg("Connection error. Retrying...");
@@ -186,32 +173,24 @@ export default function FundiTracker({
       );
     });
 
-    const loadFundiInfo = async (fundiId: string, distanceKm?: number) => {
+    socket.on("job:matched", async (payload: Record<string, unknown>) => {
+      if (!payload || payload.jobId !== jobId) return;
+      setJobStatusRaw("matched");
       try {
-        const fundiRes = await apiClient.getFundi(fundiId) as { fundi?: Record<string, unknown> };
+        const fundiRes = await apiClient.getFundi(payload.fundiId as string) as { fundi?: Record<string, unknown> };
         if (fundiRes?.fundi) {
           const f = fundiRes.fundi;
           setFundi({
             id: f.id as string,
             name: `${f.firstName} ${f.lastName}`,
             skill: (f.skills as string[])?.[0] || "Fundi",
-            distanceKm: distanceKm ?? 0,
+            distanceKm: payload.distanceKm ? Number(payload.distanceKm) : 0,
             rating: (f.rating as number) || 4.5,
             avatarUrl: (f.avatarUrl || f.avatar_url) as string | undefined,
             trustScore: (f.trustScore as number) || undefined,
           });
-          // Set fundi location if available
-          if (f.latitude && f.longitude) {
-            setFundiLatLng({ lat: Number(f.latitude), lng: Number(f.longitude) });
-          }
         }
       } catch { /* ignore */ }
-    };
-
-    socket.on("job:matched", async (payload: Record<string, unknown>) => {
-      if (!payload || payload.jobId !== jobId) return;
-      setJobStatusRaw("matched");
-      if (payload.fundiId) await loadFundiInfo(payload.fundiId as string, payload.distanceKm ? Number(payload.distanceKm) : undefined);
     });
 
     socket.on("job:accepted", async (payload: Record<string, unknown>) => {
@@ -222,7 +201,22 @@ export default function FundiTracker({
         const p = Number(payload.estimatedPrice);
         if (Number.isFinite(p)) { setEstimatedPrice(p); setPaymentAmount(p); }
       }
-      if (payload.fundiId && !fundi) await loadFundiInfo(payload.fundiId as string, payload.distanceKm ? Number(payload.distanceKm) : undefined);
+      if (payload.fundiId && !fundi) {
+        try {
+          const fundiRes = await apiClient.getFundi(payload.fundiId as string) as { fundi?: Record<string, unknown> };
+          if (fundiRes?.fundi) {
+            const f = fundiRes.fundi;
+            setFundi({
+              id: f.id as string,
+              name: `${f.firstName} ${f.lastName}`,
+              skill: (f.skills as string[])?.[0] || "Fundi",
+              distanceKm: payload.distanceKm ? Number(payload.distanceKm) : 0,
+              rating: (f.rating as number) || 4.5,
+              trustScore: (f.trustScore as number) || undefined,
+            });
+          }
+        } catch { /* ignore */ }
+      }
     });
 
     socket.on("job:status", (payload: Record<string, unknown>) => {
@@ -262,23 +256,15 @@ export default function FundiTracker({
       setCompletionConfirmed(true);
     });
 
-    // Live fundi location updates
-    socket.on("fundi:location:update", (payload: Record<string, unknown>) => {
-      if (payload?.jobId && payload.jobId !== jobId) return;
-      const lat = Number(payload?.latitude);
-      const lng = Number(payload?.longitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        setFundiLatLng({ lat, lng });
-        if (payload.etaMinutes != null) setEtaMinutes(Number(payload.etaMinutes));
-      }
-    });
-
-    // Payment confirmation
+    // ── Real-time payment confirmation ────────────────────────────────────
     socket.on("payment:confirmed", (payload: Record<string, unknown>) => {
       if (!payload || (payload.jobId && payload.jobId !== jobId)) return;
       setPaymentStatus("confirmed");
       setPaymentMsg("Payment confirmed! Your fundi will receive their payout shortly.");
-      if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null; }
+      if (paymentPollRef.current) {
+        clearInterval(paymentPollRef.current);
+        paymentPollRef.current = null;
+      }
       toast.success("Payment confirmed via M-Pesa!");
     });
 
@@ -286,7 +272,10 @@ export default function FundiTracker({
       if (!payload || (payload.jobId && payload.jobId !== jobId)) return;
       setPaymentStatus("failed");
       setPaymentMsg(String(payload.message || "Payment failed. Please try again."));
-      if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null; }
+      if (paymentPollRef.current) {
+        clearInterval(paymentPollRef.current);
+        paymentPollRef.current = null;
+      }
       toast.error("Payment failed. Please try again.");
     });
 
@@ -303,10 +292,6 @@ export default function FundiTracker({
             if (Number.isFinite(p)) { setEstimatedPrice(p); setPaymentAmount(p); }
           }
           if (job.customer_completion_confirmed) setCompletionConfirmed(true);
-          // Load fundi if job already has one
-          if (job.fundiId && !fundi) {
-            await loadFundiInfo(job.fundiId as string);
-          }
         }
       } catch (e) {
         console.error("[FundiTracker] Failed to fetch job:", e);
@@ -317,7 +302,7 @@ export default function FundiTracker({
       socket.disconnect();
       if (paymentPollRef.current) clearInterval(paymentPollRef.current);
     };
-  }, [hasAuth, jobId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasAuth, jobId]);
 
   const handleConfirmCompletion = async () => {
     if (!jobId || completionOtp.length < 4) return;
@@ -333,13 +318,14 @@ export default function FundiTracker({
     }
   };
 
-  const startPaymentPolling = useCallback((jobIdToCheck: string) => {
+  const startPaymentPolling = (jobIdToCheck: string) => {
     if (paymentPollRef.current) clearInterval(paymentPollRef.current);
     let count = 0;
     paymentPollRef.current = setInterval(async () => {
       count++;
       setPaymentPollingCount(count);
       if (count > 30) {
+        // 30 × 5s = 2.5 minutes max polling
         clearInterval(paymentPollRef.current!);
         paymentPollRef.current = null;
         setPaymentStatus("failed");
@@ -348,7 +334,7 @@ export default function FundiTracker({
       }
       try {
         const result = await apiClient.getPaymentForJob(jobIdToCheck) as {
-          payment?: { status?: string };
+          payment?: { status?: string; mpesaReceiptNumber?: string };
         };
         const payStatus = result?.payment?.status?.toLowerCase();
         if (payStatus === "completed" || payStatus === "confirmed") {
@@ -358,14 +344,17 @@ export default function FundiTracker({
           setPaymentMsg("Payment confirmed! Your fundi will receive their payout shortly.");
           toast.success("Payment confirmed!");
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore — keep polling */ }
     }, 5000);
-  }, []);
+  };
 
   const handlePayment = async () => {
     if (!jobId) return;
     const cleaned = mpesaNumber.trim().replace(/\s/g, "");
-    if (!cleaned) { toast.error("Please enter your M-Pesa number"); return; }
+    if (!cleaned) {
+      toast.error("Please enter your M-Pesa number");
+      return;
+    }
     if (!/^(07|01|\+2547|\+2541|2547|2541)\d{7,8}$/.test(cleaned)) {
       toast.error("Please enter a valid Kenyan M-Pesa number (e.g. 0712345678)");
       return;
@@ -376,6 +365,7 @@ export default function FundiTracker({
       await apiClient.processPayment(jobId, cleaned);
       setPaymentStatus("initiated");
       setPaymentMsg("M-Pesa STK push sent to your phone. Open your M-Pesa menu and enter your PIN to complete payment.");
+      // Start polling + wait for socket confirmation
       startPaymentPolling(jobId);
     } catch (e) {
       setPaymentStatus("failed");
@@ -426,19 +416,6 @@ export default function FundiTracker({
     failed: "Search Failed",
   };
 
-  const statusBg: Record<string, string> = {
-    searching: "bg-blue-50",
-    matching: "bg-blue-50",
-    matched: "bg-purple-50",
-    accepted: "bg-purple-50",
-    on_the_way: "bg-orange-50",
-    arrived: "bg-orange-50",
-    in_progress: "bg-green-50",
-    completed: "bg-green-50",
-    cancelled: "bg-red-50",
-    failed: "bg-red-50",
-  };
-
   const statusColor: Record<string, string> = {
     searching: "text-blue-600",
     matching: "text-blue-600",
@@ -452,13 +429,26 @@ export default function FundiTracker({
     failed: "text-red-600",
   };
 
+  const statusBg: Record<string, string> = {
+    searching: "bg-blue-50",
+    matching: "bg-blue-50",
+    matched: "bg-purple-50",
+    accepted: "bg-purple-50",
+    on_the_way: "bg-orange-50",
+    arrived: "bg-orange-50",
+    in_progress: "bg-green-50",
+    completed: "bg-green-50",
+    cancelled: "bg-red-50",
+    failed: "bg-red-50",
+  };
+
+  // Progress steps for the tracker
   const progressSteps = ["Searching", "Accepted", "On the Way", "Arrived", "In Progress", "Done"];
   const stepIndex: Record<string, number> = {
     searching: 0, matching: 0, matched: 1, accepted: 1,
     on_the_way: 2, arrived: 3, in_progress: 4, completed: 5,
   };
   const currentStep = stepIndex[status] ?? 0;
-  const showMap = ["accepted", "on_the_way", "arrived", "in_progress"].includes(status);
 
   return (
     <div className="min-h-screen bg-gradient-hero p-4 md:p-6">
@@ -483,7 +473,7 @@ export default function FundiTracker({
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-display font-bold text-xl">Job Tracking</h2>
               {onComplete && (
-                <button onClick={onComplete} className="p-2 hover:bg-black/10 rounded-full transition-colors">
+                <button onClick={onComplete} className="p-2 hover:bg-black/10 rounded-full transition-colors" aria-label="Close">
                   <X className="w-5 h-5" />
                 </button>
               )}
@@ -493,13 +483,13 @@ export default function FundiTracker({
             </div>
           </div>
 
-          {/* Progress steps */}
+          {/* Progress bar */}
           {!["cancelled", "failed"].includes(status) && (
             <div className="px-6 py-3 bg-card border-b border-border/30">
               <div className="flex items-center justify-between gap-1">
                 {progressSteps.map((step, idx) => (
-                  <div key={step} className="flex items-center flex-1">
-                    <div className="flex flex-col items-center gap-1 flex-1">
+                  <React.Fragment key={step}>
+                    <div className="flex flex-col items-center gap-1">
                       <div className={`w-2.5 h-2.5 rounded-full transition-all ${
                         idx < currentStep ? "bg-primary" :
                         idx === currentStep ? "bg-primary ring-4 ring-primary/20" :
@@ -510,20 +500,22 @@ export default function FundiTracker({
                       </span>
                     </div>
                     {idx < progressSteps.length - 1 && (
-                      <div className={`flex-1 h-0.5 mb-3 mx-0.5 ${idx < currentStep ? "bg-primary" : "bg-muted"}`} />
+                      <div className={`flex-1 h-0.5 mb-3 ${idx < currentStep ? "bg-primary" : "bg-muted"}`} />
                     )}
-                  </div>
+                  </React.Fragment>
                 ))}
               </div>
             </div>
           )}
 
           <div className="px-6 pb-6 pt-4 space-y-4">
-            {/* Searching / Matching */}
+            {/* Searching / Matching state */}
             {["searching", "matching"].includes(status) && (
               <div className="space-y-3">
                 <p className="text-muted-foreground text-sm">{progressMsg}</p>
-                {searchRadiusKm && <p className="text-xs text-muted-foreground">Search radius: {searchRadiusKm} km</p>}
+                {searchRadiusKm && (
+                  <p className="text-xs text-muted-foreground">Search radius: {searchRadiusKm} km</p>
+                )}
                 <div className="flex gap-1.5 mt-2">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -538,7 +530,7 @@ export default function FundiTracker({
               </div>
             )}
 
-            {/* Failed */}
+            {/* Failed / cancelled */}
             {(status === "failed" || searchFailed) && (
               <div className="space-y-3">
                 <p className="text-destructive text-sm">{progressMsg}</p>
@@ -566,7 +558,9 @@ export default function FundiTracker({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{fundi.name}</p>
-                      {fundi.trustScore != null && <TrustBadge score={fundi.trustScore} size="sm" />}
+                      {fundi.trustScore != null && (
+                        <TrustBadge score={fundi.trustScore} size="sm" />
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">{fundi.skill}</p>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -579,6 +573,7 @@ export default function FundiTracker({
                     <button
                       onClick={() => setShowChat(true)}
                       className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                      aria-label="Open chat"
                     >
                       <MessageCircle className="w-5 h-5" />
                     </button>
@@ -595,34 +590,6 @@ export default function FundiTracker({
           </div>
         </div>
 
-        {/* ── Live Map ──────────────────────────────────────────────────── */}
-        {showMap && (
-          <div className="bg-card rounded-2xl shadow-md border border-border/50 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
-              <div className="flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-primary" />
-                <span className="font-semibold text-sm">Live Tracking</span>
-              </div>
-              {fundiLatLng && (
-                <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  Live
-                </span>
-              )}
-            </div>
-            <div className="h-56">
-              <GoogleMapTracker
-                fundiLocation={fundiLatLng}
-                customerLocation={customerLatLng}
-                fundiName={fundi?.name}
-                etaMinutes={etaMinutes}
-                distanceKm={fundi?.distanceKm}
-                jobStatus={status}
-              />
-            </div>
-          </div>
-        )}
-
         {/* ── OTP Confirmation ────────────────────────────────────────────── */}
         {status === "completed" && !completionConfirmed && (
           <div className="bg-card rounded-2xl p-6 shadow-md border border-border/50 space-y-4">
@@ -635,9 +602,11 @@ export default function FundiTracker({
                 <p className="text-xs text-muted-foreground">Step 1 of 2 — Verify with OTP</p>
               </div>
             </div>
+
             <p className="text-sm text-muted-foreground">
               Enter the 6-digit OTP sent to your email to confirm the fundi has completed the work.
             </p>
+
             <InputOTP maxLength={6} value={completionOtp} onChange={setCompletionOtp}>
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -651,15 +620,17 @@ export default function FundiTracker({
                 <InputOTPSlot index={5} />
               </InputOTPGroup>
             </InputOTP>
+
             <Button
               className="w-full bg-gradient-primary"
               onClick={handleConfirmCompletion}
               disabled={completionOtp.length < 4 || confirmingOtp}
             >
-              {confirmingOtp
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</>
-                : <><ShieldCheck className="w-4 h-4 mr-2" /> Confirm Completion</>
-              }
+              {confirmingOtp ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</>
+              ) : (
+                <><ShieldCheck className="w-4 h-4 mr-2" /> Confirm Completion</>
+              )}
             </Button>
           </div>
         )}
@@ -667,6 +638,7 @@ export default function FundiTracker({
         {/* ── Escrow Payment UI ──────────────────────────────────────────── */}
         {completionConfirmed && paymentStatus !== "confirmed" && (
           <div className="bg-card rounded-2xl shadow-md border border-border/50 overflow-hidden">
+            {/* Payment header */}
             <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-green-50 to-emerald-50 border-b border-green-100">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center">
@@ -677,16 +649,23 @@ export default function FundiTracker({
                   <p className="text-xs text-green-700">Step 2 of 2 — Secure escrow payment</p>
                 </div>
               </div>
+
+              {/* Amount */}
               {(paymentAmount ?? estimatedPrice) != null && (
                 <div className="bg-white rounded-xl p-4 border border-green-200">
                   <p className="text-xs text-gray-500 mb-1">Total Amount</p>
-                  <p className="text-3xl font-bold text-green-700">KES {(paymentAmount ?? estimatedPrice)!.toFixed(0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Held in secure escrow · Released to fundi after 24h</p>
+                  <p className="text-3xl font-bold text-green-700">
+                    KES {(paymentAmount ?? estimatedPrice)!.toFixed(0)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Held in secure escrow · Released to fundi after 24h
+                  </p>
                 </div>
               )}
             </div>
 
             <div className="px-6 py-5 space-y-4">
+              {/* How escrow works */}
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
                 <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
@@ -697,6 +676,7 @@ export default function FundiTracker({
                 </div>
               </div>
 
+              {/* Idle / failed — show phone input */}
               {(paymentStatus === "idle" || paymentStatus === "failed") && (
                 <div className="space-y-4">
                   {paymentStatus === "failed" && (
@@ -705,6 +685,7 @@ export default function FundiTracker({
                       <p className="text-xs text-red-700">{paymentMsg}</p>
                     </div>
                   )}
+
                   <div>
                     <label className="block text-sm font-semibold mb-2">M-Pesa Number</label>
                     <div className="relative">
@@ -720,6 +701,7 @@ export default function FundiTracker({
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">Enter the number linked to your M-Pesa account</p>
                   </div>
+
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-base font-semibold gap-2"
                     onClick={handlePayment}
@@ -727,6 +709,7 @@ export default function FundiTracker({
                     Pay KES {(paymentAmount ?? estimatedPrice ?? 0).toFixed(0)} Now
                     <ArrowRight className="w-4 h-4" />
                   </Button>
+
                   {paymentStatus === "failed" && (
                     <Button variant="ghost" className="w-full text-sm" onClick={handleRetryPayment}>
                       <RefreshCw className="w-4 h-4 mr-2" /> Try Again
@@ -735,6 +718,7 @@ export default function FundiTracker({
                 </div>
               )}
 
+              {/* Processing state */}
               {paymentStatus === "processing" && (
                 <div className="flex flex-col items-center gap-4 py-4">
                   <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
@@ -747,6 +731,7 @@ export default function FundiTracker({
                 </div>
               )}
 
+              {/* Initiated / polling state */}
               {paymentStatus === "initiated" && (
                 <div className="space-y-4">
                   <div className="flex flex-col items-center gap-3 py-2">
@@ -759,23 +744,32 @@ export default function FundiTracker({
                     <div className="text-center">
                       <p className="font-semibold text-base text-green-800">Check Your Phone</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        M-Pesa STK push sent to <strong>{mpesaNumber}</strong>
+                        An M-Pesa STK push has been sent to <strong>{mpesaNumber}</strong>
                       </p>
                     </div>
                   </div>
+
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
                     <p className="text-xs font-semibold text-green-800">How to complete payment:</p>
-                    {["Open your M-Pesa menu", "Look for the PataFundi prompt", "Enter your M-Pesa PIN"].map((step, i) => (
+                    {["Open your M-Pesa menu or M-Pesa app", "Look for the PataFundi payment prompt", "Enter your M-Pesa PIN to confirm"].map((step, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-green-700">
-                        <div className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center font-bold text-[10px] shrink-0">{i + 1}</div>
+                        <div className="w-4 h-4 rounded-full bg-green-200 text-green-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                          {i + 1}
+                        </div>
                         {step}
                       </div>
                     ))}
                   </div>
+
                   <p className="text-xs text-center text-muted-foreground">
-                    Waiting{paymentPollingCount > 0 ? ` (${paymentPollingCount * 5}s)` : ""}...
+                    Waiting for confirmation{paymentPollingCount > 0 ? ` (${paymentPollingCount * 5}s)` : ""}...
                   </p>
-                  <Button variant="outline" className="w-full text-sm" onClick={handleRetryPayment}>
+
+                  <Button
+                    variant="outline"
+                    className="w-full text-sm"
+                    onClick={handleRetryPayment}
+                  >
                     Didn't receive it? Try again
                   </Button>
                 </div>
@@ -784,9 +778,10 @@ export default function FundiTracker({
           </div>
         )}
 
-        {/* Payment Confirmed — Review */}
+        {/* ── Payment Confirmed ──────────────────────────────────────────── */}
         {paymentStatus === "confirmed" && !reviewSubmitted && fundi && (
           <div className="bg-card rounded-2xl p-6 shadow-md border border-border/50 space-y-5">
+            {/* Success banner */}
             <div className="flex flex-col items-center gap-2 pb-4 border-b border-border/50">
               <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -794,22 +789,30 @@ export default function FundiTracker({
               <p className="font-bold text-green-800 text-base">Payment Received!</p>
               <p className="text-xs text-muted-foreground text-center">{paymentMsg}</p>
             </div>
+
+            {/* Rate your fundi */}
             <h3 className="font-semibold text-lg">Rate Your Fundi</h3>
             <p className="text-muted-foreground text-sm -mt-2">How was your experience with {fundi.name}?</p>
+
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((r) => (
                 <button
                   key={r}
                   onClick={() => setReviewRating(r)}
-                  className={`flex-1 h-12 rounded-xl flex items-center justify-center transition-all ${r <= reviewRating ? "bg-yellow-400 text-white scale-105" : "bg-muted hover:bg-yellow-100"}`}
+                  className={`flex-1 h-12 rounded-xl flex items-center justify-center transition-all ${
+                    r <= reviewRating ? "bg-yellow-400 text-white scale-105" : "bg-muted text-muted-foreground hover:bg-yellow-100"
+                  }`}
+                  aria-label={`${r} star${r > 1 ? "s" : ""}`}
                 >
                   <Star className="w-5 h-5" fill={r <= reviewRating ? "currentColor" : "none"} />
                 </button>
               ))}
             </div>
-            <div className="flex justify-center text-sm font-medium text-yellow-600">
+
+            <div className="flex justify-center gap-1 text-sm font-medium text-yellow-600">
               {["Terrible", "Poor", "Okay", "Good", "Excellent"][reviewRating - 1]}
             </div>
+
             <textarea
               value={reviewComment}
               onChange={(e) => setReviewComment(e.target.value)}
@@ -818,20 +821,23 @@ export default function FundiTracker({
               rows={3}
               maxLength={500}
             />
+
             <Button className="w-full bg-gradient-primary h-12" onClick={handleSubmitReview}>
               Submit Review & Finish
             </Button>
           </div>
         )}
 
-        {/* Review submitted */}
+        {/* ── Review submitted ───────────────────────────────────────────── */}
         {reviewSubmitted && (
           <div className="bg-card rounded-2xl p-8 shadow-md border border-border/50 text-center space-y-3">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
               <ShieldCheck className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="font-semibold text-xl">All Done!</h3>
-            <p className="text-muted-foreground text-sm">Thank you for using PataFundi. Your review helps build a trusted community.</p>
+            <p className="text-muted-foreground text-sm">
+              Thank you for using PataFundi. Your review helps build a trusted community.
+            </p>
             <Button onClick={() => (window.location.href = "/dashboard")} className="bg-gradient-primary">
               Back to Dashboard
             </Button>
