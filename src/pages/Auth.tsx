@@ -332,7 +332,9 @@ const Auth = () => {
                   onClick={() => {
                     try {
                       localStorage.setItem("fundi_prefill", JSON.stringify({ fullName: formData.name, email: formData.email }));
-                    } catch {}
+                    } catch (e) {
+                      console.warn('Failed to save prefill:', e);
+                    }
                     navigate("/fundi/register");
                   }}
                 >

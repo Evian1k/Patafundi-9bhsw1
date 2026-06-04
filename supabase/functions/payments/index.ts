@@ -68,8 +68,10 @@ Deno.serve(async (req: Request) => {
     if (processMatch && req.method === 'POST') {
       const jobId = processMatch[1];
       const { mpesaNumber, paymentMethod = 'mpesa' } = await req.json();
+      const idempotencyKey = req.headers.get('Idempotency-Key');
 
       if (!mpesaNumber) return err('M-Pesa number required');
+      if (!idempotencyKey) return err('Idempotency-Key header required for payments', 400);
 
       const { data: job } = await db.from('jobs')
         .select('*')
@@ -79,13 +81,34 @@ Deno.serve(async (req: Request) => {
       if (!job) return err('Job not found', 404);
       if (!job.customer_completion_confirmed) return err('Please confirm job completion before paying', 400);
 
-      // Check for duplicate payment
+      // Check for idempotent resubmission
+      const { data: idempotent } = await db.from('payments')
+        .select('id, status, amount')
+        .eq('job_id', jobId)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      if (idempotent) {
+        // Already processed with this key, return cached response
+        return json({
+          message: 'Payment already initiated',
+          checkoutRequestId: 'cached_' + idempotent.id,
+          payment: { id: idempotent.id, status: idempotent.status, amount: idempotent.amount },
+        });
+      }
+
+      // CRITICAL: Check for duplicate payment with enhanced checks
       const { data: existing } = await db.from('payments')
         .select('id, status')
         .eq('job_id', jobId)
-        .in('status', ['completed', 'confirmed', 'processing'])
+        .not('status', 'in', '("failed","cancelled")')  // Allow only truly failed/cancelled
         .maybeSingle();
-      if (existing) return err('Payment already processed for this job', 409);
+      if (existing) {
+        return err(
+          `Payment already ${existing.status === 'processing' ? 'processing' : 'processed'} for this job. ` +
+          `Cannot initiate duplicate payment. Contact support if needed.`,
+          409
+        );
+      }
 
       const amount = Number(job.final_price || job.estimated_price || 0);
       if (amount <= 0) return err('Invalid payment amount. Please contact support.');
@@ -107,6 +130,7 @@ Deno.serve(async (req: Request) => {
         status: 'processing',
         escrow_status: 'pending',
         checkout_request_id: checkoutRequestId,
+        idempotency_key: idempotencyKey,  // ← ADDED: Track idempotency
       }).select().maybeSingle();
       if (payErr) return err(payErr.message, 400);
 
@@ -115,10 +139,35 @@ Deno.serve(async (req: Request) => {
       const mpesaApiKey = Deno.env.get('MPESA_CONSUMER_KEY');
       
       if (mpesaApiKey) {
-        // TODO: Real M-Pesa Daraja API integration
-        console.log(`[payments] Would send STK push to ${mpesaNumber} for KES ${amount}`);
+        // PRODUCTION: Real M-Pesa Daraja API integration
+        console.log(`[payments] CRITICAL: Real M-Pesa integration required!`);
+        console.log(`[payments] TODO: Send STK push to ${mpesaNumber} for KES ${amount}`);
+        
+        // TODO: Implement actual Daraja API call:
+        // 1. Get access token from Daraja
+        // 2. Call POST /mpesa/stkpush/v1/processrequest
+        // 3. Handle response with checkout_request_id
+        // 4. Daraja will callback to /payments/daraja-callback
+        // 5. Only update payment status on verified callback
+        
+        // For now, return error to prevent demo-mode payments in production
+        console.error(
+          '[SECURITY] M-Pesa Daraja API not fully implemented! ' +
+          'Payments cannot be processed. This is a critical blocker for production.'
+        );
+        
+        return err(
+          'M-Pesa payment processing is not yet fully configured for production. ' +
+          'Please contact support. Do not attempt to send money through the app yet.',
+          503
+        );
       } else {
-        // Demo mode: auto-confirm after short delay
+        // DEMO MODE: Auto-confirm after short delay (DEV ONLY!)
+        console.warn(
+          '[WARNING] Running in DEMO MODE. Payments will auto-confirm after 3 seconds. ' +
+          'This is NOT PRODUCTION READY!'
+        );
+        
         setTimeout(async () => {
           const receipt = mockMpesaReceipt();
           await db.from('payments').update({
@@ -130,15 +179,18 @@ Deno.serve(async (req: Request) => {
 
           await db.from('jobs').update({ payment_status: 'paid' }).eq('id', jobId);
 
-          // Bypass detection: check if payment came through platform
-          if (job.customer_completion_confirmed) {
-            await db.from('audit_logs').insert({
-              action: 'payment_received',
-              resource_type: 'payment',
-              resource_id: payment!.id,
-              details: { amount, receipt, jobId },
-            });
-          }
+          // Log demo payment
+          await db.from('audit_logs').insert({
+            action: 'demo_payment_auto_confirmed',  // ← Mark as DEMO
+            resource_type: 'payment',
+            resource_id: payment!.id,
+            details: { 
+              amount, 
+              receipt: '(DEMO) ' + receipt, 
+              jobId,
+              warning: 'This payment was auto-confirmed in demo mode and is NOT a real M-Pesa transaction'
+            },
+          });
         }, 3000);
       }
 
@@ -171,6 +223,128 @@ Deno.serve(async (req: Request) => {
             }
           : null,
       });
+    }
+
+    // POST /payments/daraja-callback - M-Pesa callback endpoint
+    // CRITICAL: This receives callbacks from M-Pesa Daraja API
+    if (fullPath === '/daraja-callback' && req.method === 'POST') {
+      const body = await req.json();
+      console.log('[payments/callback] Received M-Pesa callback:', body);
+
+      // SECURITY REQUIREMENT: Verify HMAC signature
+      const signature = req.headers.get('X-Signature');
+      const callbackTimestamp = req.headers.get('X-Timestamp');
+      const hmacKey = Deno.env.get('MPESA_CALLBACK_HMAC_KEY');
+
+      if (!signature || !hmacKey) {
+        console.error('[payments/callback] ❌ Missing signature or HMAC key - REJECTING CALLBACK');
+        return json({ error: 'Signature verification required' }, { status: 401 });
+      }
+
+      // TODO: Implement HMAC verification
+      // const verified = verifyMpesaSignature(body, signature, hmacKey);
+      // if (!verified) return json({ error: 'Invalid signature' }, { status: 401 });
+
+      // Extract payment details from M-Pesa callback
+      const checkoutRequestId = body.CheckoutRequestID || body.checkoutRequestId;
+      const resultCode = body.ResultCode || body.resultCode;  // 0 = success
+      const mpesaReceiptNumber = body.MpesaReceiptNumber || body.mpesaReceiptNumber;
+
+      if (!checkoutRequestId) {
+        return json({ error: 'Invalid callback format' }, { status: 400 });
+      }
+
+      // Find payment by checkout_request_id
+      const { data: payment } = await db
+        .from('payments')
+        .select('*')
+        .eq('checkout_request_id', checkoutRequestId)
+        .maybeSingle();
+
+      if (!payment) {
+        console.warn(`[payments/callback] Payment not found for checkout_request_id: ${checkoutRequestId}`);
+        return json({ error: 'Payment not found' }, { status: 404 });
+      }
+
+      if (resultCode === 0 || resultCode === '0') {
+        // SUCCESS: Payment confirmed by M-Pesa
+        console.log(`[payments/callback] ✅ Payment confirmed: ${mpesaReceiptNumber}`);
+
+        await db.from('payments').update({
+          status: 'completed',
+          mpesa_receipt_number: mpesaReceiptNumber,
+          escrow_status: 'held',
+          payout_approval_status: 'pending',
+          callback_received_at: new Date().toISOString(),
+        }).eq('id', payment.id);
+
+        // Mark job as paid
+        await db.from('jobs').update({ payment_status: 'paid' }).eq('id', payment.job_id);
+
+        // Log successful payment
+        await db.from('audit_logs').insert({
+          action: 'payment_verified_by_mpesa',
+          resource_type: 'payment',
+          resource_id: payment.id,
+          details: {
+            checkoutRequestId,
+            mpesaReceiptNumber,
+            amount: payment.amount,
+            jobId: payment.job_id,
+            verificationTime: callbackTimestamp,
+          },
+        });
+
+        // Notify fundi
+        await db.from('notifications').insert({
+          user_id: (
+            await db.from('fundis')
+              .select('user_id')
+              .eq('id', payment.fundi_id)
+              .maybeSingle()
+          ).data?.user_id,
+          title: 'Payment Received! 🎉',
+          body: `Customer paid KES ${payment.amount} for job. Fundi payout: KES ${payment.fundi_payout}`,
+          type: 'payment_received',
+          data: { paymentId: payment.id },
+        });
+
+        return json({ status: 'success', message: 'Payment confirmed and held in escrow' });
+      } else {
+        // FAILURE: Payment failed in M-Pesa
+        console.log(`[payments/callback] ❌ Payment failed with code: ${resultCode}`);
+
+        await db.from('payments').update({
+          status: 'failed',
+          escrow_status: 'released',
+          error_code: resultCode,
+          callback_received_at: new Date().toISOString(),
+        }).eq('id', payment.id);
+
+        // Log failed payment
+        await db.from('audit_logs').insert({
+          action: 'payment_failed_at_mpesa',
+          resource_type: 'payment',
+          resource_id: payment.id,
+          details: {
+            checkoutRequestId,
+            resultCode,
+            amount: payment.amount,
+            jobId: payment.job_id,
+          },
+        });
+
+        // Notify customer
+        await db.from('notifications').insert({
+          user_id: payment.customer_id,
+          title: 'Payment Failed',
+          body: 'Your M-Pesa payment was declined. Please try again.',
+          type: 'payment_failed',
+          data: { paymentId: payment.id },
+        });
+
+        return json({ status: 'failed', message: 'Payment failed - customer notified' });
+      }
     }
 
     return err('Route not found', 404);

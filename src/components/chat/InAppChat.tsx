@@ -45,9 +45,59 @@ export default function InAppChat({ messages, onSend, onClose, currentUserId }: 
     inputRef.current?.focus();
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
+
+    // FRAUD PREVENTION: Detect bypass attempts
+    const bypassPatterns = [
+      /(?:\+?254|0)?\d{9,12}|(\d{3}[-.]?\d{3}[-.]?\d{4})/,  // Phone numbers
+      /https?:\/\/|www\.|\.com|\.co\.ke|bit\.ly|tinyurl/i,  // URLs
+      /wa\.me|whatsapp|signal|telegram|viber/i,  // External messaging
+      /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,  // Email addresses
+      /\bm-pesa\b|\bmpesa\b|\bdaraja\b|\bpaybill\b/i,  // M-Pesa keywords
+      /\bdirect pay\b|\bpay directly\b|\bskip.*app\b/i,  // Direct payment offers
+      /\bcash\b|\bhard cash\b|\bphysical.*money\b/i,  // Cash offers
+      /\boff.{0,3}platform\b|\bnot.*app\b|\bwithout.*app\b/i,  // Off-platform requests
+      /\*\d+\*|USSD|\*150\*|#100#/,  // USSD codes
+    ];
+
+    const containsBypass = bypassPatterns.some(pattern => pattern.test(text));
+
+    if (containsBypass) {
+      // Log bypass attempt for fraud investigation
+      try {
+        await fetch('/api/fraud-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'chat_bypass_attempt',
+            messagePreview: text.substring(0, 100),
+            userId: currentUserId,
+          }),
+        }).catch(e => console.warn('[chat] Could not report bypass:', e));
+      } catch (e) {
+        console.warn('[chat] Fraud reporting unavailable:', e);
+      }
+
+      // Show warning to user
+      const warning = text.includes('+254') || text.includes('0712')
+        ? 'Phone numbers cannot be shared. For your safety, all transactions must happen through PataFundi.'
+        : text.match(/wa\.me|whatsapp/i)
+        ? 'WhatsApp links are not allowed. Keep all communication in the app for protection.'
+        : text.match(/cash|direct.*pay/i)
+        ? 'Off-platform payments are not protected. Use the app to ensure both parties are safe.'
+        : 'We detected a possible attempt to move the conversation outside PataFundi. ' +
+          'All transactions must happen through the app for your protection. This attempt has been reported.';
+
+      // Show toast error
+      const event = new CustomEvent('show-toast', {
+        detail: { type: 'error', message: warning },
+      });
+      window.dispatchEvent(event);
+      return;
+    }
+
     onSend(text);
     setInput('');
   };

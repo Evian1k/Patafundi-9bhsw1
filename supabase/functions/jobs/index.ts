@@ -178,7 +178,7 @@ Deno.serve(async (req: Request) => {
       const jobId = completeMatch[1];
       const { data: fundi } = await db.from('fundis').select('id').eq('user_id', authUser.id).maybeSingle();
       let finalPrice: number | undefined;
-      let photoUrls: string[] = [];
+      const photoUrls: string[] = [];
 
       const contentType = req.headers.get('content-type') || '';
       if (contentType.includes('multipart/form-data')) {
