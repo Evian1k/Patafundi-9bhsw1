@@ -575,19 +575,19 @@ npm audit --audit-level=moderate
 
 ### Backend Architecture
 - **Type**: Deno Edge Functions
-- **Platform**: OnSpace Cloud
+- **Platform**: PataFundi-owned infrastructure
 - **Database**: Supabase PostgreSQL
 - **Auth**: Supabase Auth + JWT
 - **Storage**: Supabase Storage (S3-like)
 
 ### API Base URL
 ```
-https://rootjhvyvhrdummdroot.backend.onspace.ai/functions/v1
+https://api.patafundi.com
 ```
 
 ### Environment Variables Needed
 ```
-VITE_API_URL=https://rootjhvyvhrdummdroot.backend.onspace.ai/functions/v1
+VITE_API_URL=https://api.patafundi.com
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...

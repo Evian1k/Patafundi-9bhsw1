@@ -260,7 +260,7 @@ Payment Flow:
 **Total**: 10-15 developer days
 
 ### Infrastructure
-- Current: OnSpace Cloud (Deno Edge Functions)
+- Current: PataFundi-owned backend (migration required from Deno Edge Functions)
 - Staging: Additional $50-100/month
 - Production: Estimated $200-500/month at scale
 
