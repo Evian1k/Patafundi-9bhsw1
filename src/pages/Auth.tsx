@@ -308,8 +308,9 @@ const Auth = () => {
                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">Demo accounts:</span><br />
-                    Customer: <code className="text-primary">demo@patafundi.com</code> / <code className="text-primary">Demo12345</code><br />
-                    Fundi: <code className="text-primary">fundi@patafundi.com</code> / <code className="text-primary">Fundi12345</code>
+                    Customer: <code className="text-primary">demo@patafundi.com</code> / <code className="text-primary">Demo@2024!</code><br />
+                    Fundi: <code className="text-primary">fundi@patafundi.com</code> / <code className="text-primary">Fundi@2024!</code><br />
+                    Admin: <code className="text-primary">admin@patafundi.com</code> / <code className="text-primary">Admin@2024!</code>
                   </p>
                 </div>
               )}

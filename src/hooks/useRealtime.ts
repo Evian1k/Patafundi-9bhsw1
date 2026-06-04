@@ -1,161 +1,166 @@
-import { useEffect, useState } from 'react';
-import { realtimeService } from '@/services/realtime';
-import { toast } from 'sonner';
-
 /**
- * Hook for real-time job requests on the Fundi dashboard.
- * Uses correct backend event names.
+ * useRealtime — polling-based realtime hook for PataFundi
+ * Compatible with the polling RealtimeService
  */
-export function useJobRequest() {
-  const [jobRequest, setJobRequest] = useState<Record<string, unknown> | null>(null);
-  const [remaining, setRemaining] = useState(0);
 
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { realtimeService } from '@/services/realtime';
+import { apiClient } from '@/lib/api';
+import { env } from '@/config/env';
+
+interface JobRequest {
+  jobId: string;
+  customerName: string;
+  serviceCategory: string;
+  location: string;
+  estimatedPrice?: number;
+  urgency?: string;
+  distanceKm?: number;
+}
+
+interface UseJobRequestReturn {
+  jobRequest: JobRequest | null;
+  remaining: number;
+  acceptJob: (jobId: string) => Promise<void>;
+  declineJob: (jobId: string) => Promise<void>;
+}
+
+export function useJobRequest(): UseJobRequestReturn {
+  const [jobRequest, setJobRequest] = useState<JobRequest | null>(null);
+  const [remaining, setRemaining] = useState(60);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
+
+  const clearPoll = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
+
+  // Poll for pending jobs assigned to this fundi
   useEffect(() => {
-    let interval: number | null = null;
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
 
-    const clearCountdown = () => {
-      if (interval != null) { window.clearInterval(interval); interval = null; }
+    const poll = async () => {
+      try {
+        const res = await apiClient.getFundiActiveJob() as { job?: Record<string, unknown> | null };
+        const job = res?.job;
+        if (job && job.status === 'pending' && !jobRequest) {
+          setJobRequest({
+            jobId: job.id as string,
+            customerName: (job.customer_name as string) || 'Customer',
+            serviceCategory: job.service_category as string,
+            location: (job.location_name as string) || 'Unknown location',
+            estimatedPrice: job.estimated_price ? Number(job.estimated_price) : undefined,
+            urgency: job.urgency as string,
+          });
+          setRemaining(60);
+        }
+      } catch { /* ignore */ }
     };
 
-    const handleJobRequest = (data: Record<string, unknown>) => {
-      console.log('[useJobRequest] job:request received:', data);
-      setJobRequest(data);
-      if (data.expiresAt) {
-        clearCountdown();
-        const expiryTime = new Date(data.expiresAt as string).getTime();
-        interval = window.setInterval(() => {
-          const diff = Math.max(0, Math.floor((expiryTime - Date.now()) / 1000));
-          setRemaining(diff);
-          if (diff === 0) clearCountdown();
-        }, 500);
-      } else {
-        setRemaining(0);
-      }
-    };
+    pollRef.current = setInterval(poll, 5000);
+    return () => clearPoll();
+  }, [jobRequest]);
 
-    const handleResponseOk = (data: Record<string, unknown>) => {
-      if (!data?.jobId) return;
-      if (data.accepted) toast.success('Job accepted!');
-      else toast('Response recorded');
+  // Countdown timer
+  useEffect(() => {
+    if (!jobRequest) { clearTimer(); return; }
+    timerRef.current = setInterval(() => {
+      setRemaining((r) => {
+        if (r <= 1) {
+          clearTimer();
+          setJobRequest(null);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return clearTimer;
+  }, [jobRequest]);
+
+  const acceptJob = useCallback(async (jobId: string) => {
+    try {
+      await apiClient.acceptJob(jobId);
       setJobRequest(null);
-      clearCountdown();
-    };
-
-    const handleResponseFailed = (data: Record<string, unknown>) => {
-      toast.error((data?.message as string) || 'Could not accept job');
-    };
-
-    const handleJobAccepted = () => {
-      setJobRequest(null);
-      clearCountdown();
-    };
-
-    const handleJobDeclined = () => {
-      setJobRequest(null);
-      clearCountdown();
-    };
-
-    realtimeService.on('job:request', handleJobRequest);
-    realtimeService.on('job:request:declined', handleJobDeclined);
-    realtimeService.on('fundi:response:ok', handleResponseOk);
-    realtimeService.on('fundi:response:failed', handleResponseFailed);
-    realtimeService.on('job:accepted', handleJobAccepted);
-
-    return () => {
-      clearCountdown();
-      realtimeService.off('job:request', handleJobRequest);
-      realtimeService.off('job:request:declined', handleJobDeclined);
-      realtimeService.off('fundi:response:ok', handleResponseOk);
-      realtimeService.off('fundi:response:failed', handleResponseFailed);
-      realtimeService.off('job:accepted', handleJobAccepted);
-    };
+      clearTimer();
+    } catch (e) {
+      console.error('[useJobRequest] acceptJob error:', e);
+    }
   }, []);
 
-  const acceptJob = (jobId: string) => { realtimeService.respondToJobRequest(jobId, true); };
-  const declineJob = (jobId: string) => {
-    realtimeService.respondToJobRequest(jobId, false);
-    setJobRequest(null);
-    setRemaining(0);
-  };
+  const declineJob = useCallback(async (jobId: string) => {
+    try {
+      await apiClient.cancelJob(jobId, 'Fundi declined');
+      setJobRequest(null);
+      clearTimer();
+    } catch (e) {
+      console.error('[useJobRequest] declineJob error:', e);
+    }
+  }, []);
 
   return { jobRequest, remaining, acceptJob, declineJob };
 }
 
-/**
- * Hook for in-app job chat.
- */
-export function useJobChat(jobId: string | null) {
-  const [messages, setMessages] = useState<Record<string, unknown>[]>([]);
+interface UseJobTrackingReturn {
+  status: string;
+  updatedAt: string | null;
+  loading: boolean;
+  refresh: () => void;
+}
 
-  useEffect(() => {
-    if (!jobId) return;
-    const handleMessage = (data: Record<string, unknown>) => {
-      if (data.jobId === jobId) {
-        setMessages((prev) => [...prev, data.message as Record<string, unknown>]);
+export function useJobTracking(jobId: string | undefined): UseJobTrackingReturn {
+  const [status, setStatus] = useState('pending');
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetch = useCallback(async () => {
+    if (!jobId) { setLoading(false); return; }
+    try {
+      const res = await apiClient.getJobStatus(jobId) as { status?: string; updatedAt?: string };
+      if (res?.status) {
+        setStatus(res.status);
+        setUpdatedAt(res.updatedAt || null);
       }
-    };
-    realtimeService.on('chat:message', handleMessage);
-    return () => { realtimeService.off('chat:message', handleMessage); };
+    } catch { /* ignore */ } finally {
+      setLoading(false);
+    }
   }, [jobId]);
-
-  const sendMessage = (content: string) => {
-    if (jobId) realtimeService.sendMessage(jobId, content);
-  };
-
-  return { messages, sendMessage };
-}
-
-/**
- * Hook for tracking real-time payment status.
- */
-export function usePaymentStatus(jobId: string | null) {
-  const [status, setStatus] = useState<'idle' | 'processing' | 'confirmed' | 'failed'>('idle');
-  const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
 
   useEffect(() => {
     if (!jobId) return;
+    fetch();
 
-    const onConfirmed = (data: Record<string, unknown>) => {
-      if (data?.jobId !== jobId) return;
-      setStatus('confirmed');
-      setReceiptNumber((data.receiptNumber as string) ?? null);
+    // Also watch with realtime service
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      realtimeService.connect(token);
+      realtimeService.watchJob(jobId, env.API_URL);
+    }
+
+    const onStatus = (data: Record<string, unknown>) => {
+      if (data.status) setStatus(data.status as string);
     };
+    realtimeService.on('job:status', onStatus);
+    realtimeService.on('job:accepted', onStatus);
+    realtimeService.on('job:completed', onStatus);
+    realtimeService.on('job:cancelled', onStatus);
 
-    const onFailed = (data: Record<string, unknown>) => {
-      if (data?.jobId !== jobId) return;
-      setStatus('failed');
-    };
-
-    realtimeService.on('payment:confirmed', onConfirmed);
-    realtimeService.on('payment:failed', onFailed);
+    pollRef.current = setInterval(fetch, 8000);
 
     return () => {
-      realtimeService.off('payment:confirmed', onConfirmed);
-      realtimeService.off('payment:failed', onFailed);
+      if (pollRef.current) clearInterval(pollRef.current);
+      realtimeService.off('job:status', onStatus);
+      realtimeService.off('job:accepted', onStatus);
+      realtimeService.off('job:completed', onStatus);
+      realtimeService.off('job:cancelled', onStatus);
+      realtimeService.stopWatchingJob(jobId);
     };
-  }, [jobId]);
+  }, [jobId, fetch]);
 
-  return { paymentStatus: status, receiptNumber };
-}
-
-/**
- * Hook for payout status updates (fundi side).
- */
-export function usePayoutStatus() {
-  const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    const onProcessing = () => setPayoutStatus('processing');
-    const onCompleted = () => setPayoutStatus('completed');
-
-    realtimeService.on('payout:processing', onProcessing);
-    realtimeService.on('payout:completed', onCompleted);
-
-    return () => {
-      realtimeService.off('payout:processing', onProcessing);
-      realtimeService.off('payout:completed', onCompleted);
-    };
-  }, []);
-
-  return { payoutStatus };
+  return { status, updatedAt, loading, refresh: fetch };
 }

@@ -1,6 +1,6 @@
 /**
- * API Client for PataFundi Backend
- * Production-hardened: graceful degradation, automatic retry, no crash on missing env.
+ * API Client for PataFundi — OnSpace Cloud Backend
+ * All routes map to Edge Functions at /functions/v1/{function}/{path}
  */
 
 import { env, isApiConfigured } from '@/config/env';
@@ -8,7 +8,6 @@ import { env, isApiConfigured } from '@/config/env';
 export class ApiError extends Error {
   status: number;
   meta?: unknown;
-
   constructor(message: string, status = 0, meta?: unknown) {
     super(message);
     this.name = 'ApiError';
@@ -17,11 +16,31 @@ export class ApiError extends Error {
   }
 }
 
-// Generic user-facing message — never expose env var names
-const UNCONFIGURED_MSG = 'This feature is temporarily unavailable. Please try again later.';
+const UNAVAILABLE_MSG = 'Service temporarily unavailable. Please try again.';
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Map legacy /auth/*, /users/*, /jobs/*, etc. paths
+ * to OnSpace Cloud edge function URLs.
+ *
+ * Edge functions are deployed at:
+ *   {BASE}/auth{rest}
+ *   {BASE}/users{rest}
+ *   {BASE}/fundi{rest}
+ *   {BASE}/jobs{rest}
+ *   {BASE}/payments{rest}
+ *   {BASE}/disputes{rest}
+ *   {BASE}/admin{rest}
+ *   {BASE}/subscriptions{rest}
+ *   {BASE}/notifications{rest}
+ */
+function buildUrl(endpoint: string): string {
+  const base = env.API_URL.replace(/\/$/, '');
+  // endpoint already starts with /auth, /users, /jobs, etc.
+  return `${base}${endpoint}`;
 }
 
 class ApiClient {
@@ -39,80 +58,68 @@ class ApiClient {
     }
   }
 
-  getHeaders(includeAuth = true): Record<string, string> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (includeAuth && this.token) headers['Authorization'] = `Bearer ${this.token}`;
-    return headers;
+  private getHeaders(includeAuth = true): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (includeAuth && this.token) h['Authorization'] = `Bearer ${this.token}`;
+    return h;
   }
 
   async request(
     endpoint: string,
-    options: Record<string, unknown> = {},
-    retries = 2,
+    options: RequestInit & { includeAuth?: boolean } = {},
+    retries = 1,
   ): Promise<unknown> {
-    if (!isApiConfigured()) {
-      throw new ApiError(UNCONFIGURED_MSG, 0);
-    }
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
 
-    const url = `${env.API_URL}${endpoint}`;
+    const { includeAuth = true, ...fetchOpts } = options;
+    const url = buildUrl(endpoint);
+
     const config: RequestInit = {
-      ...(options as RequestInit),
+      ...fetchOpts,
       headers: {
-        ...this.getHeaders((options.includeAuth as boolean) !== false),
-        ...(options.headers as Record<string, string> ?? {}),
+        ...this.getHeaders(includeAuth),
+        ...(fetchOpts.headers as Record<string, string> ?? {}),
       },
     };
 
-    if (
-      config.body &&
-      typeof config.body === 'object' &&
-      !(config.body instanceof FormData)
-    ) {
+    if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
       config.body = JSON.stringify(config.body);
+    }
+    // Remove Content-Type for FormData (browser sets it with boundary)
+    if (config.body instanceof FormData) {
+      delete (config.headers as Record<string, string>)['Content-Type'];
     }
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       let response: Response;
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+        const tId = setTimeout(() => controller.abort(), 30_000);
         response = await fetch(url, { ...config, signal: controller.signal });
-        clearTimeout(timeoutId);
+        clearTimeout(tId);
       } catch (e) {
         if ((e as Error)?.name === 'AbortError') {
-          if (attempt < retries) { await sleep(1000 * 2 ** attempt); continue; }
+          if (attempt < retries) { await sleep(1000); continue; }
           throw new ApiError('Request timed out. Please check your connection.', 0);
         }
-        const msg = e instanceof Error ? e.message : 'Network error';
-        if (attempt < retries && !msg.includes('Failed to fetch')) {
-          await sleep(1000 * 2 ** attempt);
-          continue;
-        }
+        if (attempt < retries) { await sleep(1000 * 2 ** attempt); continue; }
         throw new ApiError('Unable to connect. Please check your internet connection.', 0);
       }
 
-      // Retry on 5xx
       if (response.status >= 500 && attempt < retries) {
         await sleep(1000 * 2 ** attempt);
         continue;
       }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: response.statusText })) as {
-          message?: string;
-          meta?: unknown;
-        };
-        throw new ApiError(
-          error?.message || response.statusText || 'Request failed',
-          response.status,
-          error?.meta,
-        );
+        const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+        throw new ApiError(errorBody?.message || response.statusText || 'Request failed', response.status);
       }
 
       return response.json();
     }
 
-    throw new ApiError('Unable to complete request. Please try again.', 0);
+    throw new ApiError(UNAVAILABLE_MSG, 0);
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -162,8 +169,8 @@ class ApiClient {
   }
 
   // ── User / Settings ──────────────────────────────────────────────────────
-  async updateMe({ fullName = null, phone = null }: { fullName?: string | null; phone?: string | null } = {}) {
-    return this.request('/users/me', { method: 'PUT', body: JSON.stringify({ fullName, phone }) });
+  async updateMe(payload: { fullName?: string | null; phone?: string | null } = {}) {
+    return this.request('/users/me', { method: 'PUT', body: JSON.stringify(payload) });
   }
 
   async getUserSettings() { return this.request('/users/settings'); }
@@ -173,18 +180,6 @@ class ApiClient {
   }
 
   async getSavedPlaces() { return this.request('/users/saved-places'); }
-
-  async addSavedPlace(place: Record<string, unknown>) {
-    return this.request('/users/saved-places', { method: 'POST', body: JSON.stringify(place) });
-  }
-
-  async updateSavedPlace(id: string, updates: Record<string, unknown>) {
-    return this.request(`/users/saved-places/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
-  }
-
-  async deleteSavedPlace(id: string) {
-    return this.request(`/users/saved-places/${id}`, { method: 'DELETE' });
-  }
 
   async changePassword(currentPassword: string, newPassword: string) {
     return this.request('/users/change-password', {
@@ -198,39 +193,27 @@ class ApiClient {
 
   // ── Fundi ────────────────────────────────────────────────────────────────
   async submitFundiRegistration(formData: FormData) {
-    if (!isApiConfigured()) throw new ApiError(UNCONFIGURED_MSG, 0);
-    const url = `${env.API_URL}/fundi/register`;
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 90_000);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.token ?? ''}` },
-        body: formData,
-        signal: controller.signal,
-      });
-    } catch (e) {
-      if ((e as Error)?.name === 'AbortError') throw new Error('Registration timed out. Please try again.');
-      throw e;
-    } finally { clearTimeout(t); }
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
+    const url = buildUrl('/fundi/register');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.token ?? ''}` },
+      body: formData,
+    });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-      throw new Error(error.message || 'Registration failed');
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new Error(e.message || 'Registration failed');
     }
     return response.json();
   }
 
   async getFundiProfile() { return this.request('/fundi/profile'); }
   async getFundiApprovalStatus() { return this.request('/fundi/approval-status'); }
-
   async updateFundiProfile(data: Record<string, unknown>) {
     return this.request('/fundi/profile', { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  async getFundi(fundiId: string) {
-    return this.request(`/fundi/${fundiId}`, { includeAuth: false });
-  }
+  async getFundi(fundiId: string) { return this.request(`/fundi/${fundiId}`, { includeAuth: false }); }
 
   async searchFundis(latitude: number, longitude: number, skill: string | null = null) {
     let endpoint = `/fundi/search?latitude=${latitude}&longitude=${longitude}`;
@@ -307,19 +290,19 @@ class ApiClient {
   }
 
   async completeJob(jobId: string, finalPrice: string | number, photos: File[] = []) {
-    if (!isApiConfigured()) throw new ApiError(UNCONFIGURED_MSG, 0);
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
     const formData = new FormData();
     formData.append('finalPrice', String(finalPrice));
     photos.forEach((photo) => formData.append('photos', photo));
-    const url = `${env.API_URL}/jobs/${jobId}/complete`;
+    const url = buildUrl(`/jobs/${jobId}/complete`);
     const response = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.token ?? ''}` },
       body: formData,
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-      throw new Error(error.message || 'Job completion failed');
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new Error(e.message || 'Job completion failed');
     }
     return response.json();
   }
@@ -328,6 +311,16 @@ class ApiClient {
     return this.request(`/jobs/${jobId}/confirm-completion`, {
       method: 'POST', body: JSON.stringify({ otp }),
     });
+  }
+
+  async submitReview(jobId: string, rating: number, comment: string) {
+    return this.request(`/jobs/${jobId}/review`, {
+      method: 'POST', body: JSON.stringify({ rating, comment }),
+    });
+  }
+
+  async getReviewsForFundi(fundiId: string, limit = 10, offset = 0) {
+    return this.request(`/fundi/${fundiId}/reviews?limit=${limit}&offset=${offset}`, { includeAuth: false });
   }
 
   // ── Payments ─────────────────────────────────────────────────────────────
@@ -340,17 +333,6 @@ class ApiClient {
   }
 
   async getEscrowStatus(jobId: string) { return this.request(`/payments/escrow/${jobId}`); }
-
-  // ── Reviews ──────────────────────────────────────────────────────────────
-  async submitReview(jobId: string, rating: number, comment: string) {
-    return this.request(`/jobs/${jobId}/review`, {
-      method: 'POST', body: JSON.stringify({ rating, comment }),
-    });
-  }
-
-  async getReviewsForFundi(fundiId: string, limit = 10, offset = 0) {
-    return this.request(`/fundi/${fundiId}/reviews?limit=${limit}&offset=${offset}`, { includeAuth: false });
-  }
 
   // ── Disputes ─────────────────────────────────────────────────────────────
   async openDispute(jobId: string, reason: string, evidenceUrls: string[] = []) {
@@ -367,62 +349,105 @@ class ApiClient {
   async getAdminDisputes(page = 1, status?: string) {
     let endpoint = `/admin/disputes?page=${page}`;
     if (status) endpoint += `&status=${status}`;
-    return this.request(endpoint, { includeAuth: true });
+    return this.request(endpoint);
   }
 
   async resolveDispute(disputeId: string, resolution: string, refundAmount?: number) {
     return this.request(`/admin/disputes/${disputeId}/resolve`, {
-      method: 'POST',
-      body: JSON.stringify({ resolution, refundAmount }),
-      includeAuth: true,
+      method: 'POST', body: JSON.stringify({ resolution, refundAmount }),
     });
   }
 
   async uploadDisputeEvidence(disputeId: string, formData: FormData) {
-    if (!isApiConfigured()) throw new ApiError(UNCONFIGURED_MSG, 0);
-    const url = `${env.API_URL}/disputes/${disputeId}/evidence`;
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 60_000);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.token ?? ''}` },
-        body: formData,
-        signal: controller.signal,
-      });
-    } catch (e) {
-      if ((e as Error)?.name === 'AbortError') throw new ApiError('Upload timed out.', 0);
-      throw new ApiError('Upload failed. Check your connection.', 0);
-    } finally { clearTimeout(t); }
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
+    const url = buildUrl(`/disputes/${disputeId}/evidence`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.token ?? ''}` },
+      body: formData,
+    });
     if (!response.ok) {
-      const err = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-      throw new ApiError(err.message || 'Upload failed', response.status);
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new ApiError(e.message || 'Upload failed', response.status);
     }
     return response.json();
   }
 
   // ── Admin ────────────────────────────────────────────────────────────────
-  async getBypassAlerts(page = 1, limit = 20) {
-    return this.request(`/admin/bypass-alerts?page=${page}&limit=${limit}`, { includeAuth: true });
+  async getAdminStats() { return this.request('/admin/dashboard'); }
+
+  async getAdminFundis(page = 1, status = 'pending') {
+    return this.request(`/admin/fundis?page=${page}&status=${status}`);
   }
 
-  async getTrustScores(page = 1, limit = 20) {
-    return this.request(`/admin/trust-scores?page=${page}&limit=${limit}`, { includeAuth: true });
+  async approveFundi(fundiId: string) {
+    return this.request(`/admin/fundis/${fundiId}/approve`, { method: 'POST' });
+  }
+
+  async rejectFundi(fundiId: string, reason?: string) {
+    return this.request(`/admin/fundis/${fundiId}/reject`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getAdminCustomers(page = 1) {
+    return this.request(`/admin/customers?page=${page}`);
+  }
+
+  async getAdminJobs(page = 1, status?: string) {
+    let endpoint = `/admin/jobs?page=${page}`;
+    if (status) endpoint += `&status=${status}`;
+    return this.request(endpoint);
+  }
+
+  async getAdminPayments(page = 1) {
+    return this.request(`/admin/payments?page=${page}`);
+  }
+
+  async getBypassAlerts(page = 1) {
+    return this.request(`/admin/bypass-alerts?page=${page}`);
+  }
+
+  async getTrustScores(page = 1) {
+    return this.request(`/admin/trust-scores?page=${page}`);
   }
 
   async getEscrowQueue(page = 1) {
-    return this.request(`/admin/escrow-queue?page=${page}`, { includeAuth: true });
+    return this.request(`/admin/escrow-queue?page=${page}`);
   }
 
   async releaseEscrow(jobId: string) {
-    return this.request(`/admin/escrow/${jobId}/release`, { method: 'POST', includeAuth: true });
+    return this.request(`/admin/escrow/${jobId}/release`, { method: 'POST' });
   }
 
   async freezeEscrow(jobId: string, reason: string) {
     return this.request(`/admin/escrow/${jobId}/freeze`, {
-      method: 'POST', body: JSON.stringify({ reason }), includeAuth: true,
+      method: 'POST', body: JSON.stringify({ reason }),
     });
+  }
+
+  async getAdminAuditLogs() { return this.request('/admin/audit-logs'); }
+
+  async getAdminAnalytics(days = 30) {
+    return this.request(`/admin/reports/analytics?days=${days}`);
+  }
+
+  async getSecurityOverview() { return this.request('/admin/security/overview'); }
+
+  // Admin verifyAdminToken compat shim (was server-side check in old backend)
+  async verifyAdminToken() {
+    return this.getCurrentUser();
+  }
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  async getNotifications() { return this.request('/notifications'); }
+
+  async markNotificationRead(id: string) {
+    return this.request(`/notifications/${id}/read`, { method: 'PATCH' });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request('/notifications/read-all', { method: 'PATCH' });
   }
 }
 

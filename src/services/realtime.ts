@@ -1,144 +1,144 @@
 /**
- * Real-time Socket Service (Socket.IO)
- * Production-hardened: graceful degradation, no duplicate sockets,
- * correct event names aligned with backend, clean teardown.
- *
- * Backend-aligned events:
- * job:accepted, job:request:declined, job:search:failed, job:matching,
- * job:matched, job:status, job:cancelled, job:completed,
- * fundi:location, payment:confirmed, payment:failed,
- * payout:processing, payout:completed,
- * dispute:opened, dispute:resolved,
- * trust:updated, review:submitted,
- * subscription:active,
- * fundi:response:ok, fundi:response:failed,
- * chat:message
+ * PataFundi Realtime Service
+ * 
+ * OnSpace Cloud does not support Socket.IO.
+ * This service uses polling + event emitter pattern to maintain
+ * interface compatibility with the existing codebase.
  */
 
-import { io, Socket } from 'socket.io-client';
-import { env, isSocketConfigured } from '@/config/env';
+type EventCallback = (data: Record<string, unknown>) => void;
 
 class RealtimeService {
-  socket: Socket | null = null;
-  token: string | null = null;
-  listeners: Map<string, Set<Function>> = new Map();
-  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private listeners: Map<string, EventCallback[]> = new Map();
+  private pollIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private currentJobId: string | null = null;
+  private _token: string | null = null;
+  private isConnected = false;
 
-  connect(token: string) {
-    // If already connected with the same token — do nothing
-    if (this.socket?.connected && this.token === token) return;
+  connect(token: string): void {
+    this._token = token;
+    this.isConnected = true;
+    console.info('[Realtime] Connected via polling mode');
+  }
 
-    // Disconnect stale socket
-    if (this.socket) {
-      this.socket.offAny();
-      this.socket.disconnect();
-      this.socket = null;
-    }
+  disconnect(): void {
+    this._token = null;
+    this.isConnected = false;
+    this.stopAllPolling();
+    console.info('[Realtime] Disconnected');
+  }
 
-    if (!isSocketConfigured()) {
-      console.warn('[realtime] VITE_SOCKET_URL is not set — real-time features disabled.');
-      return;
-    }
+  on(event: string, callback: EventCallback): void {
+    if (!this.listeners.has(event)) this.listeners.set(event, []);
+    this.listeners.get(event)!.push(callback);
+  }
 
-    this.token = token;
-    this.socket = io(env.SOCKET_URL, {
-      auth: { token },
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10_000,
-      reconnectionAttempts: 15,
-      transports: ['websocket', 'polling'],
-      timeout: 20_000,
+  off(event: string, callback: EventCallback): void {
+    const cbs = this.listeners.get(event) || [];
+    this.listeners.set(event, cbs.filter((cb) => cb !== callback));
+  }
+
+  emit(event: string, data: Record<string, unknown>): void {
+    const cbs = this.listeners.get(event) || [];
+    cbs.forEach((cb) => {
+      try { cb(data); } catch (e) { console.error(`[Realtime] Error in ${event} handler:`, e); }
     });
+  }
 
-    this.socket.on('connect', () => {
-      console.log('[realtime] Connected:', this.socket!.id);
-      this.socket!.emit('auth:token', token);
-      if (this.reconnectTimeout) {
-        clearTimeout(this.reconnectTimeout);
-        this.reconnectTimeout = null;
+  /**
+   * Poll a job's status and emit socket-compatible events when status changes.
+   */
+  watchJob(jobId: string, apiBaseUrl: string): void {
+    if (this.pollIntervals.has(`job:${jobId}`)) return;
+    this.currentJobId = jobId;
+    let lastStatus: string | null = null;
+    let lastPaymentStatus: string | null = null;
+
+    const poll = async () => {
+      if (!this._token) return;
+      try {
+        const [jobRes, payRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/jobs/${jobId}`, {
+            headers: { Authorization: `Bearer ${this._token}` },
+          }).then((r) => r.json()).catch(() => null),
+          fetch(`${apiBaseUrl}/payments/job/${jobId}`, {
+            headers: { Authorization: `Bearer ${this._token}` },
+          }).then((r) => r.json()).catch(() => null),
+        ]);
+
+        const job = jobRes?.job;
+        const payment = payRes?.payment;
+
+        if (job) {
+          // Emit status changes
+          if (lastStatus !== null && lastStatus !== job.status) {
+            const eventMap: Record<string, string> = {
+              accepted: 'job:accepted',
+              on_the_way: 'job:status',
+              arrived: 'job:status',
+              in_progress: 'job:status',
+              completed: 'job:completed',
+              cancelled: 'job:cancelled',
+              failed: 'job:search:failed',
+            };
+            const evt = eventMap[job.status];
+            if (evt) {
+              this.emit(evt, {
+                jobId,
+                status: job.status,
+                estimatedPrice: job.estimated_price,
+                fundiId: job.fundi_id,
+              });
+            }
+          }
+          lastStatus = job.status;
+        }
+
+        // Emit payment events
+        if (payment) {
+          const pStatus = payment.status?.toLowerCase();
+          if (lastPaymentStatus !== pStatus) {
+            if (pStatus === 'completed' || pStatus === 'confirmed') {
+              this.emit('payment:confirmed', { jobId, payment });
+            } else if (pStatus === 'failed') {
+              this.emit('payment:failed', { jobId, message: payment.failure_reason });
+            }
+            lastPaymentStatus = pStatus;
+          }
+        }
+      } catch (e) {
+        console.warn('[Realtime] Poll error:', e);
       }
-    });
+    };
 
-    this.socket.on('auth:ok', () => {
-      console.log('[realtime] Authenticated');
-    });
-
-    this.socket.on('auth:failed', (data: unknown) => {
-      console.error('[realtime] Auth failed:', data);
-      this.disconnect();
-    });
-
-    this.socket.on('disconnect', (reason: string) => {
-      console.log('[realtime] Disconnected:', reason);
-    });
-
-    this.socket.on('connect_error', (err: Error) => {
-      console.warn('[realtime] Connection error:', err.message);
-    });
-
-    this.socket.on('reconnect', () => {
-      console.log('[realtime] Reconnected — re-authenticating');
-      if (this.token) this.socket!.emit('auth:token', this.token);
-    });
-
-    // Forward all server events to local listeners
-    this.socket.onAny((event: string, ...args: unknown[]) => {
-      this._emit(event, ...args);
-    });
+    const interval = setInterval(poll, 4000);
+    this.pollIntervals.set(`job:${jobId}`, interval);
+    // Initial poll
+    poll();
   }
 
-  disconnect() {
-    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
-    if (this.socket) {
-      this.socket.offAny();
-      this.socket.disconnect();
-      this.socket = null;
+  stopWatchingJob(jobId: string): void {
+    const key = `job:${jobId}`;
+    const interval = this.pollIntervals.get(key);
+    if (interval) {
+      clearInterval(interval);
+      this.pollIntervals.delete(key);
     }
   }
 
-  isConnected(): boolean { return this.socket?.connected ?? false; }
-
-  on(event: string, callback: Function) {
-    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-    this.listeners.get(event)!.add(callback);
+  stopAllPolling(): void {
+    this.pollIntervals.forEach((interval) => clearInterval(interval));
+    this.pollIntervals.clear();
   }
 
-  off(event: string, callback: Function) {
-    this.listeners.get(event)?.delete(callback);
+  /** Compatibility shim — does nothing but avoids errors */
+  updateLocation(lat: number, lon: number, accuracy?: number, online?: boolean): void {
+    // Location updates go through REST API, not realtime
+    console.debug('[Realtime] updateLocation:', lat, lon, accuracy, online);
   }
 
-  offAll(event: string) { this.listeners.delete(event); }
-
-  private _emit(event: string, ...args: unknown[]) {
-    const cbs = this.listeners.get(event);
-    if (!cbs) return;
-    for (const cb of cbs) {
-      try { cb(...args); } catch (err) {
-        console.error(`[realtime] Listener error on "${event}":`, err);
-      }
-    }
-  }
-
-  send(event: string, data?: unknown) {
-    if (this.socket?.connected) {
-      this.socket.emit(event, data);
-    } else {
-      console.warn('[realtime] Cannot send — socket not connected:', event);
-    }
-  }
-
-  // ── Fundi helpers ────────────────────────────────────────────────────────
-  updateLocation(latitude: number, longitude: number, accuracy?: number, online?: boolean) {
-    this.send('fundi:location:update', { latitude, longitude, accuracy, online });
-  }
-
-  respondToJobRequest(jobId: string, accept: boolean) {
-    this.send('fundi:response', { jobId, accept });
-  }
-
-  sendMessage(jobId: string, content: string) {
-    this.send('chat:send', { jobId, content });
+  get connected(): boolean {
+    return this.isConnected;
   }
 }
 
