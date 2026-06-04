@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 import { realtimeService } from '@/services/realtime';
-import { useJobChat } from '@/hooks/useRealtime';
 import InAppChat from '@/components/chat/InAppChat';
 import { getCurrentPosition } from '@/lib/gps';
 
@@ -43,8 +42,15 @@ export default function FundiJob() {
   const [completing, setCompleting] = useState(false);
   const [otpConfirmed, setOtpConfirmed] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const { messages, sendMessage } = useJobChat(resolvedJobId);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    apiClient.getCurrentUser().then((res) => {
+      const u = res?.user as { id?: string } | undefined;
+      if (u?.id) setCurrentUserId(u.id);
+    }).catch(() => {});
+  }, []);
 
   // Resolve "active" to the real active job ID
   useEffect(() => {
@@ -152,13 +158,17 @@ export default function FundiJob() {
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Chat overlay */}
-      {showChat && resolvedJobId && (
-        <InAppChat
-          jobId={resolvedJobId}
-          messages={messages}
-          onSend={sendMessage}
-          onClose={() => setShowChat(false)}
-        />
+      {showChat && resolvedJobId && currentUserId && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col">
+          <div className="flex-1 max-w-lg mx-auto w-full bg-background shadow-2xl flex flex-col mt-4 rounded-t-3xl overflow-hidden">
+            <InAppChat
+              jobId={resolvedJobId}
+              currentUserId={currentUserId}
+              currentUserRole="fundi"
+              onClose={() => setShowChat(false)}
+            />
+          </div>
+        </div>
       )}
 
       {/* Header */}
@@ -173,9 +183,7 @@ export default function FundiJob() {
           </div>
           <button onClick={() => setShowChat(true)} className="p-2 hover:bg-muted rounded-xl transition-colors relative">
             <MessageCircle className="w-5 h-5 text-muted-foreground" />
-            {messages.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
-            )}
+
           </button>
         </div>
       </div>
