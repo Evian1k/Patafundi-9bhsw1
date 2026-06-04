@@ -1,13 +1,21 @@
 /**
- * PataFundi — Environment Configuration
- * Points to OnSpace Cloud Edge Functions
+ * PataFundi environment configuration.
+ *
+ * Production deployments must provide a PataFundi-owned API origin. The app no
+ * longer falls back to any vendor-hosted backend.
  */
 
-const ONSPACE_BASE = 'https://rootjhvyvhrdummdroot.backend.onspace.ai/functions/v1';
+const DEFAULT_API_BASE = '/api';
+
+function resolveSocketUrl(): string | null {
+  if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return null;
+}
 
 export const env = {
-  API_URL: import.meta.env.VITE_API_URL || ONSPACE_BASE,
-  SOCKET_URL: import.meta.env.VITE_SOCKET_URL || null, // No socket — we use polling
+  API_URL: import.meta.env.VITE_API_URL || DEFAULT_API_BASE,
+  SOCKET_URL: resolveSocketUrl(),
   GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || null,
 };
 
@@ -16,10 +24,7 @@ export function isApiConfigured(): boolean {
 }
 
 export function validateEnv(): void {
-  if (!env.API_URL) {
-    console.warn('[PataFundi] API URL not configured — using OnSpace Cloud default');
-  }
-  if (!env.GOOGLE_MAPS_API_KEY) {
-    console.info('[PataFundi] Google Maps key not set — location features use text input');
+  if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
+    console.warn('[PataFundi] VITE_API_URL is not configured; using same-origin /api');
   }
 }

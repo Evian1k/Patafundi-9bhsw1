@@ -89,7 +89,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner richColors position="top-center" />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           {/* Network status banner — shown app-wide */}
           <NetworkReconnectBanner />
 

@@ -1,6 +1,6 @@
 /**
- * API Client for PataFundi — OnSpace Cloud Backend
- * All routes map to Edge Functions at /functions/v1/{function}/{path}
+ * API Client for PataFundi — Node.js Express Backend
+ * All routes map to /api/* on the PataFundi backend.
  */
 
 import { env, isApiConfigured } from '@/config/env';
@@ -22,25 +22,13 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Map legacy /auth/*, /users/*, /jobs/*, etc. paths
- * to OnSpace Cloud edge function URLs.
- *
- * Edge functions are deployed at:
- *   {BASE}/auth{rest}
- *   {BASE}/users{rest}
- *   {BASE}/fundi{rest}
- *   {BASE}/jobs{rest}
- *   {BASE}/payments{rest}
- *   {BASE}/disputes{rest}
- *   {BASE}/admin{rest}
- *   {BASE}/subscriptions{rest}
- *   {BASE}/notifications{rest}
- */
 function buildUrl(endpoint: string): string {
   const base = env.API_URL.replace(/\/$/, '');
-  // endpoint already starts with /auth, /users, /jobs, etc.
-  return `${base}${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (base.endsWith('/api') && path.startsWith('/api/')) {
+    return `${base}${path.slice(4)}`;
+  }
+  return `${base}${path}`;
 }
 
 class ApiClient {
@@ -76,6 +64,7 @@ class ApiClient {
 
     const config: RequestInit = {
       ...fetchOpts,
+      credentials: 'include',
       headers: {
         ...this.getHeaders(includeAuth),
         ...(fetchOpts.headers as Record<string, string> ?? {}),
@@ -164,6 +153,22 @@ class ApiClient {
     finally { this.setToken(null); }
   }
 
+  async forgotPassword(email: string) {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+      includeAuth: false,
+    });
+  }
+
+  async resetPassword(token: string, password: string) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+      includeAuth: false,
+    });
+  }
+
   async getCurrentUser(): Promise<{ user: Record<string, unknown> }> {
     return this.request('/users/me') as Promise<{ user: Record<string, unknown> }>;
   }
@@ -180,6 +185,18 @@ class ApiClient {
   }
 
   async getSavedPlaces() { return this.request('/users/saved-places'); }
+
+  async addSavedPlace(payload: Record<string, unknown>) {
+    return this.request('/users/saved-places', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async updateSavedPlace(id: string, payload: Record<string, unknown>) {
+    return this.request(`/users/saved-places/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  }
+
+  async deleteSavedPlace(id: string) {
+    return this.request(`/users/saved-places/${id}`, { method: 'DELETE' });
+  }
 
   async changePassword(currentPassword: string, newPassword: string) {
     return this.request('/users/change-password', {
@@ -231,7 +248,7 @@ class ApiClient {
   }
 
   async submitWithdrawalRequest(amount: number, mpesaNumber: string) {
-    return this.request('/fundi/wallet/withdraw-request', {
+    return this.request('/payouts/request', {
       method: 'POST', body: JSON.stringify({ amount, mpesaNumber }),
     });
   }
@@ -314,8 +331,8 @@ class ApiClient {
   }
 
   async submitReview(jobId: string, rating: number, comment: string) {
-    return this.request(`/jobs/${jobId}/review`, {
-      method: 'POST', body: JSON.stringify({ rating, comment }),
+    return this.request('/reviews', {
+      method: 'POST', body: JSON.stringify({ jobId, rating, comment }),
     });
   }
 
@@ -327,8 +344,8 @@ class ApiClient {
   async getPaymentForJob(jobId: string) { return this.request(`/payments/job/${jobId}`); }
 
   async processPayment(jobId: string, mpesaNumber: string, paymentMethod = 'mpesa') {
-    return this.request(`/payments/process/${jobId}`, {
-      method: 'POST', body: JSON.stringify({ mpesaNumber, paymentMethod }),
+    return this.request('/payments/stk-push', {
+      method: 'POST', body: JSON.stringify({ jobId, mpesaNumber, paymentMethod }),
     });
   }
 
@@ -448,6 +465,38 @@ class ApiClient {
 
   async markAllNotificationsRead() {
     return this.request('/notifications/read-all', { method: 'PATCH' });
+  }
+
+  // ── Chat ─────────────────────────────────────────────────────────────────
+  async getJobMessages(jobId: string) {
+    return this.request(`/jobs/${jobId}/messages`);
+  }
+
+  async sendJobMessage(jobId: string, body: string, imageUrl?: string) {
+    return this.request(`/jobs/${jobId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, imageUrl }),
+    });
+  }
+
+  async markJobMessagesRead(jobId: string) {
+    return this.request(`/jobs/${jobId}/messages/read`, { method: 'POST' });
+  }
+
+  // ── Maps ─────────────────────────────────────────────────────────────────
+  async reverseGeocode(latitude: number, longitude: number) {
+    return this.request('/maps/reverse-geocode', {
+      method: 'POST',
+      body: JSON.stringify({ latitude, longitude }),
+      includeAuth: false,
+    });
+  }
+
+  async getDirections(origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }) {
+    return this.request('/maps/directions', {
+      method: 'POST',
+      body: JSON.stringify({ origin, destination }),
+    });
   }
 }
 
