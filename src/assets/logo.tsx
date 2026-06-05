@@ -2,27 +2,26 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-/** Public paths — files in /public, copied to Vercel dist root on build. */
+/** PataFundi brand assets in /public — deployed with Vercel build */
 export const LOGO_FULL_URL = '/logo-full.png';
 export const LOGO_URL = '/logo.png';
 export const LOGO_ICON_URL = '/logo-icon.png';
 export const FAVICON_URL = '/favicon.png';
 export const APP_NAME = 'PataFundi';
 
-const HEIGHT_CLASS = {
-  xs: 'h-7',
-  sm: 'h-8',
-  md: 'h-10',
-  lg: 'h-12',
-  xl: 'h-16',
+const HEIGHT = {
+  xs: 'h-8',
+  sm: 'h-10',
+  md: 'h-12',
+  lg: 'h-20',
+  xl: 'h-24',
 } as const;
 
-export type LogoSize = keyof typeof HEIGHT_CLASS;
+export type LogoSize = keyof typeof HEIGHT;
 
 export interface BrandLogoProps {
   size?: LogoSize;
-  /** @deprecated Wordmark is baked into logo-full.png — do not use */
-  showWordmark?: boolean;
+  /** Pin icon only (compact headers). Default: full logo with wordmark */
   iconOnly?: boolean;
   className?: string;
   linkTo?: string | false;
@@ -34,24 +33,23 @@ export function BrandLogo({
   className,
   linkTo = '/',
 }: BrandLogoProps) {
-  const primary = iconOnly ? LOGO_ICON_URL : LOGO_FULL_URL;
-  const fallback = iconOnly ? LOGO_URL : LOGO_URL;
-  const [src, setSrc] = useState(primary);
-  const [failed, setFailed] = useState(false);
+  const candidates = iconOnly
+    ? [LOGO_ICON_URL, LOGO_URL, LOGO_FULL_URL]
+    : [LOGO_FULL_URL, LOGO_URL, LOGO_ICON_URL];
 
-  const img = failed ? (
-    <span className={cn(HEIGHT_CLASS[size], 'inline-flex items-center font-display font-bold text-sm')}>
-      {APP_NAME}
-    </span>
-  ) : (
+  const [index, setIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const src = candidates[index];
+
+  const img = failed ? null : (
     <img
       src={src}
       alt=""
       role="presentation"
-      className={cn(HEIGHT_CLASS[size], 'w-auto shrink-0 object-contain')}
+      className={cn(HEIGHT[size], 'w-auto shrink-0 object-contain')}
       decoding="async"
       onError={() => {
-        if (src !== fallback) setSrc(fallback);
+        if (index < candidates.length - 1) setIndex((i) => i + 1);
         else setFailed(true);
       }}
     />
@@ -59,7 +57,10 @@ export function BrandLogo({
 
   const wrapper = cn('inline-flex items-center shrink-0', className);
 
-  if (linkTo === false) return <div className={wrapper}>{img}</div>;
+  if (linkTo === false) {
+    return <div className={wrapper}>{img}</div>;
+  }
+
   return (
     <Link to={linkTo} className={wrapper} aria-label={APP_NAME}>
       {img}
@@ -67,7 +68,6 @@ export function BrandLogo({
   );
 }
 
-/** @deprecated Use BrandLogo — wordmark is in the image */
 export function BrandWordmark({ className }: { className?: string }) {
-  return <BrandLogo size="sm" linkTo={false} className={className} />;
+  return <BrandLogo className={className} />;
 }

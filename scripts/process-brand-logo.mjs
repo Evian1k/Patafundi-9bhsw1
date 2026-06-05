@@ -1,6 +1,6 @@
 /**
- * Build optimized brand assets from public/logo-source.png (or .jpg).
- * Run: npm run setup:logo
+ * Build PataFundi brand assets from public/logo-source.png
+ * Run: npm run setup:logo  (also runs automatically via prebuild)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,12 +10,7 @@ import sharp from 'sharp';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, '../public');
 
-const SOURCE_CANDIDATES = [
-  'logo-source.png',
-  'logo-source.jpg',
-  'logo-source.jpeg',
-  'logo-source.webp',
-];
+const SOURCE_CANDIDATES = ['logo-source.png', 'logo-source.jpg', 'logo-source.jpeg'];
 
 function findSource() {
   for (const name of SOURCE_CANDIDATES) {
@@ -25,53 +20,82 @@ function findSource() {
   return null;
 }
 
+/** Remove light gray/white checkerboard background → transparent PNG */
+async function transparentLogo(input) {
+  const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = data;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i];
+    const g = px[i + 1];
+    const b = px[i + 2];
+    const isLight = r > 210 && g > 210 && b > 210;
+    const isGray = Math.abs(r - g) < 12 && Math.abs(g - b) < 12 && r > 180;
+    if (isLight || isGray) px[i + 3] = 0;
+  }
+  return sharp(Buffer.from(px), {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  });
+}
+
+async function writePng(pipeline, outPath, resize) {
+  let img = pipeline;
+  if (resize) img = img.resize(resize);
+  await img.png({ compressionLevel: 9, quality: 90 }).toFile(outPath);
+}
+
 async function main() {
   const source = findSource();
   if (!source) {
-    console.error('No logo source found. Save your image as public/logo-source.png');
+    console.error('Save your logo as public/logo-source.png');
     process.exit(1);
   }
 
   console.log(`Processing ${path.basename(source)}…`);
-  const meta = await sharp(source).metadata();
-  const width = meta.width ?? 1024;
-  const height = meta.height ?? 512;
+  const base = await transparentLogo(source);
+  const meta = await base.clone().metadata();
+  const width = meta.width ?? 800;
+  const height = meta.height ?? 800;
 
-  // Full horizontal logo — used by BrandLogo (navbar, auth, footer)
-  await sharp(source)
-    .resize({ height: 96, fit: 'inside', withoutEnlargement: true })
-    .png({ compressionLevel: 9, quality: 88 })
-    .toFile(path.join(publicDir, 'logo-full.png'));
+  // Full logo (icon + PataFundi wordmark) — auth, footer, press
+  await writePng(base.clone(), path.join(publicDir, 'logo-full.png'), {
+    height: 160,
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
 
-  await sharp(source)
-    .resize({ height: 64, fit: 'inside', withoutEnlargement: true })
-    .png({ compressionLevel: 9, quality: 88 })
-    .toFile(path.join(publicDir, 'logo.png'));
+  // Navbar / general — slightly smaller full logo
+  await writePng(base.clone(), path.join(publicDir, 'logo.png'), {
+    height: 48,
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
 
-  // Icon mark — left crop for compact headers + favicon
-  const iconWidth = Math.min(width, Math.max(Math.round(width * 0.22), 120));
-  await sharp(source)
-    .extract({ left: 0, top: 0, width: iconWidth, height })
-    .resize(256, 256, { fit: 'contain', background: { r: 10, g: 14, b: 26, alpha: 1 } })
-    .png({ compressionLevel: 9, quality: 88 })
-    .toFile(path.join(publicDir, 'logo-icon.png'));
+  // Pin icon only — top ~62% of vertical logo (icon above text)
+  const iconHeight = Math.round(height * 0.62);
+  const iconBuf = await base
+    .clone()
+    .extract({ left: 0, top: 0, width, height: Math.min(iconHeight, height) })
+    .resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+
+  await sharp(iconBuf).toFile(path.join(publicDir, 'logo-icon.png'));
 
   for (const [name, size] of [
     ['favicon.png', 32],
-    ['apple-touch-icon.png', 180],
     ['favicon-192.png', 192],
+    ['apple-touch-icon.png', 180],
   ]) {
-    await sharp(path.join(publicDir, 'logo-icon.png'))
-      .resize(size, size, { fit: 'contain', background: { r: 10, g: 14, b: 26, alpha: 1 } })
-      .png({ compressionLevel: 9, palette: size <= 32, quality: 80 })
+    await sharp(iconBuf)
+      .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png({ compressionLevel: 9, palette: size <= 32, quality: 85 })
       .toFile(path.join(publicDir, name));
   }
 
   await sharp(path.join(publicDir, 'favicon.png')).toFile(path.join(publicDir, 'favicon.ico'));
 
-  const stats = fs.statSync(path.join(publicDir, 'logo-full.png'));
-  console.log(`✓ public/logo-full.png (${Math.round(stats.size / 1024)} KB)`);
-  console.log('✓ public/logo.png, logo-icon.png, favicon assets');
+  console.log('✓ public/logo-full.png, logo.png, logo-icon.png');
+  console.log('✓ public/favicon.png, favicon.ico, apple-touch-icon.png');
 }
 
 main().catch((err) => {
