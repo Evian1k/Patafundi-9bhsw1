@@ -27,7 +27,12 @@ app.use(helmet());
 app.use(cors({ origin: config.frontendOrigin, credentials: true }));
 app.use(morgan('dev'));
 app.use(cookieParser());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
 

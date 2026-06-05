@@ -74,3 +74,14 @@ export async function deleteAccount(req, res) {
   await query('update users set status = $2, updated_at = now() where id = $1', [req.user.id, 'deleted']);
   res.json({ success: true });
 }
+
+export async function notifications(req, res) {
+  const result = await query(
+    `select * from notifications
+     where user_id = $1
+     order by created_at desc
+     limit 100`,
+    [req.user.id],
+  );
+  res.json({ success: true, notifications: result.rows, pagination: { page: 1, total: result.rows.length } });
+}

@@ -17,6 +17,7 @@ export const config = {
     shortcode: process.env.MPESA_SHORTCODE || '',
     passkey: process.env.MPESA_PASSKEY || '',
     callbackUrl: process.env.MPESA_CALLBACK_URL || '',
+    callbackSecret: process.env.MPESA_CALLBACK_SECRET || '',
     timeoutUrl: process.env.MPESA_TIMEOUT_URL || '',
     resultUrl: process.env.MPESA_RESULT_URL || '',
   },

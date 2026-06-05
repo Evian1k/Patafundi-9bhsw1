@@ -1,13 +1,29 @@
 import crypto from 'node:crypto';
 import { query, transaction } from '../db.js';
-import { badRequest, notFound } from '../utils/http.js';
-import { initiateStkPush, normalizePhone } from '../services/mpesaService.js';
+import { badRequest, forbidden, notFound } from '../utils/http.js';
+import {
+  assertValidMpesaPhone,
+  initiateStkPush,
+  verifyCallbackSecret,
+  verifyWebhookSignature,
+} from '../services/mpesaService.js';
 import { auditLog } from '../services/auditService.js';
 import { emitEvent } from '../realtime.js';
+
+function canAccessJob(user, job) {
+  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+}
+
+function parsePositiveAmount(value, label = 'Amount') {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) throw badRequest(`${label} must be greater than zero`);
+  return Math.round(amount * 100) / 100;
+}
 
 export async function stkPush(req, res) {
   const { jobId, mpesaNumber, amount, idempotencyKey = req.get('Idempotency-Key') } = req.body || {};
   if (!jobId || !mpesaNumber) throw badRequest('Job and M-Pesa number are required');
+  const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
   const key = idempotencyKey || crypto.randomUUID();
   const payment = await transaction(async (client) => {
     const duplicate = await client.query('select * from payments where idempotency_key = $1', [key]);
@@ -15,13 +31,17 @@ export async function stkPush(req, res) {
     const jobResult = await client.query('select * from jobs where id = $1 for update', [jobId]);
     const job = jobResult.rows[0];
     if (!job) throw notFound('Job not found');
-    const payableAmount = Number(amount || job.final_price || job.estimated_price);
-    if (!payableAmount || payableAmount <= 0) throw badRequest('Payment amount is required');
+    if (job.customer_id !== req.user.id && req.user.role !== 'admin') throw forbidden('Only the job customer can pay for this job');
+    if (['cancelled', 'failed'].includes(job.status)) throw badRequest('Cannot pay for a cancelled or failed job');
+    if (['escrow_held', 'payout_processing', 'payout_completed'].includes(job.payment_status)) {
+      throw badRequest('This job has already been paid');
+    }
+    const payableAmount = parsePositiveAmount(amount || job.final_price || job.estimated_price);
     const inserted = await client.query(
       `insert into payments (job_id, customer_id, amount, currency, provider, mpesa_number,
         status, escrow_status, idempotency_key)
        values ($1, $2, $3, 'KES', 'mpesa', $4, 'pending', 'pending', $5) returning *`,
-      [jobId, req.user.id, payableAmount, normalizePhone(mpesaNumber), key],
+      [jobId, req.user.id, payableAmount, normalizedPhone, key],
     );
     return inserted.rows[0];
   });
@@ -49,6 +69,10 @@ export async function legacyProcess(req, res) {
 }
 
 export async function webhook(req, res) {
+  const signature = req.get('x-mpesa-signature');
+  if (!verifyCallbackSecret(req) && !verifyWebhookSignature(req.rawBody, signature)) {
+    throw forbidden('Invalid M-Pesa callback signature');
+  }
   const callback = req.body?.Body?.stkCallback || req.body?.stkCallback || req.body;
   const checkoutRequestId = callback.CheckoutRequestID || callback.checkoutRequestId;
   const resultCode = Number(callback.ResultCode ?? callback.resultCode);
@@ -59,18 +83,24 @@ export async function webhook(req, res) {
     const row = paymentResult.rows[0];
     if (!row) throw notFound('Payment not found');
     if (row.status === 'completed') return row;
+    if (row.status !== 'pending') return row;
     if (resultCode === 0) {
       const metadata = callback.CallbackMetadata?.Item || [];
       const receipt = metadata.find((item) => item.Name === 'MpesaReceiptNumber')?.Value || callback.MpesaReceiptNumber;
+      if (!receipt) throw badRequest('MpesaReceiptNumber missing');
       const updated = await client.query(
         `update payments set status = 'completed', escrow_status = 'held', mpesa_receipt_number = $2,
           provider_response = $3, paid_at = now(), updated_at = now()
-         where id = $1 returning *`,
+         where id = $1 and status = 'pending' returning *`,
         [row.id, receipt, JSON.stringify(req.body)],
       );
+      if (!updated.rows[0]) return row;
       await client.query(
         `insert into escrow_transactions (job_id, payment_id, type, amount, status)
-         values ($1, $2, 'hold', $3, 'held')`,
+         select $1, $2, 'hold', $3, 'held'
+         where not exists (
+           select 1 from escrow_transactions where payment_id = $2 and type = 'hold'
+         )`,
         [row.job_id, row.id, row.amount],
       );
       await client.query(
@@ -95,20 +125,50 @@ export async function webhook(req, res) {
 }
 
 export async function paymentForJob(req, res) {
-  const result = await query('select * from payments where job_id = $1 order by created_at desc limit 1', [req.params.jobId]);
+  const result = await query(
+    `select p.* from payments p
+     join jobs j on j.id = p.job_id
+     where p.job_id = $1 and ($2 = 'admin' or j.customer_id = $3 or j.fundi_id = $3)
+     order by p.created_at desc limit 1`,
+    [req.params.jobId, req.user.role, req.user.id],
+  );
+  if (!result.rows[0]) {
+    const job = await query('select id from jobs where id = $1', [req.params.jobId]);
+    if (!job.rows[0]) throw notFound('Job not found');
+  }
   res.json({ success: true, payment: result.rows[0] || null });
 }
 
 export async function escrowForJob(req, res) {
+  const job = await query('select customer_id, fundi_id from jobs where id = $1', [req.params.jobId]);
+  if (!job.rows[0]) throw notFound('Job not found');
+  if (!canAccessJob(req.user, job.rows[0])) throw forbidden('Not allowed to access this escrow');
   const result = await query('select * from escrow_transactions where job_id = $1 order by created_at desc', [req.params.jobId]);
   res.json({ success: true, escrow: result.rows });
 }
 
 export async function walletBalance(req, res) {
   const result = await query(
-    `select coalesce(sum(case when status = 'completed' then amount else 0 end),0) as balance
-     from payouts where fundi_id = $1`,
+    `select
+       coalesce((
+         select sum(et.amount)
+         from escrow_transactions et
+         join jobs j on j.id = et.job_id
+         where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'
+       ), 0) as total_earnings,
+       coalesce((
+         select sum(p.amount)
+         from payouts p
+         where p.fundi_id = $1 and p.status in ('requested', 'processing', 'completed')
+       ), 0) as paid_or_pending`,
     [req.user.id],
   );
-  res.json({ success: true, balance: Number(result.rows[0]?.balance || 0), escrowPending: 0, totalEarnings: Number(result.rows[0]?.balance || 0) });
+  const totalEarnings = Number(result.rows[0]?.total_earnings || 0);
+  const paidOrPending = Number(result.rows[0]?.paid_or_pending || 0);
+  res.json({
+    success: true,
+    balance: Math.max(0, totalEarnings - paidOrPending),
+    escrowPending: 0,
+    totalEarnings,
+  });
 }

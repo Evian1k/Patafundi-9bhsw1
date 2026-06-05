@@ -1,11 +1,23 @@
 import { query, transaction } from '../db.js';
-import { badRequest, notFound } from '../utils/http.js';
+import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+
+function canAccessJob(user, job) {
+  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+}
 
 export async function createDispute(req, res) {
   const { jobId, reason, evidenceUrls = [] } = req.body || {};
   if (!jobId || !reason) throw badRequest('Job and reason are required');
   const dispute = await transaction(async (client) => {
+    const job = await client.query('select customer_id, fundi_id from jobs where id = $1 for update', [jobId]);
+    if (!job.rows[0]) throw notFound('Job not found');
+    if (!canAccessJob(req.user, job.rows[0])) throw forbidden('Not allowed to dispute this job');
+    const existing = await client.query(
+      `select id from disputes where job_id = $1 and status in ('open', 'under_review') limit 1`,
+      [jobId],
+    );
+    if (existing.rows[0]) throw badRequest('This job already has an open dispute');
     const result = await client.query(
       `insert into disputes (job_id, opened_by, reason, evidence_urls, status)
        values ($1, $2, $3, $4, 'open') returning *`,
@@ -33,6 +45,15 @@ export async function listDisputes(req, res) {
 
 export async function uploadEvidence(req, res) {
   const urls = (req.files || []).map((file) => `/uploads/${file.filename}`);
+  const dispute = await query(
+    `select d.*, j.customer_id, j.fundi_id
+     from disputes d join jobs j on j.id = d.job_id
+     where d.id = $1`,
+    [req.params.id],
+  );
+  if (!dispute.rows[0]) throw notFound('Dispute not found');
+  if (!canAccessJob(req.user, dispute.rows[0])) throw forbidden('Not allowed to update this dispute');
+  if (dispute.rows[0].status !== 'open' && dispute.rows[0].status !== 'under_review') throw badRequest('Dispute is closed');
   const result = await query(
     `update disputes set evidence_urls = coalesce(evidence_urls, array[]::text[]) || $2::text[],
      updated_at = now() where id = $1 returning *`,
@@ -48,24 +69,32 @@ export async function resolveDispute(req, res) {
   const dispute = await transaction(async (client) => {
     const d = await client.query('select * from disputes where id = $1 for update', [req.params.id]);
     if (!d.rows[0]) throw notFound('Dispute not found');
-    await client.query(
-      `update disputes set status = 'resolved', resolution = $2, refund_amount = $3,
-       resolved_by = $4, resolved_at = now(), updated_at = now() where id = $1`,
-      [req.params.id, resolution, refundAmount, req.user.id],
+    if (!['open', 'under_review'].includes(d.rows[0].status)) throw badRequest('Dispute is already closed');
+    const refund = Number(refundAmount || 0);
+    if (!Number.isFinite(refund) || refund < 0) throw badRequest('Refund amount must be zero or greater');
+    const payment = await client.query(
+      `select * from payments where job_id = $1 and escrow_status in ('held', 'frozen') order by created_at desc limit 1 for update`,
+      [d.rows[0].job_id],
     );
-    if (refundAmount > 0) {
-      const payment = await client.query(
-        `select * from payments where job_id = $1 and escrow_status in ('held', 'frozen') order by created_at desc limit 1`,
-        [d.rows[0].job_id],
-      );
-      if (payment.rows[0]) {
+    if (refund > 0) {
+      if (!payment.rows[0]) throw badRequest('No refundable escrow found');
+      if (refund > Number(payment.rows[0].amount)) throw badRequest('Refund cannot exceed held escrow');
         await client.query(
           `insert into escrow_transactions (job_id, payment_id, type, amount, status)
            values ($1, $2, 'refund', $3, 'pending')`,
-          [d.rows[0].job_id, payment.rows[0].id, refundAmount],
+          [d.rows[0].job_id, payment.rows[0].id, refund],
         );
-      }
+      await client.query(`update payments set escrow_status = 'refunded', updated_at = now() where id = $1`, [payment.rows[0].id]);
+      await client.query(`update jobs set escrow_status = 'refunded', payment_status = 'failed', updated_at = now() where id = $1`, [d.rows[0].job_id]);
+    } else if (payment.rows[0]) {
+      await client.query(`update payments set escrow_status = 'held', updated_at = now() where id = $1`, [payment.rows[0].id]);
+      await client.query(`update jobs set escrow_status = 'held', updated_at = now() where id = $1`, [d.rows[0].job_id]);
     }
+    await client.query(
+      `update disputes set status = 'resolved', resolution = $2, refund_amount = $3,
+       resolved_by = $4, resolved_at = now(), updated_at = now() where id = $1`,
+      [req.params.id, resolution, refund, req.user.id],
+    );
     return d.rows[0];
   });
   emitEvent('dispute:resolved', { jobId: dispute.job_id, disputeId: req.params.id }, `job:${dispute.job_id}`);

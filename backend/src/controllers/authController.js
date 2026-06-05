@@ -36,6 +36,7 @@ export async function register(req, res) {
   const { email, password, fullName, phone, role = 'customer' } = req.body || {};
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
   if (!['customer', 'fundi', 'admin'].includes(role)) throw badRequest('Invalid role');
+  if (role === 'admin') throw forbidden('Admin accounts must be provisioned by an existing administrator');
   const passwordHash = await bcrypt.hash(password, 12);
   const otpCode = String(crypto.randomInt(100000, 999999));
   const user = await transaction(async (client) => {
@@ -72,7 +73,7 @@ export async function login(req, res) {
   );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) throw forbidden('Invalid email or password');
-  if (user.status === 'disabled') throw forbidden('Account disabled');
+  if (user.status !== 'active') throw forbidden('Account is not active');
   const session = await issueSession(res, user);
   await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id });
   res.json({ success: true, user: publicUser(user), token: session.token });
@@ -94,10 +95,11 @@ export async function refresh(req, res) {
   );
   const user = result.rows[0];
   if (!user) throw forbidden('Invalid refresh token');
+  if (user.status !== 'active') throw forbidden('Account is not active');
   const token = signAccessToken(user);
   res.cookie('access_token', token, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: config.cookieSecure,
     maxAge: 15 * 60 * 1000,
   });

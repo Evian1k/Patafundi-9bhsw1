@@ -14,7 +14,14 @@ import * as chat from './controllers/chatController.js';
 import * as maps from './controllers/mapsController.js';
 import { asyncHandler } from './utils/http.js';
 
-const upload = multer({ dest: 'backend/uploads/' });
+const upload = multer({
+  dest: 'backend/uploads/',
+  limits: { fileSize: 5 * 1024 * 1024, files: 8 },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+    cb(allowedTypes.has(file.mimetype) ? null : new Error('Unsupported upload type'), allowedTypes.has(file.mimetype));
+  },
+});
 export const router = express.Router();
 
 router.get('/health', (_req, res) => res.json({ success: true, service: 'patafundi-api' }));
@@ -92,8 +99,8 @@ router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler
 router.post('/admin/fundis/:id/approve', authRequired, requireRole('admin'), asyncHandler(admin.approveFundi));
 router.post('/admin/fundis/:id/reject', authRequired, requireRole('admin'), asyncHandler(admin.rejectFundi));
 router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listTable('users', 'customers')));
-router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.listTable('users', 'customers')));
-router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.listTable('users', 'customers')));
+router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
+router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.unblockUser));
 router.get('/admin/jobs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('jobs', 'jobs')));
 router.get('/admin/payments', authRequired, requireRole('admin'), asyncHandler(admin.listTable('payments', 'payments')));
 router.get('/admin/transactions', authRequired, requireRole('admin'), asyncHandler(admin.listTable('payments', 'transactions')));
@@ -109,13 +116,13 @@ router.get('/admin/security/overview', authRequired, requireRole('admin'), async
 router.get('/admin/security-alerts', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fraud_alerts', 'alerts')));
 router.get('/admin/trust-scores', authRequired, requireRole('admin'), asyncHandler(admin.listTable('trust_scores', 'scores')));
 router.get('/admin/bypass-alerts', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fraud_alerts', 'alerts')));
-router.post('/admin/security-alerts/:id/resolve', authRequired, requireRole('admin'), asyncHandler(admin.securityOverview));
-router.post('/admin/users/:id/force-logout', authRequired, requireRole('admin'), asyncHandler(admin.securityOverview));
-router.post('/admin/users/:id/disable', authRequired, requireRole('admin'), asyncHandler(admin.securityOverview));
+router.post('/admin/security-alerts/:id/resolve', authRequired, requireRole('admin'), asyncHandler(admin.resolveSecurityAlert));
+router.post('/admin/users/:id/force-logout', authRequired, requireRole('admin'), asyncHandler(admin.forceLogout));
+router.post('/admin/users/:id/disable', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
 router.get('/admin/settings', authRequired, requireRole('admin'), (_req, res) => res.json({ success: true, settings: {} }));
 router.put('/admin/settings', authRequired, requireRole('admin'), (_req, res) => res.json({ success: true }));
 
-router.get('/notifications', authRequired, asyncHandler(admin.listTable('notifications', 'notifications')));
+router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/:id/read', authRequired, (_req, res) => res.json({ success: true }));
 router.patch('/notifications/read-all', authRequired, (_req, res) => res.json({ success: true }));
 router.post('/subscriptions/activate', authRequired, (_req, res) => res.json({ success: true }));

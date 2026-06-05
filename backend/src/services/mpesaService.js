@@ -17,6 +17,16 @@ export function normalizePhone(phone) {
   return digits;
 }
 
+export function assertValidMpesaPhone(phone) {
+  const normalized = normalizePhone(phone);
+  if (!/^254(7|1)\d{8}$/.test(normalized)) {
+    const error = new Error('Valid Kenyan M-Pesa number is required');
+    error.status = 400;
+    throw error;
+  }
+  return normalized;
+}
+
 export async function getAccessToken() {
   requireMpesaConfig();
   const credentials = Buffer.from(`${config.mpesa.consumerKey}:${config.mpesa.consumerSecret}`).toString('base64');
@@ -66,5 +76,16 @@ export function verifyWebhookSignature(rawBody, signature) {
   const secret = config.mpesa.consumerSecret;
   if (!secret || !signature) return false;
   const expected = crypto.createHmac('sha256', secret).update(rawBody || '').digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+  return expectedBuffer.length === signatureBuffer.length && crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+}
+
+export function verifyCallbackSecret(req) {
+  if (!config.mpesa.callbackSecret) return config.nodeEnv !== 'production';
+  const provided = req.get('x-mpesa-callback-secret') || req.query.callbackSecret || req.body?.callbackSecret;
+  if (!provided) return false;
+  const expectedBuffer = Buffer.from(config.mpesa.callbackSecret);
+  const providedBuffer = Buffer.from(String(provided));
+  return expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }

@@ -41,6 +41,30 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
     .slice(0, limit);
 }
 
+function canAccessJob(user, job) {
+  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+}
+
+function requireJobAccess(user, job) {
+  if (!canAccessJob(user, job)) throw forbidden('Not allowed to access this job');
+}
+
+function requireAssignedFundi(user, job) {
+  if (user.role === 'admin') return;
+  if (job.fundi_id !== user.id) throw forbidden('Only the assigned fundi can update this job');
+}
+
+function requireCustomer(user, job) {
+  if (user.role === 'admin') return;
+  if (job.customer_id !== user.id) throw forbidden('Only the customer can perform this action');
+}
+
+async function loadJob(jobId) {
+  const result = await query('select * from jobs where id = $1', [jobId]);
+  if (!result.rows[0]) throw notFound('Job not found');
+  return result.rows[0];
+}
+
 export async function createJob(req, res) {
   const body = req.body || {};
   const serviceCategory = body.serviceCategory || body.service_category || body.category;
@@ -85,14 +109,22 @@ export async function listJobs(req, res) {
 }
 
 export async function getJob(req, res) {
-  const result = await query('select * from jobs where id = $1', [req.params.id]);
-  if (!result.rows[0]) throw notFound('Job not found');
-  res.json({ success: true, job: result.rows[0] });
+  const job = await loadJob(req.params.id);
+  requireJobAccess(req.user, job);
+  res.json({ success: true, job });
 }
 
 export async function patchJob(req, res) {
   const { status } = req.body || {};
   if (!status) throw badRequest('Status is required');
+  const allowedStatuses = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled', 'failed'];
+  if (!allowedStatuses.includes(status)) throw badRequest('Invalid job status');
+  const job = await loadJob(req.params.id);
+  requireJobAccess(req.user, job);
+  if (req.user.role !== 'admin') {
+    if (['on_the_way', 'arrived', 'in_progress', 'completed'].includes(status)) requireAssignedFundi(req.user, job);
+    if (['cancelled'].includes(status)) requireCustomer(req.user, job);
+  }
   const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
   res.json({ success: true, job: result.rows[0] });
 }
@@ -114,6 +146,11 @@ export async function acceptJob(req, res) {
 }
 
 export async function cancelJob(req, res) {
+  const job = await loadJob(req.params.id);
+  requireJobAccess(req.user, job);
+  if (req.user.role !== 'admin' && !['pending', 'matching', 'accepted'].includes(job.status)) {
+    throw badRequest('Job can no longer be cancelled');
+  }
   const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 returning *', [
     req.params.id,
     'cancelled',
@@ -126,6 +163,10 @@ export async function cancelJob(req, res) {
 export async function checkIn(req, res) {
   const { latitude, longitude, status = 'on_the_way', accuracy = null } = req.body || {};
   if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
+  const allowedStatuses = ['on_the_way', 'arrived', 'in_progress'];
+  if (!allowedStatuses.includes(status)) throw badRequest('Invalid check-in status');
+  const job = await loadJob(req.params.id);
+  requireAssignedFundi(req.user, job);
   const result = await transaction(async (client) => {
     await client.query(
       `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
@@ -143,6 +184,9 @@ export async function checkIn(req, res) {
 }
 
 export async function completeJob(req, res) {
+  const job = await loadJob(req.params.id);
+  requireAssignedFundi(req.user, job);
+  if (!['in_progress', 'arrived'].includes(job.status)) throw badRequest('Job must be in progress before completion');
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = await bcrypt.hash(otp, 10);
   const result = await query(
@@ -158,8 +202,10 @@ export async function completeJob(req, res) {
 export async function confirmCompletion(req, res) {
   const { otp } = req.body || {};
   if (!otp) throw badRequest('OTP is required');
-  const existing = await query('select id, completion_otp_hash from jobs where id = $1', [req.params.id]);
+  const existing = await query('select id, customer_id, completion_otp_hash from jobs where id = $1', [req.params.id]);
   const job = existing.rows[0];
+  if (!job) throw notFound('Job not found');
+  requireCustomer(req.user, job);
   if (!job?.completion_otp_hash || !(await bcrypt.compare(String(otp), job.completion_otp_hash))) {
     throw forbidden('Invalid completion OTP');
   }
@@ -182,6 +228,11 @@ export async function activeFundiJob(req, res) {
 export async function submitReview(req, res) {
   const { jobId = req.params.id, rating, comment = '' } = req.body || {};
   if (!jobId || !rating) throw badRequest('Job and rating are required');
+  const job = await loadJob(jobId);
+  requireCustomer(req.user, job);
+  if (job.status !== 'completed' || !job.customer_completion_confirmed) {
+    throw badRequest('Only completed jobs can be reviewed');
+  }
   const result = await query(
     `insert into reviews (job_id, reviewer_id, rating, comment)
      values ($1, $2, $3, $4) returning *`,

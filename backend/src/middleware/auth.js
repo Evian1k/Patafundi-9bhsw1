@@ -24,7 +24,7 @@ export function signRefreshToken(user) {
 export function setAuthCookies(res, accessToken, refreshToken) {
   const base = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: config.cookieSecure,
   };
   res.cookie('access_token', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
@@ -52,6 +52,7 @@ export async function authRequired(req, _res, next) {
       [payload.sub],
     );
     if (!result.rows[0]) throw forbidden('User account not found');
+    if (result.rows[0].status !== 'active') throw forbidden('Account is not active');
     req.user = result.rows[0];
     next();
   } catch (error) {
