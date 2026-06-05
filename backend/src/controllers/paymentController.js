@@ -20,6 +20,11 @@ function parsePositiveAmount(value, label = 'Amount') {
   return Math.round(amount * 100) / 100;
 }
 
+function callbackMetadataValue(callback, name) {
+  const metadata = callback.CallbackMetadata?.Item || [];
+  return metadata.find((item) => item.Name === name)?.Value;
+}
+
 export async function stkPush(req, res) {
   const { jobId, mpesaNumber, amount, idempotencyKey = req.get('Idempotency-Key') } = req.body || {};
   if (!jobId || !mpesaNumber) throw badRequest('Job and M-Pesa number are required');
@@ -36,12 +41,16 @@ export async function stkPush(req, res) {
     if (['escrow_held', 'payout_processing', 'payout_completed'].includes(job.payment_status)) {
       throw badRequest('This job has already been paid');
     }
-    const payableAmount = parsePositiveAmount(amount || job.final_price || job.estimated_price);
+    const expectedAmount = parsePositiveAmount(job.final_price || job.estimated_price || amount);
+    const requestedAmount = parsePositiveAmount(amount || expectedAmount);
+    if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
+      throw badRequest('Payment amount does not match the job amount');
+    }
     const inserted = await client.query(
       `insert into payments (job_id, customer_id, amount, currency, provider, mpesa_number,
         status, escrow_status, idempotency_key)
        values ($1, $2, $3, 'KES', 'mpesa', $4, 'pending', 'pending', $5) returning *`,
-      [jobId, req.user.id, payableAmount, normalizedPhone, key],
+      [jobId, req.user.id, expectedAmount, normalizedPhone, key],
     );
     return inserted.rows[0];
   });
@@ -85,9 +94,12 @@ export async function webhook(req, res) {
     if (row.status === 'completed') return row;
     if (row.status !== 'pending') return row;
     if (resultCode === 0) {
-      const metadata = callback.CallbackMetadata?.Item || [];
-      const receipt = metadata.find((item) => item.Name === 'MpesaReceiptNumber')?.Value || callback.MpesaReceiptNumber;
+      const receipt = callbackMetadataValue(callback, 'MpesaReceiptNumber') || callback.MpesaReceiptNumber;
+      const paidAmount = Number(callbackMetadataValue(callback, 'Amount') ?? callback.Amount ?? row.amount);
       if (!receipt) throw badRequest('MpesaReceiptNumber missing');
+      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - Number(row.amount)) > 0.01) {
+        throw badRequest('Callback amount does not match pending payment');
+      }
       const updated = await client.query(
         `update payments set status = 'completed', escrow_status = 'held', mpesa_receipt_number = $2,
           provider_response = $3, paid_at = now(), updated_at = now()
@@ -120,7 +132,12 @@ export async function webhook(req, res) {
     return failed.rows[0];
   });
 
-  emitEvent(payment.status === 'completed' ? 'payment:confirmed' : 'payment:failed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
+  if (payment.status === 'completed') {
+    emitEvent('payment:confirmed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
+    emitEvent('escrow:held', { jobId: payment.job_id, paymentId: payment.id, amount: payment.amount }, `job:${payment.job_id}`);
+  } else {
+    emitEvent('payment:failed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
+  }
   res.json({ success: true });
 }
 

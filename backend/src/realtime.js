@@ -7,10 +7,16 @@ export const realtimeEvents = [
   'job:request:declined',
   'job:search:failed',
   'job:started',
+  'job:checkin',
   'job:completed',
+  'job:cancelled',
+  'job:status',
+  'job:completion:confirmed',
   'payment:initiated',
   'payment:confirmed',
   'payment:failed',
+  'escrow:held',
+  'escrow:released',
   'payout:requested',
   'payout:processing',
   'payout:completed',
@@ -31,13 +37,13 @@ export function attachRealtime(io) {
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
-      if (!token || !config.jwtSecret) return next();
+      if (!token || !config.jwtSecret) return next(new Error('Authentication required'));
       const payload = jwt.verify(token, config.jwtSecret, { issuer: 'patafundi-api', audience: 'patafundi-web' });
       socket.userId = payload.sub;
       socket.userRole = payload.role;
       next();
     } catch {
-      next();
+      next(new Error('Invalid realtime token'));
     }
   });
 
@@ -56,6 +62,7 @@ export function attachRealtime(io) {
     });
 
     socket.on('fundi:location:update', (payload) => {
+      if (!socket.userId) return;
       if (payload?.jobId) io.to(`job:${payload.jobId}`).emit('fundi:location:update', payload);
     });
   });

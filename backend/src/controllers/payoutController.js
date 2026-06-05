@@ -98,6 +98,7 @@ export async function releaseEscrow(req, res) {
     );
   });
   await auditLog({ userId: req.user.id, action: 'escrow.release', entityType: 'job', entityId: req.params.jobId });
+  emitEvent('escrow:released', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
   emitEvent('payout:processing', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
   res.json({ success: true, payout: result.rows[0] });
 }

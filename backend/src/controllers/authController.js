@@ -32,9 +32,18 @@ async function issueSession(res, user) {
   return { token, refreshToken };
 }
 
+function requireStrongPassword(password) {
+  const value = String(password || '');
+  if (value.length < 8) throw badRequest('Password must be at least 8 characters');
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    throw badRequest('Password must include letters and numbers');
+  }
+}
+
 export async function register(req, res) {
   const { email, password, fullName, phone, role = 'customer' } = req.body || {};
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
+  requireStrongPassword(password);
   if (!['customer', 'fundi', 'admin'].includes(role)) throw badRequest('Invalid role');
   if (role === 'admin') throw forbidden('Admin accounts must be provisioned by an existing administrator');
   const passwordHash = await bcrypt.hash(password, 12);
@@ -96,14 +105,9 @@ export async function refresh(req, res) {
   const user = result.rows[0];
   if (!user) throw forbidden('Invalid refresh token');
   if (user.status !== 'active') throw forbidden('Account is not active');
-  const token = signAccessToken(user);
-  res.cookie('access_token', token, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: config.cookieSecure,
-    maxAge: 15 * 60 * 1000,
-  });
-  res.json({ success: true, token, user: publicUser(user) });
+  await query('update refresh_tokens set revoked_at = now() where token_hash = $1', [refreshHash]);
+  const session = await issueSession(res, user);
+  res.json({ success: true, token: session.token, user: publicUser(user) });
 }
 
 export async function logout(req, res) {
@@ -181,7 +185,7 @@ export async function forgotPassword(req, res) {
 export async function resetPassword(req, res) {
   const { token, password } = req.body || {};
   if (!token || !password) throw badRequest('Token and new password are required');
-  if (String(password).length < 6) throw badRequest('Password must be at least 6 characters');
+  requireStrongPassword(password);
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const result = await query(
     `select prt.id, prt.user_id from password_reset_tokens prt

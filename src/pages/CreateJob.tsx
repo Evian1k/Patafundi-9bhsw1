@@ -198,12 +198,7 @@ const CreateJob = () => {
           try {
             const fd = new FormData();
             fd.append("photo", photo.file);
-            const API_URL = import.meta.env.VITE_API_URL || "/api";
-            await fetch(`${API_URL}/jobs/${res.job.id}/photos`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-              body: fd,
-            });
+            await apiClient.uploadJobPhoto(res.job.id, fd);
           } catch { /* non-fatal */ }
         }
       }

@@ -11,6 +11,7 @@ import { router } from './routes.js';
 import { attachRealtime } from './realtime.js';
 import { healthcheck } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
+import { csrfProtection } from './middleware/auth.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +36,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
+app.use(csrfProtection);
 
 app.get('/health', async (_req, res) => {
   const database = await healthcheck().catch((error) => ({ configured: Boolean(config.databaseUrl), ok: false, error: error.message }));

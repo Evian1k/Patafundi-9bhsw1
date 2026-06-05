@@ -218,6 +218,7 @@ export async function checkIn(req, res) {
     );
   });
   emitEvent('fundi:location:update', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
+  emitEvent('job:checkin', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
   emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]) });
@@ -251,7 +252,8 @@ export async function confirmCompletion(req, res) {
     throw forbidden('Invalid completion OTP');
   }
   const result = await query(
-    `update jobs set customer_completion_confirmed = true, escrow_status = 'completion_requested', updated_at = now()
+    `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
+      escrow_status = 'completion_requested', updated_at = now()
      where id = $1 returning *`,
     [req.params.id],
   );

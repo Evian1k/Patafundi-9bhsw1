@@ -124,17 +124,13 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
 
     if (bypassPatterns.some((pattern) => pattern.test(text))) {
       try {
-        await fetch('/api/fraud-report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'chat_bypass_attempt',
-            messagePreview: text.substring(0, 100),
-            content: text.substring(0, 100),
-            userId: currentUserId,
-            userRole: currentUserRole,
-            jobId,
-          }),
+        await apiClient.reportFraud({
+          type: 'chat_bypass_attempt',
+          messagePreview: text.substring(0, 100),
+          content: text.substring(0, 100),
+          userId: currentUserId,
+          userRole: currentUserRole,
+          jobId,
         });
       } catch (e) {
         console.warn('[chat] Fraud reporting unavailable:', e);

@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { config, requireConfig } from '../config.js';
 import { query } from '../db.js';
 import { forbidden } from '../utils/http.js';
@@ -22,6 +23,7 @@ export function signRefreshToken(user) {
 }
 
 export function setAuthCookies(res, accessToken, refreshToken) {
+  const csrfToken = crypto.randomBytes(32).toString('hex');
   const base = {
     httpOnly: true,
     sameSite: 'strict',
@@ -29,11 +31,27 @@ export function setAuthCookies(res, accessToken, refreshToken) {
   };
   res.cookie('access_token', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
   res.cookie('refresh_token', refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
+  res.cookie('csrf_token', csrfToken, {
+    sameSite: 'strict',
+    secure: config.cookieSecure,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
 }
 
 export function clearAuthCookies(res) {
   res.clearCookie('access_token');
   res.clearCookie('refresh_token');
+  res.clearCookie('csrf_token');
+}
+
+export function csrfProtection(req, _res, next) {
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) return next();
+  if (!req.cookies?.access_token && !req.cookies?.refresh_token) return next();
+  const provided = req.get('x-csrf-token');
+  const expected = req.cookies?.csrf_token;
+  if (!provided || !expected || provided !== expected) return next(forbidden('Invalid CSRF token'));
+  return next();
 }
 
 export async function authRequired(req, _res, next) {

@@ -10,10 +10,11 @@ import AdminLayout from "@/components/admin/AdminLayout";
 
 interface AuditLog {
   id: string;
-  adminId: string;
+  adminId?: string;
+  userId?: string;
   actionType: string;
   targetType: string;
-  targetId: string;
+  targetId?: string;
   reason: string;
   createdAt: string;
 }
@@ -35,11 +36,20 @@ export default function AuditLogs() {
   const fetchLogs = async (page = 1) => {
     setLoading(true);
     try {
-      let endpoint = `/admin/action-logs?page=${page}&limit=${pagination.limit}`;
+      let endpoint = `/admin/audit-logs?page=${page}&limit=${pagination.limit}`;
       if (searchQuery) endpoint += `&q=${encodeURIComponent(searchQuery)}`;
-      if (actionFilter) endpoint += `&actionType=${actionFilter}`;
-      const response = await apiClient.request(endpoint, { includeAuth: true }) as { logs?: AuditLog[]; pagination?: PaginationInfo };
-      setLogs(response.logs || []);
+      if (actionFilter) endpoint += `&action=${encodeURIComponent(actionFilter)}`;
+      const response = await apiClient.request(endpoint, { includeAuth: true }) as { logs?: Array<Record<string, unknown>>; pagination?: PaginationInfo };
+      setLogs((response.logs || []).map((log) => ({
+        id: String(log.id || ""),
+        adminId: log.user_id ? String(log.user_id) : undefined,
+        userId: log.user_id ? String(log.user_id) : undefined,
+        actionType: String(log.action || log.actionType || "unknown"),
+        targetType: String(log.entity_type || log.targetType || "system"),
+        targetId: log.entity_id ? String(log.entity_id) : log.targetId ? String(log.targetId) : undefined,
+        reason: typeof log.metadata === "object" && log.metadata ? JSON.stringify(log.metadata) : String(log.reason || ""),
+        createdAt: String(log.created_at || log.createdAt || new Date().toISOString()),
+      })));
       setPagination(response.pagination || { page, limit: 50, total: 0, pages: 1 });
     } catch (error) {
       console.error("Error fetching audit logs:", error);
@@ -153,7 +163,7 @@ export default function AuditLogs() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs">{log.targetType}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{log.targetId.substring(0, 12)}…</td>
+                        <td className="px-4 py-3 font-mono text-xs">{log.targetId ? `${log.targetId.substring(0, 12)}...` : "-"}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground max-w-48 truncate">{log.reason || "—"}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(log.createdAt)}</td>
                       </motion.tr>

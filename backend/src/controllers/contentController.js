@@ -15,11 +15,12 @@ export async function supportTicket(req, res) {
 export async function fraudReport(req, res) {
   const content = req.body?.content || req.body?.messagePreview || '';
   const detection = detectBypass(content);
-  if (detection.isBypass && req.body?.userId) {
+  const reporterId = req.user?.id || req.body?.userId;
+  if (detection.isBypass && reporterId) {
     await recordFraudAlert({
       jobId: req.body.jobId || null,
-      userId: req.body.userId,
-      userRole: req.body.userRole || 'unknown',
+      userId: reporterId,
+      userRole: req.user?.role || req.body.userRole || 'unknown',
       content,
       detection,
     });

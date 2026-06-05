@@ -31,6 +31,12 @@ function buildUrl(endpoint: string): string {
   return `${base}${path}`;
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 class ApiClient {
   token: string | null;
 
@@ -49,6 +55,8 @@ class ApiClient {
   private getHeaders(includeAuth = true): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
     if (includeAuth && this.token) h['Authorization'] = `Bearer ${this.token}`;
+    const csrf = readCookie('csrf_token');
+    if (csrf) h['X-CSRF-Token'] = csrf;
     return h;
   }
 
@@ -214,12 +222,36 @@ class ApiClient {
     const url = buildUrl('/fundi/register');
     const response = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.token ?? ''}` },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${this.token ?? ''}`,
+        ...(readCookie('csrf_token') ? { 'X-CSRF-Token': readCookie('csrf_token') as string } : {}),
+      },
       body: formData,
     });
     if (!response.ok) {
       const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
       throw new Error(e.message || 'Registration failed');
+    }
+    return response.json();
+  }
+
+  async uploadJobPhoto(jobId: string, formData: FormData) {
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
+    const url = buildUrl(`/jobs/${jobId}/photos`);
+    const csrf = readCookie('csrf_token');
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${this.token ?? ''}`,
+        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new ApiError(e.message || 'Photo upload failed', response.status);
     }
     return response.json();
   }
@@ -314,7 +346,11 @@ class ApiClient {
     const url = buildUrl(`/jobs/${jobId}/complete`);
     const response = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.token ?? ''}` },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${this.token ?? ''}`,
+        ...(readCookie('csrf_token') ? { 'X-CSRF-Token': readCookie('csrf_token') as string } : {}),
+      },
       body: formData,
     });
     if (!response.ok) {
@@ -380,7 +416,11 @@ class ApiClient {
     const url = buildUrl(`/disputes/${disputeId}/evidence`);
     const response = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.token ?? ''}` },
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${this.token ?? ''}`,
+        ...(readCookie('csrf_token') ? { 'X-CSRF-Token': readCookie('csrf_token') as string } : {}),
+      },
       body: formData,
     });
     if (!response.ok) {
@@ -481,6 +521,15 @@ class ApiClient {
 
   async markJobMessagesRead(jobId: string) {
     return this.request(`/jobs/${jobId}/messages/read`, { method: 'POST' });
+  }
+
+  async reportFraud(payload: Record<string, unknown>) {
+    const jobId = payload.jobId ? String(payload.jobId) : null;
+    return this.request(jobId ? `/jobs/${jobId}/fraud-report` : '/fraud-report', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      includeAuth: Boolean(jobId),
+    });
   }
 
   // ── Maps ─────────────────────────────────────────────────────────────────

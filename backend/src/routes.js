@@ -133,6 +133,7 @@ router.post('/subscriptions/activate', authRequired, (_req, res) => res.json({ s
 
 router.post('/support/ticket', asyncHandler(content.supportTicket));
 router.post('/fraud-report', asyncHandler(content.fraudReport));
+router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.get('/blog', asyncHandler(content.genericList('posts')));
 router.get('/blog/:slug', asyncHandler(content.blogPost));
 router.get('/careers/jobs', asyncHandler(content.genericList('jobs')));
