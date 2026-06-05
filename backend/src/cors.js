@@ -12,9 +12,13 @@ const LOCAL_ORIGINS = [
 /** Vercel production + preview deployments */
 const VERCEL_ORIGIN_RE = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$/i;
 
+const PRODUCTION_ORIGINS = [
+  'https://patafundi.vercel.app',
+];
+
 export function getAllowedOrigins() {
   return new Set(
-    [config.frontendOrigin, ...LOCAL_ORIGINS, ...config.corsOrigins].filter(Boolean),
+    [config.frontendOrigin, ...PRODUCTION_ORIGINS, ...LOCAL_ORIGINS, ...config.corsOrigins].filter(Boolean),
   );
 }
 

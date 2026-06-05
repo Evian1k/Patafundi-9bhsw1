@@ -6,13 +6,14 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { Server as SocketIOServer } from 'socket.io';
-import { config } from './config.js';
+import { config, logProductionConfigWarnings } from './config.js';
 import { router } from './routes.js';
 import { attachRealtime } from './realtime.js';
 import { healthcheck } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { csrfProtection } from './middleware/auth.js';
 import { corsOriginCallback } from './cors.js';
+import { isLocalDatabaseUrl } from './pg-config.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -30,7 +31,7 @@ app.use(cors({
   origin: corsOriginCallback,
   credentials: true,
 }));
-app.use(morgan('dev'));
+app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(cookieParser());
 app.use(express.json({
   limit: '2mb',
@@ -42,9 +43,35 @@ app.use(express.urlencoded({ extended: true }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
 app.use(csrfProtection);
 
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'API running',
+    service: 'patafundi-api',
+    health: '/health',
+    api: '/api',
+  });
+});
+
 app.get('/health', async (_req, res) => {
-  const database = await healthcheck().catch((error) => ({ configured: Boolean(config.databaseUrl), ok: false, error: error.message }));
-  res.json({ success: true, service: 'patafundi-api', database });
+  const database = await healthcheck().catch((error) => ({
+    configured: Boolean(config.databaseUrl),
+    ok: false,
+    error: error.message,
+  }));
+
+  if (config.nodeEnv === 'production' && config.databaseUrl && isLocalDatabaseUrl(config.databaseUrl)) {
+    database.ok = false;
+    database.error = 'DATABASE_URL points to localhost. Link Render PostgreSQL.';
+  }
+
+  const ok = database.ok === true;
+  res.status(ok ? 200 : 503).json({
+    status: ok ? 'healthy' : 'degraded',
+    success: ok,
+    service: 'patafundi-api',
+    database,
+    env: config.nodeEnv,
+  });
 });
 
 app.use('/api', router);
@@ -57,28 +84,57 @@ app.use((error, _req, res, _next) => {
   let status = error.status || 500;
   let message = error.message || 'Internal server error';
 
-  if (/ECONNREFUSED.*5432|connect ECONNREFUSED/i.test(message)) {
+  if (/ECONNREFUSED|connect ECONNREFUSED|Connection terminated|timeout expired|not available/i.test(message)) {
     status = 503;
-    message = 'Database unavailable. Restart the backend with: npm run dev:full';
+    message = config.nodeEnv === 'production'
+      ? 'Database unavailable. Verify DATABASE_URL on Render (PostgreSQL, not localhost).'
+      : 'Database unavailable. Start PostgreSQL or run: npm run dev';
   } else if (/relation .* does not exist/i.test(message)) {
     status = 503;
-    message = 'Database not initialized. Run: npm run db:setup';
+    message = config.nodeEnv === 'production'
+      ? 'Database not initialized. Check Render deploy logs for migration errors.'
+      : 'Database not initialized. Run: npm run db:setup';
   } else if (/invalid input syntax for type uuid/i.test(message)) {
     status = 400;
     message = 'Invalid id format';
+  } else if (/is not configured/i.test(message)) {
+    status = 503;
   }
 
-  res.status(status).json({
-    success: false,
-    message,
-    meta: config.nodeEnv === 'production' ? undefined : error.meta,
-  });
+  if (status >= 500) {
+    console.error('[PataFundi API]', message);
+  }
+
+  res.status(status).json({ success: false, message });
 });
 
-await ensureDevDatabase().catch((error) => {
+process.on('unhandledRejection', (reason) => {
+  console.error('[PataFundi API] unhandledRejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[PataFundi API] uncaughtException:', error);
+});
+
+logProductionConfigWarnings();
+
+try {
+  await ensureDevDatabase();
+} catch (error) {
   console.error('[PataFundi API] Database bootstrap failed:', error.message);
+  if (config.nodeEnv === 'production') {
+    console.error('[PataFundi API] Starting anyway — /health will report database status.');
+  }
+}
+
+const host = config.host || '0.0.0.0';
+const port = config.port;
+
+server.listen(port, host, () => {
+  console.log(`[PataFundi API] listening on ${host}:${port} (${config.nodeEnv})`);
 });
 
-server.listen(config.port, () => {
-  console.log(`[PataFundi API] listening on http://127.0.0.1:${config.port}`);
+server.on('error', (error) => {
+  console.error('[PataFundi API] server error:', error.message);
+  process.exit(1);
 });

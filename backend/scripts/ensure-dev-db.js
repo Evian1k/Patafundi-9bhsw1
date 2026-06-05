@@ -5,8 +5,11 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import pg from 'pg';
 import { getEmbeddedDb } from '../src/pglite-instance.js';
+import { getPgPoolConfig, isLocalDatabaseUrl } from '../src/pg-config.js';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
@@ -114,7 +117,7 @@ async function seedIfEmpty(db) {
 
 async function ensurePostgresDatabase(databaseUrl) {
   try {
-    const pool = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 3000 });
+    const pool = new pg.Pool(getPgPoolConfig(databaseUrl, { connectionTimeoutMillis: 3000 }));
     await pool.query('select 1');
     await pool.end();
     return true;
@@ -123,7 +126,7 @@ async function ensurePostgresDatabase(databaseUrl) {
     const parsed = new URL(databaseUrl.replace(/^postgresql:/, 'http:'));
     const dbName = parsed.pathname.replace(/^\//, '');
     const adminUrl = databaseUrl.replace(`/${dbName}`, '/postgres');
-    const admin = new pg.Pool({ connectionString: adminUrl, connectionTimeoutMillis: 3000 });
+    const admin = new pg.Pool(getPgPoolConfig(adminUrl, { connectionTimeoutMillis: 3000 }));
     try {
       await admin.query(`create database "${dbName.replace(/"/g, '""')}"`);
       console.log(`[PataFundi] Created database ${dbName}`);
@@ -134,12 +137,22 @@ async function ensurePostgresDatabase(databaseUrl) {
   }
 }
 
-async function tryPostgresBootstrap() {
+export async function bootstrapPostgresDatabase({ required = false } = {}) {
   const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) return false;
+  if (!databaseUrl) {
+    if (required) throw new Error('DATABASE_URL is required');
+    return false;
+  }
+
+  if (process.env.NODE_ENV === 'production' && isLocalDatabaseUrl(databaseUrl)) {
+    const msg = 'DATABASE_URL must not point to localhost in production';
+    if (required) throw new Error(msg);
+    console.error(`[PataFundi] ${msg}`);
+    return false;
+  }
 
   await ensurePostgresDatabase(databaseUrl);
-  const pool = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 3000 });
+  const pool = new pg.Pool(getPgPoolConfig(databaseUrl));
   try {
     await pool.query('select 1');
     await pool.query(`
@@ -173,15 +186,23 @@ async function tryPostgresBootstrap() {
     return true;
   } catch (error) {
     await pool.end().catch(() => {});
+    if (required) throw error;
     console.warn(`[PataFundi] PostgreSQL unavailable (${error.message}); falling back to embedded DB`);
     return false;
   }
 }
 
-export async function ensureDevDatabase() {
-  if (process.env.NODE_ENV === 'production') return;
+export async function ensureProductionDatabase() {
+  if (process.env.NODE_ENV !== 'production') return true;
+  return bootstrapPostgresDatabase({ required: false });
+}
 
-  if (await tryPostgresBootstrap()) return;
+export async function ensureDevDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    return ensureProductionDatabase();
+  }
+
+  if (await bootstrapPostgresDatabase()) return;
 
   process.env.PATAFUNDI_EMBEDDED_DB = '1';
   const db = await getEmbeddedDb();

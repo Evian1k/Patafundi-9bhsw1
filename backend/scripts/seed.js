@@ -3,7 +3,9 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import { getEmbeddedDb } from '../src/pglite-instance.js';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const demoUsers = [
   { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },

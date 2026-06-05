@@ -3,8 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { getPgPoolConfig } from '../src/pg-config.js';
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
@@ -16,7 +19,7 @@ async function main() {
     process.exit(1);
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const pool = new pg.Pool(getPgPoolConfig(databaseUrl));
   await pool.query(`
     create table if not exists schema_migrations (
       id serial primary key,
