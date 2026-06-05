@@ -297,9 +297,10 @@ class ApiClient {
 
   async goOffline() { return this.request('/fundi/status/offline', { method: 'POST' }); }
 
-  async updateLocation(latitude: number, longitude: number, accuracy?: number) {
+  async updateLocation(latitude: number, longitude: number, accuracy?: number, jobId?: string) {
     return this.request('/fundi/location', {
-      method: 'POST', body: JSON.stringify({ latitude, longitude, accuracy }),
+      method: 'POST',
+      body: JSON.stringify({ latitude, longitude, accuracy, jobId }),
     });
   }
 

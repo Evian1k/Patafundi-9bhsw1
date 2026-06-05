@@ -72,7 +72,6 @@ export function FundiDashboard() {
   useEffect(() => {
     if (!socketToken) return;
     realtimeService.connect(socketToken);
-    return () => realtimeService.disconnect();
   }, [socketToken]);
 
   useEffect(() => {
@@ -108,7 +107,7 @@ export function FundiDashboard() {
           watchIdRef.current = navigator.geolocation.watchPosition(
             (p) => {
               const now = Date.now();
-              if (now - lastSentAtRef.current < 3500) return;
+              if (now - lastSentAtRef.current < 3000) return;
               lastSentAtRef.current = now;
               const a = typeof p.coords.accuracy === "number" ? Math.round(p.coords.accuracy) : undefined;
               setCoords({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: a });
@@ -145,6 +144,7 @@ export function FundiDashboard() {
   const handleLogout = async () => {
     stopLocationWatch();
     await apiClient.logout().catch(console.error);
+    realtimeService.disconnect();
     navigate("/auth");
   };
 

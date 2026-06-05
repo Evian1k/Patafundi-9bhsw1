@@ -3,7 +3,8 @@
  * Ensures users always see a working app experience.
  */
 
-export const DEMO_MODE = !import.meta.env.VITE_API_URL;
+/** Only enabled when explicitly set — avoids fake demo job IDs hitting the real API. */
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export const demoJobs = [
   {

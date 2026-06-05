@@ -41,6 +41,19 @@ const TRACKING_EVENTS = [
   'chat:typing',
 ];
 
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function pollHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const csrf = readCookie('csrf_token');
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  return headers;
+}
+
 class RealtimeService {
   private listeners: Map<string, EventCallback[]> = new Map();
   private pollIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
@@ -126,18 +139,26 @@ class RealtimeService {
 
     let lastStatus: string | null = null;
     let lastPaymentStatus: string | null = null;
+    let authFailed = false;
 
     const poll = async () => {
-      if (!this.token) return;
+      if (!this.token || authFailed) return;
       try {
-        const [jobRes, payRes] = await Promise.all([
-          fetch(`${apiBaseUrl}/jobs/${jobId}`, {
-            headers: { Authorization: `Bearer ${this.token}` },
-          }).then((response) => response.json()).catch(() => null),
-          fetch(`${apiBaseUrl}/payments/job/${jobId}`, {
-            headers: { Authorization: `Bearer ${this.token}` },
-          }).then((response) => response.json()).catch(() => null),
-        ]);
+        const jobResponse = await fetch(`${apiBaseUrl}/jobs/${jobId}`, {
+          credentials: 'include',
+          headers: pollHeaders(this.token),
+        });
+        if (jobResponse.status === 403 || jobResponse.status === 404 || jobResponse.status === 400) {
+          authFailed = true;
+          this.stopWatchingJob(jobId);
+          return;
+        }
+        const payResponse = await fetch(`${apiBaseUrl}/payments/job/${jobId}`, {
+          credentials: 'include',
+          headers: pollHeaders(this.token),
+        });
+        const jobRes = jobResponse.ok ? await jobResponse.json().catch(() => null) : null;
+        const payRes = payResponse.ok ? await payResponse.json().catch(() => null) : null;
 
         const job = jobRes?.job;
         const payment = payRes?.payment;

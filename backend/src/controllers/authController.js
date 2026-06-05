@@ -40,6 +40,14 @@ function requireStrongPassword(password) {
   }
 }
 
+function devOtpPayload(code) {
+  if (config.nodeEnv !== 'development') return {};
+  return {
+    devOtp: code,
+    message: 'OTP generated (development only — configure SMS/email provider for production)',
+  };
+}
+
 export async function register(req, res) {
   const { email, password, fullName, phone, role = 'customer' } = req.body || {};
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
@@ -70,7 +78,13 @@ export async function register(req, res) {
   });
   await auditLog({ userId: user.id, action: 'auth.register', entityType: 'user', entityId: user.id });
   const session = await issueSession(res, user);
-  res.status(201).json({ success: true, user: publicUser(user), token: session.token, otpRequired: true });
+  res.status(201).json({
+    success: true,
+    user: publicUser(user),
+    token: session.token,
+    otpRequired: true,
+    ...devOtpPayload(otpCode),
+  });
 }
 
 export async function login(req, res) {
@@ -157,7 +171,7 @@ export async function otpResend(req, res) {
      values ($1, $2, $3, now() + interval '10 minutes')`,
     [userResult.rows[0].id, purpose, await bcrypt.hash(code, 10)],
   );
-  res.json({ success: true, message: 'OTP sent' });
+  res.json({ success: true, message: 'OTP sent', ...devOtpPayload(code) });
 }
 
 export async function forgotPassword(req, res) {

@@ -187,9 +187,25 @@ export async function walletTransactions(req, res) {
 }
 
 export async function ratings(req, res) {
+  const limit = Number(req.query.limit || 10);
+  const offset = Number(req.query.offset || 0);
+  const fundiId = req.params.id || req.user?.id;
+
+  if (fundiId) {
+    const result = await query(
+      `select r.* from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1 order by r.created_at desc limit $2 offset $3`,
+      [fundiId, limit, offset],
+    );
+    return res.json({ success: true, ratings: result.rows });
+  }
+
   const result = await query(
-    `select r.* from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1 order by r.created_at desc limit $2 offset $3`,
-    [req.params.id || req.user.id, Number(req.query.limit || 10), Number(req.query.offset || 0)],
+    `select r.rating, r.comment, u.full_name as "customerName", r.created_at
+     from reviews r
+     join users u on u.id = r.reviewer_id
+     order by r.created_at desc
+     limit $1 offset $2`,
+    [limit, offset],
   );
   res.json({ success: true, ratings: result.rows });
 }

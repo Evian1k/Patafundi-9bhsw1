@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { query, transaction } from '../db.js';
-import { badRequest, forbidden, notFound } from '../utils/http.js';
+import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -60,7 +60,8 @@ function requireCustomer(user, job) {
 }
 
 async function loadJob(jobId) {
-  const result = await query('select * from jobs where id = $1', [jobId]);
+  const id = parseUuid(jobId, 'job id');
+  const result = await query('select * from jobs where id = $1', [id]);
   if (!result.rows[0]) throw notFound('Job not found');
   return result.rows[0];
 }

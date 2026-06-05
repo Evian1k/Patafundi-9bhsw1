@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
-import FundiVerificationModal from "./FundiVerificationModal";
+import FundiVerificationModal from "@/components/admin/FundiVerificationModal";
 import AdminLayout from "@/components/admin/AdminLayout";
 
 interface Fundi {

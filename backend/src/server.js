@@ -25,7 +25,17 @@ const io = new SocketIOServer(server, {
 attachRealtime(io);
 
 app.use(helmet());
-app.use(cors({ origin: config.frontendOrigin, credentials: true }));
+const allowedOrigins = new Set(
+  [config.frontendOrigin, 'http://127.0.0.1:8080', 'http://127.0.0.1:8081', 'http://localhost:8080', 'http://localhost:8081']
+    .filter(Boolean),
+);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(morgan('dev'));
 app.use(cookieParser());
 app.use(express.json({
@@ -59,6 +69,9 @@ app.use((error, _req, res, _next) => {
   } else if (/relation .* does not exist/i.test(message)) {
     status = 503;
     message = 'Database not initialized. Run: npm run db:setup';
+  } else if (/invalid input syntax for type uuid/i.test(message)) {
+    status = 400;
+    message = 'Invalid id format';
   }
 
   res.status(status).json({

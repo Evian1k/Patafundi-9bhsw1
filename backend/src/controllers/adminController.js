@@ -2,6 +2,10 @@ import { query } from '../db.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 
+const tableOrderBy = {
+  trust_scores: 'updated_at',
+};
+
 const tableSelects = {
   fundis: `select f.id, f.user_id, u.full_name, u.email, u.phone, f.skills, f.experience, f.bio,
                   f.mpesa_number, f.approval_status, f.rejection_reason, f.approved_at,
@@ -56,13 +60,25 @@ export async function dashboard(req, res) {
   });
 }
 
-export async function listTable(table, key) {
+export function listTable(table, key) {
   return async (_req, res) => {
     if (!tableSelects[table]) throw badRequest('Unsupported admin table');
-    const result = await query(`${tableSelects[table]} order by created_at desc limit 100`);
+    const orderCol = tableOrderBy[table] || 'created_at';
+    const result = await query(`${tableSelects[table]} order by ${orderCol} desc limit 100`);
     const rows = table === 'fundis' ? result.rows.map(publicFundi) : result.rows;
     res.json({ success: true, [key]: rows, pagination: { page: 1, limit: 100, total: rows.length, pages: 1 } });
   };
+}
+
+export async function listCustomers(_req, res) {
+  const result = await query(
+    `${tableSelects.users} where role = 'customer' order by created_at desc limit 100`,
+  );
+  res.json({
+    success: true,
+    customers: result.rows,
+    pagination: { page: 1, limit: 100, total: result.rows.length, pages: 1 },
+  });
 }
 
 export async function searchFundis(req, res) {

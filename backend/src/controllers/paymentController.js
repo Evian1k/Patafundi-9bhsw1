@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { query, transaction } from '../db.js';
-import { badRequest, forbidden, notFound } from '../utils/http.js';
+import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import {
   assertValidMpesaPhone,
   initiateStkPush,
@@ -142,15 +142,16 @@ export async function webhook(req, res) {
 }
 
 export async function paymentForJob(req, res) {
+  const jobId = parseUuid(req.params.jobId, 'job id');
   const result = await query(
     `select p.* from payments p
      join jobs j on j.id = p.job_id
      where p.job_id = $1 and ($2 = 'admin' or j.customer_id = $3 or j.fundi_id = $3)
      order by p.created_at desc limit 1`,
-    [req.params.jobId, req.user.role, req.user.id],
+    [jobId, req.user.role, req.user.id],
   );
   if (!result.rows[0]) {
-    const job = await query('select id from jobs where id = $1', [req.params.jobId]);
+    const job = await query('select id from jobs where id = $1', [jobId]);
     if (!job.rows[0]) throw notFound('Job not found');
   }
   res.json({ success: true, payment: result.rows[0] || null });

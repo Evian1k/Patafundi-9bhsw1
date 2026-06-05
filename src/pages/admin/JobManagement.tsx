@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import AdminLayout from "@/components/admin/AdminLayout";
 
 interface Job {
@@ -153,7 +154,7 @@ export default function JobManagement() {
                       <div><p className="text-muted-foreground uppercase mb-0.5">Price</p><p className="font-medium text-primary">{formatCurrency(job.finalPrice > 0 ? job.finalPrice : job.estimatedPrice)}</p></div>
                     </div>
                     <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground border-t pt-3">
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{sanitizeLocationText(job.location, LOCATION_FALLBACK)}</span>
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(job.createdAt)}</span>
                     </div>
                   </Card>

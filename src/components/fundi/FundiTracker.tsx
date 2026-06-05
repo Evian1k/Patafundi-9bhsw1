@@ -3,11 +3,19 @@ import { Button } from "@/components/ui/button";
 import {
   X, ShieldCheck, Star, Wrench, MessageCircle,
   Smartphone, CheckCircle, Loader2, AlertCircle,
-  Lock, ArrowRight, RefreshCw, MapPin, Navigation,
+  Lock, ArrowRight, RefreshCw,
 } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
+import { isValidUuid } from "@/lib/uuid";
 import { realtimeService } from "@/services/realtime";
 import { env } from "@/config/env";
+import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
+import SearchingRadarMap from "@/components/maps/SearchingRadarMap";
+import AddressDisplay from "@/components/maps/AddressDisplay";
+import { useDirections } from "@/hooks/useDirections";
+import { useAnimatedPosition } from "@/hooks/useAnimatedPosition";
+import { useStructuredAddress } from "@/hooks/useStructuredAddress";
+import { formatAddressLines, sanitizeLocationText, LOCATION_FALLBACK } from '@/lib/maps/geocoding';
 import "./fundi-tracker.css";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 import { toast } from "sonner";
@@ -86,7 +94,8 @@ export default function FundiTracker({
   const [fundi, setFundi] = useState<FundiInfo | null>(null);
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null);
   const [progressMsg, setProgressMsg] = useState("Finding nearby fundi...");
-  const [hasAuth, setHasAuth] = useState<boolean>(true);
+  const [hasAuth, setHasAuth] = useState(() => Boolean(localStorage.getItem("auth_token")));
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [customerLocation, setCustomerLocation] = useState<Coordinates | null>(null);
   const [customerAddress, setCustomerAddress] = useState<string>("");
   const [fundiLocation, setFundiLocation] = useState<Coordinates | null>(null);
@@ -128,7 +137,17 @@ export default function FundiTracker({
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token || !jobId) setHasAuth(false);
+    if (!token) {
+      setHasAuth(false);
+      return;
+    }
+    if (!jobId || !isValidUuid(jobId)) {
+      setHasAuth(false);
+      setAccessError(jobId ? "This job link is invalid." : "No job selected.");
+      return;
+    }
+    setHasAuth(true);
+    setAccessError(null);
   }, [jobId]);
 
   // Prevent back during active search
@@ -224,8 +243,20 @@ export default function FundiTracker({
     };
   }, [hasAuth, jobId]);
 
+  const stopJobPolling = () => {
+    if (jobPollRef.current) {
+      clearInterval(jobPollRef.current);
+      jobPollRef.current = null;
+    }
+    if (jobId) realtimeService.stopWatchingJob(jobId);
+  };
+
   const loadJob = async () => {
-    if (!jobId) return;
+    if (!jobId || !isValidUuid(jobId)) {
+      setAccessError("This job link is invalid.");
+      stopJobPolling();
+      return;
+    }
     try {
       const res = await apiClient.getJob(jobId) as { job?: Record<string, unknown> };
       if (res?.job) {
@@ -247,7 +278,8 @@ export default function FundiTracker({
           ["customer_longitude", "longitude", "lng", "lon"],
         );
         if (customerCoords) setCustomerLocation(customerCoords);
-        setCustomerAddress(String(job.location_name || job.address || job.customer_address || ""));
+        const rawLocation = String(job.location_name || job.address || job.customer_address || "");
+        setCustomerAddress(sanitizeLocationText(rawLocation, ""));
         const liveFundiCoords = toCoordinates(
           job,
           ["fundi_latitude", "fundi_lat", "last_fundi_latitude"],
@@ -268,6 +300,11 @@ export default function FundiTracker({
         if (msgMap[status]) setProgressMsg(msgMap[status]);
       }
     } catch (e) {
+      if (e instanceof ApiError && (e.status === 403 || e.status === 404 || e.status === 400)) {
+        setAccessError(e.message || "Not allowed to access this job");
+        stopJobPolling();
+        return;
+      }
       console.error("[FundiTracker] loadJob error:", e);
     }
   };
@@ -375,12 +412,23 @@ export default function FundiTracker({
     }
   };
 
-  const routeDistanceKm = customerLocation && fundiLocation ? distanceKm(fundiLocation, customerLocation) : null;
-  const routeEta = routeDistanceKm == null ? null : etaMinutes(routeDistanceKm);
+  const animatedFundiLocation = useAnimatedPosition(fundiLocation);
+  const trackingActive = ["accepted", "on_the_way", "arrived", "in_progress"].includes(status);
+  const { directions, routePath } = useDirections(
+    fundiLocation,
+    customerLocation,
+    trackingActive && Boolean(fundiLocation && customerLocation),
+  );
+  const { address: resolvedCustomerAddress } = useStructuredAddress(
+    customerLocation,
+    customerAddress || '',
+  );
+  const fallbackDistanceKm = customerLocation && fundiLocation ? distanceKm(fundiLocation, customerLocation) : null;
+  const routeDistanceKm = directions?.distanceKm ?? fallbackDistanceKm;
+  const routeEta = directions?.etaMinutes ?? (fallbackDistanceKm == null ? null : etaMinutes(fallbackDistanceKm));
   const hasArrived = routeDistanceKm != null && routeDistanceKm <= 0.05;
-  const mapsRouteUrl = customerLocation && fundiLocation
-    ? `https://www.google.com/maps/dir/?api=1&origin=${fundiLocation.latitude},${fundiLocation.longitude}&destination=${customerLocation.latitude},${customerLocation.longitude}&travelmode=driving`
-    : null;
+  const showSearchingMap = ["searching", "matching", "matched"].includes(status) && customerLocation;
+  const showTrackingMap = fundi && trackingActive && customerLocation;
 
   useEffect(() => {
     if (!hasArrived || arrivalNotified || !jobId) return;
@@ -388,6 +436,16 @@ export default function FundiTracker({
     realtimeService.emit("fundi:arrived", { jobId, distanceMeters: Math.round((routeDistanceKm || 0) * 1000) });
     toast.success("Your fundi has arrived.");
   }, [arrivalNotified, hasArrived, jobId, routeDistanceKm]);
+
+  if (accessError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center gap-4">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <p className="text-muted-foreground max-w-sm">{accessError}</p>
+        <Button onClick={() => (window.location.href = "/dashboard")}>Back to Dashboard</Button>
+      </div>
+    );
+  }
 
   if (!hasAuth) {
     return (
@@ -444,7 +502,56 @@ export default function FundiTracker({
         </div>
       )}
 
-      <div className="max-w-md mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto space-y-4">
+        {(showSearchingMap || showTrackingMap) && (
+          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-md">
+            {showSearchingMap && customerLocation && (
+              <SearchingRadarMap center={customerLocation} height={380} />
+            )}
+            {showTrackingMap && customerLocation && (
+              <LiveTrackingMap
+                customer={customerLocation}
+                fundi={animatedFundiLocation}
+                routePath={routePath}
+                height={380}
+                overlay={(
+                  <div className="pf-map-overlay-card">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live ETA</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          {routeEta ? `${routeEta} min` : "Waiting for GPS"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remaining</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          {routeDistanceKm != null ? `${routeDistanceKm.toFixed(1)} km` : "--"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              />
+            )}
+            <div className="space-y-3 p-4">
+              <AddressDisplay
+                address={resolvedCustomerAddress}
+                fallback={customerAddress || LOCATION_FALLBACK}
+              />
+              {lastLocationAt && (
+                <p className="text-xs text-muted-foreground">
+                  Last fundi update {new Date(lastLocationAt).toLocaleTimeString()}
+                </p>
+              )}
+              {hasArrived && (
+                <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
+                  Your fundi has arrived.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {/* Main status card */}
         <div className="bg-card rounded-2xl shadow-md border border-border/50 overflow-hidden">
           <div className={`px-6 pt-6 pb-4 ${statusBg[status] || "bg-card"}`}>
@@ -552,63 +659,6 @@ export default function FundiTracker({
             )}
           </div>
         </div>
-
-        {fundi && ["accepted", "on_the_way", "arrived", "in_progress"].includes(status) && (
-          <div className="bg-card rounded-2xl shadow-md border border-border/50 overflow-hidden">
-            <div className="relative h-64 bg-slate-900">
-              <div className="absolute inset-0 opacity-70" style={{
-                backgroundImage: "linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px)",
-                backgroundSize: "34px 34px",
-              }} />
-              <div className="absolute left-8 right-8 top-1/2 h-1 rounded-full bg-emerald-400/70" />
-              <div className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-                <div className="h-11 w-11 rounded-full bg-emerald-500 text-white shadow-lg flex items-center justify-center ring-4 ring-emerald-300/40">
-                  <Navigation className="h-5 w-5" />
-                </div>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-800">Fundi</span>
-              </div>
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-                <div className="h-11 w-11 rounded-full bg-blue-600 text-white shadow-lg flex items-center justify-center ring-4 ring-blue-300/40">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-800">You</span>
-              </div>
-              <div className="absolute left-4 right-4 bottom-4 rounded-xl bg-white/95 p-3 shadow-lg">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Live ETA</p>
-                    <p className="text-lg font-bold text-slate-900">{routeEta ? `${routeEta} min` : "Waiting for GPS"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold text-slate-500">Remaining</p>
-                    <p className="text-lg font-bold text-slate-900">{routeDistanceKm != null ? `${routeDistanceKm.toFixed(2)} km` : "--"}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{customerAddress || "Customer location selected"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {lastLocationAt ? `Last fundi update ${new Date(lastLocationAt).toLocaleTimeString()}` : "Waiting for fundi GPS updates"}
-                  </p>
-                </div>
-              </div>
-              {hasArrived && (
-                <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
-                  Fundi is within 50 meters.
-                </div>
-              )}
-              {mapsRouteUrl && (
-                <Button variant="outline" className="w-full gap-2" onClick={() => window.open(mapsRouteUrl, "_blank", "noopener,noreferrer")}>
-                  <Navigation className="h-4 w-4" /> Open traffic-aware route
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* OTP Confirmation */}
         {status === "completed" && !completionConfirmed && (

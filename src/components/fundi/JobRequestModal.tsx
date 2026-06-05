@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { MapPin, Timer, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import AddressDisplay from '@/components/maps/AddressDisplay';
+import { sanitizeLocationText, LOCATION_FALLBACK } from '@/lib/maps/geocoding';
 
 export function JobRequestModal({
   request,
@@ -17,6 +19,10 @@ export function JobRequestModal({
   const description = (request?.description || '') as string;
   const distanceKm = typeof request?.distanceKm === 'number' ? request.distanceKm : null;
   const estimatedPrice = request?.estimatedPrice != null ? Number(request.estimatedPrice) : null;
+  const locationLabel = sanitizeLocationText(
+    String(request?.location || request?.locationName || request?.address || ''),
+    LOCATION_FALLBACK,
+  );
 
   return (
     <motion.div
@@ -70,6 +76,10 @@ export function JobRequestModal({
             <p className="text-sm">{description}</p>
           </div>
         ) : null}
+
+        <div className="mb-4">
+          <AddressDisplay fallback={locationLabel} compact />
+        </div>
 
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" onClick={onDecline}>

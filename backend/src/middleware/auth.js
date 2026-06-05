@@ -16,7 +16,7 @@ export function signAccessToken(user) {
 export function signRefreshToken(user) {
   requireConfig(config.refreshSecret || config.jwtSecret, 'REFRESH_TOKEN_SECRET');
   return jwt.sign(
-    { sub: user.id, tokenType: 'refresh' },
+    { sub: user.id, tokenType: 'refresh', jti: crypto.randomUUID() },
     config.refreshSecret || config.jwtSecret,
     { expiresIn: '30d', issuer: 'patafundi-api', audience: 'patafundi-web' },
   );
@@ -47,11 +47,35 @@ export function clearAuthCookies(res) {
 export function csrfProtection(req, _res, next) {
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (safeMethods.includes(req.method)) return next();
+  const path = req.path || '';
+  if (path.startsWith('/api/auth') || path.startsWith('/auth')) return next();
   if (!req.cookies?.access_token && !req.cookies?.refresh_token) return next();
   const provided = req.get('x-csrf-token');
   const expected = req.cookies?.csrf_token;
   if (!provided || !expected || provided !== expected) return next(forbidden('Invalid CSRF token'));
   return next();
+}
+
+export async function optionalAuth(req, _res, next) {
+  try {
+    requireConfig(config.jwtSecret, 'JWT_SECRET');
+    const header = req.get('authorization') || '';
+    const bearer = header.startsWith('Bearer ') ? header.slice(7) : null;
+    const token = bearer || req.cookies?.access_token;
+    if (!token) return next();
+    const payload = jwt.verify(token, config.jwtSecret, {
+      issuer: 'patafundi-api',
+      audience: 'patafundi-web',
+    });
+    const result = await query(
+      'select id, email, full_name, phone, role, status, trust_score from users where id = $1',
+      [payload.sub],
+    );
+    if (result.rows[0]?.status === 'active') req.user = result.rows[0];
+    next();
+  } catch {
+    next();
+  }
 }
 
 export async function authRequired(req, _res, next) {

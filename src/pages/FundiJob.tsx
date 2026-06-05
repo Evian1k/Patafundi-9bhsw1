@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  MapPin, Navigation, Phone, MessageCircle, CheckCircle2,
+  Phone, MessageCircle, CheckCircle2,
   Loader2, ChevronLeft, Camera, DollarSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,11 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 import { realtimeService } from '@/services/realtime';
 import InAppChat from '@/components/chat/InAppChat';
+import FundiNavigationMap from '@/components/maps/FundiNavigationMap';
+import AddressDisplay from '@/components/maps/AddressDisplay';
+import { sanitizeLocationText, LOCATION_FALLBACK } from '@/lib/maps/geocoding';
 import { getCurrentPosition } from '@/lib/gps';
+import type { Coordinates } from '@/lib/maps/types';
 
 type Job = {
   id: string;
@@ -24,10 +28,6 @@ type Job = {
   estimatedPrice?: number | null;
   finalPrice?: number | null;
 };
-
-function openGoogleMaps(lat: number, lng: number) {
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank', 'noopener,noreferrer');
-}
 
 export default function FundiJob() {
   const { jobId: jobIdParam } = useParams();
@@ -43,7 +43,10 @@ export default function FundiJob() {
   const [otpConfirmed, setOtpConfirmed] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [fundiPosition, setFundiPosition] = useState<Coordinates | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const lastSentAtRef = useRef<number>(0);
 
   useEffect(() => {
     apiClient.getCurrentUser().then((res) => {
@@ -52,7 +55,6 @@ export default function FundiJob() {
     }).catch(() => {});
   }, []);
 
-  // Resolve "active" to the real active job ID
   useEffect(() => {
     if (jobIdParam && jobIdParam !== 'active') {
       setResolvedJobId(jobIdParam);
@@ -72,7 +74,6 @@ export default function FundiJob() {
   useEffect(() => {
     if (!token) return;
     realtimeService.connect(token);
-    return () => realtimeService.disconnect();
   }, [token]);
 
   useEffect(() => {
@@ -105,11 +106,58 @@ export default function FundiJob() {
     };
   }, [resolvedJobId]);
 
+  const destination = job?.latitude != null && job?.longitude != null
+    ? { latitude: Number(job.latitude), longitude: Number(job.longitude) }
+    : null;
+
+  const status = job?.status.toLowerCase() || '';
+  const shouldTrack = ['accepted', 'on_the_way', 'arrived', 'in_progress'].includes(status);
+
+  useEffect(() => {
+    if (!resolvedJobId || !shouldTrack || !navigator.geolocation) return;
+
+    const sendPosition = (latitude: number, longitude: number, accuracy?: number) => {
+      const now = Date.now();
+      if (now - lastSentAtRef.current < 3000) return;
+      lastSentAtRef.current = now;
+      setFundiPosition({ latitude, longitude });
+      apiClient.updateLocation(latitude, longitude, accuracy, resolvedJobId)
+        .catch(() => realtimeService.updateLocation(latitude, longitude, accuracy, true, resolvedJobId));
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = typeof position.coords.accuracy === 'number'
+          ? Math.round(position.coords.accuracy)
+          : undefined;
+        sendPosition(position.coords.latitude, position.coords.longitude, accuracy);
+      },
+      () => toast.error('Unable to track your location for navigation'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+
+    return () => {
+      if (watchIdRef.current != null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [resolvedJobId, shouldTrack]);
+
   const step = async (nextStatus: 'on_the_way' | 'arrived' | 'in_progress') => {
     if (!resolvedJobId) return;
     try {
       const pos = await getCurrentPosition();
-      await apiClient.checkInToJob(resolvedJobId, pos.coords.latitude, pos.coords.longitude, nextStatus);
+      await apiClient.checkInToJob(
+        resolvedJobId,
+        pos.coords.latitude,
+        pos.coords.longitude,
+        nextStatus,
+      );
+      setFundiPosition({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
       setJob((prev) => prev ? { ...prev, status: nextStatus } : prev);
       const labels = { on_the_way: 'On the way!', arrived: 'Arrived!', in_progress: 'Work started!' };
       toast.success(labels[nextStatus]);
@@ -152,12 +200,8 @@ export default function FundiJob() {
     );
   }
 
-  const canNavigate = job.latitude != null && job.longitude != null;
-  const status = job.status.toLowerCase();
-
   return (
     <div className="min-h-screen bg-gradient-hero">
-      {/* Chat overlay */}
       {showChat && resolvedJobId && currentUserId && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col">
           <div className="flex-1 max-w-lg mx-auto w-full bg-background shadow-2xl flex flex-col mt-4 rounded-t-3xl overflow-hidden">
@@ -171,7 +215,6 @@ export default function FundiJob() {
         </div>
       )}
 
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
           <button onClick={() => navigate('/fundi')} className="p-2 hover:bg-muted rounded-xl transition-colors">
@@ -183,20 +226,26 @@ export default function FundiJob() {
           </div>
           <button onClick={() => setShowChat(true)} className="p-2 hover:bg-muted rounded-xl transition-colors relative">
             <MessageCircle className="w-5 h-5 text-muted-foreground" />
-
           </button>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* Job details */}
+        {destination && shouldTrack && (
+          <FundiNavigationMap
+            fundiPosition={fundiPosition}
+            destination={destination}
+            destinationLabel={sanitizeLocationText(job.location, LOCATION_FALLBACK)}
+            height={380}
+          />
+        )}
+
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-5 border border-border/50">
           <p className="font-bold text-lg">{job.title}</p>
           <p className="text-muted-foreground text-sm mt-1">{job.description}</p>
           <div className="flex items-center gap-3 mt-4">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="w-4 h-4" />
-              <span className="truncate">{job.location}</span>
+            <div className="min-w-0 flex-1">
+              <AddressDisplay fallback={sanitizeLocationText(job.location, LOCATION_FALLBACK)} compact />
             </div>
             {job.estimatedPrice != null && (
               <div className="flex items-center gap-1.5 text-sm ml-auto shrink-0">
@@ -207,16 +256,7 @@ export default function FundiJob() {
           </div>
         </motion.div>
 
-        {/* Navigation */}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => canNavigate ? openGoogleMaps(Number(job.latitude), Number(job.longitude)) : toast.error('No GPS location for this job')}
-            disabled={!canNavigate}
-            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
-          >
-            <Navigation className="w-5 h-5 text-primary" />
-            <span className="text-xs font-medium">Navigate</span>
-          </button>
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setShowChat(true)}
             className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
@@ -233,7 +273,6 @@ export default function FundiJob() {
           </button>
         </div>
 
-        {/* Status controls */}
         {status !== 'completed' && (
           <div className="bg-card rounded-2xl p-5 border border-border/50 space-y-4">
             <h3 className="font-semibold">Job Controls</h3>
@@ -255,7 +294,6 @@ export default function FundiJob() {
               ))}
             </div>
 
-            {/* Complete form */}
             {status === 'in_progress' && (
               <div className="space-y-3 pt-2 border-t border-border/50">
                 <div>
@@ -301,7 +339,6 @@ export default function FundiJob() {
           </div>
         )}
 
-        {/* Completion status */}
         {status === 'completed' && (
           <div className={`rounded-2xl p-5 border ${otpConfirmed ? 'bg-green-50 border-green-200' : 'bg-muted/50 border-border/50'}`}>
             <div className="flex items-center gap-3">

@@ -30,6 +30,7 @@ const Auth = () => {
   const [signupStage, setSignupStage] = useState<"form" | "otp">("form");
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -87,13 +88,22 @@ const Auth = () => {
       const validatedData = schema.parse(formData);
 
       if (mode === "signup") {
-        const reg = await apiClient.register(validatedData.email, validatedData.password, formData.name) as { message?: string };
+        const reg = await apiClient.register(validatedData.email, validatedData.password, formData.name) as {
+          message?: string;
+          devOtp?: string;
+        };
         setPendingEmail(validatedData.email);
         setSignupStage("otp");
         setResendCooldown(30);
         localStorage.setItem("pending_otp_email", validatedData.email);
         localStorage.setItem("pending_otp_purpose", "register");
-        toast.success(reg?.message || "OTP sent! Check your email.");
+        if (reg?.devOtp) {
+          setDevOtpHint(reg.devOtp);
+          toast.success(`Development OTP: ${reg.devOtp}`, { duration: 30000 });
+        } else {
+          setDevOtpHint(null);
+          toast.success(reg?.message || "OTP sent! Check your email.");
+        }
       } else {
         await apiClient.login(validatedData.email, validatedData.password);
         toast.success("Welcome back!");
@@ -186,6 +196,11 @@ const Auth = () => {
               <p className="text-sm text-muted-foreground text-center">
                 Enter the 6-digit code sent to <span className="font-medium text-foreground">{pendingEmail}</span>
               </p>
+              {devOtpHint && (
+                <p className="text-xs text-center bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
+                  Development OTP (no email provider configured): <span className="font-mono font-bold">{devOtpHint}</span>
+                </p>
+              )}
 
               <div className="flex justify-center">
                 <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
@@ -216,9 +231,14 @@ const Auth = () => {
                 onClick={async () => {
                   if (!pendingEmail) return;
                   try {
-                    await apiClient.otpResend(pendingEmail, "register");
+                    const res = await apiClient.otpResend(pendingEmail, "register") as { devOtp?: string; message?: string };
                     setResendCooldown(30);
-                    toast.success("OTP resent. Check your email.");
+                    if (res?.devOtp) {
+                      setDevOtpHint(res.devOtp);
+                      toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
+                    } else {
+                      toast.success(res?.message || "OTP resent. Check your email.");
+                    }
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : "Failed to resend OTP");
                   }

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import pg from 'pg';
 import { getEmbeddedDb } from '../src/pglite-instance.js';
 
 dotenv.config();
@@ -52,13 +53,15 @@ async function applyMigrations(db) {
 async function ensureCustomersTable(db) {
   const check = await db.query(`select to_regclass('public.customers') as t`);
   if (check.rows[0]?.t) return;
-  await db.exec(`
+  const sql = `
     create table if not exists customers (
       user_id uuid primary key references users(id) on delete cascade,
       default_location_name text,
       created_at timestamptz not null default now()
-    );
-  `);
+    )
+  `;
+  if (typeof db.exec === 'function') await db.exec(`${sql};`);
+  else await db.query(sql);
 }
 
 async function seedIfEmpty(db) {
@@ -109,8 +112,76 @@ async function seedIfEmpty(db) {
   }
 }
 
+async function ensurePostgresDatabase(databaseUrl) {
+  try {
+    const pool = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 3000 });
+    await pool.query('select 1');
+    await pool.end();
+    return true;
+  } catch (error) {
+    if (!/database .* does not exist/i.test(error.message)) throw error;
+    const parsed = new URL(databaseUrl.replace(/^postgresql:/, 'http:'));
+    const dbName = parsed.pathname.replace(/^\//, '');
+    const adminUrl = databaseUrl.replace(`/${dbName}`, '/postgres');
+    const admin = new pg.Pool({ connectionString: adminUrl, connectionTimeoutMillis: 3000 });
+    try {
+      await admin.query(`create database "${dbName.replace(/"/g, '""')}"`);
+      console.log(`[PataFundi] Created database ${dbName}`);
+    } finally {
+      await admin.end();
+    }
+    return true;
+  }
+}
+
+async function tryPostgresBootstrap() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) return false;
+
+  await ensurePostgresDatabase(databaseUrl);
+  const pool = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 3000 });
+  try {
+    await pool.query('select 1');
+    await pool.query(`
+      create table if not exists schema_migrations (
+        id serial primary key,
+        filename text not null unique,
+        applied_at timestamptz not null default now()
+      )
+    `);
+    const applied = await pool.query('select filename from schema_migrations order by filename');
+    const appliedSet = new Set(applied.rows.map((row) => row.filename));
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+    for (const file of files) {
+      if (appliedSet.has(file)) continue;
+      const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+      console.log(`[migrate] apply ${file}`);
+      await pool.query('BEGIN');
+      try {
+        await pool.query(sql);
+        await pool.query('insert into schema_migrations (filename) values ($1)', [file]);
+        await pool.query('COMMIT');
+      } catch (error) {
+        await pool.query('ROLLBACK');
+        throw error;
+      }
+    }
+    await ensureCustomersTable(pool);
+    await seedIfEmpty(pool);
+    await pool.end();
+    console.log('[PataFundi] PostgreSQL database ready');
+    return true;
+  } catch (error) {
+    await pool.end().catch(() => {});
+    console.warn(`[PataFundi] PostgreSQL unavailable (${error.message}); falling back to embedded DB`);
+    return false;
+  }
+}
+
 export async function ensureDevDatabase() {
   if (process.env.NODE_ENV === 'production') return;
+
+  if (await tryPostgresBootstrap()) return;
 
   process.env.PATAFUNDI_EMBEDDED_DB = '1';
   const db = await getEmbeddedDb();

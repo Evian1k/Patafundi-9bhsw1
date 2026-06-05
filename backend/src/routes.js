@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { authRequired, requireRole } from './middleware/auth.js';
+import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
 import * as auth from './controllers/authController.js';
 import * as users from './controllers/userController.js';
 import * as jobs from './controllers/jobController.js';
@@ -89,7 +89,7 @@ router.post('/fundi/status/online', authRequired, requireRole('fundi', 'admin'),
 router.post('/fundi/status/offline', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.goOffline));
 router.post('/fundi/location', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.location));
 router.get('/fundi/wallet/transactions', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.walletTransactions));
-router.get('/fundi/ratings', authRequired, asyncHandler(fundi.ratings));
+router.get('/fundi/ratings', optionalAuth, asyncHandler(fundi.ratings));
 router.get('/fundi/:id/reviews', asyncHandler(fundi.ratings));
 router.get('/fundi/:id', asyncHandler(fundi.publicFundi));
 
@@ -101,7 +101,7 @@ router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler
 router.post('/admin/fundis/:id/approve', authRequired, requireRole('admin'), asyncHandler(admin.approveFundi));
 router.post('/admin/fundis/:id/reject', authRequired, requireRole('admin'), asyncHandler(admin.rejectFundi));
 router.post('/admin/fundis/:id/suspend', authRequired, requireRole('admin'), asyncHandler(admin.suspendFundi));
-router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listTable('users', 'customers')));
+router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listCustomers));
 router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
 router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.unblockUser));
 router.get('/admin/jobs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('jobs', 'jobs')));

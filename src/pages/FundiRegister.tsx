@@ -43,17 +43,26 @@ export default function FundiRegister() {
       );
       const { latitude, longitude, accuracy } = pos.coords;
       // Reverse geocode
-      let locationDisplayName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      let locationDisplayName = "Selected location";
       let locationCity = "";
       let locationArea = "";
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=en`);
-        const geoData = await res.json();
-        const addr = geoData.address || {};
-        locationCity = addr.city || addr.town || addr.village || "";
-        locationArea = addr.suburb || addr.neighbourhood || addr.county || "";
-        const parts = [addr.road, locationArea, locationCity].filter(Boolean);
-        locationDisplayName = parts.length > 0 ? parts.join(", ") : locationDisplayName;
+        const geoData = await apiClient.reverseGeocode(latitude, longitude) as {
+          address?: {
+            town?: string | null;
+            estate?: string | null;
+            fullLabel?: string;
+            shortLabel?: string;
+          };
+          formattedAddress?: string | null;
+          areaName?: string;
+        };
+        locationDisplayName = geoData.address?.fullLabel
+          || geoData.formattedAddress
+          || geoData.areaName
+          || "Selected location";
+        locationCity = geoData.address?.town || "";
+        locationArea = geoData.address?.estate || "";
       } catch { /* ignore */ }
       setData(d => ({ ...d, latitude, longitude, accuracy: Math.round(accuracy), locationDisplayName, locationCity, locationArea }));
       toast.success("Location captured");

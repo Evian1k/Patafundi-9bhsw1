@@ -1,7 +1,4 @@
-/**
- * Fundi registration data types.
- */
-
+/** Fundi registration form types (for future use in FundiRegister). */
 export interface FundiRegistrationData {
   firstName: string;
   lastName: string;

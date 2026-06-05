@@ -23,11 +23,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
+import AddressDisplay from "@/components/maps/AddressDisplay";
+import { formatAddressLines, formatAddressShort, sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
+import type { StructuredAddress } from "@/lib/maps/types";
 
 interface LocationSearchResult {
   lat: string;
   lon: string;
   display_name: string;
+  address?: StructuredAddress;
 }
 
 interface PhotoData {
@@ -101,10 +106,20 @@ const CreateJob = () => {
 
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     try {
-      const data = await apiClient.reverseGeocode(lat, lng) as { areaName?: string; formattedAddress?: string | null };
-      return data.formattedAddress || data.areaName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      const data = await apiClient.reverseGeocode(lat, lng) as {
+        address?: { fullLabel?: string; shortLabel?: string; displayLines?: string[] };
+        areaName?: string;
+        formattedAddress?: string | null;
+      };
+      return sanitizeLocationText(
+        data.address?.fullLabel
+        || data.formattedAddress
+        || data.areaName
+        || data.address?.shortLabel,
+        LOCATION_FALLBACK,
+      );
     } catch {
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      return LOCATION_FALLBACK;
     }
   };
 
@@ -124,8 +139,9 @@ const CreateJob = () => {
   const selectLocation = (result: LocationSearchResult) => {
     const lat = parseFloat(result.lat);
     const lng = parseFloat(result.lon);
-    // Show area name, not raw coordinates
-    const displayName = result.display_name.split(",").slice(0, 3).join(",").trim();
+    const displayName = result.address
+      ? formatAddressShort(result.address)
+      : sanitizeLocationText(result.display_name, LOCATION_FALLBACK);
     setJobData((prev) => ({ ...prev, latitude: lat, longitude: lng, location: displayName, locationName: displayName }));
     setSearchQuery(displayName);
     setSearchResults([]);
@@ -409,7 +425,11 @@ const CreateJob = () => {
                         >
                           <div className="flex items-start gap-2">
                             <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                            <p className="text-sm">{r.display_name.split(",").slice(0, 3).join(",")}</p>
+                            <p className="text-sm">
+                              {r.address
+                                ? formatAddressLines(r.address).slice(0, 3).join(', ')
+                                : sanitizeLocationText(r.display_name, LOCATION_FALLBACK)}
+                            </p>
                           </div>
                         </button>
                       ))}
@@ -423,13 +443,15 @@ const CreateJob = () => {
                     </div>
                   )}
 
-                  {/* Show selected location name (no coordinates) */}
-                  {jobData.location && jobData.latitude && (
-                    <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-primary shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">Location set</p>
-                        <p className="text-xs text-muted-foreground">{jobData.location}</p>
+                  {jobData.location && jobData.latitude != null && jobData.longitude != null && (
+                    <div className="mt-3 space-y-3 overflow-hidden rounded-2xl border border-primary/20 bg-card">
+                      <LiveTrackingMap
+                        customer={{ latitude: jobData.latitude, longitude: jobData.longitude }}
+                        height={220}
+                        showControls={false}
+                      />
+                      <div className="px-4 pb-4">
+                        <AddressDisplay fallback={jobData.location} />
                       </div>
                     </div>
                   )}
@@ -466,7 +488,7 @@ const CreateJob = () => {
                     <p className="text-xs font-medium text-muted-foreground mb-1">LOCATION</p>
                     <div className="flex items-start gap-2">
                       <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                      <p className="text-sm">{jobData.location}</p>
+                      <p className="text-sm">{sanitizeLocationText(jobData.location, LOCATION_FALLBACK)}</p>
                     </div>
                   </div>
 

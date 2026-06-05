@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, Check, AlertTriangle, MapPin, FileText } from "lucide-react";
+import { X, Check, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 
 interface FundiVerificationModalProps {
   fundi: Record<string, unknown>;
@@ -46,14 +47,12 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
         className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
           <h2 className="font-bold text-xl">{fundi.firstName as string} {fundi.lastName as string}</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Personal Info */}
           <div>
             <h3 className="font-semibold mb-3">Personal Information</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -68,7 +67,6 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
             </div>
           </div>
 
-          {/* OCR Verification */}
           {fundi.ocrComparison && (
             <div className={`p-4 rounded-xl border ${isOCRMatch ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
               <div className="flex items-center gap-2 mb-2">
@@ -82,7 +80,6 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
             </div>
           )}
 
-          {/* Documents */}
           <div>
             <h3 className="font-semibold mb-3">Uploaded Documents</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -107,28 +104,16 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
             </div>
           </div>
 
-          {/* Location (no coords shown) */}
           {(fundi.locationAddress || fundi.locationCity) && (
             <div>
               <h3 className="font-semibold mb-2">Location</h3>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <MapPin className="w-4 h-4 text-primary" />
-                <span>{(fundi.locationAddress || fundi.locationCity) as string}</span>
+                <span>{sanitizeLocationText(String(fundi.locationAddress || fundi.locationCity || ''), LOCATION_FALLBACK)}</span>
               </div>
-              {fundi.latitude && fundi.longitude && (
-                <a
-                  href={`https://www.google.com/maps?q=${fundi.latitude},${fundi.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline mt-1 inline-block"
-                >
-                  Open in Google Maps
-                </a>
-              )}
             </div>
           )}
 
-          {/* Skills */}
           {Array.isArray(fundi.skills) && (fundi.skills as string[]).length > 0 && (
             <div>
               <h3 className="font-semibold mb-2">Skills</h3>
@@ -138,7 +123,6 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
             </div>
           )}
 
-          {/* Action Section */}
           {fundi.verificationStatus === "pending" && (
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-3">Admin Action</h3>
@@ -181,7 +165,6 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
         </div>
       </motion.div>
 
-      {/* Zoomed image */}
       {zoomedImage && (
         <div className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4" onClick={() => setZoomedImage(null)}>
           <div className="relative max-w-2xl w-full">

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { DEMO_MODE, demoJobs, demoUser } from "@/lib/demo";
+import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 
 interface JobData {
@@ -47,6 +48,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const ACTIVE_STATUSES = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress'];
+
+function openJobTracking(navigate: ReturnType<typeof useNavigate>, jobId: string) {
+  if (DEMO_MODE) {
+    toast.info("Demo mode is off for live jobs — sign in with a real account.");
+    navigate("/auth");
+    return;
+  }
+  navigate(`/job/${jobId}/tracking`);
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -227,10 +237,10 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-card rounded-2xl p-4 border border-border/50 cursor-pointer hover:shadow-md transition-all"
-                  onClick={() => navigate(`/job/${job.id}/tracking`)}
+                  onClick={() => openJobTracking(navigate, job.id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/job/${job.id}/tracking`); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') openJobTracking(navigate, job.id); }}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
@@ -255,7 +265,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="w-3 h-3" />
-                    <span className="truncate">{job.location}</span>
+                    <span className="truncate">{sanitizeLocationText(job.location, LOCATION_FALLBACK)}</span>
                   </div>
                 </motion.div>
               ))}

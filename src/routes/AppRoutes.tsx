@@ -1,0 +1,112 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+import { ProtectedAdminRoute } from "@/routes/guards";
+
+import Index from "@/pages/Index";
+import Auth from "@/pages/Auth";
+import Dashboard from "@/pages/Dashboard";
+import CreateJob from "@/pages/CreateJob";
+import FundiRegister from "@/pages/FundiRegister";
+import FundiPendingApproval from "@/pages/FundiPendingApproval";
+import { FundiDashboard } from "@/pages/FundiDashboard";
+import FundiJob from "@/pages/FundiJob";
+import FundiWallet from "@/pages/FundiWallet";
+import DisputeCenter from "@/pages/DisputeCenter";
+import Settings from "@/pages/Settings";
+import JobTracking from "@/pages/JobTracking";
+import NotFound from "@/pages/NotFound";
+import ServicePage from "@/pages/ServicePage";
+import About from "@/pages/About";
+import Careers from "@/pages/Careers";
+import Blog from "@/pages/Blog";
+import BlogPost from "@/pages/BlogPost";
+import Press from "@/pages/Press";
+import HowItWorks from "@/pages/HowItWorks";
+import TrustSafety from "@/pages/TrustSafety";
+import Investors from "@/pages/Investors";
+import Contact from "@/pages/Contact";
+import HelpCenter from "@/pages/HelpCenter";
+import SafetyGuidelines from "@/pages/SafetyGuidelines";
+import ContactSupport from "@/pages/ContactSupport";
+import ReportProblem from "@/pages/ReportProblem";
+import Socials from "@/pages/Socials";
+import PolicyPage from "@/pages/PolicyPage";
+import FundiResources from "@/pages/FundiResources";
+import FundiApp from "@/pages/FundiApp";
+
+import AdminLogin from "@/pages/admin/AdminLogin";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import FundiVerificationManagement from "@/pages/admin/FundiVerificationManagement";
+import CustomerManagement from "@/pages/admin/CustomerManagement";
+import JobManagement from "@/pages/admin/JobManagement";
+import PaymentsManagement from "@/pages/admin/PaymentsManagement";
+import SecurityManagement from "@/pages/admin/SecurityManagement";
+import ReportsAnalytics from "@/pages/admin/ReportsAnalytics";
+import AdminSettings from "@/pages/admin/SettingsPage";
+import AuditLogs from "@/pages/admin/AuditLogs";
+import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
+
+export default function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/auth" element={<Auth />} />
+
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/create-job" element={<CreateJob />} />
+      <Route path="/job/:jobId/tracking" element={<JobTracking />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="/disputes" element={<DisputeCenter />} />
+
+      <Route path="/services/:slug" element={<ServicePage />} />
+
+      <Route path="/about" element={<About />} />
+      <Route path="/careers" element={<Careers />} />
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/press" element={<Press />} />
+      <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/trust-safety" element={<TrustSafety />} />
+      <Route path="/investors" element={<Investors />} />
+      <Route path="/contact" element={<Contact />} />
+
+      <Route path="/help" element={<HelpCenter />} />
+      <Route path="/safety-guidelines" element={<SafetyGuidelines />} />
+      <Route path="/contact-support" element={<ContactSupport />} />
+      <Route path="/report-problem" element={<ReportProblem />} />
+      <Route path="/socials" element={<Socials />} />
+
+      <Route path="/privacy" element={<PolicyPage slug="privacy" />} />
+      <Route path="/terms" element={<PolicyPage slug="terms" />} />
+      <Route path="/cookies" element={<PolicyPage slug="cookies" />} />
+      <Route path="/refund-policy" element={<PolicyPage slug="refund-policy" />} />
+      <Route path="/platform-rules" element={<PolicyPage slug="platform-rules" />} />
+      <Route path="/enforcement" element={<PolicyPage slug="enforcement" />} />
+      <Route path="/policies/:slug" element={<PolicyPage />} />
+
+      <Route path="/fundi/register" element={<FundiRegister />} />
+      <Route path="/fundi/pending" element={<FundiPendingApproval />} />
+      <Route path="/fundi" element={<FundiDashboard />} />
+      <Route path="/fundi/job/:jobId" element={<FundiJob />} />
+      <Route path="/fundi/job/active" element={<FundiJob />} />
+      <Route path="/fundi/wallet" element={<FundiWallet />} />
+      <Route path="/fundi/disputes" element={<DisputeCenter />} />
+      <Route path="/fundi/resources" element={<FundiResources />} />
+      <Route path="/fundi/app" element={<FundiApp />} />
+
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+      <Route path="/admin/dashboard" element={<ProtectedAdminRoute element={<AdminDashboard />} />} />
+      <Route path="/admin/fundis" element={<ProtectedAdminRoute element={<FundiVerificationManagement />} />} />
+      <Route path="/admin/customers" element={<ProtectedAdminRoute element={<CustomerManagement />} />} />
+      <Route path="/admin/jobs" element={<ProtectedAdminRoute element={<JobManagement />} />} />
+      <Route path="/admin/payments" element={<ProtectedAdminRoute element={<PaymentsManagement />} />} />
+      <Route path="/admin/security" element={<ProtectedAdminRoute element={<SecurityManagement />} />} />
+      <Route path="/admin/reports" element={<ProtectedAdminRoute element={<ReportsAnalytics />} />} />
+      <Route path="/admin/settings" element={<ProtectedAdminRoute element={<AdminSettings />} />} />
+      <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
+      <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
+
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
