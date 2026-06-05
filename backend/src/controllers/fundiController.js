@@ -1,5 +1,15 @@
-import { query } from '../db.js';
+import { query, transaction } from '../db.js';
 import { badRequest } from '../utils/http.js';
+import { emitEvent } from '../realtime.js';
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export async function registerFundi(req, res) {
   const body = req.body || {};
@@ -50,27 +60,69 @@ export async function publicFundi(req, res) {
 }
 
 export async function searchFundis(req, res) {
+  const latitude = req.query.latitude == null ? null : Number(req.query.latitude);
+  const longitude = req.query.longitude == null ? null : Number(req.query.longitude);
+  const skill = req.query.skill ? String(req.query.skill).toLowerCase() : null;
   const result = await query(
     `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
-      null::numeric as latitude, null::numeric as longitude
+      f.latitude, f.longitude, f.location_accuracy
      from fundis f join users u on u.id = f.user_id
-     where f.approval_status = 'approved'
+     where f.approval_status = 'approved' and f.online = true
      order by f.rating desc limit 25`,
   );
-  res.json({ success: true, fundis: result.rows });
+  const fundis = result.rows
+    .filter((row) => !skill || row.skills?.map((s) => String(s).toLowerCase()).includes(skill))
+    .map((row) => {
+      const distanceKm = Number.isFinite(latitude) && Number.isFinite(longitude) && row.latitude != null && row.longitude != null
+        ? haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude))
+        : null;
+      return { ...row, distanceKm };
+    })
+    .sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
+  res.json({ success: true, fundis });
 }
 
 export async function dashboard(req, res) {
-  const [jobs, fundi] = await Promise.all([
+  const [jobs, fundi, wallet, ratings] = await Promise.all([
     query(`select * from jobs where fundi_id = $1 order by updated_at desc limit 10`, [req.user.id]),
     query(`select * from fundis where user_id = $1`, [req.user.id]),
+    query(
+      `select coalesce(sum(case when status in ('requested','processing','completed') then amount else 0 end),0) as balance
+       from payouts where fundi_id = $1`,
+      [req.user.id],
+    ),
+    query(
+      `select coalesce(avg(r.rating),0) as average, count(*)::int as total
+       from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1`,
+      [req.user.id],
+    ),
   ]);
-  res.json({ success: true, dashboard: { jobs: jobs.rows, fundi: fundi.rows[0] || null } });
+  const profile = fundi.rows[0] || null;
+  res.json({
+    success: true,
+    dashboard: {
+      jobs: jobs.rows,
+      fundi: profile,
+      verificationStatus: profile?.approval_status || 'not_registered',
+      profileCompletion: profile ? 85 : 0,
+      online: Boolean(profile?.online),
+      walletBalance: Number(wallet.rows[0]?.balance || 0),
+      jobStats: {
+        newRequests: 0,
+        activeJobs: jobs.rows.filter((job) => !['completed', 'cancelled', 'failed'].includes(job.status)).length,
+        completedJobs: jobs.rows.filter((job) => job.status === 'completed').length,
+      },
+      ratings: {
+        average: Number(ratings.rows[0]?.average || 0),
+        total: Number(ratings.rows[0]?.total || 0),
+      },
+    },
+  });
 }
 
 export async function status(req, res) {
-  const result = await query('select online, latitude, longitude from fundis where user_id = $1', [req.user.id]);
-  res.json({ success: true, status: result.rows[0] || { online: false } });
+  const result = await query('select online, latitude, longitude, location_accuracy, approval_status from fundis where user_id = $1', [req.user.id]);
+  res.json({ success: true, status: { ...(result.rows[0] || { online: false }), subscriptionActive: true, daysLeft: 30 } });
 }
 
 export async function goOnline(req, res) {
@@ -90,7 +142,40 @@ export async function goOffline(req, res) {
 }
 
 export async function location(req, res) {
-  return goOnline(req, res);
+  const { latitude, longitude, accuracy = null, jobId = null } = req.body || {};
+  if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
+  const active = await transaction(async (client) => {
+    await client.query(
+      `update fundis set online = true, latitude = $2, longitude = $3, location_accuracy = $4, updated_at = now()
+       where user_id = $1`,
+      [req.user.id, latitude, longitude, accuracy],
+    );
+    const job = await client.query(
+      `select * from jobs
+       where ($2::uuid is null or id = $2)
+         and fundi_id = $1
+         and status not in ('completed', 'cancelled', 'failed')
+       order by updated_at desc limit 1`,
+      [req.user.id, jobId],
+    );
+    if (job.rows[0]) {
+      await client.query(
+        `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
+         values ($1, $2, $3, $4, $5)`,
+        [job.rows[0].id, req.user.id, latitude, longitude, accuracy],
+      );
+      await client.query(
+        `update jobs set fundi_latitude = $2, fundi_longitude = $3, updated_at = now()
+         where id = $1`,
+        [job.rows[0].id, latitude, longitude],
+      );
+    }
+    return job.rows[0] || null;
+  });
+  const payload = { jobId: active?.id || jobId || null, fundiId: req.user.id, latitude, longitude, accuracy, recordedAt: new Date().toISOString() };
+  if (payload.jobId) emitEvent('fundi:location:update', payload, `job:${payload.jobId}`);
+  emitEvent('fundi:location:update', payload, `user:${req.user.id}`);
+  res.json({ success: true, location: payload });
 }
 
 export async function walletTransactions(req, res) {

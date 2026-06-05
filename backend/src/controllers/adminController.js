@@ -20,6 +20,24 @@ const tableSelects = {
   notifications: `select * from notifications`,
 };
 
+function publicFundi(row) {
+  if (!row) return null;
+  const [firstName = row.full_name || '', ...rest] = String(row.full_name || '').split(' ');
+  return {
+    ...row,
+    userId: row.user_id,
+    firstName,
+    lastName: rest.join(' '),
+    verificationStatus: row.approval_status,
+    idNumber: row.id_number || '',
+    idPhotoUrl: row.id_photo_url || '',
+    selfieUrl: row.selfie_url || '',
+    experienceYears: row.experience || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function dashboard(req, res) {
   const [users, jobs, payments, disputes] = await Promise.all([
     query('select count(*)::int as total from users'),
@@ -42,8 +60,98 @@ export async function listTable(table, key) {
   return async (_req, res) => {
     if (!tableSelects[table]) throw badRequest('Unsupported admin table');
     const result = await query(`${tableSelects[table]} order by created_at desc limit 100`);
-    res.json({ success: true, [key]: result.rows, pagination: { page: 1, total: result.rows.length } });
+    const rows = table === 'fundis' ? result.rows.map(publicFundi) : result.rows;
+    res.json({ success: true, [key]: rows, pagination: { page: 1, limit: 100, total: rows.length, pages: 1 } });
   };
+}
+
+export async function searchFundis(req, res) {
+  const status = req.query.status ? String(req.query.status) : null;
+  const q = req.query.q ? `%${String(req.query.q).toLowerCase()}%` : null;
+  const result = await query(
+    `${tableSelects.fundis}
+     where ($1::text is null or f.approval_status = $1)
+       and ($2::text is null or lower(u.full_name) like $2 or lower(u.email) like $2 or u.phone like $2)
+     order by f.created_at desc limit 100`,
+    [status, q],
+  );
+  const fundis = result.rows.map(publicFundi);
+  res.json({ success: true, fundis, pagination: { page: 1, limit: 100, total: fundis.length, pages: 1 } });
+}
+
+export async function getFundi(req, res) {
+  const result = await query(
+    `${tableSelects.fundis} where f.id = $1 or f.user_id = $1 limit 1`,
+    [req.params.id],
+  );
+  if (!result.rows[0]) throw notFound('Fundi not found');
+  res.json({ success: true, fundi: publicFundi(result.rows[0]) });
+}
+
+export async function transactions(_req, res) {
+  const result = await query(
+    `select p.id, p.job_id, p.customer_id, cu.full_name as customer_name,
+            j.fundi_id, fu.full_name as fundi_name, p.amount, p.provider, p.status, p.created_at
+     from payments p
+     join jobs j on j.id = p.job_id
+     join users cu on cu.id = p.customer_id
+     left join users fu on fu.id = j.fundi_id
+     order by p.created_at desc limit 100`,
+  );
+  const transactions = result.rows.map((row) => {
+    const amount = Number(row.amount || 0);
+    const commission = Math.round(amount * 0.1 * 100) / 100;
+    return {
+      id: row.id,
+      jobId: row.job_id,
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      fundiId: row.fundi_id,
+      fundiName: row.fundi_name || 'Unassigned',
+      amount,
+      commission,
+      fundiEarnings: amount - commission,
+      status: row.status,
+      paymentMethod: row.provider,
+      createdAt: row.created_at,
+    };
+  });
+  const completed = transactions.filter((tx) => tx.status === 'completed');
+  res.json({
+    success: true,
+    transactions,
+    count: transactions.length,
+    totalRevenue: completed.reduce((sum, tx) => sum + tx.amount, 0),
+    totalCommission: completed.reduce((sum, tx) => sum + tx.commission, 0),
+    pagination: { page: 1, total: transactions.length },
+  });
+}
+
+export async function escrowQueue(_req, res) {
+  const result = await query(
+    `select j.id as job_id, cu.full_name as customer_name, fu.full_name as fundi_name,
+            p.amount, j.updated_at as completed_at,
+            extract(epoch from (now() - j.updated_at)) / 3600 as hours_elapsed,
+            exists(select 1 from fraud_alerts fa where fa.job_id = j.id and fa.resolved_at is null) as flagged
+     from jobs j
+     join payments p on p.job_id = j.id and p.escrow_status in ('held', 'frozen')
+     join users cu on cu.id = j.customer_id
+     left join users fu on fu.id = j.fundi_id
+     where j.status = 'completed'
+     order by j.updated_at asc limit 100`,
+  );
+  res.json({
+    success: true,
+    queue: result.rows.map((row) => ({
+      jobId: row.job_id,
+      customerName: row.customer_name,
+      fundiName: row.fundi_name || 'Unassigned',
+      amount: Number(row.amount || 0),
+      completedAt: row.completed_at,
+      hoursElapsed: Math.round(Number(row.hours_elapsed || 0)),
+      flagged: Boolean(row.flagged),
+    })),
+  });
 }
 
 export async function approveFundi(req, res) {
@@ -66,6 +174,17 @@ export async function rejectFundi(req, res) {
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
   await auditLog({ userId: req.user.id, action: 'admin.fundi.reject', entityType: 'fundi', entityId: result.rows[0].id });
+  res.json({ success: true, fundi: result.rows[0] });
+}
+
+export async function suspendFundi(req, res) {
+  const result = await query(
+    `update fundis set approval_status = 'suspended', rejection_reason = $2, online = false, updated_at = now()
+     where id = $1 or user_id = $1 returning *`,
+    [req.params.id, req.body?.reason || null],
+  );
+  if (!result.rows[0]) throw notFound('Fundi not found');
+  await auditLog({ userId: req.user.id, action: 'admin.fundi.suspend', entityType: 'fundi', entityId: result.rows[0].id });
   res.json({ success: true, fundi: result.rows[0] });
 }
 

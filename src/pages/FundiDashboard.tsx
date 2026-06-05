@@ -112,7 +112,8 @@ export function FundiDashboard() {
               lastSentAtRef.current = now;
               const a = typeof p.coords.accuracy === "number" ? Math.round(p.coords.accuracy) : undefined;
               setCoords({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: a });
-              realtimeService.updateLocation(p.coords.latitude, p.coords.longitude, a, true);
+              apiClient.updateLocation(p.coords.latitude, p.coords.longitude, a)
+                .catch(() => realtimeService.updateLocation(p.coords.latitude, p.coords.longitude, a, true));
             },
             (e) => { toast.error(`Location tracking error: ${e.message}`); },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }

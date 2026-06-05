@@ -65,6 +65,21 @@ async function loadJob(jobId) {
   return result.rows[0];
 }
 
+function publicJob(job) {
+  if (!job) return null;
+  return {
+    ...job,
+    title: job.title || `${job.service_category || 'Service'} job`,
+    category: job.service_category,
+    location: job.location_name,
+    latitude: job.customer_latitude == null ? undefined : Number(job.customer_latitude),
+    longitude: job.customer_longitude == null ? undefined : Number(job.customer_longitude),
+    estimatedPrice: job.estimated_price == null ? undefined : Number(job.estimated_price),
+    finalPrice: job.final_price == null ? undefined : Number(job.final_price),
+    updatedAt: job.updated_at,
+  };
+}
+
 export async function createJob(req, res) {
   const body = req.body || {};
   const serviceCategory = body.serviceCategory || body.service_category || body.category;
@@ -97,21 +112,40 @@ export async function createJob(req, res) {
   if (!candidates.length) {
     await query(`update jobs set status = 'failed', updated_at = now() where id = $1`, [job.id]);
     emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
-    return res.status(201).json({ success: true, job: { ...job, status: 'failed' }, matching: { candidates: [], failed: true } });
+    return res.status(201).json({ success: true, job: publicJob({ ...job, status: 'failed' }), matching: { candidates: [], failed: true } });
   }
-  res.status(201).json({ success: true, job, matching: { candidates, failed: false } });
+  emitEvent('job:created', { jobId: job.id, job: publicJob(job), candidates });
+  res.status(201).json({ success: true, job: publicJob(job), matching: { candidates, failed: false } });
+}
+
+export async function uploadJobPhotos(req, res) {
+  const job = await loadJob(req.params.id);
+  requireJobAccess(req.user, job);
+  const photos = (req.files || []).map((file) => ({
+    url: `/uploads/${file.filename}`,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+  }));
+  res.status(201).json({ success: true, photos });
 }
 
 export async function listJobs(req, res) {
   const column = req.user.role === 'fundi' ? 'fundi_id' : 'customer_id';
   const result = await query(`select * from jobs where ${column} = $1 order by created_at desc`, [req.user.id]);
-  res.json({ success: true, jobs: result.rows });
+  res.json({ success: true, jobs: result.rows.map(publicJob) });
 }
 
 export async function getJob(req, res) {
   const job = await loadJob(req.params.id);
   requireJobAccess(req.user, job);
-  res.json({ success: true, job });
+  res.json({ success: true, job: publicJob(job) });
+}
+
+export async function getJobStatus(req, res) {
+  const job = await loadJob(req.params.id);
+  requireJobAccess(req.user, job);
+  res.json({ success: true, status: job.status, updatedAt: job.updated_at, job: publicJob(job) });
 }
 
 export async function patchJob(req, res) {
@@ -126,7 +160,10 @@ export async function patchJob(req, res) {
     if (['cancelled'].includes(status)) requireCustomer(req.user, job);
   }
   const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
-  res.json({ success: true, job: result.rows[0] });
+  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  if (status === 'cancelled') emitEvent('job:cancelled', { jobId: req.params.id, status }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
 export async function updateStatus(req, res) {
@@ -141,8 +178,9 @@ export async function acceptJob(req, res) {
     [req.params.id, req.user.id, req.body?.estimatedPrice || null],
   );
   if (!result.rows[0]) throw badRequest('Job cannot be accepted');
-  emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted' }, `job:${req.params.id}`);
-  res.json({ success: true, job: result.rows[0] });
+  emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  emitEvent('fundi:response:ok', { accepted: true, jobId: req.params.id }, `user:${req.user.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
 export async function cancelJob(req, res) {
@@ -157,7 +195,8 @@ export async function cancelJob(req, res) {
     req.body?.reason || null,
   ]);
   emitEvent('job:request:declined', { jobId: req.params.id, reason: req.body?.reason || null }, `job:${req.params.id}`);
-  res.json({ success: true, job: result.rows[0] });
+  emitEvent('job:cancelled', { jobId: req.params.id, status: 'cancelled', reason: req.body?.reason || null }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
 export async function checkIn(req, res) {
@@ -180,7 +219,9 @@ export async function checkIn(req, res) {
     );
   });
   emitEvent('fundi:location:update', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
-  res.json({ success: true, job: result.rows[0] });
+  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
 export async function completeJob(req, res) {
@@ -196,7 +237,8 @@ export async function completeJob(req, res) {
     [req.params.id, otpHash, req.body?.finalPrice || null],
   );
   emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
-  res.json({ success: true, job: result.rows[0], completionOtpIssued: true });
+  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
 }
 
 export async function confirmCompletion(req, res) {
@@ -214,15 +256,38 @@ export async function confirmCompletion(req, res) {
      where id = $1 returning *`,
     [req.params.id],
   );
-  res.json({ success: true, job: result.rows[0] });
+  emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
 export async function activeFundiJob(req, res) {
-  const result = await query(
+  const assigned = await query(
     `select * from jobs where fundi_id = $1 and status not in ('completed', 'cancelled') order by updated_at desc limit 1`,
     [req.user.id],
   );
-  res.json({ success: true, job: result.rows[0] || null });
+  if (assigned.rows[0]) return res.json({ success: true, job: publicJob(assigned.rows[0]) });
+
+  const fundi = await query('select skills, latitude, longitude, online from fundis where user_id = $1 and approval_status = $2', [req.user.id, 'approved']);
+  if (!fundi.rows[0]?.online) return res.json({ success: true, job: null });
+  const available = await query(
+    `select j.*, u.full_name as customer_name
+     from jobs j join users u on u.id = j.customer_id
+     where j.fundi_id is null and j.status = 'matching'
+     order by j.created_at asc limit 25`,
+  );
+  const skills = (fundi.rows[0].skills || []).map((skill) => String(skill).toLowerCase());
+  const lat = Number(fundi.rows[0].latitude);
+  const lon = Number(fundi.rows[0].longitude);
+  const matches = available.rows
+    .filter((job) => !skills.length || skills.includes(String(job.service_category || '').toLowerCase()))
+    .map((job) => ({
+      ...job,
+      distanceKm: Number.isFinite(lat) && Number.isFinite(lon) && job.customer_latitude != null && job.customer_longitude != null
+        ? haversineKm(lat, lon, Number(job.customer_latitude), Number(job.customer_longitude))
+        : null,
+    }))
+    .sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
+  res.json({ success: true, job: publicJob(matches[0]) });
 }
 
 export async function submitReview(req, res) {
@@ -239,5 +304,6 @@ export async function submitReview(req, res) {
     [jobId, req.user.id, rating, comment],
   );
   emitEvent('review:submitted', { jobId, reviewId: result.rows[0].id }, `job:${jobId}`);
+  emitEvent('trust:updated', { userId: job.fundi_id, jobId }, `user:${job.fundi_id}`);
   res.status(201).json({ success: true, review: result.rows[0] });
 }

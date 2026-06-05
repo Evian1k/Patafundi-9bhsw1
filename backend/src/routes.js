@@ -50,9 +50,10 @@ router.post('/jobs', authRequired, asyncHandler(jobs.createJob));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));
 router.get('/jobs/fundi/active', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.activeFundiJob));
 router.get('/jobs/:id', authRequired, asyncHandler(jobs.getJob));
+router.post('/jobs/:id/photos', authRequired, upload.any(), asyncHandler(jobs.uploadJobPhotos));
 router.patch('/jobs/:id', authRequired, asyncHandler(jobs.patchJob));
 router.patch('/jobs/:id/status', authRequired, asyncHandler(jobs.updateStatus));
-router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJob));
+router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJobStatus));
 router.get('/jobs/:id/location', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/accept', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.acceptJob));
 router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
@@ -94,19 +95,22 @@ router.get('/fundi/:id', asyncHandler(fundi.publicFundi));
 
 router.get('/admin/dashboard', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
 router.get('/admin/dashboard-stats', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
+router.get('/admin/search-fundis', authRequired, requireRole('admin'), asyncHandler(admin.searchFundis));
 router.get('/admin/fundis', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fundis', 'fundis')));
-router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fundis', 'fundis')));
+router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler(admin.getFundi));
 router.post('/admin/fundis/:id/approve', authRequired, requireRole('admin'), asyncHandler(admin.approveFundi));
 router.post('/admin/fundis/:id/reject', authRequired, requireRole('admin'), asyncHandler(admin.rejectFundi));
+router.post('/admin/fundis/:id/suspend', authRequired, requireRole('admin'), asyncHandler(admin.suspendFundi));
 router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listTable('users', 'customers')));
 router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
 router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.unblockUser));
 router.get('/admin/jobs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('jobs', 'jobs')));
 router.get('/admin/payments', authRequired, requireRole('admin'), asyncHandler(admin.listTable('payments', 'payments')));
-router.get('/admin/transactions', authRequired, requireRole('admin'), asyncHandler(admin.listTable('payments', 'transactions')));
-router.get('/admin/escrow-queue', authRequired, requireRole('admin'), asyncHandler(admin.listTable('escrow_transactions', 'queue')));
+router.get('/admin/transactions', authRequired, requireRole('admin'), asyncHandler(admin.transactions));
+router.get('/admin/escrow-queue', authRequired, requireRole('admin'), asyncHandler(admin.escrowQueue));
 router.post('/admin/escrow/:jobId/release', authRequired, requireRole('admin'), asyncHandler(payouts.releaseEscrow));
 router.post('/admin/escrow/:jobId/freeze', authRequired, requireRole('admin'), asyncHandler(payouts.freezeEscrow));
+router.post('/admin/payouts/:id/complete', authRequired, requireRole('admin'), asyncHandler(payouts.completePayout));
 router.get('/admin/disputes', authRequired, requireRole('admin'), asyncHandler(disputes.listDisputes));
 router.post('/admin/disputes/:id/resolve', authRequired, requireRole('admin'), asyncHandler(disputes.resolveDispute));
 router.get('/admin/audit-logs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('audit_logs', 'logs')));
@@ -138,6 +142,7 @@ router.get('/policies/:slug', (_req, res) => res.json({ success: true, policy: n
 router.get('/services/:slug', (_req, res) => res.json({ success: true, service: null, fundis: [] }));
 
 router.post('/maps/reverse-geocode', asyncHandler(maps.reverseGeocode));
+router.get('/maps/search', asyncHandler(maps.search));
 router.post('/maps/directions', asyncHandler(maps.directions));
 
 router.get('/jobs/:jobId/messages', authRequired, asyncHandler(chat.listMessages));

@@ -492,6 +492,10 @@ class ApiClient {
     });
   }
 
+  async searchLocations(q: string) {
+    return this.request(`/maps/search?q=${encodeURIComponent(q)}`, { includeAuth: false });
+  }
+
   async getDirections(origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }) {
     return this.request('/maps/directions', {
       method: 'POST',

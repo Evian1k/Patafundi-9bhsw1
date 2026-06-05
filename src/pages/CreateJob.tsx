@@ -101,18 +101,8 @@ const CreateJob = () => {
 
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`
-      );
-      const data = await res.json();
-      const addr = data.address || {};
-      const parts: string[] = [];
-      if (addr.road) parts.push(addr.house_number ? `${addr.house_number} ${addr.road}` : addr.road);
-      if (addr.suburb) parts.push(addr.suburb);
-      else if (addr.neighbourhood) parts.push(addr.neighbourhood);
-      if (addr.city) parts.push(addr.city);
-      else if (addr.town) parts.push(addr.town);
-      return parts.length > 0 ? parts.join(", ") : data.display_name?.split(",").slice(0, 2).join(",") || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      const data = await apiClient.reverseGeocode(lat, lng) as { areaName?: string; formattedAddress?: string | null };
+      return data.formattedAddress || data.areaName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     } catch {
       return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     }
@@ -122,11 +112,8 @@ const CreateJob = () => {
     if (!query.trim()) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=ke`
-      );
-      const data = await res.json();
-      setSearchResults(data);
+      const data = await apiClient.searchLocations(query) as { results?: LocationSearchResult[] };
+      setSearchResults(data.results || []);
     } catch {
       setSearchResults([]);
     } finally {
@@ -211,7 +198,7 @@ const CreateJob = () => {
           try {
             const fd = new FormData();
             fd.append("photo", photo.file);
-            const API_URL = import.meta.env.VITE_API_URL;
+            const API_URL = import.meta.env.VITE_API_URL || "/api";
             await fetch(`${API_URL}/jobs/${res.job.id}/photos`, {
               method: "POST",
               headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },

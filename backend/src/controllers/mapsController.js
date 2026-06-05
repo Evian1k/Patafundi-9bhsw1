@@ -36,6 +36,27 @@ export async function reverseGeocode(req, res) {
   });
 }
 
+export async function search(req, res) {
+  const q = String(req.query.q || req.body?.q || '').trim();
+  if (!q) throw badRequest('Search query is required');
+  const key = process.env.GOOGLE_MAPS_SERVER_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return res.json({ success: true, results: [], source: 'not_configured' });
+  }
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+  url.searchParams.set('address', q);
+  url.searchParams.set('components', 'country:KE');
+  url.searchParams.set('key', key);
+  const response = await fetch(url);
+  const data = await response.json();
+  const results = (data.results || []).slice(0, 5).map((result) => ({
+    lat: String(result.geometry?.location?.lat ?? ''),
+    lon: String(result.geometry?.location?.lng ?? ''),
+    display_name: result.formatted_address,
+  }));
+  res.json({ success: true, results, source: 'google' });
+}
+
 export async function directions(req, res) {
   const { origin, destination, mode = 'driving' } = req.body || {};
   if (!origin?.latitude || !origin?.longitude || !destination?.latitude || !destination?.longitude) {

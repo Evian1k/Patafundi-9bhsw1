@@ -112,3 +112,25 @@ export async function freezeEscrow(req, res) {
   await auditLog({ userId: req.user.id, action: 'escrow.freeze', entityType: 'job', entityId: req.params.jobId });
   res.json({ success: true });
 }
+
+export async function completePayout(req, res) {
+  const { providerReference = null } = req.body || {};
+  const result = await transaction(async (client) => {
+    const payout = await client.query('select * from payouts where id = $1 for update', [req.params.id]);
+    if (!payout.rows[0]) throw badRequest('Payout not found');
+    if (payout.rows[0].status === 'completed') return payout.rows[0];
+    const updated = await client.query(
+      `update payouts set status = 'completed', provider_reference = coalesce($2, provider_reference), updated_at = now()
+       where id = $1 returning *`,
+      [req.params.id, providerReference],
+    );
+    if (updated.rows[0].job_id) {
+      await client.query(`update jobs set payment_status = 'payout_completed', updated_at = now() where id = $1`, [updated.rows[0].job_id]);
+      await client.query(`update escrow_accounts set status = 'payout_completed', updated_at = now() where job_id = $1`, [updated.rows[0].job_id]);
+    }
+    return updated.rows[0];
+  });
+  await auditLog({ userId: req.user.id, action: 'payout.complete', entityType: 'payout', entityId: req.params.id });
+  emitEvent('payout:completed', { payoutId: req.params.id, payout: result }, result.fundi_id ? `user:${result.fundi_id}` : null);
+  res.json({ success: true, payout: result });
+}
