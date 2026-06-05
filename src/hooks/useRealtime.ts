@@ -6,7 +6,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { realtimeService } from '@/services/realtime';
 import { apiClient } from '@/lib/api';
-import { env } from '@/config/env';
 
 interface JobRequest {
   jobId: string;
@@ -139,7 +138,7 @@ export function useJobTracking(jobId: string | undefined): UseJobTrackingReturn 
     const token = localStorage.getItem('auth_token');
     if (token) {
       realtimeService.connect(token);
-      realtimeService.watchJob(jobId, env.API_URL);
+      realtimeService.watchJob(jobId);
     }
 
     const onStatus = (data: Record<string, unknown>) => {

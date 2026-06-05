@@ -18,9 +18,9 @@ export const env = {
 };
 
 export function validateEnv(): void {
-  if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
-    console.warn(
-      '[PataFundi] VITE_API_URL is not set; production build should use .env.production or platform env vars.',
+  if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
+    console.info(
+      `[PataFundi] Using production API default: ${API_BASE_URL}`,
     );
   }
 }

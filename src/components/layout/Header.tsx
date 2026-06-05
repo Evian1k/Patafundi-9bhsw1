@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/assets/logo";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -17,15 +18,7 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-xl border-b border-border/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-primary flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-sm">P</span>
-          </div>
-          <span className="font-display font-bold text-lg">
-            Pata<span className="text-primary">Fundi</span>
-          </span>
-        </Link>
+        <BrandLogo size="sm" showWordmark />
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">

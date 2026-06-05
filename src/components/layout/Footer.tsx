@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { BrandLogo } from "@/assets/logo";
 
 const Footer = () => {
   const companyName = "PataFundi";
@@ -57,14 +58,12 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-gradient-primary flex items-center justify-center">
-                <span className="text-white font-bold text-sm">P</span>
-              </div>
-              <span className="font-display font-bold text-xl text-background">
-                Pata<span className="text-primary">Fundi</span>
-              </span>
-            </Link>
+            <BrandLogo
+              size="sm"
+              showWordmark
+              wordmarkClassName="text-xl text-background"
+              className="mb-4"
+            />
             <p className="text-sm text-background/60 mb-4 leading-relaxed">
               Connecting you with verified local professionals for all your home and business needs.
             </p>

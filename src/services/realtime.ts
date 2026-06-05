@@ -6,7 +6,7 @@
  */
 
 import { io, type Socket } from 'socket.io-client';
-import { API_BASE_URL, SOCKET_URL } from '@/api/config';
+import { SOCKET_URL, buildApiUrl } from '@/api/config';
 
 type EventPayload = Record<string, unknown>;
 type EventCallback = (data: EventPayload) => void;
@@ -133,7 +133,7 @@ class RealtimeService {
     });
   }
 
-  watchJob(jobId: string, apiBaseUrl: string): void {
+  watchJob(jobId: string): void {
     this.socket?.emit('job:subscribe', { jobId });
     if (this.pollIntervals.has(`job:${jobId}`)) return;
 
@@ -144,7 +144,7 @@ class RealtimeService {
     const poll = async () => {
       if (!this.token || authFailed) return;
       try {
-        const jobResponse = await fetch(`${apiBaseUrl}/jobs/${jobId}`, {
+        const jobResponse = await fetch(buildApiUrl(`/jobs/${jobId}`), {
           credentials: 'include',
           headers: pollHeaders(this.token),
         });
@@ -153,7 +153,7 @@ class RealtimeService {
           this.stopWatchingJob(jobId);
           return;
         }
-        const payResponse = await fetch(`${apiBaseUrl}/payments/job/${jobId}`, {
+        const payResponse = await fetch(buildApiUrl(`/payments/job/${jobId}`), {
           credentials: 'include',
           headers: pollHeaders(this.token),
         });

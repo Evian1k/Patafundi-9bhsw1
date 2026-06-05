@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { BrandLogo } from "@/assets/logo";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -76,9 +77,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-primary flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
+          <BrandLogo size="md" linkTo={false} />
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
         </div>
       </div>
@@ -95,9 +94,7 @@ export default function AdminLogin() {
         <Card className="bg-slate-900 border-slate-700 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-7 h-7 text-white" />
-            </div>
+            <BrandLogo size="lg" linkTo={false} className="justify-center mb-4" />
             <h1 className="text-white text-2xl font-display font-bold">Admin Access</h1>
             <p className="text-slate-400 text-sm mt-1">PataFundi Management Panel</p>
           </div>

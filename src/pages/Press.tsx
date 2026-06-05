@@ -1,5 +1,6 @@
 import SiteLayout from "@/components/layout/SiteLayout";
 import { Button } from "@/components/ui/button";
+import { BrandLogo, LOGO_URL, FAVICON_URL } from "@/assets/logo";
 
 export default function Press() {
   return (
@@ -11,9 +12,14 @@ export default function Press() {
           <div className="p-6 bg-card rounded-2xl border border-border/50">
             <h2 className="font-semibold mb-2">Brand assets</h2>
             <p className="text-muted-foreground text-sm mb-4">Use the official logo and icon when referencing PataFundi.</p>
+            <BrandLogo size="lg" linkTo={false} className="mb-4" />
             <div className="flex gap-3">
-              <Button variant="outline" size="sm">Download icon</Button>
-              <Button variant="outline" size="sm">Download logo</Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href={FAVICON_URL} download="patafundi-icon.png">Download icon</a>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href={LOGO_URL} download="patafundi-logo.png">Download logo</a>
+              </Button>
             </div>
           </div>
           <div className="p-6 bg-card rounded-2xl border border-border/50">

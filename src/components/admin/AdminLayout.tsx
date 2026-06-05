@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { realtimeService } from "@/services/realtime";
 import { toast } from "sonner";
+import { BrandLogo } from "@/assets/logo";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -110,11 +111,8 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
       <div className={`flex items-center gap-3 px-4 h-14 border-b border-slate-700/50 ${!sidebarOpen ? "justify-center" : ""}`}>
-        <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0">
-          <span className="text-white font-bold text-sm">P</span>
-        </div>
+        <BrandLogo size="sm" linkTo={false} />
         {sidebarOpen && (
           <div>
             <p className="text-white font-bold text-sm leading-none">PataFundi</p>

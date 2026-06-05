@@ -9,6 +9,7 @@ import { isApiConfigured } from "@/config/env";
 import { toast } from "sonner";
 import { z } from "zod";
 import EnvWarning from "@/components/ui/EnvWarning";
+import { BrandLogo } from "@/assets/logo";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -170,11 +171,8 @@ const Auth = () => {
           animate={{ opacity: 1, y: 0 }}
           className="bg-card rounded-3xl p-8 shadow-xl border border-border/50"
         >
-          {/* Logo */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-              <span className="text-white font-bold text-xl">P</span>
-            </div>
+            <BrandLogo size="lg" linkTo={false} className="justify-center mb-4" />
             <h1 className="text-2xl font-display font-bold">
               {mode === "login" ? "Welcome back" : "Create account"}
             </h1>

@@ -8,7 +8,6 @@ import {
 import { apiClient, ApiError } from "@/lib/api";
 import { isValidUuid } from "@/lib/uuid";
 import { realtimeService } from "@/services/realtime";
-import { env } from "@/config/env";
 import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
 import SearchingRadarMap from "@/components/maps/SearchingRadarMap";
 import AddressDisplay from "@/components/maps/AddressDisplay";
@@ -223,7 +222,7 @@ export default function FundiTracker({
     realtimeService.on("fundi:location:update", onFundiLocation);
 
     // Start watching job (polling)
-    realtimeService.watchJob(jobId, env.API_URL);
+    realtimeService.watchJob(jobId);
 
     // Initial fetch
     loadJob();

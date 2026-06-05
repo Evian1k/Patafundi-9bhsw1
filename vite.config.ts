@@ -4,6 +4,7 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
+  envPrefix: ["VITE_", "REACT_APP_"],
   server: {
     host: "::",
     port: 8080,
