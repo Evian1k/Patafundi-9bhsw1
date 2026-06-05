@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 import { apiClient } from "@/lib/api";
@@ -20,20 +20,35 @@ const signupSchema = loginSchema.extend({
   name: z.string().min(2, "Name must be at least 2 characters"),
 });
 
+const forgotEmailSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">(
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">(
     searchParams.get("mode") === "signup" ? "signup" : "login"
   );
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signupStage, setSignupStage] = useState<"form" | "otp">("form");
+  const [forgotStage, setForgotStage] = useState<"email" | "reset">("email");
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
+  const [forgotData, setForgotData] = useState({ email: "", password: "", confirmPassword: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const routeAfterAuth = useCallback(async () => {
@@ -75,10 +90,11 @@ const Auth = () => {
 
   // OTP countdown
   useEffect(() => {
-    if (signupStage !== "otp" || resendCooldown <= 0) return;
+    const otpActive = (mode === "signup" && signupStage === "otp") || (mode === "forgot" && forgotStage === "reset");
+    if (!otpActive || resendCooldown <= 0) return;
     const t = setInterval(() => setResendCooldown((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(t);
-  }, [signupStage, resendCooldown]);
+  }, [mode, signupStage, forgotStage, resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +173,92 @@ const Auth = () => {
     }
   };
 
+  const handleForgotEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setLoading(true);
+    try {
+      const validated = forgotEmailSchema.parse({ email: forgotData.email });
+      const res = await apiClient.forgotPassword(validated.email) as { devOtp?: string; message?: string };
+      setPendingEmail(validated.email);
+      setForgotStage("reset");
+      setOtpCode("");
+      setResendCooldown(30);
+      if (res?.devOtp) {
+        setDevOtpHint(res.devOtp);
+        toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
+      } else {
+        setDevOtpHint(null);
+        toast.success(res?.message || "If the account exists, a code was sent to your email.");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) fieldErrors[err.path[0].toString()] = err.message;
+        });
+        setErrors(fieldErrors);
+      } else {
+        toast.error(error instanceof Error ? error.message : "Failed to send reset code");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingEmail) return;
+    setErrors({});
+    setLoading(true);
+    try {
+      const validated = resetPasswordSchema.parse({
+        email: pendingEmail,
+        password: forgotData.password,
+        confirmPassword: forgotData.confirmPassword,
+      });
+      if (otpCode.length < 6) {
+        setErrors({ otp: "Enter the 6-digit code from your email" });
+        return;
+      }
+      await apiClient.resetPassword(validated.email, otpCode, validated.password);
+      toast.success("Password updated. You can sign in now.");
+      setMode("login");
+      setForgotStage("email");
+      setFormData((prev) => ({ ...prev, email: validated.email, password: "" }));
+      setForgotData({ email: "", password: "", confirmPassword: "" });
+      setOtpCode("");
+      setDevOtpHint(null);
+      setPendingEmail(null);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) fieldErrors[err.path[0].toString()] = err.message;
+        });
+        setErrors(fieldErrors);
+      } else {
+        toast.error(error instanceof Error ? error.message : "Password reset failed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pageTitle = mode === "forgot"
+    ? (forgotStage === "email" ? "Forgot password" : "Reset password")
+    : mode === "login"
+      ? "Welcome back"
+      : "Create account";
+
+  const pageSubtitle = mode === "forgot"
+    ? (forgotStage === "email"
+      ? "We'll email you a verification code"
+      : "Enter the code and choose a new password")
+    : mode === "login"
+      ? "Sign in to access your account"
+      : "Get started with PataFundi today";
+
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -173,12 +275,8 @@ const Auth = () => {
         >
           <div className="text-center mb-8">
             <BrandLogo size="lg" linkTo={false} className="justify-center mb-4" />
-            <h1 className="text-2xl font-display font-bold">
-              {mode === "login" ? "Welcome back" : "Create account"}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              {mode === "login" ? "Sign in to access your account" : "Get started with PataFundi today"}
-            </p>
+            <h1 className="text-2xl font-display font-bold">{pageTitle}</h1>
+            <p className="text-muted-foreground text-sm mt-1">{pageSubtitle}</p>
           </div>
 
           {/* API not configured warning */}
@@ -188,15 +286,152 @@ const Auth = () => {
             </div>
           )}
 
-          {/* OTP Stage */}
-          {mode === "signup" && signupStage === "otp" ? (
+          {/* Forgot password — request code */}
+          {mode === "forgot" && forgotStage === "email" ? (
+            <form onSubmit={handleForgotEmail} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="email"
+                    value={forgotData.email}
+                    onChange={(e) => setForgotData({ ...forgotData, email: e.target.value })}
+                    placeholder="you@example.com"
+                    className="w-full h-12 pl-10 pr-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm"
+                    autoComplete="email"
+                  />
+                </div>
+                {errors.email && <p className="text-xs text-destructive mt-1">{errors.email}</p>}
+              </div>
+              <Button type="submit" disabled={loading || !isApiConfigured()} className="w-full bg-gradient-primary rounded-xl h-12">
+                {loading ? "Sending..." : "Send reset code"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setMode("login");
+                  setForgotStage("email");
+                  setErrors({});
+                }}
+              >
+                Back to sign in
+              </Button>
+            </form>
+          ) : mode === "forgot" && forgotStage === "reset" ? (
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <p className="text-sm text-muted-foreground text-center">
+                Enter the code sent to <span className="font-medium text-foreground">{pendingEmail}</span>
+              </p>
+              {devOtpHint && (
+                <p className="text-xs text-center bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
+                  Development OTP: <span className="font-mono font-bold">{devOtpHint}</span>
+                </p>
+              )}
+              <div className="flex justify-center">
+                <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                  </InputOTPGroup>
+                  <InputOTPSeparator />
+                  <InputOTPGroup>
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              {errors.otp && <p className="text-xs text-destructive text-center">{errors.otp}</p>}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">New password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={forgotData.password}
+                    onChange={(e) => setForgotData({ ...forgotData, password: e.target.value })}
+                    placeholder="At least 8 characters"
+                    className="w-full h-12 pl-10 pr-12 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Confirm password</label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={forgotData.confirmPassword}
+                  onChange={(e) => setForgotData({ ...forgotData, confirmPassword: e.target.value })}
+                  placeholder="Repeat new password"
+                  className="w-full h-12 px-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm"
+                  autoComplete="new-password"
+                />
+                {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>}
+              </div>
+              <Button type="submit" disabled={loading || otpCode.length < 6} className="w-full bg-gradient-primary rounded-xl h-12">
+                {loading ? "Updating..." : "Update password"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={resendCooldown > 0}
+                onClick={async () => {
+                  if (!pendingEmail) return;
+                  try {
+                    const res = await apiClient.otpResend(pendingEmail, "password_reset") as { devOtp?: string; message?: string };
+                    setResendCooldown(30);
+                    if (res?.devOtp) {
+                      setDevOtpHint(res.devOtp);
+                      toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
+                    } else {
+                      toast.success(res?.message || "Code resent. Check your email.");
+                    }
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Failed to resend code");
+                  }
+                }}
+              >
+                {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend code"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setForgotStage("email");
+                  setOtpCode("");
+                  setResendCooldown(0);
+                  setDevOtpHint(null);
+                }}
+              >
+                Back
+              </Button>
+            </form>
+          ) : mode === "signup" && signupStage === "otp" ? (
             <form onSubmit={handleVerifyOtp} className="space-y-5">
               <p className="text-sm text-muted-foreground text-center">
                 Enter the 6-digit code sent to <span className="font-medium text-foreground">{pendingEmail}</span>
               </p>
               {devOtpHint && (
                 <p className="text-xs text-center bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
-                  Development OTP (no email provider configured): <span className="font-mono font-bold">{devOtpHint}</span>
+                  Development OTP: <span className="font-mono font-bold">{devOtpHint}</span>
                 </p>
               )}
 
@@ -321,6 +556,23 @@ const Auth = () => {
                 {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
               </div>
 
+              {mode === "login" && (
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setForgotStage("email");
+                      setForgotData((prev) => ({ ...prev, email: formData.email }));
+                      setErrors({});
+                    }}
+                    className="text-sm text-primary font-medium hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
               {/* Demo account hint */}
               {mode === "login" && (
                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
@@ -363,7 +615,7 @@ const Auth = () => {
           )}
 
           {/* Toggle mode */}
-          {signupStage === "form" && (
+          {signupStage === "form" && mode !== "forgot" && (
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">
                 {mode === "login" ? "Don't have an account? " : "Already have an account? "}

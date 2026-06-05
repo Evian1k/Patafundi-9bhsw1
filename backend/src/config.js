@@ -34,6 +34,8 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || '',
   refreshSecret: process.env.REFRESH_TOKEN_SECRET || '',
   cookieSecure: process.env.COOKIE_SECURE === 'true' || isProduction,
+  resendApiKey: process.env.RESEND_API_KEY || '',
+  emailFrom: process.env.EMAIL_FROM || 'onboarding@resend.dev',
   mpesa: {
     baseUrl: process.env.MPESA_BASE_URL || 'https://api.safaricom.co.ke',
     consumerKey: process.env.MPESA_CONSUMER_KEY || '',

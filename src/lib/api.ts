@@ -160,10 +160,10 @@ class ApiClient {
     });
   }
 
-  async resetPassword(token: string, password: string) {
+  async resetPassword(email: string, code: string, password: string) {
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ email, code, password }),
       includeAuth: false,
     });
   }

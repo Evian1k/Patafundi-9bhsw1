@@ -5,6 +5,7 @@ import { query, transaction } from '../db.js';
 import { config } from '../config.js';
 import { badRequest, forbidden } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
+import { sendOtpEmail } from '../services/emailService.js';
 import { clearAuthCookies, setAuthCookies, signAccessToken, signRefreshToken } from '../middleware/auth.js';
 
 function publicUser(user) {
@@ -16,6 +17,7 @@ function publicUser(user) {
     role: user.role,
     status: user.status,
     trustScore: user.trust_score,
+    emailVerified: Boolean(user.email_verified_at),
   };
 }
 
@@ -44,8 +46,38 @@ function devOtpPayload(code) {
   if (config.nodeEnv !== 'development') return {};
   return {
     devOtp: code,
-    message: 'OTP generated (development only — configure SMS/email provider for production)',
+    message: 'OTP generated (development fallback — check email or use devOtp)',
   };
+}
+
+async function storeOtp(userId, purpose, code) {
+  await query(
+    `insert into otp_codes (user_id, purpose, code_hash, expires_at)
+     values ($1, $2, $3, now() + interval '10 minutes')`,
+    [userId, purpose, await bcrypt.hash(code, 10)],
+  );
+}
+
+async function deliverOtp(email, code, purpose) {
+  const emailResult = await sendOtpEmail({ to: email, code, purpose });
+  return {
+    message: emailResult.sent
+      ? 'OTP sent to your email'
+      : 'OTP generated. Email delivery is temporarily unavailable — try resend or contact support.',
+    emailSent: emailResult.sent,
+    ...devOtpPayload(code),
+  };
+}
+
+async function findValidOtp(email, purpose) {
+  const result = await query(
+    `select oc.id, oc.code_hash, u.id as user_id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score, u.email_verified_at
+     from otp_codes oc join users u on u.id = oc.user_id
+     where lower(u.email) = lower($1) and oc.purpose = $2 and oc.consumed_at is null and oc.expires_at > now()
+     order by oc.created_at desc limit 1`,
+    [email, purpose],
+  );
+  return result.rows[0] || null;
 }
 
 export async function register(req, res) {
@@ -60,9 +92,9 @@ export async function register(req, res) {
     const existing = await client.query('select id from users where lower(email) = lower($1)', [email]);
     if (existing.rows[0]) throw badRequest('Email is already registered');
     const inserted = await client.query(
-      `insert into users (email, password_hash, full_name, phone, role, status)
-       values (lower($1), $2, $3, $4, $5, 'active')
-       returning id, email, full_name, phone, role, status, trust_score`,
+      `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
+       values (lower($1), $2, $3, $4, $5, 'active', null)
+       returning id, email, full_name, phone, role, status, trust_score, email_verified_at`,
       [email, passwordHash, fullName, phone, role],
     );
     await client.query(
@@ -77,13 +109,12 @@ export async function register(req, res) {
     return inserted.rows[0];
   });
   await auditLog({ userId: user.id, action: 'auth.register', entityType: 'user', entityId: user.id });
-  const session = await issueSession(res, user);
+  const otpDelivery = await deliverOtp(email, otpCode, 'register');
   res.status(201).json({
     success: true,
-    user: publicUser(user),
-    token: session.token,
     otpRequired: true,
-    ...devOtpPayload(otpCode),
+    email: user.email,
+    ...otpDelivery,
   });
 }
 
@@ -91,12 +122,16 @@ export async function login(req, res) {
   const { email, password } = req.body || {};
   if (!email || !password) throw badRequest('Email and password are required');
   const result = await query(
-    'select id, email, password_hash, full_name, phone, role, status, trust_score from users where lower(email) = lower($1)',
+    `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at
+     from users where lower(email) = lower($1)`,
     [email],
   );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(password, user.password_hash))) throw forbidden('Invalid email or password');
   if (user.status !== 'active') throw forbidden('Account is not active');
+  if (!user.email_verified_at) {
+    throw forbidden('Email not verified. Please check your inbox for the verification code.');
+  }
   const session = await issueSession(res, user);
   await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id });
   res.json({ success: true, user: publicUser(user), token: session.token });
@@ -111,7 +146,7 @@ export async function refresh(req, res) {
   });
   const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const result = await query(
-    `select u.id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score
+    `select u.id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score, u.email_verified_at
      from refresh_tokens rt join users u on u.id = rt.user_id
      where rt.token_hash = $1 and rt.revoked_at is null and rt.expires_at > now() and u.id = $2`,
     [refreshHash, payload.sub],
@@ -119,6 +154,7 @@ export async function refresh(req, res) {
   const user = result.rows[0];
   if (!user) throw forbidden('Invalid refresh token');
   if (user.status !== 'active') throw forbidden('Account is not active');
+  if (!user.email_verified_at) throw forbidden('Email not verified');
   await query('update refresh_tokens set revoked_at = now() where token_hash = $1', [refreshHash]);
   const session = await issueSession(res, user);
   res.json({ success: true, token: session.token, user: publicUser(user) });
@@ -137,16 +173,21 @@ export async function logout(req, res) {
 export async function otpVerify(req, res) {
   const { email, code, purpose = 'register' } = req.body || {};
   if (!email || !code) throw badRequest('Email and OTP code are required');
-  const result = await query(
-    `select oc.id, oc.code_hash, u.id as user_id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score
-     from otp_codes oc join users u on u.id = oc.user_id
-     where lower(u.email) = lower($1) and oc.purpose = $2 and oc.consumed_at is null and oc.expires_at > now()
-     order by oc.created_at desc limit 1`,
-    [email, purpose],
-  );
-  const row = result.rows[0];
-  if (!row || !(await bcrypt.compare(code, row.code_hash))) throw forbidden('Invalid OTP code');
+  const row = await findValidOtp(email, purpose);
+  if (!row || !(await bcrypt.compare(String(code), row.code_hash))) throw forbidden('Invalid OTP code');
   await query('update otp_codes set consumed_at = now() where id = $1', [row.id]);
+
+  if (purpose === 'password_reset') {
+    return res.json({ success: true, message: 'OTP verified. You can now set a new password.' });
+  }
+
+  if (purpose === 'register') {
+    await query(
+      'update users set email_verified_at = now(), updated_at = now() where id = $1 and email_verified_at is null',
+      [row.user_id],
+    );
+  }
+
   const user = {
     id: row.user_id,
     email: row.email,
@@ -155,6 +196,7 @@ export async function otpVerify(req, res) {
     role: row.role,
     status: row.status,
     trust_score: row.trust_score,
+    email_verified_at: purpose === 'register' ? new Date() : row.email_verified_at,
   };
   const session = await issueSession(res, user);
   res.json({ success: true, token: session.token, user: publicUser(user) });
@@ -163,58 +205,80 @@ export async function otpVerify(req, res) {
 export async function otpResend(req, res) {
   const { email, purpose = 'register' } = req.body || {};
   if (!email) throw badRequest('Email is required');
-  const userResult = await query('select id from users where lower(email) = lower($1)', [email]);
-  if (!userResult.rows[0]) throw badRequest('Account not found');
-  const code = String(crypto.randomInt(100000, 999999));
-  await query(
-    `insert into otp_codes (user_id, purpose, code_hash, expires_at)
-     values ($1, $2, $3, now() + interval '10 minutes')`,
-    [userResult.rows[0].id, purpose, await bcrypt.hash(code, 10)],
+  const userResult = await query(
+    'select id, email_verified_at from users where lower(email) = lower($1)',
+    [email],
   );
-  res.json({ success: true, message: 'OTP sent', ...devOtpPayload(code) });
+  const user = userResult.rows[0];
+  if (!user) throw badRequest('Account not found');
+  if (purpose === 'register' && user.email_verified_at) {
+    throw badRequest('Email is already verified');
+  }
+  const code = String(crypto.randomInt(100000, 999999));
+  await storeOtp(user.id, purpose, code);
+  const otpDelivery = await deliverOtp(email, code, purpose);
+  res.json({ success: true, ...otpDelivery });
 }
 
 export async function forgotPassword(req, res) {
   const { email } = req.body || {};
   if (!email) throw badRequest('Email is required');
   const userResult = await query('select id, email from users where lower(email) = lower($1)', [email]);
+  const genericMessage = 'If the account exists, a verification code has been sent to your email';
   if (!userResult.rows[0]) {
-    return res.json({ success: true, message: 'If the account exists, a reset link has been sent' });
+    return res.json({ success: true, message: genericMessage });
   }
-  const token = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  await query(
-    `insert into password_reset_tokens (user_id, token_hash, expires_at)
-     values ($1, $2, now() + interval '1 hour')`,
-    [userResult.rows[0].id, tokenHash],
-  );
-  await auditLog({ userId: userResult.rows[0].id, action: 'auth.forgot_password', entityType: 'user', entityId: userResult.rows[0].id });
+  const user = userResult.rows[0];
+  const code = String(crypto.randomInt(100000, 999999));
+  await storeOtp(user.id, 'password_reset', code);
+  await deliverOtp(user.email, code, 'password_reset');
+  await auditLog({ userId: user.id, action: 'auth.forgot_password', entityType: 'user', entityId: user.id });
   res.json({
     success: true,
-    message: 'If the account exists, a reset link has been sent',
-    resetToken: config.nodeEnv === 'development' ? token : undefined,
+    message: genericMessage,
+    ...devOtpPayload(code),
   });
 }
 
 export async function resetPassword(req, res) {
-  const { token, password } = req.body || {};
-  if (!token || !password) throw badRequest('Token and new password are required');
-  requireStrongPassword(password);
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const result = await query(
-    `select prt.id, prt.user_id from password_reset_tokens prt
-     where prt.token_hash = $1 and prt.consumed_at is null and prt.expires_at > now()
-     order by prt.created_at desc limit 1`,
-    [tokenHash],
-  );
-  const row = result.rows[0];
-  if (!row) throw forbidden('Invalid or expired reset token');
-  const passwordHash = await bcrypt.hash(password, 12);
-  await transaction(async (client) => {
-    await client.query('update users set password_hash = $2, updated_at = now() where id = $1', [row.user_id, passwordHash]);
-    await client.query('update password_reset_tokens set consumed_at = now() where id = $1', [row.id]);
-    await client.query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [row.user_id]);
-  });
-  await auditLog({ userId: row.user_id, action: 'auth.reset_password', entityType: 'user', entityId: row.user_id });
-  res.json({ success: true, message: 'Password updated successfully' });
+  const { email, code, password, token } = req.body || {};
+
+  if (email && code && password) {
+    requireStrongPassword(password);
+    const row = await findValidOtp(email, 'password_reset');
+    if (!row || !(await bcrypt.compare(String(code), row.code_hash))) {
+      throw forbidden('Invalid or expired OTP code');
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    await transaction(async (client) => {
+      await client.query('update users set password_hash = $2, updated_at = now() where id = $1', [row.user_id, passwordHash]);
+      await client.query('update otp_codes set consumed_at = now() where id = $1', [row.id]);
+      await client.query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [row.user_id]);
+    });
+    await auditLog({ userId: row.user_id, action: 'auth.reset_password', entityType: 'user', entityId: row.user_id });
+    return res.json({ success: true, message: 'Password updated successfully' });
+  }
+
+  if (token && password) {
+    requireStrongPassword(password);
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const result = await query(
+      `select prt.id, prt.user_id from password_reset_tokens prt
+       where prt.token_hash = $1 and prt.consumed_at is null and prt.expires_at > now()
+       order by prt.created_at desc limit 1`,
+      [tokenHash],
+    );
+    const row = result.rows[0];
+    if (!row) throw forbidden('Invalid or expired reset token');
+    const passwordHash = await bcrypt.hash(password, 12);
+    await transaction(async (client) => {
+      await client.query('update users set password_hash = $2, updated_at = now() where id = $1', [row.user_id, passwordHash]);
+      await client.query('update password_reset_tokens set consumed_at = now() where id = $1', [row.id]);
+      await client.query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [row.user_id]);
+    });
+    await auditLog({ userId: row.user_id, action: 'auth.reset_password', entityType: 'user', entityId: row.user_id });
+    return res.json({ success: true, message: 'Password updated successfully' });
+  }
+
+  throw badRequest('Email, OTP code, and new password are required');
 }
