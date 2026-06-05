@@ -193,7 +193,7 @@ export function FundiDashboard() {
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BrandLogo size="xs" linkTo={false} />
+            <BrandLogo size="xs" iconOnly linkTo={false} />
             <span className="font-display font-bold">Fundi <span className="text-primary">Hub</span></span>
           </div>
           <div className="flex items-center gap-1">

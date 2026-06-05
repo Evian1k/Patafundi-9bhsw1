@@ -58,12 +58,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-1">
-            <BrandLogo
-              size="sm"
-              showWordmark
-              wordmarkClassName="text-xl text-background"
-              className="mb-4"
-            />
+            <BrandLogo size="md" className="mb-4" />
             <p className="text-sm text-background/60 mb-4 leading-relaxed">
               Connecting you with verified local professionals for all your home and business needs.
             </p>

@@ -1,6 +1,6 @@
 /**
- * Build optimized brand assets from a source image.
- * Place your logo at public/logo-source.jpg (or .png) then run: npm run setup:logo
+ * Build optimized brand assets from public/logo-source.png (or .jpg).
+ * Run: npm run setup:logo
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,9 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, '../public');
 
 const SOURCE_CANDIDATES = [
+  'logo-source.png',
   'logo-source.jpg',
   'logo-source.jpeg',
-  'logo-source.png',
   'logo-source.webp',
 ];
 
@@ -25,49 +25,53 @@ function findSource() {
   return null;
 }
 
-async function writePng(input, outPath, size, options = {}) {
-  await sharp(input)
-    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png({ compressionLevel: 9, palette: true, quality: 80, ...options })
-    .toFile(outPath);
-}
-
 async function main() {
   const source = findSource();
   if (!source) {
-    console.error('No logo source found. Save your image as public/logo-source.jpg or .png');
+    console.error('No logo source found. Save your image as public/logo-source.png');
     process.exit(1);
   }
 
   console.log(`Processing ${path.basename(source)}…`);
+  const meta = await sharp(source).metadata();
+  const width = meta.width ?? 1024;
+  const height = meta.height ?? 512;
 
-  const pipeline = sharp(source).ensureAlpha();
+  // Full horizontal logo — used by BrandLogo (navbar, auth, footer)
+  await sharp(source)
+    .resize({ height: 96, fit: 'inside', withoutEnlargement: true })
+    .png({ compressionLevel: 9, quality: 88 })
+    .toFile(path.join(publicDir, 'logo-full.png'));
 
-  await pipeline
-    .clone()
-    .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png({ compressionLevel: 9, quality: 85 })
+  await sharp(source)
+    .resize({ height: 64, fit: 'inside', withoutEnlargement: true })
+    .png({ compressionLevel: 9, quality: 88 })
     .toFile(path.join(publicDir, 'logo.png'));
 
-  await writePng(source, path.join(publicDir, 'favicon.png'), 32);
-  await writePng(source, path.join(publicDir, 'apple-touch-icon.png'), 180);
-  await writePng(source, path.join(publicDir, 'favicon-192.png'), 192);
+  // Icon mark — left crop for compact headers + favicon
+  const iconWidth = Math.min(width, Math.max(Math.round(width * 0.22), 120));
+  await sharp(source)
+    .extract({ left: 0, top: 0, width: iconWidth, height })
+    .resize(256, 256, { fit: 'contain', background: { r: 10, g: 14, b: 26, alpha: 1 } })
+    .png({ compressionLevel: 9, quality: 88 })
+    .toFile(path.join(publicDir, 'logo-icon.png'));
 
-  // Multi-size ICO (16 + 32)
-  const icon16 = await sharp(source)
-    .resize(16, 16, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  const icon32 = await sharp(source)
-    .resize(32, 32, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
+  for (const [name, size] of [
+    ['favicon.png', 32],
+    ['apple-touch-icon.png', 180],
+    ['favicon-192.png', 192],
+  ]) {
+    await sharp(path.join(publicDir, 'logo-icon.png'))
+      .resize(size, size, { fit: 'contain', background: { r: 10, g: 14, b: 26, alpha: 1 } })
+      .png({ compressionLevel: 9, palette: size <= 32, quality: 80 })
+      .toFile(path.join(publicDir, name));
+  }
 
-  await sharp(icon32).toFile(path.join(publicDir, 'favicon.ico'));
+  await sharp(path.join(publicDir, 'favicon.png')).toFile(path.join(publicDir, 'favicon.ico'));
 
-  const stats = fs.statSync(path.join(publicDir, 'logo.png'));
-  console.log(`✓ public/logo.png (${Math.round(stats.size / 1024)} KB)`);
-  console.log('✓ public/favicon.png, favicon.ico, apple-touch-icon.png');
+  const stats = fs.statSync(path.join(publicDir, 'logo-full.png'));
+  console.log(`✓ public/logo-full.png (${Math.round(stats.size / 1024)} KB)`);
+  console.log('✓ public/logo.png, logo-icon.png, favicon assets');
 }
 
 main().catch((err) => {

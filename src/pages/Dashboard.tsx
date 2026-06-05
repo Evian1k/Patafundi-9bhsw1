@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { DEMO_MODE, demoJobs, demoUser } from "@/lib/demo";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
-import { BrandLogo, BrandWordmark } from "@/assets/logo";
+import { BrandLogo } from "@/assets/logo";
 
 interface JobData {
   id: string;
@@ -152,8 +152,7 @@ export default function Dashboard() {
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BrandLogo size="xs" linkTo={false} />
-            <BrandWordmark />
+            <BrandLogo size="xs" iconOnly linkTo={false} />
             {DEMO_MODE && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Demo</span>}
           </div>
           <div className="flex items-center gap-1">

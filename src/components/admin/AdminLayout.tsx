@@ -112,12 +112,9 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className={`flex items-center gap-3 px-4 h-14 border-b border-slate-700/50 ${!sidebarOpen ? "justify-center" : ""}`}>
-        <BrandLogo size="sm" linkTo={false} />
+        <BrandLogo size="sm" iconOnly={!sidebarOpen} linkTo={false} />
         {sidebarOpen && (
-          <div>
-            <p className="text-white font-bold text-sm leading-none">PataFundi</p>
-            <p className="text-slate-400 text-xs">Admin Panel</p>
-          </div>
+          <p className="text-slate-400 text-xs leading-none">Admin Panel</p>
         )}
       </div>
 

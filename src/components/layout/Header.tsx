@@ -18,7 +18,7 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-xl border-b border-border/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <BrandLogo size="sm" showWordmark />
+        <BrandLogo size="sm" />
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">

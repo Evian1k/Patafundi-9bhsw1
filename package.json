@@ -13,6 +13,7 @@
     "db:migrate": "node backend/scripts/migrate.js",
     "db:seed": "node backend/scripts/seed.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
+    "prebuild": "node scripts/process-brand-logo.mjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
