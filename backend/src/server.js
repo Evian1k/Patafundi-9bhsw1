@@ -12,12 +12,13 @@ import { attachRealtime } from './realtime.js';
 import { healthcheck } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { csrfProtection } from './middleware/auth.js';
+import { corsOriginCallback } from './cors.js';
 
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
-    origin: config.frontendOrigin,
+    origin: corsOriginCallback,
     credentials: true,
   },
 });
@@ -25,15 +26,8 @@ const io = new SocketIOServer(server, {
 attachRealtime(io);
 
 app.use(helmet());
-const allowedOrigins = new Set(
-  [config.frontendOrigin, 'http://127.0.0.1:8080', 'http://127.0.0.1:8081', 'http://localhost:8080', 'http://localhost:8081']
-    .filter(Boolean),
-);
 app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
+  origin: corsOriginCallback,
   credentials: true,
 }));
 app.use(morgan('dev'));

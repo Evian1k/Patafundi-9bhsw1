@@ -6,7 +6,7 @@
  */
 
 import { io, type Socket } from 'socket.io-client';
-import { env } from '@/config/env';
+import { API_BASE_URL, SOCKET_URL } from '@/api/config';
 
 type EventPayload = Record<string, unknown>;
 type EventCallback = (data: EventPayload) => void;
@@ -64,7 +64,7 @@ class RealtimeService {
   connect(token: string): void {
     this.token = token;
 
-    if (!env.SOCKET_URL) {
+    if (!SOCKET_URL) {
       this.isConnected = true;
       console.info('[Realtime] Socket URL not configured; using polling fallback');
       return;
@@ -72,7 +72,7 @@ class RealtimeService {
 
     if (this.socket?.connected) return;
 
-    this.socket = io(env.SOCKET_URL, {
+    this.socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,

@@ -3,7 +3,7 @@
  * All routes map to /api/* on the PataFundi backend.
  */
 
-import { env, isApiConfigured } from '@/config/env';
+import { buildApiUrl, isApiConfigured } from '@/api/config';
 
 export class ApiError extends Error {
   status: number;
@@ -20,15 +20,6 @@ const UNAVAILABLE_MSG = 'Service temporarily unavailable. Please try again.';
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildUrl(endpoint: string): string {
-  const base = env.API_URL.replace(/\/$/, '');
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  if (base.endsWith('/api') && path.startsWith('/api/')) {
-    return `${base}${path.slice(4)}`;
-  }
-  return `${base}${path}`;
 }
 
 function readCookie(name: string): string | null {
@@ -68,7 +59,7 @@ class ApiClient {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
 
     const { includeAuth = true, ...fetchOpts } = options;
-    const url = buildUrl(endpoint);
+    const url = buildApiUrl(endpoint);
 
     const config: RequestInit = {
       ...fetchOpts,
@@ -219,7 +210,7 @@ class ApiClient {
   // ── Fundi ────────────────────────────────────────────────────────────────
   async submitFundiRegistration(formData: FormData) {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
-    const url = buildUrl('/fundi/register');
+    const url = buildApiUrl('/fundi/register');
     const response = await fetch(url, {
       method: 'POST',
       credentials: 'include',
@@ -238,7 +229,7 @@ class ApiClient {
 
   async uploadJobPhoto(jobId: string, formData: FormData) {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
-    const url = buildUrl(`/jobs/${jobId}/photos`);
+    const url = buildApiUrl(`/jobs/${jobId}/photos`);
     const csrf = readCookie('csrf_token');
     const response = await fetch(url, {
       method: 'POST',
@@ -344,7 +335,7 @@ class ApiClient {
     const formData = new FormData();
     formData.append('finalPrice', String(finalPrice));
     photos.forEach((photo) => formData.append('photos', photo));
-    const url = buildUrl(`/jobs/${jobId}/complete`);
+    const url = buildApiUrl(`/jobs/${jobId}/complete`);
     const response = await fetch(url, {
       method: 'POST',
       credentials: 'include',
@@ -414,7 +405,7 @@ class ApiClient {
 
   async uploadDisputeEvidence(disputeId: string, formData: FormData) {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
-    const url = buildUrl(`/disputes/${disputeId}/evidence`);
+    const url = buildApiUrl(`/disputes/${disputeId}/evidence`);
     const response = await fetch(url, {
       method: 'POST',
       credentials: 'include',
