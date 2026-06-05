@@ -110,9 +110,8 @@ export async function createJob(req, res) {
   emitEvent('job:created', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
   const candidates = await findNearestFundis(latitude, longitude, serviceCategory);
   if (!candidates.length) {
-    await query(`update jobs set status = 'failed', updated_at = now() where id = $1`, [job.id]);
     emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
-    return res.status(201).json({ success: true, job: publicJob({ ...job, status: 'failed' }), matching: { candidates: [], failed: true } });
+    return res.status(201).json({ success: true, job: publicJob(job), matching: { candidates: [], failed: true } });
   }
   emitEvent('job:created', { jobId: job.id, job: publicJob(job), candidates });
   res.status(201).json({ success: true, job: publicJob(job), matching: { candidates, failed: false } });

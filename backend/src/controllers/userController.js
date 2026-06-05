@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
-import { badRequest, forbidden } from '../utils/http.js';
+import { badRequest, forbidden, notFound } from '../utils/http.js';
 
 export async function me(req, res) {
   res.json({ success: true, user: req.user });
@@ -84,4 +84,27 @@ export async function notifications(req, res) {
     [req.user.id],
   );
   res.json({ success: true, notifications: result.rows, pagination: { page: 1, total: result.rows.length } });
+}
+
+export async function markNotificationRead(req, res) {
+  const result = await query(
+    `update notifications
+     set read_at = coalesce(read_at, now())
+     where id = $1 and user_id = $2
+     returning *`,
+    [req.params.id, req.user.id],
+  );
+  if (!result.rows[0]) throw notFound('Notification not found');
+  res.json({ success: true, notification: result.rows[0] });
+}
+
+export async function markAllNotificationsRead(req, res) {
+  const result = await query(
+    `update notifications
+     set read_at = coalesce(read_at, now())
+     where user_id = $1 and read_at is null
+     returning id`,
+    [req.user.id],
+  );
+  res.json({ success: true, markedRead: result.rowCount || result.rows.length });
 }

@@ -240,3 +240,46 @@ export async function securityOverview(_req, res) {
   ]);
   res.json({ success: true, alerts: alerts.rows, scores: trust.rows });
 }
+
+const defaultSettings = {
+  payments: {
+    commissionRate: 0.1,
+    disputeWindowHours: 24,
+    minimumPayoutKes: 100,
+  },
+  security: {
+    fraudAutoBlockSeverity: 'critical',
+    uploadMaxBytes: 5 * 1024 * 1024,
+    sessionMinutes: 15,
+  },
+  operations: {
+    supportEmail: 'support@patafundi.com',
+    autoAssignFundis: true,
+  },
+};
+
+export async function getSettings(_req, res) {
+  const result = await query(`select value from platform_settings where key = 'global'`);
+  res.json({ success: true, settings: result.rows[0]?.value || defaultSettings });
+}
+
+export async function updateSettings(req, res) {
+  const nextSettings = req.body || {};
+  if (typeof nextSettings !== 'object' || Array.isArray(nextSettings)) throw badRequest('Settings payload must be an object');
+  const merged = {
+    ...defaultSettings,
+    ...nextSettings,
+    payments: { ...defaultSettings.payments, ...(nextSettings.payments || {}) },
+    security: { ...defaultSettings.security, ...(nextSettings.security || {}) },
+    operations: { ...defaultSettings.operations, ...(nextSettings.operations || {}) },
+  };
+  const result = await query(
+    `insert into platform_settings (key, value, updated_by)
+     values ('global', $1::jsonb, $2)
+     on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now()
+     returning value`,
+    [JSON.stringify(merged), req.user.id],
+  );
+  await auditLog({ userId: req.user.id, action: 'admin.settings.update', entityType: 'platform_settings', metadata: merged });
+  res.json({ success: true, settings: result.rows[0].value });
+}

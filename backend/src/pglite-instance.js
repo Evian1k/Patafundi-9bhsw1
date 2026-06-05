@@ -2,7 +2,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../../.pgdata');
+const DATA_DIR = process.env.PATAFUNDI_PGDATA_DIR
+  ? path.resolve(process.env.PATAFUNDI_PGDATA_DIR)
+  : path.join(__dirname, '../../.pgdata');
 
 /** @type {import('@electric-sql/pglite').PGlite | null} */
 let pglite = null;

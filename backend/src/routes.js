@@ -123,23 +123,23 @@ router.get('/admin/bypass-alerts', authRequired, requireRole('admin'), asyncHand
 router.post('/admin/security-alerts/:id/resolve', authRequired, requireRole('admin'), asyncHandler(admin.resolveSecurityAlert));
 router.post('/admin/users/:id/force-logout', authRequired, requireRole('admin'), asyncHandler(admin.forceLogout));
 router.post('/admin/users/:id/disable', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
-router.get('/admin/settings', authRequired, requireRole('admin'), (_req, res) => res.json({ success: true, settings: {} }));
-router.put('/admin/settings', authRequired, requireRole('admin'), (_req, res) => res.json({ success: true }));
+router.get('/admin/settings', authRequired, requireRole('admin'), asyncHandler(admin.getSettings));
+router.put('/admin/settings', authRequired, requireRole('admin'), asyncHandler(admin.updateSettings));
 
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
-router.patch('/notifications/:id/read', authRequired, (_req, res) => res.json({ success: true }));
-router.patch('/notifications/read-all', authRequired, (_req, res) => res.json({ success: true }));
+router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
+router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
 router.post('/subscriptions/activate', authRequired, (_req, res) => res.json({ success: true }));
 
 router.post('/support/ticket', asyncHandler(content.supportTicket));
 router.post('/fraud-report', asyncHandler(content.fraudReport));
 router.get('/blog', asyncHandler(content.genericList('posts')));
-router.get('/blog/:slug', (_req, res) => res.json({ success: true, post: null }));
+router.get('/blog/:slug', asyncHandler(content.blogPost));
 router.get('/careers/jobs', asyncHandler(content.genericList('jobs')));
 router.post('/careers/apply', (_req, res) => res.status(201).json({ success: true }));
-router.get('/help', (_req, res) => res.json({ success: true, categories: [], faqs: [] }));
-router.get('/policies/:slug', (_req, res) => res.json({ success: true, policy: null }));
-router.get('/services/:slug', (_req, res) => res.json({ success: true, service: null, fundis: [] }));
+router.get('/help', asyncHandler(content.help));
+router.get('/policies/:slug', asyncHandler(content.policy));
+router.get('/services/:slug', asyncHandler(content.service));
 
 router.post('/maps/reverse-geocode', asyncHandler(maps.reverseGeocode));
 router.get('/maps/search', asyncHandler(maps.search));
