@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BrandLogo } from "@/assets/logo";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
