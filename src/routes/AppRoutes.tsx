@@ -51,6 +51,9 @@ export default function AppRoutes() {
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
 
+      <Route path="/customer" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/profile" element={<Navigate to="/settings" replace />} />
+
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/create-job" element={<CreateJob />} />
       <Route path="/job/:jobId/tracking" element={<JobTracking />} />
