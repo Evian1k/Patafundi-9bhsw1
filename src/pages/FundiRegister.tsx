@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, ArrowRight, Camera, Upload, CheckCircle, AlertCircle, MapPin, Loader, X, Shield, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Upload, CheckCircle, AlertCircle, Loader, X, Shield, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
 import { toast } from "sonner";
 
 const SKILLS = ["Plumbing", "Electrical", "AC & HVAC", "Cleaning", "Carpentry", "Auto Repair", "Painting", "Masonry", "Welding", "Roofing"];
@@ -12,7 +13,7 @@ export default function FundiRegister() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [geoLoading, setGeoLoading] = useState(false);
+  const [locationSelection, setLocationSelection] = useState<LocationSelection | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,43 +35,27 @@ export default function FundiRegister() {
     return () => { if (streamRef) streamRef.getTracks().forEach(t => t.stop()); };
   }, [streamRef]);
 
-  const captureLocation = async () => {
-    if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
-    setGeoLoading(true);
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 })
-      );
-      const { latitude, longitude, accuracy } = pos.coords;
-      // Reverse geocode
-      let locationDisplayName = "Selected location";
-      let locationCity = "";
-      let locationArea = "";
-      try {
-        const geoData = await apiClient.reverseGeocode(latitude, longitude) as {
-          address?: {
-            town?: string | null;
-            estate?: string | null;
-            fullLabel?: string;
-            shortLabel?: string;
-          };
-          formattedAddress?: string | null;
-          areaName?: string;
-        };
-        locationDisplayName = geoData.address?.fullLabel
-          || geoData.formattedAddress
-          || geoData.areaName
-          || "Selected location";
-        locationCity = geoData.address?.town || "";
-        locationArea = geoData.address?.estate || "";
-      } catch { /* ignore */ }
-      setData(d => ({ ...d, latitude, longitude, accuracy: Math.round(accuracy), locationDisplayName, locationCity, locationArea }));
-      toast.success("Location captured");
-    } catch (e) {
-      toast.error("Failed to get location: " + (e instanceof Error ? e.message : "Unknown error"));
-    } finally {
-      setGeoLoading(false);
+  const onLocationChange = (selection: LocationSelection | null) => {
+    setLocationSelection(selection);
+    if (!selection?.formattedAddress || selection.latitude == null || selection.longitude == null) {
+      setData((d) => ({
+        ...d,
+        latitude: null,
+        longitude: null,
+        locationDisplayName: "",
+        locationCity: "",
+        locationArea: "",
+      }));
+      return;
     }
+    setData((d) => ({
+      ...d,
+      latitude: selection.latitude,
+      longitude: selection.longitude,
+      locationDisplayName: selection.formattedAddress,
+      locationCity: selection.address?.town || "",
+      locationArea: selection.address?.estate || selection.address?.street || "",
+    }));
   };
 
   const startCamera = async () => {
@@ -251,16 +236,11 @@ export default function FundiRegister() {
             <div className="space-y-5 mt-4">
               <div>
                 <label className="text-xs font-medium block mb-2">Your Location *</label>
-                <Button variant="outline" className="w-full" onClick={captureLocation} disabled={geoLoading}>
-                  {geoLoading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <MapPin className="w-4 h-4 mr-2" />}
-                  {data.locationDisplayName || "Capture My Location"}
-                </Button>
-                {data.locationDisplayName && (
-                  <div className="mt-2 p-3 bg-primary/5 rounded-xl">
-                    <p className="text-xs text-muted-foreground">Location set (area name shown to customers — no coordinates shared)</p>
-                    <p className="text-sm font-medium">{data.locationDisplayName}</p>
-                  </div>
-                )}
+                <LocationPicker
+                  value={locationSelection}
+                  onChange={onLocationChange}
+                  placeholder="Search your street, estate, or area"
+                />
               </div>
               <div>
                 <label className="text-xs font-medium block mb-2">Skills * (select all that apply)</label>

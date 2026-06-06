@@ -1,4 +1,4 @@
-const GENERIC_FALLBACK = 'Location identified';
+const GENERIC_FALLBACK = 'Address not available';
 
 function pickComponent(components, ...types) {
   for (const type of types) {
@@ -36,7 +36,7 @@ export function formatStructuredAddress(address) {
     ...address,
     displayLines: lines,
     shortLabel: lines.slice(0, 2).join(', ') || address.formattedAddress || GENERIC_FALLBACK,
-    fullLabel: lines.join(', ') || address.formattedAddress || GENERIC_FALLBACK,
+    fullLabel: address.formattedAddress || lines.join(', ') || GENERIC_FALLBACK,
   };
 }
 
@@ -52,9 +52,24 @@ export async function googleReverseGeocode(latitude, longitude, key) {
 export async function googlePlacesAutocomplete(input, key) {
   const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
   url.searchParams.set('input', input);
-  url.searchParams.set('components', 'country:ke');
   url.searchParams.set('key', key);
   const response = await fetch(url);
   const data = await response.json();
+  if (data.status && data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+    throw new Error(`Places autocomplete failed: ${data.status}`);
+  }
   return data.predictions || [];
+}
+
+export async function googlePlaceDetails(placeId, key) {
+  const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+  url.searchParams.set('place_id', placeId);
+  url.searchParams.set('fields', 'formatted_address,geometry,address_components,name,place_id');
+  url.searchParams.set('key', key);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (data.status !== 'OK' || !data.result) {
+    throw new Error(`Place details failed: ${data.status}`);
+  }
+  return data.result;
 }

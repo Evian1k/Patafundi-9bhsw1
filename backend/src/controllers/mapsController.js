@@ -1,6 +1,8 @@
 import { badRequest } from '../utils/http.js';
 import {
   formatStructuredAddress,
+  googlePlaceDetails,
+  googlePlacesAutocomplete,
   googleReverseGeocode,
   parseGoogleAddress,
 } from '../utils/geocoding.js';
@@ -18,33 +20,36 @@ function mapsKey() {
   return process.env.GOOGLE_MAPS_SERVER_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
 }
 
-const FALLBACK_ADDRESS = formatStructuredAddress({
-  formattedAddress: 'Location identified',
-});
-
 export async function reverseGeocode(req, res) {
   const { latitude, longitude } = req.body || {};
   if (latitude == null || longitude == null) throw badRequest('Latitude and longitude are required');
 
   const key = mapsKey();
   if (!key) {
-    return res.json({
-      success: true,
-      address: FALLBACK_ADDRESS,
-      areaName: 'Location identified',
-      formattedAddress: 'Location identified',
+    return res.status(503).json({
+      success: false,
       source: 'not_configured',
+      message: 'Google Maps is not configured for reverse geocoding',
     });
   }
 
-  const address = await googleReverseGeocode(latitude, longitude, key);
-  res.json({
-    success: true,
-    address,
-    areaName: address.shortLabel,
-    formattedAddress: address.fullLabel,
-    source: 'google',
-  });
+  try {
+    const address = await googleReverseGeocode(latitude, longitude, key);
+    res.json({
+      success: true,
+      address,
+      areaName: address.shortLabel,
+      formattedAddress: address.formattedAddress || address.fullLabel,
+      source: 'google',
+    });
+  } catch (err) {
+    console.error('[maps] reverse geocode failed:', err);
+    res.status(502).json({
+      success: false,
+      message: 'Could not resolve coordinates to an address',
+      source: 'google',
+    });
+  }
 }
 
 export async function search(req, res) {
@@ -54,22 +59,53 @@ export async function search(req, res) {
   if (!key) {
     return res.json({ success: true, results: [], source: 'not_configured' });
   }
-  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-  url.searchParams.set('address', q);
-  url.searchParams.set('components', 'country:KE');
-  url.searchParams.set('key', key);
-  const response = await fetch(url);
-  const data = await response.json();
-  const results = (data.results || []).slice(0, 5).map((result) => {
-    const address = formatStructuredAddress(parseGoogleAddress(result));
-    return {
-      lat: String(result.geometry?.location?.lat ?? ''),
-      lon: String(result.geometry?.location?.lng ?? ''),
-      display_name: address.fullLabel,
-      address,
-    };
-  });
-  res.json({ success: true, results, source: 'google' });
+
+  try {
+    const predictions = await googlePlacesAutocomplete(q, key);
+    const top = predictions.slice(0, 6);
+    const results = [];
+
+    for (const prediction of top) {
+      try {
+        const place = await googlePlaceDetails(prediction.place_id, key);
+        const address = formatStructuredAddress(parseGoogleAddress(place));
+        results.push({
+          placeId: prediction.place_id,
+          lat: String(place.geometry?.location?.lat ?? ''),
+          lon: String(place.geometry?.location?.lng ?? ''),
+          display_name: place.formatted_address || prediction.description,
+          mainText: prediction.structured_formatting?.main_text || prediction.description,
+          secondaryText: prediction.structured_formatting?.secondary_text || '',
+          address,
+        });
+      } catch (detailErr) {
+        console.warn('[maps] place details skipped:', prediction.place_id, detailErr?.message);
+      }
+    }
+
+    if (results.length) {
+      return res.json({ success: true, results, source: 'google_places' });
+    }
+
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('address', q);
+    url.searchParams.set('key', key);
+    const response = await fetch(url);
+    const data = await response.json();
+    const geocodeResults = (data.results || []).slice(0, 5).map((result) => {
+      const address = formatStructuredAddress(parseGoogleAddress(result));
+      return {
+        lat: String(result.geometry?.location?.lat ?? ''),
+        lon: String(result.geometry?.location?.lng ?? ''),
+        display_name: address.fullLabel,
+        address,
+      };
+    });
+    return res.json({ success: true, results: geocodeResults, source: 'google_geocode' });
+  } catch (err) {
+    console.error('[maps] search failed:', err);
+    res.json({ success: true, results: [], source: 'error' });
+  }
 }
 
 export async function directions(req, res) {

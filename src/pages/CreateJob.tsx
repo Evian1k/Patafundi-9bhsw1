@@ -17,23 +17,14 @@ import {
   CheckCircle,
   X,
   Loader,
-  Navigation2,
-  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
 import AddressDisplay from "@/components/maps/AddressDisplay";
-import { formatAddressLines, formatAddressShort, sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
-import type { StructuredAddress } from "@/lib/maps/types";
-
-interface LocationSearchResult {
-  lat: string;
-  lon: string;
-  display_name: string;
-  address?: StructuredAddress;
-}
+import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
+import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 
 interface PhotoData {
   file: File;
@@ -77,10 +68,7 @@ const CreateJob = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [geoLoading, setGeoLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [locationSelection, setLocationSelection] = useState<LocationSelection | null>(null);
   const [jobData, setJobData] = useState<JobFormData>({
     service: searchParams.get("service") || "",
     problem: searchParams.get("problem") || "",
@@ -104,66 +92,25 @@ const CreateJob = () => {
     apiClient.getCurrentUser().catch(() => navigate("/auth"));
   }, [navigate]);
 
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    try {
-      const data = await apiClient.reverseGeocode(lat, lng) as {
-        address?: { fullLabel?: string; shortLabel?: string; displayLines?: string[] };
-        areaName?: string;
-        formattedAddress?: string | null;
-      };
-      return sanitizeLocationText(
-        data.address?.fullLabel
-        || data.formattedAddress
-        || data.areaName
-        || data.address?.shortLabel,
-        LOCATION_FALLBACK,
-      );
-    } catch {
-      return LOCATION_FALLBACK;
+  const syncLocation = (selection: LocationSelection | null) => {
+    setLocationSelection(selection);
+    if (!selection?.formattedAddress || selection.latitude == null || selection.longitude == null) {
+      setJobData((prev) => ({
+        ...prev,
+        latitude: undefined,
+        longitude: undefined,
+        location: "",
+        locationName: "",
+      }));
+      return;
     }
-  };
-
-  const searchLocation = async (query: string) => {
-    if (!query.trim()) { setSearchResults([]); return; }
-    setSearchLoading(true);
-    try {
-      const data = await apiClient.searchLocations(query) as { results?: LocationSearchResult[] };
-      setSearchResults(data.results || []);
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const selectLocation = (result: LocationSearchResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-    const displayName = result.address
-      ? formatAddressShort(result.address)
-      : sanitizeLocationText(result.display_name, LOCATION_FALLBACK);
-    setJobData((prev) => ({ ...prev, latitude: lat, longitude: lng, location: displayName, locationName: displayName }));
-    setSearchQuery(displayName);
-    setSearchResults([]);
-  };
-
-  const captureLocation = async () => {
-    if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
-    setGeoLoading(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
-      );
-      const { latitude, longitude } = position.coords;
-      const locationName = await reverseGeocode(latitude, longitude);
-      setJobData((prev) => ({ ...prev, latitude, longitude, location: locationName, locationName }));
-      setSearchQuery(locationName);
-      toast.success("Location captured");
-    } catch {
-      toast.error("Failed to get location. Please search manually.");
-    } finally {
-      setGeoLoading(false);
-    }
+    setJobData((prev) => ({
+      ...prev,
+      latitude: selection.latitude,
+      longitude: selection.longitude,
+      location: selection.formattedAddress,
+      locationName: selection.formattedAddress,
+    }));
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +131,12 @@ const CreateJob = () => {
   const canProceed = () => {
     if (step === 1) return !!jobData.service;
     if (step === 2) return jobData.description.trim().length >= 10;
-    if (step === 3) return !!jobData.urgency && !!jobData.location && jobData.latitude !== undefined;
+    if (step === 3) {
+      return !!jobData.urgency
+        && !!locationSelection?.formattedAddress
+        && jobData.latitude !== undefined
+        && jobData.longitude !== undefined;
+    }
     return true;
   };
 
@@ -199,7 +151,8 @@ const CreateJob = () => {
         title: `${jobData.service} - ${jobData.problem || jobData.description.slice(0, 40)}`,
         description: jobData.description,
         category: jobData.service,
-        location: jobData.location,
+        locationName: locationSelection?.formattedAddress || jobData.location,
+        formattedAddress: locationSelection?.formattedAddress || jobData.location,
         latitude: jobData.latitude,
         longitude: jobData.longitude,
         urgency: jobData.urgency,
@@ -387,63 +340,16 @@ const CreateJob = () => {
                 {/* Location */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Service location *</label>
-                  <div className="flex gap-2 mb-2">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => {
-                          setSearchQuery(e.target.value);
-                          searchLocation(e.target.value);
-                        }}
-                        placeholder="Search location..."
-                        className="w-full pl-9 pr-4 py-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0 rounded-xl"
-                      onClick={captureLocation}
-                      disabled={geoLoading}
-                      title="Use my location"
-                    >
-                      {geoLoading ? <Loader className="w-4 h-4 animate-spin" /> : <Navigation2 className="w-4 h-4" />}
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Search for your street, building, or area — or use GPS. Fundis will see this exact address.
+                  </p>
+                  <LocationPicker
+                    value={locationSelection}
+                    onChange={syncLocation}
+                    placeholder="e.g. Kenyatta Avenue, Nairobi or Moi University, Eldoret"
+                  />
 
-                  {/* Search results */}
-                  {searchResults.length > 0 && (
-                    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-md">
-                      {searchResults.map((r, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => selectLocation(r)}
-                          className="w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border/50 last:border-0"
-                        >
-                          <div className="flex items-start gap-2">
-                            <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                            <p className="text-sm">
-                              {r.address
-                                ? formatAddressLines(r.address).slice(0, 3).join(', ')
-                                : sanitizeLocationText(r.display_name, LOCATION_FALLBACK)}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {searchLoading && (
-                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Loader className="w-3 h-3 animate-spin" />
-                      Searching...
-                    </div>
-                  )}
-
-                  {jobData.location && jobData.latitude != null && jobData.longitude != null && (
+                  {jobData.latitude != null && jobData.longitude != null && locationSelection?.formattedAddress && (
                     <div className="mt-3 space-y-3 overflow-hidden rounded-2xl border border-primary/20 bg-card">
                       <LiveTrackingMap
                         customer={{ latitude: jobData.latitude, longitude: jobData.longitude }}
@@ -451,7 +357,7 @@ const CreateJob = () => {
                         showControls={false}
                       />
                       <div className="px-4 pb-4">
-                        <AddressDisplay fallback={jobData.location} />
+                        <AddressDisplay address={locationSelection.address} fallback={locationSelection.formattedAddress} />
                       </div>
                     </div>
                   )}

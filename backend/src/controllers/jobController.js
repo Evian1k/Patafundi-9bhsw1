@@ -96,7 +96,8 @@ export async function createJob(req, res) {
       req.user.id,
       serviceCategory,
       description,
-      body.locationName || body.location_name || body.address || '',
+      body.formattedAddress || body.formatted_address
+      || body.locationName || body.location_name || body.location || body.address || '',
       latitude,
       longitude,
       body.urgency || 'normal',

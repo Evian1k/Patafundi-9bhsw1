@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/api';
 import type { StructuredAddress } from './types';
 
-export const LOCATION_FALLBACK = 'Location identified';
+export const LOCATION_FALLBACK = 'Address not available';
 export const LOCATION_AVAILABLE = 'Location available';
 
 const COORDINATE_RE = /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/;
