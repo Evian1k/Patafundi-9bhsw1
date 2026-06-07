@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { toast } from "sonner";
 import { DEMO_MODE, demoJobs, demoUser } from "@/lib/demo";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
@@ -95,8 +96,9 @@ export default function Dashboard() {
     if (DEMO_MODE) { setLoading(false); return; }
     try {
       const userData = await apiClient.getCurrentUser();
+      bootstrapAuthSessionFromUser(userData.user);
       setUser(userData.user);
-      const role = String(userData?.user?.role || "").toLowerCase();
+      const role = resolveAuthRole(userData.user);
       if (role === "admin") { navigate("/admin/dashboard"); return; }
       if (role === "fundi") { navigate("/fundi"); return; }
       if (role === "fundi_pending") { navigate("/fundi/pending"); return; }

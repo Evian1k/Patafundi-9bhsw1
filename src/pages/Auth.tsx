@@ -5,6 +5,7 @@ import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 import { apiClient } from "@/lib/api";
+import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { isApiConfigured } from "@/config/env";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -55,7 +56,8 @@ const Auth = () => {
     const meRes = await apiClient.getCurrentUser();
     const me = meRes?.user ?? null;
     if (!me) return navigate("/dashboard");
-    const role = String(me.role || "").toLowerCase();
+    bootstrapAuthSessionFromUser(me);
+    const role = resolveAuthRole(me);
     if (role === "admin") return navigate("/admin/dashboard");
     if (role === "fundi") return navigate("/fundi");
     if (role === "fundi_pending") {

@@ -4,6 +4,7 @@
  */
 
 import { buildApiUrl, isApiConfigured } from '@/api/config';
+import { clearAuthSession, setAuthSession } from '@/lib/authSession';
 
 export class ApiError extends Error {
   status: number;
@@ -41,11 +42,20 @@ class ApiClient {
       if (token) localStorage.setItem('auth_token', token);
       else localStorage.removeItem('auth_token');
     }
+    if (!token) clearAuthSession();
+  }
+
+  private syncTokenFromStorage(): string | null {
+    if (typeof localStorage !== 'undefined') {
+      this.token = localStorage.getItem('auth_token');
+    }
+    return this.token;
   }
 
   private getHeaders(includeAuth = true): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (includeAuth && this.token) h['Authorization'] = `Bearer ${this.token}`;
+    const token = this.syncTokenFromStorage();
+    if (includeAuth && token) h['Authorization'] = `Bearer ${token}`;
     const csrf = readCookie('csrf_token');
     if (csrf) h['X-CSRF-Token'] = csrf;
     return h;
@@ -125,7 +135,11 @@ class ApiClient {
       body: JSON.stringify({ email, code, purpose }),
       includeAuth: false,
     }) as { token?: string };
-    if (data?.token) this.setToken(data.token);
+    if (data?.token) {
+      this.setToken(data.token);
+      const user = (data as { user?: Record<string, unknown> }).user;
+      if (user?.id) setAuthSession(String(user.id), String(user.role || 'customer'));
+    }
     return data;
   }
 
@@ -143,7 +157,11 @@ class ApiClient {
       body: JSON.stringify({ email, password }),
       includeAuth: false,
     }) as { token?: string };
-    if (data?.token) this.setToken(data.token);
+    if (data?.token) {
+      this.setToken(data.token);
+      const user = (data as { user?: Record<string, unknown> }).user;
+      if (user?.id) setAuthSession(String(user.id), String(user.role || 'customer'));
+    }
     return data;
   }
 

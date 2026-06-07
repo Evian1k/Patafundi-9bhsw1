@@ -6,6 +6,7 @@ import {
   Lock, ArrowRight, RefreshCw,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
+import { bootstrapAuthSessionFromUser } from "@/lib/authSession";
 import { isValidUuid } from "@/lib/uuid";
 import { realtimeService } from "@/services/realtime";
 import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
@@ -130,7 +131,10 @@ export default function FundiTracker({
   useEffect(() => {
     apiClient.getCurrentUser().then((res) => {
       const u = res?.user as { id: string } | undefined;
-      if (u) setCurrentUser(u);
+      if (u) {
+        bootstrapAuthSessionFromUser(u);
+        setCurrentUser({ id: u.id });
+      }
     }).catch(() => {});
   }, []);
 
@@ -180,11 +184,13 @@ export default function FundiTracker({
     const onAccepted = (data: Record<string, unknown>) => {
       if (data.jobId && data.jobId !== jobId) return;
       setJobStatusRaw("accepted");
-      if (data.estimatedPrice) {
-        const p = Number(data.estimatedPrice);
+      const rawPrice = data.estimatedPrice ?? data.estimated_price;
+      if (rawPrice != null) {
+        const p = Number(rawPrice);
         if (Number.isFinite(p)) { setEstimatedPrice(p); setPaymentAmount(p); }
       }
-      if (data.fundiId && !fundi) loadFundi(data.fundiId as string);
+      const assignedFundi = data.fundiId ?? data.fundi_id;
+      if (assignedFundi) loadFundi(String(assignedFundi));
     };
 
     const onCompleted = (data: Record<string, unknown>) => {
@@ -261,8 +267,9 @@ export default function FundiTracker({
       if (res?.job) {
         const job = res.job;
         setJobStatusRaw((job.status as string) || "searching");
-        if (job.estimated_price != null) {
-          const p = Number(job.estimated_price);
+        const est = job.estimated_price ?? job.estimatedPrice;
+        if (est != null) {
+          const p = Number(est);
           if (Number.isFinite(p)) { setEstimatedPrice(p); setPaymentAmount(p); }
         }
         if (job.final_price != null) {
@@ -270,7 +277,8 @@ export default function FundiTracker({
           if (Number.isFinite(fp)) { setPaymentAmount(fp); }
         }
         if (job.customer_completion_confirmed) setCompletionConfirmed(true);
-        if (job.fundi_id && !fundi) loadFundi(job.fundi_id as string);
+        const assignedFundi = job.fundi_id ?? job.fundiId;
+        if (assignedFundi) loadFundi(String(assignedFundi));
         const customerCoords = toCoordinates(
           job,
           ["customer_latitude", "latitude", "lat"],
@@ -313,14 +321,22 @@ export default function FundiTracker({
       const fundiRes = await apiClient.getFundi(fundiId) as { fundi?: Record<string, unknown> };
       if (fundiRes?.fundi) {
         const f = fundiRes.fundi;
+        const rating = Number(f.rating);
+        const trust = Number(f.trust_score ?? f.trustScore);
+        const skills = Array.isArray(f.skills) ? f.skills as string[] : [];
+        const displayName = String(
+          f.name
+          || [f.first_name, f.last_name].filter(Boolean).join(' ')
+          || 'Fundi',
+        );
         setFundi({
-          id: f.id as string,
-          name: `${f.first_name} ${f.last_name}`,
-          skill: (f.skills as string[])?.[0] || "Fundi",
-          distanceKm: 0,
-          rating: (f.rating as number) || 4.5,
-          avatarUrl: (f.avatar_url) as string | undefined,
-          trustScore: (f.trust_score as number) || undefined,
+          id: String(f.user_id || f.id || fundiId),
+          name: displayName,
+          skill: skills[0] || "Fundi",
+          distanceKm: Number(f.distance_km ?? f.distanceKm ?? 0) || 0,
+          rating: Number.isFinite(rating) ? rating : 4.5,
+          avatarUrl: (f.avatar_url ?? f.avatarUrl) as string | undefined,
+          trustScore: Number.isFinite(trust) ? trust : undefined,
         });
       }
     } catch { /* ignore */ }
@@ -503,7 +519,10 @@ export default function FundiTracker({
 
       <div className="max-w-2xl mx-auto space-y-4">
         {(showSearchingMap || showTrackingMap) && (
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-md">
+          <div
+            key={showTrackingMap ? `track-${jobId}` : `search-${jobId}`}
+            className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-md"
+          >
             {showSearchingMap && customerLocation && (
               <SearchingRadarMap center={customerLocation} height={380} />
             )}
@@ -639,7 +658,7 @@ export default function FundiTracker({
                     <p className="text-sm text-muted-foreground">{fundi.skill}</p>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span>{fundi.rating.toFixed(1)}</span>
+                      <span>{Number(fundi.rating || 0).toFixed(1)}</span>
                     </div>
                   </div>
                   {jobId && currentUser && (

@@ -61,8 +61,10 @@ class RealtimeService {
   private token: string | null = null;
   private isConnected = false;
 
-  connect(token: string): void {
-    this.token = token;
+  connect(token?: string | null): void {
+    const resolved = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null);
+    if (!resolved) return;
+    this.token = resolved;
 
     if (!SOCKET_URL) {
       this.isConnected = true;
@@ -73,7 +75,7 @@ class RealtimeService {
     if (this.socket?.connected) return;
 
     this.socket = io(SOCKET_URL, {
-      auth: { token },
+      auth: { token: resolved },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,

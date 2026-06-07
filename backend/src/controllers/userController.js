@@ -2,8 +2,21 @@ import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
 
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.full_name,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    trustScore: user.trust_score,
+  };
+}
+
 export async function me(req, res) {
-  res.json({ success: true, user: req.user });
+  res.json({ success: true, user: publicUser(req.user) });
 }
 
 export async function updateMe(req, res) {

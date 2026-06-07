@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import FundiTracker from '@/components/fundi/FundiTracker';
+import RouteErrorBoundary from '@/components/system/RouteErrorBoundary';
 
 export default function JobTracking() {
   const { jobId } = useParams();
@@ -8,7 +9,9 @@ export default function JobTracking() {
 
   return (
     <div className="min-h-screen bg-gradient-hero">
-      <FundiTracker jobId={jobId} onComplete={() => navigate('/dashboard')} />
+      <RouteErrorBoundary fallbackTitle="Job tracking unavailable">
+        <FundiTracker jobId={jobId} onComplete={() => navigate('/dashboard')} />
+      </RouteErrorBoundary>
     </div>
   );
 }

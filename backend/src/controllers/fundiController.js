@@ -13,6 +13,9 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 
 export async function registerFundi(req, res) {
   const body = req.body || {};
+  const skills = body.skills
+    ? (Array.isArray(body.skills) ? body.skills : String(body.skills).split(',').map((s) => s.trim()).filter(Boolean))
+    : [];
   const result = await query(
     `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude)
      values ($1, $2, $3, $4, 'pending', $5, $6)
@@ -21,13 +24,19 @@ export async function registerFundi(req, res) {
      returning *`,
     [
       req.user.id,
-      body.skills ? (Array.isArray(body.skills) ? body.skills : String(body.skills).split(',')) : [],
+      skills,
       body.experience || '',
       body.mpesaNumber || body.mpesa_number || '',
       body.latitude || null,
       body.longitude || null,
     ],
   );
+  if (req.user.role === 'customer') {
+    await query(
+      `update users set role = 'fundi_pending', updated_at = now() where id = $1`,
+      [req.user.id],
+    );
+  }
   res.status(201).json({ success: true, fundi: result.rows[0] });
 }
 
@@ -56,7 +65,23 @@ export async function publicFundi(req, res) {
      from fundis f join users u on u.id = f.user_id where f.id = $1 or f.user_id = $1`,
     [req.params.id],
   );
-  res.json({ success: true, fundi: result.rows[0] || null });
+  const row = result.rows[0];
+  res.json({
+    success: true,
+    fundi: row
+      ? {
+          id: row.id,
+          userId: row.user_id,
+          user_id: row.user_id,
+          name: row.name,
+          skills: row.skills || [],
+          rating: row.rating == null ? null : Number(row.rating),
+          trustScore: row.trust_score,
+          trust_score: row.trust_score,
+          approvalStatus: row.approval_status,
+        }
+      : null,
+  });
 }
 
 export async function searchFundis(req, res) {

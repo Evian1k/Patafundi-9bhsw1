@@ -116,14 +116,10 @@ export function useJobRequest(): UseJobRequestReturn {
     }
   }, []);
 
-  const declineJob = useCallback(async (jobId: string) => {
-    try {
-      await apiClient.cancelJob(jobId, 'Fundi declined');
-      setJobRequest(null);
-      clearTimer();
-    } catch (e) {
-      console.error('[useJobRequest] declineJob error:', e);
-    }
+  const declineJob = useCallback(async (_jobId: string) => {
+    // Dismiss only — job stays open for other fundis (must not cancel customer request).
+    setJobRequest(null);
+    clearTimer();
   }, []);
 
   return { jobRequest, remaining, acceptJob, declineJob };

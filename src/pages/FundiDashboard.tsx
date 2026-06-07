@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiClient } from "@/lib/api";
+import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { realtimeService } from "@/services/realtime";
 import { useJobRequest } from "@/hooks/useRealtime";
 import {
@@ -42,7 +43,8 @@ export function FundiDashboard() {
     if (!quiet) setLoading(true); else setRefreshing(true);
     try {
       const me = await apiClient.getCurrentUser();
-      const role = String(me?.user?.role || "").toLowerCase();
+      bootstrapAuthSessionFromUser(me?.user);
+      const role = resolveAuthRole(me?.user);
       if (role === "customer") { navigate("/dashboard"); return; }
       if (role === "fundi_pending") { navigate("/fundi/pending"); return; }
 
