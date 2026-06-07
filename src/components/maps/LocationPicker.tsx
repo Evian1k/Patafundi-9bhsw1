@@ -3,6 +3,7 @@ import { Loader, MapPin, Navigation2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api';
 import { useGoogleMapsReady } from '@/components/maps/GoogleMapsProvider';
+import { env } from '@/config/env';
 import { geocoderResultToSelection, parseAddressComponents, placeResultToSelection } from '@/lib/maps/parseGooglePlace';
 import { formatAddressLines } from '@/lib/maps/geocoding';
 import type { StructuredAddress } from '@/lib/maps/types';
@@ -39,7 +40,7 @@ export default function LocationPicker({
   className = '',
   showUseCurrentLocation = true,
 }: LocationPickerProps) {
-  const { isLoaded, hasApiKey } = useGoogleMapsReady();
+  const { isLoaded, hasApiKey, useGoogleMaps } = useGoogleMapsReady();
   const [query, setQuery] = useState(value?.formattedAddress || '');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -56,7 +57,7 @@ export default function LocationPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const serverCacheRef = useRef<Map<string, { lat: string; lon: string; display_name: string; address?: StructuredAddress }>>(new Map());
 
-  const mapsReady = isLoaded && hasApiKey && typeof google !== 'undefined';
+  const mapsReady = useGoogleMaps && isLoaded && hasApiKey && typeof google !== 'undefined';
 
   useEffect(() => {
     if (value?.formattedAddress) setQuery(value.formattedAddress);
@@ -106,31 +107,38 @@ export default function LocationPicker({
 
     try {
       if (mapsReady) {
-        const service = new google.maps.places.AutocompleteService();
-        const token = sessionTokenRef.current || newSessionToken();
-        const response = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve) => {
-          service.getPlacePredictions(
-            {
-              input: trimmed,
-              sessionToken: token || undefined,
-            },
-            (results) => resolve(results || []),
-          );
-        });
-        const mapped = response.map((p) => ({
-          placeId: p.place_id,
-          mainText: p.structured_formatting.main_text,
-          secondaryText: p.structured_formatting.secondary_text || '',
-        }));
-        setPredictions(mapped);
-        setIsOpen(mapped.length > 0);
-        setActiveIndex(-1);
-      } else {
-        const serverResults = await fetchServerSuggestions(trimmed);
-        setPredictions(serverResults);
-        setIsOpen(serverResults.length > 0);
-        setManualMode(true);
+        try {
+          const service = new google.maps.places.AutocompleteService();
+          const token = sessionTokenRef.current || newSessionToken();
+          const response = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve) => {
+            service.getPlacePredictions(
+              {
+                input: trimmed,
+                sessionToken: token || undefined,
+              },
+              (results) => resolve(results || []),
+            );
+          });
+          const mapped = response.map((p) => ({
+            placeId: p.place_id,
+            mainText: p.structured_formatting.main_text,
+            secondaryText: p.structured_formatting.secondary_text || '',
+          }));
+          if (mapped.length) {
+            setPredictions(mapped);
+            setIsOpen(true);
+            setActiveIndex(-1);
+            return;
+          }
+        } catch {
+          // Fall through to free server search (OpenStreetMap).
+        }
       }
+
+      const serverResults = await fetchServerSuggestions(trimmed);
+      setPredictions(serverResults);
+      setIsOpen(serverResults.length > 0);
+      if (!mapsReady) setManualMode(true);
     } catch {
       setPredictions([]);
       setManualMode(true);
@@ -198,6 +206,22 @@ export default function LocationPicker({
       if (!parsed) throw new Error('Missing coordinates');
       applySelection({ ...parsed, source: 'places' });
     } catch {
+      try {
+        await fetchServerSuggestions(label);
+        const cached = [...serverCacheRef.current.entries()].find(([id]) => id.startsWith('server-'))?.[1];
+        if (cached) {
+          applySelection({
+            formattedAddress: cached.display_name,
+            latitude: parseFloat(cached.lat),
+            longitude: parseFloat(cached.lon),
+            address: cached.address,
+            source: 'server',
+          });
+          return;
+        }
+      } catch {
+        // Ignore and show manual entry prompt below.
+      }
       setError('Could not load place details. Try again or enter your address manually.');
       setManualMode(true);
     } finally {
@@ -207,15 +231,19 @@ export default function LocationPicker({
 
   const reverseGeocodeCoords = useCallback(async (latitude: number, longitude: number): Promise<LocationSelection | null> => {
     if (mapsReady) {
-      const geocoder = new google.maps.Geocoder();
-      const response = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-        geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-          if (status === 'OK' && results?.length) resolve(results);
-          else reject(new Error(status));
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const response = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+            if (status === 'OK' && results?.length) resolve(results);
+            else reject(new Error(status));
+          });
         });
-      });
-      const parsed = geocoderResultToSelection(response[0]);
-      if (parsed) return { ...parsed, source: 'gps' };
+        const parsed = geocoderResultToSelection(response[0]);
+        if (parsed) return { ...parsed, source: 'gps' };
+      } catch {
+        // Fall through to free server geocoding (OpenStreetMap).
+      }
     }
 
     const data = await apiClient.reverseGeocode(latitude, longitude) as {
@@ -224,7 +252,7 @@ export default function LocationPicker({
       areaName?: string;
     };
     const formattedAddress = data.formattedAddress || data.address?.fullLabel || data.areaName || '';
-    if (!formattedAddress || formattedAddress === 'Location identified') {
+    if (!formattedAddress) {
       return null;
     }
     return {
@@ -284,17 +312,21 @@ export default function LocationPicker({
     setError(null);
     try {
       if (mapsReady) {
-        const geocoder = new google.maps.Geocoder();
-        const response = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-          geocoder.geocode({ address: trimmed }, (results, status) => {
-            if (status === 'OK' && results?.length) resolve(results);
-            else reject(new Error(status));
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const response = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+            geocoder.geocode({ address: trimmed }, (results, status) => {
+              if (status === 'OK' && results?.length) resolve(results);
+              else reject(new Error(status));
+            });
           });
-        });
-        const parsed = geocoderResultToSelection(response[0]);
-        if (parsed) {
-          applySelection({ ...parsed, source: 'manual' });
-          return;
+          const parsed = geocoderResultToSelection(response[0]);
+          if (parsed) {
+            applySelection({ ...parsed, source: 'manual' });
+            return;
+          }
+        } catch {
+          // Fall through to free server geocoding (OpenStreetMap).
         }
       }
       const serverResults = await fetchServerSuggestions(trimmed);
@@ -449,7 +481,7 @@ export default function LocationPicker({
         </Button>
       )}
 
-      {!hasApiKey && (
+      {env.USE_GOOGLE_MAPS && !hasApiKey && (
         <p className="text-xs text-amber-700">
           Google Maps key not configured — using server search. You can still type and confirm an address manually.
         </p>

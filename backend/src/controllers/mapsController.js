@@ -4,6 +4,8 @@ import {
   googlePlaceDetails,
   googlePlacesAutocomplete,
   googleReverseGeocode,
+  nominatimForwardSearch,
+  nominatimReverseGeocode,
   parseGoogleAddress,
 } from '../utils/geocoding.js';
 
@@ -20,34 +22,96 @@ function mapsKey() {
   return process.env.GOOGLE_MAPS_SERVER_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
 }
 
+/** When false (default), OpenStreetMap Nominatim is used for geocoding. */
+function useGoogleMaps() {
+  const flag = process.env.USE_GOOGLE_MAPS;
+  return flag === 'true' || flag === '1';
+}
+
+async function reverseGeocodeWithFallback(latitude, longitude) {
+  const key = mapsKey();
+  if (useGoogleMaps() && key) {
+    try {
+      const address = await googleReverseGeocode(latitude, longitude, key);
+      return { address, source: 'google' };
+    } catch (err) {
+      console.warn('[maps] Google reverse geocode failed, falling back to OSM:', err?.message);
+    }
+  }
+
+  const address = await nominatimReverseGeocode(latitude, longitude);
+  return { address, source: 'nominatim' };
+}
+
+async function searchWithGoogle(q, key) {
+  const predictions = await googlePlacesAutocomplete(q, key);
+  const top = predictions.slice(0, 6);
+  const results = [];
+
+  for (const prediction of top) {
+    try {
+      const place = await googlePlaceDetails(prediction.place_id, key);
+      const address = formatStructuredAddress(parseGoogleAddress(place));
+      results.push({
+        placeId: prediction.place_id,
+        lat: String(place.geometry?.location?.lat ?? ''),
+        lon: String(place.geometry?.location?.lng ?? ''),
+        display_name: place.formatted_address || prediction.description,
+        mainText: prediction.structured_formatting?.main_text || prediction.description,
+        secondaryText: prediction.structured_formatting?.secondary_text || '',
+        address,
+      });
+    } catch (detailErr) {
+      console.warn('[maps] place details skipped:', prediction.place_id, detailErr?.message);
+    }
+  }
+
+  if (results.length) {
+    return { results, source: 'google_places' };
+  }
+
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+  url.searchParams.set('address', q);
+  url.searchParams.set('key', key);
+  const response = await fetch(url);
+  const data = await response.json();
+  const geocodeResults = (data.results || []).slice(0, 5).map((result) => {
+    const address = formatStructuredAddress(parseGoogleAddress(result));
+    return {
+      lat: String(result.geometry?.location?.lat ?? ''),
+      lon: String(result.geometry?.location?.lng ?? ''),
+      display_name: address.fullLabel,
+      address,
+    };
+  });
+  return { results: geocodeResults, source: 'google_geocode' };
+}
+
 export async function reverseGeocode(req, res) {
   const { latitude, longitude } = req.body || {};
   if (latitude == null || longitude == null) throw badRequest('Latitude and longitude are required');
 
-  const key = mapsKey();
-  if (!key) {
-    return res.status(503).json({
-      success: false,
-      source: 'not_configured',
-      message: 'Google Maps is not configured for reverse geocoding',
-    });
-  }
-
   try {
-    const address = await googleReverseGeocode(latitude, longitude, key);
+    const { address, source } = await reverseGeocodeWithFallback(latitude, longitude);
     res.json({
       success: true,
       address,
       areaName: address.shortLabel,
       formattedAddress: address.formattedAddress || address.fullLabel,
-      source: 'google',
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      street: address.street || null,
+      area: address.estate || address.neighborhood || null,
+      city: address.town || null,
+      country: address.country || null,
+      source,
     });
   } catch (err) {
     console.error('[maps] reverse geocode failed:', err);
     res.status(502).json({
       success: false,
       message: 'Could not resolve coordinates to an address',
-      source: 'google',
+      source: 'nominatim',
     });
   }
 }
@@ -55,56 +119,25 @@ export async function reverseGeocode(req, res) {
 export async function search(req, res) {
   const q = String(req.query.q || req.body?.q || '').trim();
   if (!q) throw badRequest('Search query is required');
+
   const key = mapsKey();
-  if (!key) {
-    return res.json({ success: true, results: [], source: 'not_configured' });
+  if (useGoogleMaps() && key) {
+    try {
+      const { results, source } = await searchWithGoogle(q, key);
+      if (results.length) {
+        return res.json({ success: true, results, source });
+      }
+    } catch (err) {
+      console.warn('[maps] Google search failed, falling back to OSM:', err?.message);
+    }
   }
 
   try {
-    const predictions = await googlePlacesAutocomplete(q, key);
-    const top = predictions.slice(0, 6);
-    const results = [];
-
-    for (const prediction of top) {
-      try {
-        const place = await googlePlaceDetails(prediction.place_id, key);
-        const address = formatStructuredAddress(parseGoogleAddress(place));
-        results.push({
-          placeId: prediction.place_id,
-          lat: String(place.geometry?.location?.lat ?? ''),
-          lon: String(place.geometry?.location?.lng ?? ''),
-          display_name: place.formatted_address || prediction.description,
-          mainText: prediction.structured_formatting?.main_text || prediction.description,
-          secondaryText: prediction.structured_formatting?.secondary_text || '',
-          address,
-        });
-      } catch (detailErr) {
-        console.warn('[maps] place details skipped:', prediction.place_id, detailErr?.message);
-      }
-    }
-
-    if (results.length) {
-      return res.json({ success: true, results, source: 'google_places' });
-    }
-
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-    url.searchParams.set('address', q);
-    url.searchParams.set('key', key);
-    const response = await fetch(url);
-    const data = await response.json();
-    const geocodeResults = (data.results || []).slice(0, 5).map((result) => {
-      const address = formatStructuredAddress(parseGoogleAddress(result));
-      return {
-        lat: String(result.geometry?.location?.lat ?? ''),
-        lon: String(result.geometry?.location?.lng ?? ''),
-        display_name: address.fullLabel,
-        address,
-      };
-    });
-    return res.json({ success: true, results: geocodeResults, source: 'google_geocode' });
+    const results = await nominatimForwardSearch(q);
+    return res.json({ success: true, results, source: 'nominatim' });
   } catch (err) {
     console.error('[maps] search failed:', err);
-    res.json({ success: true, results: [], source: 'error' });
+    return res.json({ success: true, results: [], source: 'error' });
   }
 }
 
@@ -116,7 +149,7 @@ export async function directions(req, res) {
   const distanceKm = haversineKm(origin.latitude, origin.longitude, destination.latitude, destination.longitude);
   const etaMinutes = Math.max(5, Math.round((distanceKm / 30) * 60));
   const key = mapsKey();
-  if (!key) {
+  if (!useGoogleMaps() || !key) {
     return res.json({
       success: true,
       distanceKm: Number(distanceKm.toFixed(2)),

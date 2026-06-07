@@ -11,10 +11,17 @@ import {
 
 export { API_BASE_URL, SOCKET_URL, buildApiUrl, isApiConfigured } from '@/api/config';
 
+function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined || value === '') return defaultValue;
+  return value === 'true' || value === '1';
+}
+
 export const env = {
   API_URL: API_BASE_URL,
   SOCKET_URL,
   GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || null,
+  /** When false (default), location search/geocoding uses OpenStreetMap via the backend. */
+  USE_GOOGLE_MAPS: parseBoolEnv(import.meta.env.VITE_USE_GOOGLE_MAPS, false),
 };
 
 export function validateEnv(): void {

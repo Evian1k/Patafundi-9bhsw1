@@ -1,4 +1,86 @@
 const GENERIC_FALLBACK = 'Address not available';
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+const NOMINATIM_UA = process.env.NOMINATIM_USER_AGENT || 'PataFundi/1.0 (location service)';
+
+async function nominatimFetch(path, params) {
+  const url = new URL(`${NOMINATIM_BASE}${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null && value !== '') url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': NOMINATIM_UA,
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) throw new Error(`Nominatim request failed: ${response.status}`);
+  return response.json();
+}
+
+export function parseNominatimAddress(result) {
+  const addr = result?.address || {};
+  const streetParts = [addr.house_number, addr.road || addr.pedestrian || addr.footway || addr.path]
+    .filter(Boolean);
+  const street = streetParts.join(' ') || null;
+  const estate = addr.suburb
+    || addr.neighbourhood
+    || addr.quarter
+    || addr.residential
+    || addr.hamlet
+    || null;
+  const town = addr.city || addr.town || addr.village || addr.municipality || null;
+  const county = addr.county || addr.state || addr.state_district || null;
+  const country = addr.country || null;
+  const building = addr.building || addr.amenity || addr.shop || result?.name || null;
+
+  return {
+    building,
+    buildingName: building,
+    street,
+    estate,
+    neighborhood: estate,
+    town,
+    county,
+    country,
+    formattedAddress: result?.display_name || null,
+    latitude: result?.lat != null ? Number(result.lat) : null,
+    longitude: result?.lon != null ? Number(result.lon) : null,
+  };
+}
+
+export async function nominatimReverseGeocode(latitude, longitude) {
+  const data = await nominatimFetch('/reverse', {
+    lat: latitude,
+    lon: longitude,
+    format: 'json',
+    addressdetails: 1,
+  });
+  if (!data || data.error) {
+    throw new Error(data?.error || 'Nominatim reverse geocode returned no results');
+  }
+  return formatStructuredAddress(parseNominatimAddress(data));
+}
+
+export async function nominatimForwardSearch(query, limit = 6) {
+  const data = await nominatimFetch('/search', {
+    q: query,
+    format: 'json',
+    addressdetails: 1,
+    limit,
+  });
+  if (!Array.isArray(data)) return [];
+  return data.map((result) => {
+    const address = formatStructuredAddress(parseNominatimAddress(result));
+    return {
+      lat: String(result.lat ?? ''),
+      lon: String(result.lon ?? ''),
+      display_name: address.fullLabel,
+      mainText: address.street || address.building || result.name || address.shortLabel,
+      secondaryText: [address.estate, address.town, address.country].filter(Boolean).join(', '),
+      address,
+    };
+  });
+}
 
 function pickComponent(components, ...types) {
   for (const type of types) {
