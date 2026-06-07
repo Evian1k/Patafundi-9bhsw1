@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GoogleMap, Marker } from '@react-google-maps/api';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { apiClient } from '@/lib/api';
 import type { Coordinates, NearbyFundi } from '@/lib/maps/types';
-import { createGoogleMarkerIcon } from '@/lib/maps/googleMarkers';
-import { DARK_MAP_STYLE } from '@/lib/maps/mapStyles';
-import { useGoogleMapsReady } from './GoogleMapsProvider';
-import OsmSearchingRadarMap from './OsmSearchingRadarMap';
+import { createOsmMarkerIcon, OSM_TILES } from './osmMarkers';
+import 'leaflet/dist/leaflet.css';
 import './maps.css';
 
-interface SearchingRadarMapProps {
+interface OsmSearchingRadarMapProps {
   center: Coordinates;
   height?: string | number;
   skill?: string | null;
 }
 
-export default function SearchingRadarMap({
+export default function OsmSearchingRadarMap({
   center,
   height = '100%',
   skill = null,
-}: SearchingRadarMapProps) {
-  const { isLoaded, hasApiKey, useGoogleMaps } = useGoogleMapsReady();
-  const googleActive = useGoogleMaps && hasApiKey;
+}: OsmSearchingRadarMapProps) {
   const [nearbyFundis, setNearbyFundis] = useState<NearbyFundi[]>([]);
-  const customerIcon = useMemo(() => createGoogleMarkerIcon('customer', 'You'), [isLoaded]);
+  const customerIcon = useMemo(() => createOsmMarkerIcon('customer', 'You'), []);
+  const tiles = OSM_TILES.dark;
 
   useEffect(() => {
     let cancelled = false;
@@ -55,18 +52,6 @@ export default function SearchingRadarMap({
     };
   }, [center.latitude, center.longitude, skill]);
 
-  if (!googleActive) {
-    return <OsmSearchingRadarMap center={center} height={height} skill={skill} />;
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="pf-map-shell pf-map-loading" style={{ height }}>
-        <div className="pf-map-loading__spinner" />
-      </div>
-    );
-  }
-
   return (
     <div className="pf-map-shell" style={{ height }}>
       <div className="pf-radar pointer-events-none z-[400]">
@@ -74,40 +59,27 @@ export default function SearchingRadarMap({
         <span className="pf-radar__ring" />
         <span className="pf-radar__ring" />
       </div>
-      <GoogleMap
-        mapContainerClassName="pf-google-map"
-        center={{ lat: center.latitude, lng: center.longitude }}
+      <MapContainer
+        className="pf-osm-map"
+        center={[center.latitude, center.longitude]}
         zoom={14}
-        options={{
-          disableDefaultUI: true,
-          gestureHandling: 'none',
-          draggable: false,
-          scrollwheel: false,
-          disableDoubleClickZoom: true,
-          styles: DARK_MAP_STYLE,
-          clickableIcons: false,
-        }}
+        scrollWheelZoom={false}
+        dragging={false}
+        doubleClickZoom={false}
+        zoomControl={false}
+        attributionControl
       >
-        {customerIcon && (
+        <TileLayer url={tiles.url} attribution={tiles.attribution} />
+        <Marker position={[center.latitude, center.longitude]} icon={customerIcon} />
+        {nearbyFundis.map((fundi) => (
           <Marker
-            position={{ lat: center.latitude, lng: center.longitude }}
-            icon={customerIcon}
-            title="Your location"
+            key={fundi.id}
+            position={[fundi.latitude, fundi.longitude]}
+            icon={createOsmMarkerIcon('nearby')}
+            title={fundi.name}
           />
-        )}
-        {nearbyFundis.map((fundi) => {
-          const icon = createGoogleMarkerIcon('nearby');
-          if (!icon) return null;
-          return (
-            <Marker
-              key={fundi.id}
-              position={{ lat: fundi.latitude, lng: fundi.longitude }}
-              icon={icon}
-              title={fundi.name}
-            />
-          );
-        })}
-      </GoogleMap>
+        ))}
+      </MapContainer>
       <div className="pf-map-overlay-card">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Searching nearby</p>
         <p className="mt-1 text-lg font-bold text-slate-900">

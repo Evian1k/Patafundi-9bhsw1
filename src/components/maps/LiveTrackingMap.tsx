@@ -5,7 +5,7 @@ import type { Coordinates, MapTheme } from '@/lib/maps/types';
 import { createGoogleMarkerIcon } from '@/lib/maps/googleMarkers';
 import { DEFAULT_CENTER, mapStylesForTheme } from '@/lib/maps/mapStyles';
 import { useGoogleMapsReady } from './GoogleMapsProvider';
-import MapUnavailable from './MapUnavailable';
+import OsmLiveTrackingMap from './OsmLiveTrackingMap';
 import './maps.css';
 
 function toLatLng(c: Coordinates): google.maps.LatLngLiteral {
@@ -57,7 +57,8 @@ export default function LiveTrackingMap({
   autoFit = true,
   showPulse = true,
 }: LiveTrackingMapProps) {
-  const { isLoaded, hasApiKey } = useGoogleMapsReady();
+  const { isLoaded, hasApiKey, useGoogleMaps } = useGoogleMapsReady();
+  const googleActive = useGoogleMaps && hasApiKey;
   const [theme, setTheme] = useState<MapTheme>(defaultTheme);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
@@ -91,12 +92,19 @@ export default function LiveTrackingMap({
     map.fitBounds(bounds, 48);
   };
 
-  if (!hasApiKey) {
+  if (!googleActive) {
     return (
-      <div className="pf-map-shell" style={{ height }}>
-        <MapUnavailable height={height} />
-        {overlay}
-      </div>
+      <OsmLiveTrackingMap
+        customer={customer}
+        fundi={fundi}
+        routePath={routePath}
+        height={height}
+        showControls={showControls}
+        defaultTheme={defaultTheme}
+        overlay={overlay}
+        autoFit={autoFit}
+        showPulse={showPulse}
+      />
     );
   }
 
