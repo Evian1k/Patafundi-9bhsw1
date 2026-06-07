@@ -43,6 +43,30 @@ async function writePng(pipeline, outPath, resize) {
   await img.png({ compressionLevel: 9, quality: 90 }).toFile(outPath);
 }
 
+async function extractIcon(base, width, height) {
+  const isHorizontal = width > height * 1.15;
+
+  if (isHorizontal) {
+    // Mascot sits on the left of the horizontal wordmark logo.
+    const iconWidth = Math.round(width * 0.38);
+    return base
+      .clone()
+      .extract({ left: 0, top: 0, width: Math.min(iconWidth, width), height })
+      .resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+  }
+
+  // Legacy vertical logo — icon above text.
+  const iconHeight = Math.round(height * 0.62);
+  return base
+    .clone()
+    .extract({ left: 0, top: 0, width, height: Math.min(iconHeight, height) })
+    .resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+}
+
 async function main() {
   const source = findSource();
   if (!source) {
@@ -56,29 +80,21 @@ async function main() {
   const width = meta.width ?? 800;
   const height = meta.height ?? 800;
 
-  // Full logo (icon + PataFundi wordmark) — auth, footer, press
+  // Full logo — auth, footer, press
   await writePng(base.clone(), path.join(publicDir, 'logo-full.png'), {
     height: 160,
     fit: 'inside',
     withoutEnlargement: true,
   });
 
-  // Navbar / general — slightly smaller full logo
+  // Navbar / general
   await writePng(base.clone(), path.join(publicDir, 'logo.png'), {
     height: 48,
     fit: 'inside',
     withoutEnlargement: true,
   });
 
-  // Pin icon only — top ~62% of vertical logo (icon above text)
-  const iconHeight = Math.round(height * 0.62);
-  const iconBuf = await base
-    .clone()
-    .extract({ left: 0, top: 0, width, height: Math.min(iconHeight, height) })
-    .resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-
+  const iconBuf = await extractIcon(base, width, height);
   await sharp(iconBuf).toFile(path.join(publicDir, 'logo-icon.png'));
 
   for (const [name, size] of [

@@ -104,7 +104,7 @@ router.post('/admin/fundis/:id/suspend', authRequired, requireRole('admin'), asy
 router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listCustomers));
 router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
 router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.unblockUser));
-router.get('/admin/jobs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('jobs', 'jobs')));
+router.get('/admin/jobs', authRequired, requireRole('admin'), asyncHandler(admin.listJobs));
 router.get('/admin/payments', authRequired, requireRole('admin'), asyncHandler(admin.listTable('payments', 'payments')));
 router.get('/admin/transactions', authRequired, requireRole('admin'), asyncHandler(admin.transactions));
 router.get('/admin/escrow-queue', authRequired, requireRole('admin'), asyncHandler(admin.escrowQueue));

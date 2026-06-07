@@ -21,7 +21,7 @@ export type LogoSize = keyof typeof HEIGHT;
 
 export interface BrandLogoProps {
   size?: LogoSize;
-  /** Pin icon only (compact headers). Default: full logo with wordmark */
+  /** Mascot icon only (compact headers). Default: full logo with wordmark */
   iconOnly?: boolean;
   className?: string;
   linkTo?: string | false;

@@ -73,7 +73,11 @@ export default function JobManagement() {
     }
   };
 
-  useEffect(() => { fetchJobs(1); }, []);
+  useEffect(() => {
+    fetchJobs(1);
+    const interval = setInterval(() => fetchJobs(pagination.page), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(amount || 0);

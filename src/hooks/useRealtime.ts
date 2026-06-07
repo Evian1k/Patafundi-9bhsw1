@@ -15,6 +15,8 @@ interface JobRequest {
   estimatedPrice?: number;
   urgency?: string;
   distanceKm?: number;
+  title?: string;
+  description?: string;
 }
 
 interface UseJobRequestReturn {
@@ -38,32 +40,55 @@ export function useJobRequest(): UseJobRequestReturn {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
 
-  // Poll for pending jobs assigned to this fundi
+  const applyIncomingJob = useCallback((job: Record<string, unknown>) => {
+    const status = String(job.status || '');
+    if (!['pending', 'matching'].includes(status)) return;
+    setJobRequest({
+      jobId: String(job.id || ''),
+      customerName: String(job.customer_name || job.customerName || 'Customer'),
+      serviceCategory: String(job.service_category || job.category || 'Service'),
+      location: String(job.location_name || job.location || 'Unknown location'),
+      estimatedPrice: job.estimated_price != null ? Number(job.estimated_price)
+        : job.estimatedPrice != null ? Number(job.estimatedPrice) : undefined,
+      urgency: job.urgency as string | undefined,
+      title: String(job.title || job.service_category || job.category || 'New Job Request'),
+      description: String(job.description || ''),
+      distanceKm: typeof job.distanceKm === 'number' ? job.distanceKm
+        : typeof job.distance_km === 'number' ? job.distance_km : undefined,
+    });
+    setRemaining(60);
+  }, []);
+
+  // Poll + realtime for open matching jobs in the fundi's specialty
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
 
     const poll = async () => {
+      if (jobRequest) return;
       try {
         const res = await apiClient.getFundiActiveJob() as { job?: Record<string, unknown> | null };
         const job = res?.job;
-        if (job && job.status === 'pending' && !jobRequest) {
-          setJobRequest({
-            jobId: job.id as string,
-            customerName: (job.customer_name as string) || 'Customer',
-            serviceCategory: job.service_category as string,
-            location: (job.location_name as string) || 'Unknown location',
-            estimatedPrice: job.estimated_price ? Number(job.estimated_price) : undefined,
-            urgency: job.urgency as string,
-          });
-          setRemaining(60);
-        }
+        if (job) applyIncomingJob(job);
       } catch { /* ignore */ }
     };
 
+    realtimeService.connect(token);
+    const onJobCreated = (data: Record<string, unknown>) => {
+      if (jobRequest) return;
+      const job = (data.job as Record<string, unknown> | undefined) || data;
+      if (job?.id) applyIncomingJob({ ...job, distanceKm: data.distanceKm });
+      else if (data.jobId) poll();
+    };
+    realtimeService.on('job:created', onJobCreated);
+
+    poll();
     pollRef.current = setInterval(poll, 5000);
-    return () => clearPoll();
-  }, [jobRequest]);
+    return () => {
+      clearPoll();
+      realtimeService.off('job:created', onJobCreated);
+    };
+  }, [jobRequest, applyIncomingJob]);
 
   // Countdown timer
   useEffect(() => {

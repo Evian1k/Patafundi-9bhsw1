@@ -70,6 +70,79 @@ export function listTable(table, key) {
   };
 }
 
+export async function listJobs(req, res) {
+  const page = Math.max(1, Number(req.query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
+  const offset = (page - 1) * limit;
+  const status = String(req.query.status || '').trim();
+  const q = String(req.query.q || '').trim();
+
+  const filters = [];
+  const params = [];
+  if (status) {
+    params.push(status);
+    filters.push(`j.status = $${params.length}`);
+  }
+  if (q) {
+    params.push(`%${q}%`);
+    const idx = params.length;
+    filters.push(`(j.description ilike $${idx} or j.location_name ilike $${idx} or j.service_category ilike $${idx} or cu.full_name ilike $${idx})`);
+  }
+  const where = filters.length ? `where ${filters.join(' and ')}` : '';
+
+  const countResult = await query(
+    `select count(*)::int as total
+     from jobs j
+     join users cu on cu.id = j.customer_id
+     left join users fu on fu.id = j.fundi_id
+     ${where}`,
+    params,
+  );
+  const total = countResult.rows[0]?.total || 0;
+
+  params.push(limit, offset);
+  const result = await query(
+    `select j.id, j.service_category, j.description, j.location_name, j.status,
+            j.estimated_price, j.final_price, j.customer_id, j.fundi_id,
+            j.created_at, j.updated_at,
+            cu.full_name as customer_name,
+            fu.full_name as fundi_name
+     from jobs j
+     join users cu on cu.id = j.customer_id
+     left join users fu on fu.id = j.fundi_id
+     ${where}
+     order by j.created_at desc
+     limit $${params.length - 1} offset $${params.length}`,
+    params,
+  );
+
+  res.json({
+    success: true,
+    jobs: result.rows.map((row) => ({
+      id: row.id,
+      title: `${row.service_category || 'Service'} job`,
+      description: row.description,
+      category: row.service_category,
+      status: row.status,
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      fundiId: row.fundi_id,
+      fundiName: row.fundi_name,
+      estimatedPrice: Number(row.estimated_price || 0),
+      finalPrice: Number(row.final_price || 0),
+      location: row.location_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })),
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+    },
+  });
+}
+
 export async function listCustomers(_req, res) {
   const result = await query(
     `${tableSelects.users} where role = 'customer' order by created_at desc limit 100`,

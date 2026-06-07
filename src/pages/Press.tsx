@@ -1,6 +1,6 @@
 import SiteLayout from "@/components/layout/SiteLayout";
 import { Button } from "@/components/ui/button";
-import { BrandLogo, LOGO_URL, FAVICON_URL } from "@/assets/logo";
+import { BrandLogo, LOGO_FULL_URL, FAVICON_URL } from "@/assets/logo";
 
 export default function Press() {
   return (
@@ -18,7 +18,7 @@ export default function Press() {
                 <a href={FAVICON_URL} download="patafundi-icon.png">Download icon</a>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href={LOGO_URL} download="patafundi-logo.png">Download logo</a>
+                <a href={LOGO_FULL_URL} download="patafundi-logo.png">Download logo</a>
               </Button>
             </div>
           </div>

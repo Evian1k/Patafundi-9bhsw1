@@ -36,7 +36,11 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
       ...row,
       distanceKm: haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude)),
     }))
-    .filter((row) => !skill || row.skills?.includes(skill))
+    .filter((row) => {
+      if (!skill) return true;
+      const needle = String(skill).toLowerCase();
+      return (row.skills || []).some((s) => String(s).toLowerCase() === needle);
+    })
     .sort((a, b) => a.distanceKm - b.distanceKm)
     .slice(0, limit);
 }
@@ -115,8 +119,16 @@ export async function createJob(req, res) {
     emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
     return res.status(201).json({ success: true, job: publicJob(job), matching: { candidates: [], failed: true } });
   }
-  emitEvent('job:created', { jobId: job.id, job: publicJob(job), candidates });
-  res.status(201).json({ success: true, job: publicJob(job), matching: { candidates, failed: false } });
+  const publishedJob = publicJob(job);
+  for (const candidate of candidates) {
+    emitEvent(
+      'job:created',
+      { jobId: job.id, job: publishedJob, distanceKm: candidate.distanceKm, status: 'matching' },
+      `user:${candidate.user_id}`,
+    );
+  }
+  emitEvent('job:created', { jobId: job.id, job: publishedJob, candidates, status: 'matching' }, `job:${job.id}`);
+  res.status(201).json({ success: true, job: publishedJob, matching: { candidates, failed: false } });
 }
 
 export async function uploadJobPhotos(req, res) {
@@ -290,7 +302,16 @@ export async function activeFundiJob(req, res) {
         : null,
     }))
     .sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
-  res.json({ success: true, job: publicJob(matches[0]) });
+  const next = matches[0];
+  if (!next) return res.json({ success: true, job: null });
+  res.json({
+    success: true,
+    job: {
+      ...publicJob(next),
+      customer_name: next.customer_name,
+      distanceKm: next.distanceKm,
+    },
+  });
 }
 
 export async function submitReview(req, res) {
