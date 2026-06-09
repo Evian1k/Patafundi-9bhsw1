@@ -43,11 +43,12 @@ function publicFundi(row) {
 }
 
 export async function dashboard(req, res) {
-  const [users, jobs, payments, disputes] = await Promise.all([
+  const [users, jobs, payments, disputes, revenue] = await Promise.all([
     query('select count(*)::int as total from users'),
     query('select count(*)::int as total from jobs'),
     query(`select coalesce(sum(amount),0)::numeric as total from payments where status = 'completed'`),
     query(`select count(*)::int as total from disputes where status = 'open'`),
+    revenueSummaryQuery(),
   ]);
   res.json({
     success: true,
@@ -55,7 +56,10 @@ export async function dashboard(req, res) {
       users: users.rows[0].total,
       jobs: jobs.rows[0].total,
       revenue: Number(payments.rows[0].total),
+      platformRevenue: revenue.totals.lifetimeRevenue,
+      netProfit: revenue.totals.netProfit,
       openDisputes: disputes.rows[0].total,
+      revenueBreakdown: revenue,
     },
   });
 }
@@ -180,7 +184,8 @@ export async function getFundi(req, res) {
 export async function transactions(_req, res) {
   const result = await query(
     `select p.id, p.job_id, p.customer_id, cu.full_name as customer_name,
-            j.fundi_id, fu.full_name as fundi_name, p.amount, p.provider, p.status, p.created_at
+            j.fundi_id, fu.full_name as fundi_name, p.amount, p.platform_commission,
+            p.fundi_amount, p.provider, p.status, p.created_at
      from payments p
      join jobs j on j.id = p.job_id
      join users cu on cu.id = p.customer_id
@@ -189,7 +194,7 @@ export async function transactions(_req, res) {
   );
   const transactions = result.rows.map((row) => {
     const amount = Number(row.amount || 0);
-    const commission = Math.round(amount * 0.1 * 100) / 100;
+    const commission = Number(row.platform_commission || 0);
     return {
       id: row.id,
       jobId: row.job_id,
@@ -199,7 +204,7 @@ export async function transactions(_req, res) {
       fundiName: row.fundi_name || 'Unassigned',
       amount,
       commission,
-      fundiEarnings: amount - commission,
+      fundiEarnings: Number(row.fundi_amount || (amount - commission)),
       status: row.status,
       paymentMethod: row.provider,
       createdAt: row.created_at,
@@ -214,6 +219,41 @@ export async function transactions(_req, res) {
     totalCommission: completed.reduce((sum, tx) => sum + tx.commission, 0),
     pagination: { page: 1, total: transactions.length },
   });
+}
+
+async function revenueSummaryQuery() {
+  const result = await query(
+    `select
+       coalesce(sum(amount) filter (where period_date = current_date), 0)::numeric as daily_revenue,
+       coalesce(sum(amount) filter (where period_date >= current_date - interval '6 days'), 0)::numeric as weekly_revenue,
+       coalesce(sum(amount) filter (where period_date >= date_trunc('month', current_date)), 0)::numeric as monthly_revenue,
+       coalesce(sum(amount) filter (where period_date >= date_trunc('year', current_date)), 0)::numeric as yearly_revenue,
+       coalesce(sum(amount), 0)::numeric as lifetime_revenue,
+       coalesce(sum(amount) filter (where entry_type = 'commission'), 0)::numeric as commission_revenue,
+       coalesce(sum(amount) filter (where entry_type = 'withdrawal_fee'), 0)::numeric as withdrawal_fee_revenue,
+       coalesce(sum(amount) filter (where entry_type = 'subscription'), 0)::numeric as subscription_revenue,
+       coalesce(sum(amount) filter (where entry_type = 'refund'), 0)::numeric as refund_costs
+     from revenue_ledger`,
+  );
+  const row = result.rows[0] || {};
+  const totals = {
+    dailyRevenue: Number(row.daily_revenue || 0),
+    weeklyRevenue: Number(row.weekly_revenue || 0),
+    monthlyRevenue: Number(row.monthly_revenue || 0),
+    yearlyRevenue: Number(row.yearly_revenue || 0),
+    lifetimeRevenue: Number(row.lifetime_revenue || 0),
+    commissionRevenue: Number(row.commission_revenue || 0),
+    withdrawalFeeRevenue: Number(row.withdrawal_fee_revenue || 0),
+    subscriptionRevenue: Number(row.subscription_revenue || 0),
+    refundCosts: Number(row.refund_costs || 0),
+  };
+  totals.netProfit = totals.lifetimeRevenue - totals.refundCosts;
+  return { totals };
+}
+
+export async function revenueDashboard(_req, res) {
+  const summary = await revenueSummaryQuery();
+  res.json({ success: true, ...summary });
 }
 
 export async function escrowQueue(_req, res) {
@@ -277,6 +317,30 @@ export async function suspendFundi(req, res) {
   res.json({ success: true, fundi: result.rows[0] });
 }
 
+export async function setFundiFinancialFreeze(req, res) {
+  const { walletFrozen, payoutFrozen, reason = '' } = req.body || {};
+  if (typeof walletFrozen !== 'boolean' && typeof payoutFrozen !== 'boolean') {
+    throw badRequest('walletFrozen or payoutFrozen boolean is required');
+  }
+  const current = await query('select wallet_frozen, payout_frozen from fundis where user_id = $1 or id = $1', [req.params.id]);
+  if (!current.rows[0]) throw notFound('Fundi not found');
+  const nextWallet = typeof walletFrozen === 'boolean' ? walletFrozen : current.rows[0].wallet_frozen;
+  const nextPayout = typeof payoutFrozen === 'boolean' ? payoutFrozen : current.rows[0].payout_frozen;
+  const result = await query(
+    `update fundis set wallet_frozen = $2, payout_frozen = $3, updated_at = now()
+     where user_id = $1 or id = $1 returning *`,
+    [req.params.id, nextWallet, nextPayout],
+  );
+  await auditLog({
+    userId: req.user.id,
+    action: 'admin.fundi.financial_freeze',
+    entityType: 'fundi',
+    entityId: result.rows[0].id,
+    metadata: { walletFrozen: nextWallet, payoutFrozen: nextPayout, reason },
+  });
+  res.json({ success: true, fundi: result.rows[0] });
+}
+
 async function setUserStatus(req, res, status) {
   const result = await query(
     `update users set status = $2, updated_at = now()
@@ -332,9 +396,17 @@ export async function securityOverview(_req, res) {
 
 const defaultSettings = {
   payments: {
-    commissionRate: 0.1,
+    commissionRate: 0.15,
+    commissionType: 'percentage',
+    fixedCommissionKes: 0,
+    categoryCommissionRates: {},
+    promotionalDiscounts: {},
+    withdrawalFeeType: 'flat',
+    withdrawalFeeKes: 0,
+    withdrawalFeeRate: 0,
     disputeWindowHours: 24,
     minimumPayoutKes: 100,
+    minimumTrustScoreForPayout: 30,
   },
   security: {
     fraudAutoBlockSeverity: 'critical',

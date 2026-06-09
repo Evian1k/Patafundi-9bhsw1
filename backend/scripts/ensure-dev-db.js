@@ -21,14 +21,27 @@ const demoUsers = [
 ];
 
 async function execSql(db, sql) {
-  const statements = sql
+  const withoutLineComments = sql
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n');
+  const statements = withoutLineComments
     .split(/;\s*(?:\n|$)/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+    .filter((s) => s.length > 0);
   for (const statement of statements) {
     if (/create\s+extension\s+if\s+not\s+exists\s+pgcrypto/i.test(statement)) continue;
     await db.exec(`${statement};`);
   }
+}
+
+async function tableExists(db, tableName) {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(tableName)) return false;
+  const result = await db.query(
+    `select table_name from information_schema.tables
+     where table_schema = 'public' and table_name = '${tableName}' limit 1`,
+  );
+  return Boolean(result.rows[0]);
 }
 
 async function applyMigrations(db) {
@@ -41,21 +54,21 @@ async function applyMigrations(db) {
   `);
 
   const applied = await db.query('select filename from schema_migrations order by filename');
-  const appliedSet = new Set(applied.rows.map((row) => row.filename));
+  if (!(await tableExists(db, 'users')) && applied.rows.length > 0) {
+    await db.query('delete from schema_migrations');
+  }
   const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
 
   for (const file of files) {
-    if (appliedSet.has(file)) continue;
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
     console.log(`[migrate] apply ${file}`);
     await execSql(db, sql);
-    await db.query('insert into schema_migrations (filename) values ($1)', [file]);
+    await db.query('insert into schema_migrations (filename) values ($1) on conflict (filename) do nothing', [file]);
   }
 }
 
 async function ensureCustomersTable(db) {
-  const check = await db.query(`select to_regclass('public.customers') as t`);
-  if (check.rows[0]?.t) return;
+  if (await tableExists(db, 'customers')) return;
   const sql = `
     create table if not exists customers (
       user_id uuid primary key references users(id) on delete cascade,
@@ -68,8 +81,7 @@ async function ensureCustomersTable(db) {
 }
 
 async function seedIfEmpty(db) {
-  const users = await db.query(`select to_regclass('public.users') as users_table`);
-  if (!users.rows[0]?.users_table) return;
+  if (!(await tableExists(db, 'users'))) return;
 
   for (const user of demoUsers) {
     const existing = await db.query('select id from users where lower(email) = lower($1)', [user.email]);
@@ -77,9 +89,12 @@ async function seedIfEmpty(db) {
 
     const hash = await bcrypt.hash(user.password, 12);
     const inserted = await db.query(
-      `insert into users (email, password_hash, full_name, phone, role, status)
-       values (lower($1), $2, $3, $4, $5, 'active')
-       on conflict (email) do update set password_hash = excluded.password_hash, full_name = excluded.full_name
+      `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
+       values (lower($1), $2, $3, $4, $5, 'active', now())
+       on conflict (email) do update set
+        password_hash = excluded.password_hash,
+        full_name = excluded.full_name,
+        email_verified_at = coalesce(users.email_verified_at, now())
        returning id, email, role`,
       [user.email, hash, user.fullName, user.phone, user.role],
     );
@@ -103,8 +118,7 @@ async function seedIfEmpty(db) {
       );
     }
     if (user.role === 'customer') {
-      const hasCustomers = await db.query(`select to_regclass('public.customers') as t`);
-      if (hasCustomers.rows[0]?.t) {
+      if (await tableExists(db, 'customers')) {
         await db.query(
           `insert into customers (user_id) values ($1) on conflict (user_id) do nothing`,
           [row.id],

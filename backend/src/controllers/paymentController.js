@@ -8,6 +8,7 @@ import {
   verifyWebhookSignature,
 } from '../services/mpesaService.js';
 import { auditLog } from '../services/auditService.js';
+import { calculateCommission, getPaymentSettings } from '../services/financeService.js';
 import { emitEvent } from '../realtime.js';
 
 function canAccessJob(user, job) {
@@ -46,11 +47,29 @@ export async function stkPush(req, res) {
     if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
       throw badRequest('Payment amount does not match the job amount');
     }
+    const settings = await getPaymentSettings(client);
+    const commission = calculateCommission({
+      amount: expectedAmount,
+      category: job.service_category,
+      settings,
+    });
     const inserted = await client.query(
       `insert into payments (job_id, customer_id, amount, currency, provider, mpesa_number,
-        status, escrow_status, idempotency_key)
-       values ($1, $2, $3, 'KES', 'mpesa', $4, 'pending', 'pending', $5) returning *`,
-      [jobId, req.user.id, expectedAmount, normalizedPhone, key],
+        status, escrow_status, idempotency_key, commission_rate, commission_type,
+        platform_commission, fundi_amount, commission_details)
+       values ($1, $2, $3, 'KES', 'mpesa', $4, 'pending', 'pending', $5, $6, $7, $8, $9, $10::jsonb) returning *`,
+      [
+        jobId,
+        req.user.id,
+        expectedAmount,
+        normalizedPhone,
+        key,
+        commission.commissionRate,
+        commission.commissionType,
+        commission.platformCommission,
+        commission.fundiAmount,
+        JSON.stringify(commission.details),
+      ],
     );
     return inserted.rows[0];
   });
@@ -120,6 +139,31 @@ export async function webhook(req, res) {
          select j.id, j.customer_id, j.fundi_id, $2, 'escrow_held' from jobs j where j.id = $1
          on conflict (job_id) do update set balance = excluded.balance, status = 'escrow_held', updated_at = now()`,
         [row.job_id, row.amount],
+      );
+      await client.query(
+        `insert into revenue_ledger (payment_id, job_id, user_id, entry_type, amount, currency, metadata)
+         values ($1, $2, $3, 'commission', $4, $5, $6::jsonb)`,
+        [
+          row.id,
+          row.job_id,
+          row.customer_id,
+          row.platform_commission || 0,
+          row.currency || 'KES',
+          JSON.stringify({ source: 'payment_webhook', commissionRate: row.commission_rate, commissionType: row.commission_type }),
+        ],
+      );
+      await client.query(
+        `insert into accounting_ledger (source_type, source_id, debit_account, credit_account, amount, currency, metadata)
+         values
+          ('payment', $1, 'customer_cash', 'escrow_liability', $2, $4, $5::jsonb),
+          ('payment', $1, 'escrow_liability', 'platform_revenue', $3, $4, $5::jsonb)`,
+        [
+          row.id,
+          row.amount,
+          row.platform_commission || 0,
+          row.currency || 'KES',
+          JSON.stringify({ jobId: row.job_id, fundiAmount: row.fundi_amount || 0 }),
+        ],
       );
       await client.query(`update jobs set payment_status = 'escrow_held', escrow_status = 'held' where id = $1`, [row.job_id]);
       return updated.rows[0];

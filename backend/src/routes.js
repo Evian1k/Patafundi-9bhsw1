@@ -101,6 +101,7 @@ router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler
 router.post('/admin/fundis/:id/approve', authRequired, requireRole('admin'), asyncHandler(admin.approveFundi));
 router.post('/admin/fundis/:id/reject', authRequired, requireRole('admin'), asyncHandler(admin.rejectFundi));
 router.post('/admin/fundis/:id/suspend', authRequired, requireRole('admin'), asyncHandler(admin.suspendFundi));
+router.post('/admin/fundis/:id/financial-freeze', authRequired, requireRole('admin'), asyncHandler(admin.setFundiFinancialFreeze));
 router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listCustomers));
 router.post('/admin/customers/:id/block', authRequired, requireRole('admin'), asyncHandler(admin.blockUser));
 router.post('/admin/customers/:id/unblock', authRequired, requireRole('admin'), asyncHandler(admin.unblockUser));
@@ -116,6 +117,7 @@ router.post('/admin/disputes/:id/resolve', authRequired, requireRole('admin'), a
 router.get('/admin/audit-logs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('audit_logs', 'logs')));
 router.get('/admin/reports', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
 router.get('/admin/reports/analytics', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
+router.get('/admin/revenue', authRequired, requireRole('admin'), asyncHandler(admin.revenueDashboard));
 router.get('/admin/security/overview', authRequired, requireRole('admin'), asyncHandler(admin.securityOverview));
 router.get('/admin/security-alerts', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fraud_alerts', 'alerts')));
 router.get('/admin/trust-scores', authRequired, requireRole('admin'), asyncHandler(admin.listTable('trust_scores', 'scores')));
