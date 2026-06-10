@@ -1,6 +1,10 @@
 import { query, transaction } from '../db.js';
-import { badRequest } from '../utils/http.js';
+import { badRequest, forbidden } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+import { mapMulterFile } from '../middleware/upload.js';
+import { uploadPrivateFile, getSignedAccessUrl, getSignedThumbUrl } from '../services/storageService.js';
+import { runIdentityVerification } from '../services/identityVerificationService.js';
+import { auditLog } from '../services/auditService.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const toRad = (v) => (v * Math.PI) / 180;
@@ -11,33 +15,114 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function fileByField(files, names) {
+  const list = files || [];
+  for (const name of names) {
+    const f = list.find((x) => x.fieldname === name);
+    if (f) return mapMulterFile(f);
+  }
+  return null;
+}
+
+async function saveVerificationDoc(client, { fundiId, userId, documentType, file }) {
+  if (!file) return null;
+  const uploaded = await uploadPrivateFile({
+    folder: `verification/${userId}`,
+    file,
+    allowPdf: documentType === 'certificate' || documentType === 'business_permit',
+  });
+  const result = await client.query(
+    `insert into verification_documents (fundi_id, user_id, document_type, r2_key, mime_type, file_size, original_name, width, height, uploaded_by, blur_score, perceptual_hash, status)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $2, $10, $11, 'pending')
+     on conflict (fundi_id, document_type) do update set
+       r2_key = excluded.r2_key,
+       mime_type = excluded.mime_type,
+       file_size = excluded.file_size,
+       original_name = excluded.original_name,
+       width = excluded.width,
+       height = excluded.height,
+       blur_score = excluded.blur_score,
+       perceptual_hash = excluded.perceptual_hash,
+       status = 'pending',
+       created_at = now()
+     returning *`,
+    [
+      fundiId,
+      userId,
+      documentType,
+      uploaded.r2Key,
+      uploaded.mimeType,
+      uploaded.fileSize,
+      file.originalname,
+      uploaded.width,
+      uploaded.height,
+      uploaded.blurScore,
+      uploaded.perceptualHash,
+    ],
+  );
+  return result.rows[0];
+}
+
 export async function registerFundi(req, res) {
   const body = req.body || {};
   const skills = body.skills
-    ? (Array.isArray(body.skills) ? body.skills : String(body.skills).split(',').map((s) => s.trim()).filter(Boolean))
+    ? (Array.isArray(body.skills) ? body.skills : (() => {
+      try { return JSON.parse(body.skills); } catch { return String(body.skills).split(',').map((s) => s.trim()).filter(Boolean); }
+    })())
     : [];
-  const result = await query(
-    `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude)
-     values ($1, $2, $3, $4, 'pending', $5, $6)
-     on conflict (user_id) do update set skills = excluded.skills, experience = excluded.experience,
-       mpesa_number = excluded.mpesa_number, updated_at = now()
-     returning *`,
-    [
-      req.user.id,
-      skills,
-      body.experience || '',
-      body.mpesaNumber || body.mpesa_number || '',
-      body.latitude || null,
-      body.longitude || null,
-    ],
-  );
-  if (req.user.role === 'customer') {
-    await query(
-      `update users set role = 'fundi_pending', updated_at = now() where id = $1`,
-      [req.user.id],
+
+  const idFront = fileByField(req.files, ['idPhoto', 'id_photo', 'idFront']);
+  const idBack = fileByField(req.files, ['idPhotoBack', 'id_photo_back', 'idBack']);
+  const selfie = fileByField(req.files, ['selfiePhoto', 'selfie_photo', 'selfie']);
+  const certificate = fileByField(req.files, ['certificate', 'certificates']);
+  const businessPermit = fileByField(req.files, ['businessPermit', 'business_permit']);
+
+  if (!idFront) throw badRequest('National ID front is required');
+
+  const fundi = await transaction(async (client) => {
+    const inserted = await client.query(
+      `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude, id_number)
+       values ($1, $2, $3, $4, 'pending', $5, $6, $7)
+       on conflict (user_id) do update set skills = excluded.skills, experience = excluded.experience,
+         mpesa_number = excluded.mpesa_number, id_number = coalesce(excluded.id_number, fundis.id_number), updated_at = now()
+       returning *`,
+      [
+        req.user.id,
+        skills,
+        body.experience || '',
+        body.mpesaNumber || body.mpesa_number || '',
+        body.latitude || null,
+        body.longitude || null,
+        body.idNumber || body.id_number || null,
+      ],
     );
+    const row = inserted.rows[0];
+    await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'id_front', file: idFront });
+    if (idBack) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'id_back', file: idBack });
+    if (selfie) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'selfie_id', file: selfie });
+    if (certificate) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'certificate', file: certificate });
+    if (businessPermit) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'business_permit', file: businessPermit });
+
+    if (req.user.role === 'customer') {
+      await client.query(
+        `update users set role = 'fundi_pending', verification_status = 'pending', updated_at = now() where id = $1`,
+        [req.user.id],
+      );
+    }
+    return row;
+  });
+
+  let verification = null;
+  if (selfie) {
+    try {
+      verification = await runIdentityVerification(fundi.id, req.user.id);
+    } catch (err) {
+      console.warn('[fundi] identity verification failed:', err.message);
+    }
   }
-  res.status(201).json({ success: true, fundi: result.rows[0] });
+
+  await auditLog({ userId: req.user.id, action: 'fundi.register', entityType: 'fundi', entityId: fundi.id });
+  res.status(201).json({ success: true, fundi, verification });
 }
 
 export async function profile(req, res) {
@@ -59,29 +144,42 @@ export async function updateProfile(req, res) {
   res.json({ success: true, fundi: result.rows[0] });
 }
 
+function publicFundiShape(row, photoUrls = {}) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    user_id: row.user_id,
+    name: row.name || row.full_name,
+    skills: row.skills || [],
+    rating: row.rating == null ? null : Number(row.rating),
+    trustScore: row.trust_score,
+    trust_score: row.trust_score,
+    approvalStatus: row.approval_status,
+    profilePhotoUrl: photoUrls.profilePhotoUrl || null,
+    profile_photo_url: photoUrls.profilePhotoUrl || null,
+    verified: Boolean(row.verification_badge) || row.approval_status === 'approved',
+    verificationBadge: Boolean(row.verification_badge),
+  };
+}
+
+async function resolveProfilePhotoUrls(row) {
+  if (!row?.profile_photo_url || row.approval_status !== 'approved') return {};
+  return {
+    profilePhotoUrl: await getSignedThumbUrl(row.profile_photo_thumb_url, row.profile_photo_url),
+  };
+}
+
 export async function publicFundi(req, res) {
   const result = await query(
-    `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score, f.approval_status
+    `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score, f.approval_status,
+            f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge
      from fundis f join users u on u.id = f.user_id where f.id = $1 or f.user_id = $1`,
     [req.params.id],
   );
   const row = result.rows[0];
-  res.json({
-    success: true,
-    fundi: row
-      ? {
-          id: row.id,
-          userId: row.user_id,
-          user_id: row.user_id,
-          name: row.name,
-          skills: row.skills || [],
-          rating: row.rating == null ? null : Number(row.rating),
-          trustScore: row.trust_score,
-          trust_score: row.trust_score,
-          approvalStatus: row.approval_status,
-        }
-      : null,
-  });
+  const photoUrls = await resolveProfilePhotoUrls(row);
+  res.json({ success: true, fundi: publicFundiShape(row, photoUrls) });
 }
 
 export async function searchFundis(req, res) {
@@ -90,20 +188,22 @@ export async function searchFundis(req, res) {
   const skill = req.query.skill ? String(req.query.skill).toLowerCase() : null;
   const result = await query(
     `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
-      f.latitude, f.longitude, f.location_accuracy
+      f.latitude, f.longitude, f.location_accuracy,
+      f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge
      from fundis f join users u on u.id = f.user_id
      where f.approval_status = 'approved' and f.online = true
      order by f.rating desc limit 25`,
   );
-  const fundis = result.rows
+  const fundis = await Promise.all(result.rows
     .filter((row) => !skill || row.skills?.map((s) => String(s).toLowerCase()).includes(skill))
-    .map((row) => {
+    .map(async (row) => {
       const distanceKm = Number.isFinite(latitude) && Number.isFinite(longitude) && row.latitude != null && row.longitude != null
         ? haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude))
         : null;
-      return { ...row, distanceKm };
-    })
-    .sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
+      const photoUrls = await resolveProfilePhotoUrls(row);
+      return { ...publicFundiShape(row, photoUrls), distanceKm };
+    }));
+  fundis.sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
   res.json({ success: true, fundis });
 }
 
@@ -150,7 +250,16 @@ export async function status(req, res) {
   res.json({ success: true, status: { ...(result.rows[0] || { online: false }), subscriptionActive: true, daysLeft: 30 } });
 }
 
+async function requireApprovedFundi(userId, role) {
+  if (role === 'admin') return;
+  const result = await query('select approval_status from fundis where user_id = $1', [userId]);
+  if (!result.rows[0] || result.rows[0].approval_status !== 'approved') {
+    throw forbidden('Only approved fundis can go online');
+  }
+}
+
 export async function goOnline(req, res) {
+  await requireApprovedFundi(req.user.id, req.user.role);
   const { latitude, longitude, accuracy = null } = req.body || {};
   if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
   await query(
@@ -167,6 +276,7 @@ export async function goOffline(req, res) {
 }
 
 export async function location(req, res) {
+  await requireApprovedFundi(req.user.id, req.user.role);
   const { latitude, longitude, accuracy = null, jobId = null } = req.body || {};
   if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
   const active = await transaction(async (client) => {

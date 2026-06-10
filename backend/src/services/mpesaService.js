@@ -82,10 +82,18 @@ export function verifyWebhookSignature(rawBody, signature) {
 }
 
 export function verifyCallbackSecret(req) {
-  if (!config.mpesa.callbackSecret) return config.nodeEnv !== 'production';
-  const provided = req.get('x-mpesa-callback-secret') || req.query.callbackSecret || req.body?.callbackSecret;
+  if (!config.mpesa.callbackSecret) {
+    return config.nodeEnv !== 'production';
+  }
+  const provided = req.get('x-mpesa-callback-secret') || req.body?.callbackSecret;
   if (!provided) return false;
   const expectedBuffer = Buffer.from(config.mpesa.callbackSecret);
   const providedBuffer = Buffer.from(String(provided));
   return expectedBuffer.length === providedBuffer.length && crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+export function requireCallbackSecretInProduction() {
+  if (config.nodeEnv === 'production' && !config.mpesa.callbackSecret) {
+    throw new Error('MPESA_CALLBACK_SECRET is required in production');
+  }
 }

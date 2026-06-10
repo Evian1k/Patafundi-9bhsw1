@@ -39,9 +39,10 @@ export function setAuthCookies(res, accessToken, refreshToken) {
 }
 
 export function clearAuthCookies(res) {
-  res.clearCookie('access_token');
-  res.clearCookie('refresh_token');
-  res.clearCookie('csrf_token');
+  const opts = { httpOnly: true, sameSite: 'strict', secure: config.cookieSecure, path: '/' };
+  res.clearCookie('access_token', opts);
+  res.clearCookie('refresh_token', opts);
+  res.clearCookie('csrf_token', { sameSite: 'strict', secure: config.cookieSecure, path: '/' });
 }
 
 export function csrfProtection(req, _res, next) {

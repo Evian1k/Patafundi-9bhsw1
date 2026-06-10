@@ -1,6 +1,8 @@
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+import { uploadPrivateFile, getSignedAccessUrl } from '../services/storageService.js';
+import { mapMulterFiles } from '../middleware/upload.js';
 
 function canAccessJob(user, job) {
   return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
@@ -44,7 +46,9 @@ export async function listDisputes(req, res) {
 }
 
 export async function uploadEvidence(req, res) {
-  const urls = (req.files || []).map((file) => `/uploads/${file.filename}`);
+  const files = mapMulterFiles(req.files);
+  if (!files.length) throw badRequest('At least one evidence file is required');
+
   const dispute = await query(
     `select d.*, j.customer_id, j.fundi_id
      from disputes d join jobs j on j.id = d.job_id
@@ -54,13 +58,41 @@ export async function uploadEvidence(req, res) {
   if (!dispute.rows[0]) throw notFound('Dispute not found');
   if (!canAccessJob(req.user, dispute.rows[0])) throw forbidden('Not allowed to update this dispute');
   if (dispute.rows[0].status !== 'open' && dispute.rows[0].status !== 'under_review') throw badRequest('Dispute is closed');
+
+  const uploadedFiles = [];
+  for (const file of files) {
+    const uploaded = await uploadPrivateFile({
+      folder: `disputes/${req.params.id}`,
+      file,
+    });
+    const row = await query(
+      `insert into dispute_files (dispute_id, uploaded_by, r2_key, thumb_r2_key, mime_type, file_size, original_name, status)
+       values ($1, $2, $3, $4, $5, $6, $7, 'active') returning *`,
+      [
+        req.params.id,
+        req.user.id,
+        uploaded.r2Key,
+        uploaded.thumbR2Key,
+        uploaded.mimeType,
+        uploaded.fileSize,
+        file.originalname,
+      ],
+    );
+    uploadedFiles.push({
+      id: row.rows[0].id,
+      signedUrl: await getSignedAccessUrl(uploaded.r2Key),
+      expiresIn: 900,
+    });
+  }
+
+  const legacyUrls = uploadedFiles.map((f) => f.signedUrl);
   const result = await query(
     `update disputes set evidence_urls = coalesce(evidence_urls, array[]::text[]) || $2::text[],
      updated_at = now() where id = $1 returning *`,
-    [req.params.id, urls],
+    [req.params.id, legacyUrls],
   );
-  if (!result.rows[0]) throw notFound('Dispute not found');
-  res.json({ success: true, dispute: result.rows[0] });
+
+  res.json({ success: true, dispute: result.rows[0], files: uploadedFiles });
 }
 
 export async function resolveDispute(req, res) {

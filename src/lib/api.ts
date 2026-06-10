@@ -245,6 +245,66 @@ class ApiClient {
     return response.json();
   }
 
+  async getJobPhotos(jobId: string) {
+    return this.request(`/jobs/${jobId}/photos`);
+  }
+
+  async getAdminVerificationDocuments(fundiId: string) {
+    return this.request(`/admin/verification-documents/${fundiId}`);
+  }
+
+  async startLivenessSession() {
+    return this.request('/verification/liveness/start', { method: 'POST' }) as Promise<{
+      sessionId: string;
+      challenges: { id: string; label: string; durationMs: number }[];
+    }>;
+  }
+
+  async submitLivenessFrame(sessionId: string, challengeId: string, frame: Blob, clientConfidence = 0.85) {
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
+    const fd = new FormData();
+    fd.append('challengeId', challengeId);
+    fd.append('clientConfidence', String(clientConfidence));
+    fd.append('frame', frame, 'frame.jpg');
+    const url = buildApiUrl(`/verification/liveness/${sessionId}/frame`);
+    const csrf = readCookie('csrf_token');
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${this.token ?? ''}`,
+        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+      },
+      body: fd,
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new ApiError(e.message || 'Frame upload failed', response.status);
+    }
+    return response.json();
+  }
+
+  async completeLivenessSession(sessionId: string) {
+    return this.request(`/verification/liveness/${sessionId}/complete`, { method: 'POST' }) as Promise<{
+      livenessScore: number;
+      faceMatchScore: number;
+      fraudRiskScore: number;
+      verificationResult: string;
+      autoApproved?: boolean;
+    }>;
+  }
+
+  async getVerificationStatus() {
+    return this.request('/verification/status');
+  }
+
+  async requestFundiReupload(fundiId: string, reason: string) {
+    return this.request(`/admin/fundis/${fundiId}/request-reupload`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
   async uploadJobPhoto(jobId: string, formData: FormData) {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
     const url = buildApiUrl(`/jobs/${jobId}/photos`);
@@ -501,6 +561,33 @@ class ApiClient {
 
   async getSecurityOverview() { return this.request('/admin/security/overview'); }
 
+  async getFraudDashboard(period = '30d') {
+    return this.request(`/admin/fraud/dashboard?period=${period}`);
+  }
+
+  async getFraudAlerts(params: { period?: string; severity?: string; status?: string } = {}) {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return this.request(`/admin/fraud/alerts${q ? `?${q}` : ''}`);
+  }
+
+  async getCommissionDebts(status?: string) {
+    return this.request(`/admin/fraud/debts${status ? `?status=${status}` : ''}`);
+  }
+
+  async getSuspiciousJobs() { return this.request('/admin/fraud/suspicious-jobs'); }
+
+  async getSuspiciousUsers(role?: string) {
+    return this.request(`/admin/fraud/suspicious-users${role ? `?role=${role}` : ''}`);
+  }
+
+  async getFraudReports(period = '30d', format = 'json') {
+    return this.request(`/admin/fraud/reports?period=${period}&format=${format}`);
+  }
+
+  async adminFraudAction(payload: Record<string, unknown>) {
+    return this.request('/admin/fraud/actions', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
   // Admin verifyAdminToken compat shim (was server-side check in old backend)
   async verifyAdminToken() {
     return this.getCurrentUser();
@@ -538,7 +625,7 @@ class ApiClient {
     return this.request(jobId ? `/jobs/${jobId}/fraud-report` : '/fraud-report', {
       method: 'POST',
       body: JSON.stringify(payload),
-      includeAuth: Boolean(jobId),
+      includeAuth: true,
     });
   }
 

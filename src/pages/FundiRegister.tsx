@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { apiClient } from "@/lib/api";
-import { ArrowLeft, ArrowRight, Camera, Upload, CheckCircle, AlertCircle, Loader, X, Shield, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Loader, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
+import LivenessVerification from "@/components/fundi/LivenessVerification";
 import { toast } from "sonner";
 
 const SKILLS = ["Plumbing", "Electrical", "AC & HVAC", "Cleaning", "Carpentry", "Auto Repair", "Painting", "Masonry", "Welding", "Roofing"];
@@ -13,27 +14,18 @@ export default function FundiRegister() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
   const [locationSelection, setLocationSelection] = useState<LocationSelection | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
 
   const [data, setData] = useState({
     firstName: "", lastName: "", email: "", phone: "", password: "",
     idNumber: "", idPhoto: null as File | null, idPhotoPreview: "",
     idPhotoBack: null as File | null, idPhotoBackPreview: "",
-    selfiePhoto: null as Blob | null, selfiePhotoPreview: "",
     latitude: null as number | null, longitude: null as number | null,
     accuracy: null as number | null,
     locationDisplayName: "", locationArea: "", locationCity: "",
     skills: [] as string[], experience: "", mpesaNumber: "",
   });
-
-  useEffect(() => {
-    return () => { if (streamRef) streamRef.getTracks().forEach(t => t.stop()); };
-  }, [streamRef]);
 
   const onLocationChange = (selection: LocationSelection | null) => {
     setLocationSelection(selection);
@@ -58,43 +50,15 @@ export default function FundiRegister() {
     }));
   };
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-      setStreamRef(stream);
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-      setCameraActive(true);
-    } catch { toast.error("Camera access denied"); }
-  };
-
-  const takeSelfie = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const ctx = canvasRef.current.getContext("2d");
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    ctx?.drawImage(videoRef.current, 0, 0);
-    canvasRef.current.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        setData(d => ({ ...d, selfiePhoto: blob, selfiePhotoPreview: url }));
-        setCameraActive(false);
-        if (streamRef) { streamRef.getTracks().forEach(t => t.stop()); setStreamRef(null); }
-      }
-    }, "image/jpeg", 0.9);
-  };
-
   const handleSubmit = async () => {
     if (!data.latitude || !data.longitude) { toast.error("Location is required"); return; }
-    if (!data.selfiePhoto) { toast.error("Selfie is required"); return; }
     if (!data.idPhoto) { toast.error("ID photo is required"); return; }
     if (data.skills.length === 0) { toast.error("Select at least one skill"); return; }
 
     setLoading(true);
     try {
-      // Check if already logged in as a user
       const token = localStorage.getItem("auth_token");
       if (!token) {
-        // Need to register first
         toast.error("Please sign up first, then register as a fundi");
         navigate("/auth?mode=signup");
         return;
@@ -117,11 +81,11 @@ export default function FundiRegister() {
       fd.append("locationArea", data.locationArea);
       if (data.idPhoto) fd.append("idPhoto", data.idPhoto);
       if (data.idPhotoBack) fd.append("idPhotoBack", data.idPhotoBack);
-      if (data.selfiePhoto) fd.append("selfiePhoto", data.selfiePhoto, "selfie.jpg");
 
       await apiClient.submitFundiRegistration(fd);
-      toast.success("Registration submitted! Awaiting admin review.");
-      navigate("/fundi/pending");
+      setRegistered(true);
+      toast.success("Documents submitted. Complete live verification.");
+      setStep(5);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Registration failed");
     } finally {
@@ -129,7 +93,7 @@ export default function FundiRegister() {
     }
   };
 
-  const steps = ["Personal Info", "ID Verification", "Selfie", "Location & Skills", "Review"];
+  const steps = ["Personal Info", "ID Verification", "Location & Skills", "Review", "Live Verification"];
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -195,44 +159,8 @@ export default function FundiRegister() {
             </div>
           )}
 
-          {/* Step 3: Selfie */}
+          {/* Step 3: Location & Skills */}
           {step === 3 && (
-            <div className="space-y-4 mt-4">
-              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl">
-                <Shield className="w-5 h-5 text-blue-600 shrink-0" />
-                <p className="text-xs text-blue-700">Take a live selfie to verify your identity matches your ID.</p>
-              </div>
-              {data.selfiePhotoPreview ? (
-                <div className="relative">
-                  <img src={data.selfiePhotoPreview} alt="Selfie" className="w-full h-64 object-cover rounded-xl" />
-                  <button onClick={() => setData(d => ({...d, selfiePhoto: null, selfiePhotoPreview: ""}))} className="absolute top-2 right-2 bg-black/50 rounded-full p-1"><X className="w-3 h-3 text-white" /></button>
-                </div>
-              ) : cameraActive ? (
-                <div className="space-y-3">
-                  <video ref={videoRef} className="w-full h-64 object-cover rounded-xl bg-black" autoPlay playsInline muted />
-                  <canvas ref={canvasRef} className="hidden" />
-                  <Button className="w-full bg-gradient-primary" onClick={takeSelfie}><Camera className="w-4 h-4 mr-2" />Take Selfie</Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-xl">
-                    <Camera className="w-12 h-12 text-muted-foreground mb-3" />
-                    <p className="text-sm text-muted-foreground mb-4">Take a live selfie for verification</p>
-                    <Button onClick={startCamera} variant="outline"><Camera className="w-4 h-4 mr-2" />Open Camera</Button>
-                  </div>
-                  <div className="text-center text-xs text-muted-foreground">— or upload a photo —</div>
-                  <label className="flex items-center justify-center gap-2 py-3 border border-border rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm">Upload selfie</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) setData(d => ({...d, selfiePhoto: f, selfiePhotoPreview: URL.createObjectURL(f)})); }} />
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 4: Location & Skills */}
-          {step === 4 && (
             <div className="space-y-5 mt-4">
               <div>
                 <label className="text-xs font-medium block mb-2">Your Location *</label>
@@ -262,8 +190,8 @@ export default function FundiRegister() {
             </div>
           )}
 
-          {/* Step 5: Review */}
-          {step === 5 && (
+          {/* Step 4: Review */}
+          {step === 4 && (
             <div className="space-y-4 mt-4">
               {[
                 { label: "Name", value: `${data.firstName} ${data.lastName}` },
@@ -286,19 +214,38 @@ export default function FundiRegister() {
               </div>
             </div>
           )}
+
+          {/* Step 5: Live Verification */}
+          {step === 5 && registered && (
+            <div className="space-y-4 mt-4">
+              <LivenessVerification
+                onComplete={(result) => {
+                  if (result.autoApproved) {
+                    toast.success("Verified automatically! Welcome to PataFundi.");
+                    navigate("/fundi/dashboard");
+                  } else {
+                    toast.success("Live verification complete. Awaiting admin review.");
+                    navigate("/fundi/pending");
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
+        {step < 5 && (
         <div className="mt-4 flex gap-3">
           {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1 rounded-xl"><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>}
-          {step < 5 ? (
+          {step < 4 ? (
             <Button onClick={() => setStep(step + 1)} className="flex-1 bg-gradient-primary rounded-xl">Continue<ArrowRight className="w-4 h-4 ml-2" /></Button>
           ) : (
             <Button onClick={handleSubmit} disabled={loading} className="flex-1 bg-gradient-primary rounded-xl">
-              {loading ? <><Loader className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : <><CheckCircle className="w-4 h-4 mr-2" />Submit Registration</>}
+              {loading ? <><Loader className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : <><CheckCircle className="w-4 h-4 mr-2" />Submit & Verify</>}
             </Button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

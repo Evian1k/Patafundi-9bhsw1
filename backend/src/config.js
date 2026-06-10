@@ -47,6 +47,17 @@ export const config = {
     timeoutUrl: process.env.MPESA_TIMEOUT_URL || '',
     resultUrl: process.env.MPESA_RESULT_URL || '',
   },
+  storage: {
+    r2AccountId: process.env.R2_ACCOUNT_ID || '',
+    r2AccessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    r2Bucket: process.env.R2_BUCKET_NAME || 'patafundi',
+    r2PublicUrl: process.env.R2_PUBLIC_URL || '',
+  },
+  aws: {
+    region: process.env.AWS_REGION || 'us-east-1',
+    rekognitionEnabled: process.env.AWS_REKOGNITION_ENABLED === 'true',
+  },
 };
 
 export function requireConfig(value, name) {
@@ -64,6 +75,7 @@ export function logProductionConfigWarnings() {
   const missing = [];
   if (!config.databaseUrl) missing.push('DATABASE_URL');
   if (!config.jwtSecret) missing.push('JWT_SECRET');
+  if (!config.mpesa.callbackSecret) missing.push('MPESA_CALLBACK_SECRET (required before accepting live payments)');
   if (missing.length) {
     console.error(`[PataFundi API] Missing required production env: ${missing.join(', ')}`);
   }

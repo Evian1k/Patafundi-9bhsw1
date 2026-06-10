@@ -3,6 +3,14 @@ import bcrypt from 'bcryptjs';
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
+import {
+  createExpectedCommission,
+  markCommissionCustomerConfirmed,
+  rewardTrust,
+  scanContent,
+  verifyJobCompletionOtp,
+} from '../services/fraudService.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const toRad = (v) => (v * Math.PI) / 180;
@@ -139,6 +147,29 @@ export async function createJob(req, res) {
     `insert into job_status_updates (job_id, status, actor_id, note) values ($1, 'matching', $2, 'Job created')`,
     [job.id, req.user.id],
   );
+  await recordTimelineEvent({
+    jobId: job.id,
+    eventType: 'job_created',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    metadata: { serviceCategory, urgency: body.urgency || 'normal' },
+  });
+  await recordTimelineEvent({
+    jobId: job.id,
+    eventType: 'job_posted',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  if (body.description) {
+    const scan = await scanContent({
+      content: body.description,
+      userId: req.user.id,
+      userRole: req.user.role,
+      jobId: job.id,
+      source: 'job_notes',
+    });
+    if (scan.blocked) throw forbidden('Job description contains off-platform contact or payment information');
+  }
   emitEvent('job:created', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
   const candidates = await findNearestFundis(latitude, longitude, serviceCategory);
   if (!candidates.length) {
@@ -160,12 +191,44 @@ export async function createJob(req, res) {
 export async function uploadJobPhotos(req, res) {
   const job = await loadJob(req.params.id);
   requireJobAccess(req.user, job);
-  const photos = (req.files || []).map((file) => ({
-    url: `/uploads/${file.filename}`,
-    originalName: file.originalname,
-    mimeType: file.mimetype,
-    size: file.size,
-  }));
+  const { uploadPrivateFile, getSignedAccessUrl, getSignedThumbUrl } = await import('../services/storageService.js');
+  const { mapMulterFiles } = await import('../middleware/upload.js');
+  const files = mapMulterFiles(req.files);
+  if (!files.length) throw badRequest('At least one photo is required');
+
+  const photos = [];
+  let sortOrder = 0;
+  for (const file of files) {
+    const uploaded = await uploadPrivateFile({
+      folder: `jobs/${job.id}`,
+      file,
+    });
+    const row = await query(
+      `insert into job_photos (job_id, uploaded_by, r2_key, thumb_r2_key, mime_type, file_size, original_name, width, height, sort_order, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active') returning *`,
+      [
+        job.id,
+        req.user.id,
+        uploaded.r2Key,
+        uploaded.thumbR2Key,
+        uploaded.mimeType,
+        uploaded.fileSize,
+        file.originalname,
+        uploaded.width,
+        uploaded.height,
+        sortOrder++,
+      ],
+    );
+    photos.push({
+      id: row.rows[0].id,
+      signedUrl: await getSignedAccessUrl(uploaded.r2Key),
+      thumbSignedUrl: await getSignedThumbUrl(uploaded.thumbR2Key, uploaded.r2Key),
+      originalName: file.originalname,
+      mimeType: uploaded.mimeType,
+      size: uploaded.fileSize,
+      expiresIn: 900,
+    });
+  }
   res.status(201).json({ success: true, photos });
 }
 
@@ -199,6 +262,7 @@ export async function patchJob(req, res) {
     if (['cancelled'].includes(status)) requireCustomer(req.user, job);
   }
   const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
+  await recordJobStatusTimeline(result.rows[0], status, req.user.id, req.user.role);
   emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   if (status === 'cancelled') emitEvent('job:cancelled', { jobId: req.params.id, status }, `job:${req.params.id}`);
@@ -211,13 +275,43 @@ export async function updateStatus(req, res) {
 }
 
 export async function acceptJob(req, res) {
+  const fundi = await query(
+    `select approval_status from fundis where user_id = $1`,
+    [req.user.id],
+  );
+  if (req.user.role !== 'admin' && fundi.rows[0]?.approval_status !== 'approved') {
+    throw forbidden('Only approved fundis can accept jobs');
+  }
   const result = await query(
     `update jobs set fundi_id = $2, status = 'accepted', estimated_price = coalesce($3, estimated_price), updated_at = now()
      where id = $1 and status in ('pending', 'matching') returning *`,
     [req.params.id, req.user.id, req.body?.estimatedPrice || null],
   );
   if (!result.rows[0]) throw badRequest('Job cannot be accepted');
-  emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  const job = result.rows[0];
+  const amount = Number(job.final_price || job.estimated_price || 0);
+  if (amount > 0) {
+    await createExpectedCommission({
+      jobId: job.id,
+      fundiId: req.user.id,
+      customerId: job.customer_id,
+      amount,
+    });
+  }
+  await recordTimelineEvent({
+    jobId: job.id,
+    eventType: 'fundi_matched',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  await recordTimelineEvent({
+    jobId: job.id,
+    eventType: 'fundi_accepted',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    metadata: { estimatedPrice: job.estimated_price },
+  });
+  emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted', job: publicJob(job) }, `job:${req.params.id}`);
   emitEvent('fundi:response:ok', { accepted: true, jobId: req.params.id }, `user:${req.user.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]) });
 }
@@ -276,6 +370,12 @@ export async function completeJob(req, res) {
      where id = $1 returning *`,
     [req.params.id, otpHash, req.body?.finalPrice || null],
   );
+  await recordTimelineEvent({
+    jobId: req.params.id,
+    eventType: 'work_completed',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
   emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
   emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
@@ -284,19 +384,29 @@ export async function completeJob(req, res) {
 export async function confirmCompletion(req, res) {
   const { otp } = req.body || {};
   if (!otp) throw badRequest('OTP is required');
-  const existing = await query('select id, customer_id, completion_otp_hash from jobs where id = $1', [req.params.id]);
+  const existing = await query('select * from jobs where id = $1', [req.params.id]);
   const job = existing.rows[0];
   if (!job) throw notFound('Job not found');
   requireCustomer(req.user, job);
-  if (!job?.completion_otp_hash || !(await bcrypt.compare(String(otp), job.completion_otp_hash))) {
-    throw forbidden('Invalid completion OTP');
-  }
+  const otpResult = await verifyJobCompletionOtp({
+    jobId: req.params.id,
+    otp,
+    verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
+  });
+  if (!otpResult.ok) throw forbidden(otpResult.error);
   const result = await query(
     `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
       escrow_status = 'completion_requested', updated_at = now()
      where id = $1 returning *`,
     [req.params.id],
   );
+  await markCommissionCustomerConfirmed(req.params.id);
+  await recordTimelineEvent({
+    jobId: req.params.id,
+    eventType: 'customer_confirmed',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
   emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]) });
 }
@@ -348,11 +458,24 @@ export async function submitReview(req, res) {
   if (job.status !== 'completed' || !job.customer_completion_confirmed) {
     throw badRequest('Only completed jobs can be reviewed');
   }
+  if (comment) {
+    const scan = await scanContent({
+      content: comment,
+      userId: req.user.id,
+      userRole: req.user.role,
+      jobId,
+      source: 'review',
+    });
+    if (scan.blocked) throw forbidden('Review contains off-platform contact or payment information');
+  }
   const result = await query(
     `insert into reviews (job_id, reviewer_id, rating, comment)
      values ($1, $2, $3, $4) returning *`,
     [jobId, req.user.id, rating, comment],
   );
+  if (Number(rating) >= 4 && job.fundi_id) {
+    await rewardTrust({ userId: job.fundi_id, reason: 'Positive review', bonusKey: 'positive_review' });
+  }
   emitEvent('review:submitted', { jobId, reviewId: result.rows[0].id }, `job:${jobId}`);
   emitEvent('trust:updated', { userId: job.fundi_id, jobId }, `user:${job.fundi_id}`);
   res.status(201).json({ success: true, review: result.rows[0] });

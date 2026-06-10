@@ -96,4 +96,24 @@ export async function sendOtpEmail({ to, code, purpose = 'register' }) {
   }
 }
 
+export async function sendFraudWarningEmail({ to, subject, body }) {
+  const recipient = String(to || '').trim().toLowerCase();
+  if (!recipient) return { sent: false, reason: 'invalid_payload' };
+  const client = getResendClient();
+  if (!client) return { sent: false, reason: 'not_configured' };
+  try {
+    const result = await client.emails.send({
+      from: config.emailFrom,
+      to: [recipient],
+      subject: subject || 'PataFundi Security Notice',
+      html: `<p>${body}</p>`,
+      text: body,
+    });
+    if (result.error) return { sent: false, reason: result.error.message };
+    return { sent: true, id: result.data?.id };
+  } catch (err) {
+    return { sent: false, reason: err?.message || 'send_failed' };
+  }
+}
+
 export { OTP_EXPIRY_MINUTES };

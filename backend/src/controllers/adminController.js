@@ -1,6 +1,7 @@
-import { query } from '../db.js';
+import { query, transaction } from '../db.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
+import { getSignedAccessUrl, getObjectBuffer, uploadProfilePhoto } from '../services/storageService.js';
 
 const tableOrderBy = {
   trust_scores: 'updated_at',
@@ -9,7 +10,10 @@ const tableOrderBy = {
 const tableSelects = {
   fundis: `select f.id, f.user_id, u.full_name, u.email, u.phone, f.skills, f.experience, f.bio,
                   f.mpesa_number, f.approval_status, f.rejection_reason, f.approved_at,
-                  f.online, f.rating, f.trust_score, f.created_at, f.updated_at
+                  f.online, f.rating, f.trust_score, f.id_number, f.profile_photo_url,
+                  f.profile_photo_thumb_url, f.verification_badge, f.face_match_score,
+                  f.liveness_score, f.fraud_risk_score, f.verification_result, f.verification_review_status,
+                  u.verification_status, u.verified_at, f.created_at, f.updated_at
            from fundis f join users u on u.id = f.user_id`,
   users: `select id, email, full_name, phone, role, status, trust_score, created_at, updated_at from users`,
   jobs: `select * from jobs`,
@@ -24,6 +28,47 @@ const tableSelects = {
   notifications: `select * from notifications`,
 };
 
+async function enrichFundiWithDocs(row) {
+  if (!row) return null;
+  const [firstName = row.full_name || '', ...rest] = String(row.full_name || '').split(' ');
+  const docs = await query(
+    `select id, document_type, r2_key, mime_type, face_match_score, verification_result, blur_score, status
+     from verification_documents where fundi_id = $1`,
+    [row.id],
+  );
+  const docUrls = {};
+  for (const doc of docs.rows) {
+    docUrls[doc.document_type] = await getSignedAccessUrl(doc.r2_key);
+  }
+  const profileSignedUrl = row.profile_photo_url
+    ? await getSignedAccessUrl(row.profile_photo_url)
+    : '';
+  return {
+    ...row,
+    userId: row.user_id,
+    firstName,
+    lastName: rest.join(' '),
+    verificationStatus: row.approval_status,
+    idNumber: row.id_number || '',
+    idPhotoUrl: docUrls.id_front || '',
+    idPhotoBackUrl: docUrls.id_back || '',
+    selfieUrl: docUrls.selfie_id || '',
+    certificateUrl: docUrls.certificate || '',
+    businessPermitUrl: docUrls.business_permit || '',
+    profilePhotoUrl: profileSignedUrl || '',
+    faceMatchScore: row.face_match_score != null ? Number(row.face_match_score) : null,
+    livenessScore: row.liveness_score != null ? Number(row.liveness_score) : null,
+    fraudRiskScore: row.fraud_risk_score != null ? Number(row.fraud_risk_score) : null,
+    verificationResult: row.verification_result || row.verification_review_status || 'pending',
+    identityVerificationStatus: row.verification_review_status || 'pending',
+    verificationBadge: Boolean(row.verification_badge),
+    experienceYears: row.experience || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    verificationDocuments: docs.rows,
+  };
+}
+
 function publicFundi(row) {
   if (!row) return null;
   const [firstName = row.full_name || '', ...rest] = String(row.full_name || '').split(' ');
@@ -34,8 +79,8 @@ function publicFundi(row) {
     lastName: rest.join(' '),
     verificationStatus: row.approval_status,
     idNumber: row.id_number || '',
-    idPhotoUrl: row.id_photo_url || '',
-    selfieUrl: row.selfie_url || '',
+    profilePhotoUrl: row.profile_photo_url || row.profile_photo_thumb_url || '',
+    verificationBadge: Boolean(row.verification_badge),
     experienceYears: row.experience || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -178,7 +223,8 @@ export async function getFundi(req, res) {
     [req.params.id],
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
-  res.json({ success: true, fundi: publicFundi(result.rows[0]) });
+  const fundi = await enrichFundiWithDocs(result.rows[0]);
+  res.json({ success: true, fundi });
 }
 
 export async function transactions(_req, res) {
@@ -284,14 +330,73 @@ export async function escrowQueue(_req, res) {
 }
 
 export async function approveFundi(req, res) {
+  const fundi = await transaction(async (client) => {
+    const existing = await client.query(
+      'select * from fundis where id = $1 or user_id = $1',
+      [req.params.id],
+    );
+    if (!existing.rows[0]) throw notFound('Fundi not found');
+    const fundiRow = existing.rows[0];
+
+    const selfieDoc = await client.query(
+      `select r2_key from verification_documents
+       where fundi_id = $1 and document_type = 'selfie_id' limit 1`,
+      [fundiRow.id],
+    );
+
+    let profilePhotoUrl = fundiRow.profile_photo_url;
+    let profileThumbUrl = fundiRow.profile_photo_thumb_url;
+
+    if (selfieDoc.rows[0]?.r2_key) {
+      const selfieBuffer = await getObjectBuffer(selfieDoc.rows[0].r2_key);
+      const uploaded = await uploadProfilePhoto({ userId: fundiRow.user_id, buffer: selfieBuffer });
+      profilePhotoUrl = uploaded.r2Key;
+      profileThumbUrl = uploaded.thumbR2Key;
+    }
+
+    const updated = await client.query(
+      `update fundis set approval_status = 'approved', approved_at = now(), verification_badge = true,
+        verification_review_status = 'approved',
+        profile_photo_url = coalesce($2, profile_photo_url),
+        profile_photo_thumb_url = coalesce($3, profile_photo_thumb_url),
+        updated_at = now()
+       where id = $1 returning *`,
+      [fundiRow.id, profilePhotoUrl, profileThumbUrl],
+    );
+    await client.query(
+      `update users set role = 'fundi', status = 'active', verification_status = 'verified',
+        verified_at = now(), updated_at = now() where id = $1`,
+      [fundiRow.user_id],
+    );
+    await client.query(
+      `update verification_documents set status = 'approved' where fundi_id = $1`,
+      [fundiRow.id],
+    );
+    return updated.rows[0];
+  });
+
+  await auditLog({ userId: req.user.id, action: 'admin.fundi.approve', entityType: 'fundi', entityId: fundi.id, metadata: { profileSet: Boolean(fundi.profile_photo_url) } });
+  res.json({ success: true, fundi });
+}
+
+export async function requestFundiReupload(req, res) {
+  const reason = req.body?.reason || 'Please re-upload your verification documents';
   const result = await query(
-    `update fundis set approval_status = 'approved', approved_at = now(), updated_at = now()
+    `update fundis set approval_status = 'pending', verification_review_status = 'reupload_requested',
+      rejection_reason = $2, updated_at = now()
      where id = $1 or user_id = $1 returning *`,
-    [req.params.id],
+    [req.params.id, reason],
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
-  await query(`update users set role = 'fundi', status = 'active', updated_at = now() where id = $1`, [result.rows[0].user_id]);
-  await auditLog({ userId: req.user.id, action: 'admin.fundi.approve', entityType: 'fundi', entityId: result.rows[0].id });
+  await query(
+    `update verification_documents set status = 'reupload_requested' where fundi_id = $1`,
+    [result.rows[0].id],
+  );
+  await query(
+    `update users set verification_status = 'review_required', updated_at = now() where id = $1`,
+    [result.rows[0].user_id],
+  );
+  await auditLog({ userId: req.user.id, action: 'admin.fundi.request_reupload', entityType: 'fundi', entityId: result.rows[0].id, metadata: { reason } });
   res.json({ success: true, fundi: result.rows[0] });
 }
 

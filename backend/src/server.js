@@ -12,8 +12,10 @@ import { attachRealtime } from './realtime.js';
 import { healthcheck } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { csrfProtection } from './middleware/auth.js';
+import { authRateLimit, otpRateLimit, paymentWebhookRateLimit, mapsRateLimit } from './middleware/rateLimit.js';
 import { corsOriginCallback } from './cors.js';
 import { isLocalDatabaseUrl } from './pg-config.js';
+import { checkCommissionProtection, runPatternDetection } from './services/fraudService.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +43,15 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/auth/login', authRateLimit);
+app.use('/api/auth/register', authRateLimit);
+app.use('/api/auth/forgot-password', authRateLimit);
+app.use('/api/auth/otp-verify', otpRateLimit);
+app.use('/api/auth/otp-resend', otpRateLimit);
+app.use('/api/auth/reset-password', otpRateLimit);
+app.use('/api/payments/webhook', paymentWebhookRateLimit);
+app.use('/api/payments/daraja-callback', paymentWebhookRateLimit);
+app.use('/api/maps', mapsRateLimit);
 app.use(csrfProtection);
 
 app.get('/', (_req, res) => {
@@ -73,6 +84,8 @@ app.get('/health', async (_req, res) => {
     env: config.nodeEnv,
   });
 });
+
+// No public /uploads — all files require signed URLs via /api/storage/*
 
 app.use('/api', router);
 
@@ -132,6 +145,17 @@ const port = config.port;
 
 server.listen(port, host, () => {
   console.log(`[PataFundi API] listening on ${host}:${port} (${config.nodeEnv})`);
+  const runFraudJobs = async () => {
+    try {
+      const flagged = await checkCommissionProtection();
+      const patterns = await runPatternDetection();
+      if (flagged || patterns) console.log(`[fraud] flagged=${flagged} patterns=${patterns}`);
+    } catch (err) {
+      console.error('[fraud] background job error:', err.message);
+    }
+  };
+  runFraudJobs();
+  setInterval(runFraudJobs, 15 * 60 * 1000);
 });
 
 server.on('error', (error) => {

@@ -4,6 +4,8 @@ import { emitEvent } from '../realtime.js';
 import { auditLog } from '../services/auditService.js';
 import { assertValidMpesaPhone } from '../services/mpesaService.js';
 import { calculateWithdrawalFee, getPaymentSettings } from '../services/financeService.js';
+import { calculateCommissionDebtDeduction, applyCommissionDebtDeduction } from '../services/fraudService.js';
+import { recordTimelineEvent } from '../services/timelineService.js';
 
 function parsePositiveAmount(value) {
   const amount = Number(value);
@@ -69,6 +71,7 @@ export async function requestPayout(req, res) {
     if (requestedAmount < Number(settings.minimumPayoutKes || 0)) throw badRequest('Requested payout is below the minimum payout amount');
     if (requestedAmount > available) throw badRequest('Requested payout exceeds available balance');
     const fee = calculateWithdrawalFee(requestedAmount, settings);
+    const debtPreview = await calculateCommissionDebtDeduction(req.user.id, fee.netAmount, client);
     const result = await client.query(
       `insert into payouts (fundi_id, amount, mpesa_number, status, idempotency_key, withdrawal_fee, net_amount, protection_snapshot)
        values ($1, $2, $3, 'requested', $4, $5, $6, $7::jsonb) returning *`,
@@ -78,10 +81,23 @@ export async function requestPayout(req, res) {
         normalizedPhone,
         idempotencyKey || null,
         fee.withdrawalFee,
-        fee.netAmount,
-        JSON.stringify({ trustScore, available, withdrawalFeeType: fee.withdrawalFeeType }),
+        debtPreview.netPayout,
+        JSON.stringify({
+          trustScore,
+          available,
+          withdrawalFeeType: fee.withdrawalFeeType,
+          commissionDebtDeducted: debtPreview.deducted,
+        }),
       ],
     );
+    if (debtPreview.deducted > 0) {
+      await applyCommissionDebtDeduction({
+        userId: req.user.id,
+        payoutAmount: fee.netAmount,
+        payoutId: result.rows[0].id,
+        client,
+      });
+    }
     if (fee.withdrawalFee > 0) {
       await client.query(
         `insert into revenue_ledger (payout_id, user_id, entry_type, amount, metadata)
@@ -95,6 +111,13 @@ export async function requestPayout(req, res) {
       );
     }
     return result.rows[0];
+  });
+  await recordTimelineEvent({
+    jobId: payout.job_id,
+    eventType: 'payout_requested',
+    actorId: req.user.id,
+    actorRole: 'fundi',
+    metadata: { payoutId: payout.id, amount: payout.amount },
   });
   await auditLog({ userId: req.user.id, action: 'payout.request', entityType: 'payout', entityId: payout.id });
   emitEvent('payout:requested', { payoutId: payout.id, fundiId: req.user.id });
@@ -150,6 +173,12 @@ export async function releaseEscrow(req, res) {
       ],
     );
   });
+  await recordTimelineEvent({
+    jobId: req.params.jobId,
+    eventType: 'escrow_released',
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
   await auditLog({ userId: req.user.id, action: 'escrow.release', entityType: 'job', entityId: req.params.jobId });
   emitEvent('escrow:released', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
   emitEvent('payout:processing', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
@@ -183,6 +212,13 @@ export async function completePayout(req, res) {
       await client.query(`update escrow_accounts set status = 'payout_completed', updated_at = now() where job_id = $1`, [updated.rows[0].job_id]);
     }
     return updated.rows[0];
+  });
+  await recordTimelineEvent({
+    jobId: result.job_id,
+    eventType: 'payout_completed',
+    actorId: req.user.id,
+    actorRole: 'admin',
+    metadata: { payoutId: req.params.id },
   });
   await auditLog({ userId: req.user.id, action: 'payout.complete', entityType: 'payout', entityId: req.params.id });
   emitEvent('payout:completed', { payoutId: req.params.id, payout: result }, result.fundi_id ? `user:${result.fundi_id}` : null);

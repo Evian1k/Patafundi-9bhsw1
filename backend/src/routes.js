@@ -1,6 +1,6 @@
 import express from 'express';
-import multer from 'multer';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
+import { imageUpload } from './middleware/upload.js';
 import * as auth from './controllers/authController.js';
 import * as users from './controllers/userController.js';
 import * as jobs from './controllers/jobController.js';
@@ -12,16 +12,17 @@ import * as admin from './controllers/adminController.js';
 import * as content from './controllers/contentController.js';
 import * as chat from './controllers/chatController.js';
 import * as maps from './controllers/mapsController.js';
+import * as fraud from './controllers/fraudController.js';
+import * as storage from './controllers/storageController.js';
+import * as verification from './controllers/verificationController.js';
+import {
+  requireAdminDocumentAccess,
+  requireJobPhotoAccess,
+  requireDisputeAccess,
+  requireProfilePhotoAccess,
+} from './middleware/storageAccess.js';
 import { asyncHandler } from './utils/http.js';
 
-const upload = multer({
-  dest: 'backend/uploads/',
-  limits: { fileSize: 5 * 1024 * 1024, files: 8 },
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-    cb(allowedTypes.has(file.mimetype) ? null : new Error('Unsupported upload type'), allowedTypes.has(file.mimetype));
-  },
-});
 export const router = express.Router();
 
 router.get('/health', (_req, res) => res.json({ success: true, service: 'patafundi-api' }));
@@ -50,7 +51,7 @@ router.post('/jobs', authRequired, asyncHandler(jobs.createJob));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));
 router.get('/jobs/fundi/active', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.activeFundiJob));
 router.get('/jobs/:id', authRequired, asyncHandler(jobs.getJob));
-router.post('/jobs/:id/photos', authRequired, upload.any(), asyncHandler(jobs.uploadJobPhotos));
+router.post('/jobs/:id/photos', authRequired, imageUpload.array('photos', 10), asyncHandler(jobs.uploadJobPhotos));
 router.patch('/jobs/:id', authRequired, asyncHandler(jobs.patchJob));
 router.patch('/jobs/:id/status', authRequired, asyncHandler(jobs.updateStatus));
 router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJobStatus));
@@ -58,7 +59,7 @@ router.get('/jobs/:id/location', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/accept', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.acceptJob));
 router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
 router.post('/jobs/:id/check-in', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.checkIn));
-router.post('/jobs/:id/complete', authRequired, requireRole('fundi', 'admin'), upload.array('photos'), asyncHandler(jobs.completeJob));
+router.post('/jobs/:id/complete', authRequired, requireRole('fundi', 'admin'), imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
 router.post('/jobs/:id/confirm-completion', authRequired, asyncHandler(jobs.confirmCompletion));
 router.post('/jobs/:id/review', authRequired, asyncHandler(jobs.submitReview));
 router.post('/reviews', authRequired, asyncHandler(jobs.submitReview));
@@ -76,9 +77,9 @@ router.post('/fundi/wallet/withdraw-request', authRequired, requireRole('fundi',
 
 router.post('/disputes', authRequired, asyncHandler(disputes.createDispute));
 router.get('/disputes', authRequired, asyncHandler(disputes.listDisputes));
-router.post('/disputes/:id/evidence', authRequired, upload.array('evidence'), asyncHandler(disputes.uploadEvidence));
+router.post('/disputes/:id/evidence', authRequired, imageUpload.array('evidence', 5), asyncHandler(disputes.uploadEvidence));
 
-router.post('/fundi/register', authRequired, upload.any(), asyncHandler(fundi.registerFundi));
+router.post('/fundi/register', authRequired, imageUpload.any(), asyncHandler(fundi.registerFundi));
 router.get('/fundi/profile', authRequired, asyncHandler(fundi.profile));
 router.put('/fundi/profile', authRequired, asyncHandler(fundi.updateProfile));
 router.get('/fundi/approval-status', authRequired, asyncHandler(fundi.approvalStatus));
@@ -100,6 +101,7 @@ router.get('/admin/fundis', authRequired, requireRole('admin'), asyncHandler(adm
 router.get('/admin/fundis/:id', authRequired, requireRole('admin'), asyncHandler(admin.getFundi));
 router.post('/admin/fundis/:id/approve', authRequired, requireRole('admin'), asyncHandler(admin.approveFundi));
 router.post('/admin/fundis/:id/reject', authRequired, requireRole('admin'), asyncHandler(admin.rejectFundi));
+router.post('/admin/fundis/:id/request-reupload', authRequired, requireRole('admin'), asyncHandler(admin.requestFundiReupload));
 router.post('/admin/fundis/:id/suspend', authRequired, requireRole('admin'), asyncHandler(admin.suspendFundi));
 router.post('/admin/fundis/:id/financial-freeze', authRequired, requireRole('admin'), asyncHandler(admin.setFundiFinancialFreeze));
 router.get('/admin/customers', authRequired, requireRole('admin'), asyncHandler(admin.listCustomers));
@@ -118,6 +120,15 @@ router.get('/admin/audit-logs', authRequired, requireRole('admin'), asyncHandler
 router.get('/admin/reports', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
 router.get('/admin/reports/analytics', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
 router.get('/admin/revenue', authRequired, requireRole('admin'), asyncHandler(admin.revenueDashboard));
+router.get('/admin/fraud/dashboard', authRequired, requireRole('admin'), asyncHandler(fraud.fraudDashboard));
+router.get('/admin/fraud/alerts', authRequired, requireRole('admin'), asyncHandler(fraud.listFraudAlerts));
+router.get('/admin/fraud/debts', authRequired, requireRole('admin'), asyncHandler(fraud.listCommissionDebts));
+router.get('/admin/fraud/suspicious-jobs', authRequired, requireRole('admin'), asyncHandler(fraud.listSuspiciousJobs));
+router.get('/admin/fraud/suspicious-users', authRequired, requireRole('admin'), asyncHandler(fraud.listSuspiciousUsers));
+router.get('/admin/fraud/reports', authRequired, requireRole('admin'), asyncHandler(fraud.fraudReports));
+router.get('/admin/fraud/users/:userId', authRequired, requireRole('admin'), asyncHandler(fraud.getUserFraudProfile));
+router.get('/admin/fraud/jobs/:jobId/timeline', authRequired, requireRole('admin'), asyncHandler(fraud.getJobTimelineAdmin));
+router.post('/admin/fraud/actions', authRequired, requireRole('admin'), asyncHandler(fraud.adminFraudAction));
 router.get('/admin/security/overview', authRequired, requireRole('admin'), asyncHandler(admin.securityOverview));
 router.get('/admin/security-alerts', authRequired, requireRole('admin'), asyncHandler(admin.listTable('fraud_alerts', 'alerts')));
 router.get('/admin/trust-scores', authRequired, requireRole('admin'), asyncHandler(admin.listTable('trust_scores', 'scores')));
@@ -134,7 +145,7 @@ router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNot
 router.post('/subscriptions/activate', authRequired, (_req, res) => res.json({ success: true }));
 
 router.post('/support/ticket', asyncHandler(content.supportTicket));
-router.post('/fraud-report', asyncHandler(content.fraudReport));
+router.post('/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.get('/blog', asyncHandler(content.genericList('posts')));
 router.get('/blog/:slug', asyncHandler(content.blogPost));
@@ -149,9 +160,39 @@ router.get('/maps/search', asyncHandler(maps.search));
 router.post('/maps/directions', asyncHandler(maps.directions));
 
 router.get('/jobs/:jobId/messages', authRequired, asyncHandler(chat.listMessages));
-router.post('/jobs/:jobId/messages', authRequired, asyncHandler(chat.sendMessage));
+router.post('/jobs/:jobId/messages', authRequired, imageUpload.single('attachment'), asyncHandler(chat.sendMessage));
 router.post('/jobs/:jobId/messages/read', authRequired, asyncHandler(chat.markRead));
+
+router.get('/admin/verification-documents/:fundiId', authRequired, requireRole('admin'), requireAdminDocumentAccess, asyncHandler(storage.getVerificationDocuments));
+router.get('/storage/verification/:id/signed-url', authRequired, requireRole('admin'), requireAdminDocumentAccess, asyncHandler(storage.getSignedDocumentUrl));
+router.get('/jobs/:jobId/photos', authRequired, requireJobPhotoAccess, asyncHandler(storage.getJobPhotos));
+router.get('/jobs/:jobId/photos/:photoId/signed-url', authRequired, requireJobPhotoAccess, asyncHandler(storage.getJobPhotoSignedUrl));
+router.get('/disputes/:disputeId/files', authRequired, requireDisputeAccess, asyncHandler(storage.getDisputeFiles));
+router.get('/storage/profile/:userId/signed-url', authRequired, requireProfilePhotoAccess, asyncHandler(storage.getProfilePhotoSignedUrl));
+router.get('/storage/chat/:attachmentId/signed-url', authRequired, asyncHandler(storage.getChatAttachmentSignedUrl));
+router.get('/storage/local/:key(*)', authRequired, asyncHandler(storage.serveLocalFile));
+
+router.get('/verification/challenges', authRequired, asyncHandler(verification.getLivenessChallenges));
+router.post('/verification/liveness/start', authRequired, asyncHandler(verification.startLiveness));
+router.post('/verification/liveness/:sessionId/frame', authRequired, imageUpload.single('frame'), asyncHandler(verification.submitLivenessFrame));
+router.post('/verification/liveness/:sessionId/complete', authRequired, asyncHandler(verification.finishLiveness));
+router.post('/verification/run-check', authRequired, asyncHandler(verification.runVerificationCheck));
+router.get('/verification/status', authRequired, asyncHandler(verification.getVerificationStatus));
+
+
 router.get('/trust/:userId', authRequired, asyncHandler(async (req, res) => {
-  const result = await import('./db.js').then(({ query }) => query('select * from trust_scores where user_id = $1', [req.params.userId]));
+  const { query } = await import('./db.js');
+  if (req.user.role !== 'admin' && req.user.id !== req.params.userId) {
+    const jobLink = await query(
+      `select 1 from jobs where (customer_id = $1 and fundi_id = $2) or (customer_id = $2 and fundi_id = $1) limit 1`,
+      [req.user.id, req.params.userId],
+    );
+    if (!jobLink.rows[0]) {
+      const err = new Error('Not allowed to view this trust score');
+      err.status = 403;
+      throw err;
+    }
+  }
+  const result = await query('select * from trust_scores where user_id = $1', [req.params.userId]);
   res.json({ success: true, trust: result.rows[0] || null });
 }));

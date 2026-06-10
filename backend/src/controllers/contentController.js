@@ -15,17 +15,33 @@ export async function supportTicket(req, res) {
 export async function fraudReport(req, res) {
   const content = req.body?.content || req.body?.messagePreview || '';
   const detection = detectBypass(content);
-  const reporterId = req.user?.id || req.body?.userId;
-  if (detection.isBypass && reporterId) {
+  const reportedUserId = req.body?.reportedUserId || req.body?.userId;
+  if (!req.user?.id && !req.body?.email) {
+    throw badRequest('Authentication or contact email required for fraud reports');
+  }
+  if (detection.isBypass && reportedUserId && req.user?.role === 'admin') {
     await recordFraudAlert({
-      jobId: req.body.jobId || null,
-      userId: reporterId,
-      userRole: req.user?.role || req.body.userRole || 'unknown',
+      jobId: req.body.jobId || req.params?.jobId || null,
+      userId: reportedUserId,
+      userRole: req.body.userRole || 'unknown',
       content,
       detection,
+      source: 'admin_report',
     });
   }
-  res.json({ success: true, detection });
+  if (req.body?.jobId || req.params?.jobId) {
+    await query(
+      `insert into support_tickets (name, email, subject, message, status)
+       values ($1, $2, $3, $4, 'open')`,
+      [
+        req.user?.full_name || req.body?.name || 'Anonymous',
+        req.user?.email || req.body?.email,
+        'Fraud Report',
+        content || 'Fraud report submitted',
+      ],
+    );
+  }
+  res.json({ success: true, detection, message: 'Report received' });
 }
 
 export async function genericList(key) {

@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { badRequest, forbidden } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 import { sendOtpEmail } from '../services/emailService.js';
+import { verifyOtpWithLockout } from '../services/fraudService.js';
 import { clearAuthCookies, setAuthCookies, signAccessToken, signRefreshToken } from '../middleware/auth.js';
 
 function publicUser(user) {
@@ -81,11 +82,11 @@ async function findValidOtp(email, purpose) {
 }
 
 export async function register(req, res) {
-  const { email, password, fullName, phone, role = 'customer' } = req.body || {};
+  const { email, password, fullName, phone } = req.body || {};
+  const role = 'customer';
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
   requireStrongPassword(password);
-  if (!['customer', 'fundi', 'admin'].includes(role)) throw badRequest('Invalid role');
-  if (role === 'admin') throw forbidden('Admin accounts must be provisioned by an existing administrator');
+  if (req.body?.role === 'admin') throw forbidden('Admin accounts must be provisioned by an existing administrator');
   const passwordHash = await bcrypt.hash(password, 12);
   const otpCode = String(crypto.randomInt(100000, 999999));
   const user = await transaction(async (client) => {
@@ -98,7 +99,11 @@ export async function register(req, res) {
       [email, passwordHash, fullName, phone, role],
     );
     await client.query(
-      `insert into trust_scores (user_id, score, level) values ($1, 75, 'standard')`,
+      `insert into trust_scores (user_id, score, level) values ($1, 100, 'standard')`,
+      [inserted.rows[0].id],
+    );
+    await client.query(
+      `insert into user_fraud_scores (user_id, fraud_score, risk_level) values ($1, 0, 'low')`,
       [inserted.rows[0].id],
     );
     await client.query(
@@ -173,9 +178,14 @@ export async function logout(req, res) {
 export async function otpVerify(req, res) {
   const { email, code, purpose = 'register' } = req.body || {};
   if (!email || !code) throw badRequest('Email and OTP code are required');
-  const row = await findValidOtp(email, purpose);
-  if (!row || !(await bcrypt.compare(String(code), row.code_hash))) throw forbidden('Invalid OTP code');
-  await query('update otp_codes set consumed_at = now() where id = $1', [row.id]);
+  const result = await verifyOtpWithLockout({
+    email,
+    purpose,
+    code,
+    verifyFn: (otp) => bcrypt.compare(String(code), otp.code_hash),
+  });
+  if (!result.ok) throw forbidden(result.error);
+  const row = result.user;
 
   if (purpose === 'password_reset') {
     return res.json({ success: true, message: 'OTP verified. You can now set a new password.' });
@@ -205,6 +215,13 @@ export async function otpVerify(req, res) {
 export async function otpResend(req, res) {
   const { email, purpose = 'register' } = req.body || {};
   if (!email) throw badRequest('Email is required');
+  const recent = await query(
+    `select count(*)::int as cnt from otp_codes oc
+     join users u on u.id = oc.user_id
+     where lower(u.email) = lower($1) and oc.created_at > now() - interval '1 hour'`,
+    [email],
+  );
+  if (Number(recent.rows[0]?.cnt || 0) >= 5) throw forbidden('Too many OTP requests. Try again later.');
   const userResult = await query(
     'select id, email_verified_at from users where lower(email) = lower($1)',
     [email],
@@ -245,10 +262,14 @@ export async function resetPassword(req, res) {
 
   if (email && code && password) {
     requireStrongPassword(password);
-    const row = await findValidOtp(email, 'password_reset');
-    if (!row || !(await bcrypt.compare(String(code), row.code_hash))) {
-      throw forbidden('Invalid or expired OTP code');
-    }
+    const otpResult = await verifyOtpWithLockout({
+      email,
+      purpose: 'password_reset',
+      code,
+      verifyFn: (otp) => bcrypt.compare(String(code), otp.code_hash),
+    });
+    if (!otpResult.ok) throw forbidden(otpResult.error);
+    const row = otpResult.user;
     const passwordHash = await bcrypt.hash(password, 12);
     await transaction(async (client) => {
       await client.query('update users set password_hash = $2, updated_at = now() where id = $1', [row.user_id, passwordHash]);

@@ -10,6 +10,12 @@ import {
 import { auditLog } from '../services/auditService.js';
 import { calculateCommission, getPaymentSettings } from '../services/financeService.js';
 import { emitEvent } from '../realtime.js';
+import { recordTimelineEvent } from '../services/timelineService.js';
+import {
+  markCommissionPaymentReceived,
+  isWebhookReplay,
+  recordWebhookProcessed,
+} from '../services/fraudService.js';
 
 function canAccessJob(user, job) {
   return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
@@ -105,8 +111,14 @@ export async function webhook(req, res) {
   const checkoutRequestId = callback.CheckoutRequestID || callback.checkoutRequestId;
   const resultCode = Number(callback.ResultCode ?? callback.resultCode);
   if (!checkoutRequestId) throw badRequest('CheckoutRequestID missing');
+  const receiptPreview = callback.CallbackMetadata?.Item?.find((i) => i.Name === 'MpesaReceiptNumber')?.Value
+    || callback.MpesaReceiptNumber || null;
 
   const payment = await transaction(async (client) => {
+    if (await isWebhookReplay({ checkoutRequestId, receipt: receiptPreview, rawBody: req.rawBody, client })) {
+      const existing = await client.query('select * from payments where checkout_request_id = $1', [checkoutRequestId]);
+      return existing.rows[0] || { status: 'completed' };
+    }
     const paymentResult = await client.query('select * from payments where checkout_request_id = $1 for update', [checkoutRequestId]);
     const row = paymentResult.rows[0];
     if (!row) throw notFound('Payment not found');
@@ -166,6 +178,19 @@ export async function webhook(req, res) {
         ],
       );
       await client.query(`update jobs set payment_status = 'escrow_held', escrow_status = 'held' where id = $1`, [row.job_id]);
+      await markCommissionPaymentReceived(row.job_id, client);
+      await recordWebhookProcessed({
+        checkoutRequestId,
+        receipt,
+        paymentId: row.id,
+        rawBody: req.rawBody,
+        client,
+      });
+      await client.query(
+        `insert into job_timeline (job_id, event_type, metadata)
+         values ($1, 'payment_made', $2::jsonb)`,
+        [row.job_id, JSON.stringify({ paymentId: row.id, amount: row.amount, receipt })],
+      );
       return updated.rows[0];
     }
     const failed = await client.query(
