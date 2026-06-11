@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,12 @@ const resetPasswordSchema = z.object({
 });
 
 const Auth = () => {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const isCustomerRegister = location.pathname === "/register/customer";
   const [mode, setMode] = useState<"login" | "signup" | "forgot">(
-    searchParams.get("mode") === "signup" ? "signup" : "login"
+    isCustomerRegister || searchParams.get("mode") === "signup" ? "signup" : "login"
   );
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,9 +65,9 @@ const Auth = () => {
     if (role === "fundi_pending") {
       try {
         const s = await apiClient.getFundiApprovalStatus() as { fundi?: Record<string, unknown> };
-        return navigate(s?.fundi ? "/fundi/pending" : "/fundi/register");
+        return navigate(s?.fundi ? "/fundi/pending" : "/register/fundi");
       } catch {
-        return navigate("/fundi/register");
+        return navigate("/register/fundi");
       }
     }
     return navigate("/dashboard");
@@ -607,7 +609,7 @@ const Auth = () => {
                     } catch (e) {
                       console.warn('Failed to save prefill:', e);
                     }
-                    navigate("/fundi/register");
+                    navigate("/register/fundi");
                   }}
                 >
                   Register as Fundi (verification required)

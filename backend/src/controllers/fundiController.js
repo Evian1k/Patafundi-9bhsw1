@@ -1,9 +1,8 @@
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
-import { mapMulterFile } from '../middleware/upload.js';
-import { uploadPrivateFile, getSignedAccessUrl, getSignedThumbUrl } from '../services/storageService.js';
-import { runIdentityVerification } from '../services/identityVerificationService.js';
+import { getSignedAccessUrl, getSignedThumbUrl } from '../services/storageService.js';
+import { createFundiRegistration } from '../services/fundiRegistrationService.js';
 import { auditLog } from '../services/auditService.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -15,114 +14,40 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function fileByField(files, names) {
-  const list = files || [];
-  for (const name of names) {
-    const f = list.find((x) => x.fieldname === name);
-    if (f) return mapMulterFile(f);
-  }
-  return null;
-}
-
-async function saveVerificationDoc(client, { fundiId, userId, documentType, file }) {
-  if (!file) return null;
-  const uploaded = await uploadPrivateFile({
-    folder: `verification/${userId}`,
-    file,
-    allowPdf: documentType === 'certificate' || documentType === 'business_permit',
-  });
-  const result = await client.query(
-    `insert into verification_documents (fundi_id, user_id, document_type, r2_key, mime_type, file_size, original_name, width, height, uploaded_by, blur_score, perceptual_hash, status)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $2, $10, $11, 'pending')
-     on conflict (fundi_id, document_type) do update set
-       r2_key = excluded.r2_key,
-       mime_type = excluded.mime_type,
-       file_size = excluded.file_size,
-       original_name = excluded.original_name,
-       width = excluded.width,
-       height = excluded.height,
-       blur_score = excluded.blur_score,
-       perceptual_hash = excluded.perceptual_hash,
-       status = 'pending',
-       created_at = now()
-     returning *`,
-    [
-      fundiId,
-      userId,
-      documentType,
-      uploaded.r2Key,
-      uploaded.mimeType,
-      uploaded.fileSize,
-      file.originalname,
-      uploaded.width,
-      uploaded.height,
-      uploaded.blurScore,
-      uploaded.perceptualHash,
-    ],
-  );
-  return result.rows[0];
-}
-
 export async function registerFundi(req, res) {
-  const body = req.body || {};
-  const skills = body.skills
-    ? (Array.isArray(body.skills) ? body.skills : (() => {
-      try { return JSON.parse(body.skills); } catch { return String(body.skills).split(',').map((s) => s.trim()).filter(Boolean); }
-    })())
-    : [];
-
-  const idFront = fileByField(req.files, ['idPhoto', 'id_photo', 'idFront']);
-  const idBack = fileByField(req.files, ['idPhotoBack', 'id_photo_back', 'idBack']);
-  const selfie = fileByField(req.files, ['selfiePhoto', 'selfie_photo', 'selfie']);
-  const certificate = fileByField(req.files, ['certificate', 'certificates']);
-  const businessPermit = fileByField(req.files, ['businessPermit', 'business_permit']);
-
-  if (!idFront) throw badRequest('National ID front is required');
-
-  const fundi = await transaction(async (client) => {
-    const inserted = await client.query(
-      `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude, id_number)
-       values ($1, $2, $3, $4, 'pending', $5, $6, $7)
-       on conflict (user_id) do update set skills = excluded.skills, experience = excluded.experience,
-         mpesa_number = excluded.mpesa_number, id_number = coalesce(excluded.id_number, fundis.id_number), updated_at = now()
-       returning *`,
-      [
-        req.user.id,
-        skills,
-        body.experience || '',
-        body.mpesaNumber || body.mpesa_number || '',
-        body.latitude || null,
-        body.longitude || null,
-        body.idNumber || body.id_number || null,
-      ],
-    );
-    const row = inserted.rows[0];
-    await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'id_front', file: idFront });
-    if (idBack) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'id_back', file: idBack });
-    if (selfie) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'selfie_id', file: selfie });
-    if (certificate) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'certificate', file: certificate });
-    if (businessPermit) await saveVerificationDoc(client, { fundiId: row.id, userId: req.user.id, documentType: 'business_permit', file: businessPermit });
-
-    if (req.user.role === 'customer') {
-      await client.query(
-        `update users set role = 'fundi_pending', verification_status = 'pending', updated_at = now() where id = $1`,
-        [req.user.id],
-      );
-    }
-    return row;
-  });
-
-  let verification = null;
-  if (selfie) {
-    try {
-      verification = await runIdentityVerification(fundi.id, req.user.id);
-    } catch (err) {
-      console.warn('[fundi] identity verification failed:', err.message);
-    }
+  if (req.user.role === 'fundi_pending' || req.user.role === 'customer') {
+    const result = await createFundiRegistration({
+      body: req.body,
+      files: req.files,
+      existingUserId: req.user.id,
+    });
+    await auditLog({ userId: req.user.id, action: 'fundi.register', entityType: 'fundi', entityId: result.fundi.id });
+    return res.status(201).json({ success: true, fundi: result.fundi, verification: result.verification });
   }
+  throw badRequest('Already registered as a fundi');
+}
 
-  await auditLog({ userId: req.user.id, action: 'fundi.register', entityType: 'fundi', entityId: fundi.id });
-  res.status(201).json({ success: true, fundi, verification });
+export async function onboardingStatus(req, res) {
+  const [user, fundi] = await Promise.all([
+    query('select id, email, role, email_verified_at from users where id = $1', [req.user.id]),
+    query('select approval_status, rejection_reason, verification_review_status from fundis where user_id = $1', [req.user.id]),
+  ]);
+  const approvalStatus = fundi.rows[0]?.approval_status || 'not_registered';
+  res.json({
+    success: true,
+    onboarding: {
+      role: user.rows[0]?.role,
+      emailVerified: Boolean(user.rows[0]?.email_verified_at),
+      approvalStatus,
+      rejectionReason: fundi.rows[0]?.rejection_reason || null,
+      reviewStatus: fundi.rows[0]?.verification_review_status || null,
+      message: approvalStatus === 'approved'
+        ? 'Approved — you can go online and accept jobs.'
+        : approvalStatus === 'rejected'
+          ? 'Your application was rejected. Contact support or re-register.'
+          : 'Your account is under review.',
+    },
+  });
 }
 
 export async function profile(req, res) {
@@ -254,7 +179,11 @@ async function requireApprovedFundi(userId, role) {
   if (role === 'admin') return;
   const result = await query('select approval_status from fundis where user_id = $1', [userId]);
   if (!result.rows[0] || result.rows[0].approval_status !== 'approved') {
-    throw forbidden('Only approved fundis can go online');
+    const { logAccessDecision } = await import('../middleware/accessDebug.js');
+    await logAccessDecision({ user: { id: userId, role } }, 'fundiController.requireApprovedFundi:denied', {
+      approvalStatus: result.rows[0]?.approval_status ?? 'not_registered',
+    });
+    throw forbidden('Only approved fundis can perform this action');
   }
 }
 

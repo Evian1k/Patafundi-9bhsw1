@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { config, requireConfig } from '../config.js';
 import { query } from '../db.js';
 import { forbidden } from '../utils/http.js';
+import { logAccessDecision } from './accessDebug.js';
 
 export function signAccessToken(user) {
   requireConfig(config.jwtSecret, 'JWT_SECRET');
@@ -97,6 +98,8 @@ export async function authRequired(req, _res, next) {
     if (!result.rows[0]) throw forbidden('User account not found');
     if (result.rows[0].status !== 'active') throw forbidden('Account is not active');
     req.user = result.rows[0];
+    req.authPayload = payload;
+    await logAccessDecision(req, 'authRequired:ok', { jwtRole: payload.role ?? null });
     next();
   } catch (error) {
     error.status = error.status || 401;
@@ -106,7 +109,11 @@ export async function authRequired(req, _res, next) {
 
 export function requireRole(...roles) {
   return (req, _res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) return next(forbidden());
+    if (!req.user || !roles.includes(req.user.role)) {
+      logAccessDecision(req, 'requireRole:denied', { requiredRoles: roles }).catch(() => {});
+      return next(forbidden());
+    }
+    logAccessDecision(req, 'requireRole:allowed', { requiredRoles: roles }).catch(() => {});
     return next();
   };
 }

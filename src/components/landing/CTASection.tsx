@@ -20,12 +20,9 @@ const CTASection = () => {
               Get connected with verified professionals in minutes.
               Fast, reliable, and secure.
             </p>
-            <Link to="/auth?mode=signup">
-              <Button
-                variant="secondary"
-                className="bg-white text-primary hover:bg-white/90"
-              >
-                Get Started Free
+            <Link to="/register/customer">
+              <Button variant="secondary" className="bg-white text-primary hover:bg-white/90">
+                Register as Customer
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
@@ -47,9 +44,9 @@ const CTASection = () => {
               Join thousands of fundis earning more with PataFundi.
               Get verified, get jobs, get paid directly.
             </p>
-            <Link to="/fundi/register">
+            <Link to="/register/fundi">
               <Button className="bg-primary hover:bg-primary/90">
-                Join as a Fundi
+                Register as Fundi
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>

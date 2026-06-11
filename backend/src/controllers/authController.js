@@ -7,6 +7,7 @@ import { badRequest, forbidden } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 import { sendOtpEmail } from '../services/emailService.js';
 import { verifyOtpWithLockout } from '../services/fraudService.js';
+import { createFundiRegistration } from '../services/fundiRegistrationService.js';
 import { clearAuthCookies, setAuthCookies, signAccessToken, signRefreshToken } from '../middleware/auth.js';
 
 function publicUser(user) {
@@ -119,6 +120,29 @@ export async function register(req, res) {
     success: true,
     otpRequired: true,
     email: user.email,
+    ...otpDelivery,
+  });
+}
+
+/** Public fundi onboarding — creates account + fundi profile + verification docs, then sends OTP. */
+export async function registerFundi(req, res) {
+  const { body, files } = req;
+  const result = await createFundiRegistration({ body, files });
+  const otpDelivery = await deliverOtp(result.user.email, result.otpCode, 'register');
+  await auditLog({
+    userId: result.user.id,
+    action: 'auth.register_fundi',
+    entityType: 'fundi',
+    entityId: result.fundi.id,
+    metadata: { verification: result.verification?.verificationResult || null },
+  });
+  res.status(201).json({
+    success: true,
+    otpRequired: true,
+    email: result.user.email,
+    fundiId: result.fundi.id,
+    verification: result.verification,
+    message: 'Fundi account created. Verify your email to continue.',
     ...otpDelivery,
   });
 }

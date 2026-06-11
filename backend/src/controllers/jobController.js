@@ -275,10 +275,14 @@ export async function updateStatus(req, res) {
 }
 
 export async function acceptJob(req, res) {
+  const { logAccessDecision } = await import('../middleware/accessDebug.js');
   const fundi = await query(
     `select approval_status from fundis where user_id = $1`,
     [req.user.id],
   );
+  await logAccessDecision(req, 'jobs.acceptJob:precheck', {
+    approvalStatus: fundi.rows[0]?.approval_status ?? null,
+  });
   if (req.user.role !== 'admin' && fundi.rows[0]?.approval_status !== 'approved') {
     throw forbidden('Only approved fundis can accept jobs');
   }
@@ -412,6 +416,8 @@ export async function confirmCompletion(req, res) {
 }
 
 export async function activeFundiJob(req, res) {
+  const { logAccessDecision } = await import('../middleware/accessDebug.js');
+  await logAccessDecision(req, 'jobs.activeFundiJob:enter');
   const assigned = await query(
     `select * from jobs where fundi_id = $1 and status not in ('completed', 'cancelled') order by updated_at desc limit 1`,
     [req.user.id],

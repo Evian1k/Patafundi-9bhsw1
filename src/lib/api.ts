@@ -129,6 +129,25 @@ class ApiClient {
     });
   }
 
+  async registerFundiAccount(formData: FormData) {
+    if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
+    const url = buildApiUrl('/auth/register/fundi');
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
+      throw new ApiError(e.message || 'Fundi registration failed', response.status);
+    }
+    return response.json() as Promise<{ success: boolean; email: string; otpRequired: boolean; devOtp?: string }>;
+  }
+
+  async getFundiOnboardingStatus() {
+    return this.request('/fundi/onboarding-status');
+  }
+
   async otpVerify(email: string, code: string, purpose = 'register') {
     const data = await this.request('/auth/otp-verify', {
       method: 'POST',

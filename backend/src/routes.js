@@ -1,5 +1,6 @@
 import express from 'express';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
+import { requireFundiAccount, requireApprovedFundi } from './middleware/fundiAccess.js';
 import { imageUpload } from './middleware/upload.js';
 import * as auth from './controllers/authController.js';
 import * as users from './controllers/userController.js';
@@ -25,9 +26,15 @@ import { asyncHandler } from './utils/http.js';
 
 export const router = express.Router();
 
-router.get('/health', (_req, res) => res.json({ success: true, service: 'patafundi-api' }));
+router.get('/health', (_req, res) => res.json({
+  success: true,
+  service: 'patafundi-api',
+  build: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'local',
+  deployId: process.env.RENDER_DEPLOY_ID || null,
+}));
 
 router.post('/auth/register', asyncHandler(auth.register));
+router.post('/auth/register/fundi', imageUpload.any(), asyncHandler(auth.registerFundi));
 router.post('/auth/login', asyncHandler(auth.login));
 router.post('/auth/logout', asyncHandler(auth.logout));
 router.post('/auth/refresh', asyncHandler(auth.refresh));
@@ -49,17 +56,17 @@ router.post('/users/delete-account', authRequired, asyncHandler(users.deleteAcco
 
 router.post('/jobs', authRequired, asyncHandler(jobs.createJob));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));
-router.get('/jobs/fundi/active', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.activeFundiJob));
+router.get('/jobs/fundi/active', authRequired, requireApprovedFundi, asyncHandler(jobs.activeFundiJob));
 router.get('/jobs/:id', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/photos', authRequired, imageUpload.array('photos', 10), asyncHandler(jobs.uploadJobPhotos));
 router.patch('/jobs/:id', authRequired, asyncHandler(jobs.patchJob));
 router.patch('/jobs/:id/status', authRequired, asyncHandler(jobs.updateStatus));
 router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJobStatus));
 router.get('/jobs/:id/location', authRequired, asyncHandler(jobs.getJob));
-router.post('/jobs/:id/accept', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.acceptJob));
+router.post('/jobs/:id/accept', authRequired, requireApprovedFundi, asyncHandler(jobs.acceptJob));
 router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
-router.post('/jobs/:id/check-in', authRequired, requireRole('fundi', 'admin'), asyncHandler(jobs.checkIn));
-router.post('/jobs/:id/complete', authRequired, requireRole('fundi', 'admin'), imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
+router.post('/jobs/:id/check-in', authRequired, requireApprovedFundi, asyncHandler(jobs.checkIn));
+router.post('/jobs/:id/complete', authRequired, requireApprovedFundi, imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
 router.post('/jobs/:id/confirm-completion', authRequired, asyncHandler(jobs.confirmCompletion));
 router.post('/jobs/:id/review', authRequired, asyncHandler(jobs.submitReview));
 router.post('/reviews', authRequired, asyncHandler(jobs.submitReview));
@@ -72,24 +79,25 @@ router.get('/payments/job/:jobId', authRequired, asyncHandler(payments.paymentFo
 router.get('/payments/escrow/:jobId', authRequired, asyncHandler(payments.escrowForJob));
 router.get('/payments/wallet/balance', authRequired, asyncHandler(payments.walletBalance));
 
-router.post('/payouts/request', authRequired, requireRole('fundi', 'admin'), asyncHandler(payouts.requestPayout));
-router.post('/fundi/wallet/withdraw-request', authRequired, requireRole('fundi', 'admin'), asyncHandler(payouts.requestPayout));
+router.post('/payouts/request', authRequired, requireApprovedFundi, asyncHandler(payouts.requestPayout));
+router.post('/fundi/wallet/withdraw-request', authRequired, requireApprovedFundi, asyncHandler(payouts.requestPayout));
 
 router.post('/disputes', authRequired, asyncHandler(disputes.createDispute));
 router.get('/disputes', authRequired, asyncHandler(disputes.listDisputes));
 router.post('/disputes/:id/evidence', authRequired, imageUpload.array('evidence', 5), asyncHandler(disputes.uploadEvidence));
 
-router.post('/fundi/register', authRequired, imageUpload.any(), asyncHandler(fundi.registerFundi));
-router.get('/fundi/profile', authRequired, asyncHandler(fundi.profile));
-router.put('/fundi/profile', authRequired, asyncHandler(fundi.updateProfile));
-router.get('/fundi/approval-status', authRequired, asyncHandler(fundi.approvalStatus));
+router.post('/fundi/register', authRequired, requireFundiAccount, imageUpload.any(), asyncHandler(fundi.registerFundi));
+router.get('/fundi/onboarding-status', authRequired, requireFundiAccount, asyncHandler(fundi.onboardingStatus));
+router.get('/fundi/profile', authRequired, requireFundiAccount, asyncHandler(fundi.profile));
+router.put('/fundi/profile', authRequired, requireFundiAccount, asyncHandler(fundi.updateProfile));
+router.get('/fundi/approval-status', authRequired, requireFundiAccount, asyncHandler(fundi.approvalStatus));
 router.get('/fundi/search', asyncHandler(fundi.searchFundis));
-router.get('/fundi/dashboard', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.dashboard));
-router.get('/fundi/status', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.status));
-router.post('/fundi/status/online', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.goOnline));
-router.post('/fundi/status/offline', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.goOffline));
-router.post('/fundi/location', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.location));
-router.get('/fundi/wallet/transactions', authRequired, requireRole('fundi', 'admin'), asyncHandler(fundi.walletTransactions));
+router.get('/fundi/dashboard', authRequired, requireApprovedFundi, asyncHandler(fundi.dashboard));
+router.get('/fundi/status', authRequired, requireApprovedFundi, asyncHandler(fundi.status));
+router.post('/fundi/status/online', authRequired, requireApprovedFundi, asyncHandler(fundi.goOnline));
+router.post('/fundi/status/offline', authRequired, requireApprovedFundi, asyncHandler(fundi.goOffline));
+router.post('/fundi/location', authRequired, requireApprovedFundi, asyncHandler(fundi.location));
+router.get('/fundi/wallet/transactions', authRequired, requireApprovedFundi, asyncHandler(fundi.walletTransactions));
 router.get('/fundi/ratings', optionalAuth, asyncHandler(fundi.ratings));
 router.get('/fundi/:id/reviews', asyncHandler(fundi.ratings));
 router.get('/fundi/:id', asyncHandler(fundi.publicFundi));
@@ -172,12 +180,12 @@ router.get('/storage/profile/:userId/signed-url', authRequired, requireProfilePh
 router.get('/storage/chat/:attachmentId/signed-url', authRequired, asyncHandler(storage.getChatAttachmentSignedUrl));
 router.get('/storage/local/:key(*)', authRequired, asyncHandler(storage.serveLocalFile));
 
-router.get('/verification/challenges', authRequired, asyncHandler(verification.getLivenessChallenges));
-router.post('/verification/liveness/start', authRequired, asyncHandler(verification.startLiveness));
-router.post('/verification/liveness/:sessionId/frame', authRequired, imageUpload.single('frame'), asyncHandler(verification.submitLivenessFrame));
-router.post('/verification/liveness/:sessionId/complete', authRequired, asyncHandler(verification.finishLiveness));
-router.post('/verification/run-check', authRequired, asyncHandler(verification.runVerificationCheck));
-router.get('/verification/status', authRequired, asyncHandler(verification.getVerificationStatus));
+router.get('/verification/challenges', authRequired, requireFundiAccount, asyncHandler(verification.getLivenessChallenges));
+router.post('/verification/liveness/start', authRequired, requireFundiAccount, asyncHandler(verification.startLiveness));
+router.post('/verification/liveness/:sessionId/frame', authRequired, requireFundiAccount, imageUpload.single('frame'), asyncHandler(verification.submitLivenessFrame));
+router.post('/verification/liveness/:sessionId/complete', authRequired, requireFundiAccount, asyncHandler(verification.finishLiveness));
+router.post('/verification/run-check', authRequired, requireFundiAccount, asyncHandler(verification.runVerificationCheck));
+router.get('/verification/status', authRequired, requireFundiAccount, asyncHandler(verification.getVerificationStatus));
 
 
 router.get('/trust/:userId', authRequired, asyncHandler(async (req, res) => {

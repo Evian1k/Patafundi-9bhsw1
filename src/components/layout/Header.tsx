@@ -12,7 +12,7 @@ const Header = () => {
   const navLinks = [
     { name: "How it Works", href: "/how-it-works" },
     { name: "Services", href: "/#services" },
-    { name: "For Professionals", href: "/fundi/register" },
+    { name: "For Professionals", href: "/register/fundi" },
   ];
 
   return (
@@ -40,10 +40,13 @@ const Header = () => {
           <Link to="/auth">
             <Button variant="ghost" size="sm">Sign In</Button>
           </Link>
-          <Link to="/auth?mode=signup">
+          <Link to="/register/customer">
             <Button size="sm" className="bg-gradient-primary shadow-glow">
-              Get Started
+              Register as Customer
             </Button>
+          </Link>
+          <Link to="/register/fundi">
+            <Button size="sm" variant="outline">Register as Fundi</Button>
           </Link>
         </div>
 

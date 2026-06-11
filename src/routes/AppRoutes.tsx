@@ -50,6 +50,8 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/register/customer" element={<Auth />} />
+      <Route path="/register/fundi" element={<FundiRegister />} />
 
       <Route path="/customer" element={<Navigate to="/dashboard" replace />} />
       <Route path="/profile" element={<Navigate to="/settings" replace />} />
@@ -86,7 +88,7 @@ export default function AppRoutes() {
       <Route path="/enforcement" element={<PolicyPage slug="enforcement" />} />
       <Route path="/policies/:slug" element={<PolicyPage />} />
 
-      <Route path="/fundi/register" element={<FundiRegister />} />
+      <Route path="/fundi/register" element={<Navigate to="/register/fundi" replace />} />
       <Route path="/fundi/pending" element={<FundiPendingApproval />} />
       <Route path="/fundi" element={<FundiDashboard />} />
       <Route path="/fundi/job/:jobId" element={<FundiJob />} />

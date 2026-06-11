@@ -34,19 +34,26 @@ export function getAuthUserId(): string | null {
   return sessionStorage.getItem(USER_ID_KEY);
 }
 
-/** Prefer locked session role; fall back to API user object (login/bootstrap only). */
+/** Prefer live API role over stale sessionStorage lock. */
 export function resolveAuthRole(user?: Record<string, unknown> | null): AuthRole {
+  if (user?.role) {
+    const apiRole = String(user.role).toLowerCase();
+    if (apiRole === 'fundi' || apiRole === 'fundi_pending' || apiRole === 'admin' || apiRole === 'customer') {
+      return apiRole;
+    }
+  }
   const locked = getAuthRole();
   if (locked) return locked;
-  const role = String(user?.role || 'customer').toLowerCase();
-  if (role === 'fundi' || role === 'fundi_pending' || role === 'admin') return role;
   return 'customer';
 }
 
-/** Lock role from /users/me only when session is empty (page refresh / new tab). */
+/** Lock role from /users/me; refresh when API role changed (e.g. after admin approval). */
 export function bootstrapAuthSessionFromUser(user?: Record<string, unknown> | null): AuthRole | null {
-  if (getAuthRole()) return getAuthRole();
   if (!user?.id) return null;
-  setAuthSession(String(user.id), String(user.role || 'customer'));
+  const apiRole = String(user.role || 'customer');
+  const locked = getAuthRole();
+  if (!locked || locked !== apiRole) {
+    setAuthSession(String(user.id), apiRole);
+  }
   return resolveAuthRole(user);
 }
