@@ -87,9 +87,16 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
       if (!token) { navigate("/admin/login"); return; }
       try {
         const me = await apiClient.getCurrentUser();
-        if (me?.user?.role !== "admin") {
-          localStorage.removeItem("auth_token");
-          navigate("/admin/login");
+        // Accept all staff roles — super_admin, admin, and any role with
+        // staff dashboard access. Non-staff (customer/fundi/fundi_pending)
+        // are redirected to their own dashboard.
+        const staffRoles = ["super_admin", "admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];
+        if (!staffRoles.includes(me?.user?.role)) {
+          // Not staff — redirect to their appropriate dashboard
+          const role = me?.user?.role;
+          if (role === "fundi") navigate("/fundi");
+          else if (role === "fundi_pending") navigate("/fundi/pending");
+          else navigate("/dashboard");
         }
       } catch {
         localStorage.removeItem("auth_token");

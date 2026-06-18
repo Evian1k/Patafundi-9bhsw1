@@ -6,7 +6,7 @@ import path from "path";
 export default defineConfig(() => ({
   envPrefix: ["VITE_", "REACT_APP_"],
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
     proxy: {
       "/api": {
@@ -21,6 +21,11 @@ export default defineConfig(() => ({
     },
     hmr: {
       overlay: false,
+      // Fix: on Windows, 'localhost' can resolve to IPv4 (127.0.0.1) while
+      // the server binds to IPv6 (::). Explicitly set host + clientPort so
+      // the HMR WebSocket connects to the right address.
+      host: "localhost",
+      clientPort: 8080,
     },
   },
   plugins: [react()],

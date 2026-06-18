@@ -1,7 +1,12 @@
 import { Navigate } from "react-router-dom";
 
-/** Fast client-side admin gate — AdminLayout does server-side verification. */
-export function isAdmin(): boolean {
+const STAFF_ROLES = [
+  "admin", "super_admin", "support_agent", "fraud_analyst",
+  "finance_team", "dispatch_team", "devops_engineer", "auditor",
+];
+
+/** Fast client-side staff gate — AdminLayout does server-side verification. */
+export function isStaff(): boolean {
   try {
     const token = localStorage.getItem("auth_token");
     if (!token) return false;
@@ -15,14 +20,22 @@ export function isAdmin(): boolean {
           .join(""),
       ),
     );
-    return payload.role === "admin" || (Array.isArray(payload.roles) && payload.roles.includes("admin"));
+    // Check both 'role' (single) and 'roles' (array) for backward compat.
+    const role = payload.role;
+    const roles = Array.isArray(payload.roles) ? payload.roles : [];
+    return STAFF_ROLES.includes(role) || roles.some((r: string) => STAFF_ROLES.includes(r));
   } catch {
     return false;
   }
 }
 
+/** Backward-compat alias — accepts super_admin + all staff roles. */
+export function isAdmin(): boolean {
+  return isStaff();
+}
+
 export function ProtectedAdminRoute({ element }: { element: React.ReactNode }) {
   const token = localStorage.getItem("auth_token");
-  if (!token || !isAdmin()) return <Navigate to="/admin/login" replace />;
+  if (!token || !isStaff()) return <Navigate to="/admin/login" replace />;
   return <>{element}</>;
 }
