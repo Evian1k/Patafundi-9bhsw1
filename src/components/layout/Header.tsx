@@ -4,16 +4,23 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { useReducedMotion } from "@/lib/motion";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const reduceMotion = useReducedMotion();
 
   const navLinks = [
     { name: "How it Works", href: "/how-it-works" },
     { name: "Services", href: "/#services" },
     { name: "For Professionals", href: "/register/fundi" },
   ];
+
+  // Mobile menu animation variants — collapse to instant when reduced motion is on.
+  const menuVariants = reduceMotion
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : { initial: { opacity: 0, height: 0 }, animate: { opacity: 1, height: "auto" }, exit: { opacity: 0, height: 0 } };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-xl border-b border-border/40">
@@ -64,10 +71,10 @@ const Header = () => {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-border/40 bg-background"
+            initial={menuVariants.initial}
+            animate={menuVariants.animate}
+            exit={menuVariants.exit}
+            className="md:hidden border-t border-border/40 bg-background overflow-hidden"
           >
             <div className="max-w-6xl mx-auto px-4 py-4 space-y-1">
               {navLinks.map((link) => (

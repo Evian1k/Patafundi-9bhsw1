@@ -3,6 +3,7 @@ import {
   getObjectBuffer,
   hashSimilarityPercent,
   uploadProfilePhoto,
+  computePerceptualHash,
 } from './storageService.js';
 import { auditLog } from './auditService.js';
 import { config } from '../config.js';

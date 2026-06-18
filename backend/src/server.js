@@ -77,6 +77,7 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', async (_req, res) => {
+  const startedAt = Date.now();
   const database = await healthcheck().catch((error) => ({
     configured: Boolean(config.databaseUrl),
     ok: false,
@@ -88,13 +89,50 @@ app.get('/health', async (_req, res) => {
     database.error = 'DATABASE_URL points to localhost. Link Render PostgreSQL.';
   }
 
+  // Storage subsystem — R2 client init + bucket env vars present?
+  let storage = { configured: false, provider: 'local_fallback' };
+  try {
+    const { storageStatus } = await import('./services/storageService.js');
+    storage = storageStatus();
+  } catch { /* storageService not yet loaded — leave default */ }
+
+  // Email (Resend) — API key present?
+  const email = {
+    configured: Boolean(config.resendApiKey),
+    from: config.emailFrom,
+  };
+
+  // M-Pesa Daraja — required env vars present?
+  const mpesa = {
+    configured: Boolean(
+      config.mpesa.consumerKey
+      && config.mpesa.consumerSecret
+      && config.mpesa.shortcode
+      && config.mpesa.passkey
+      && config.mpesa.callbackUrl,
+    ),
+    callbackConfigured: Boolean(config.mpesa.callbackUrl),
+    callbackSecretConfigured: Boolean(config.mpesa.callbackSecret),
+  };
+
   const ok = database.ok === true;
   res.status(ok ? 200 : 503).json({
     status: ok ? 'healthy' : 'degraded',
     success: ok,
     service: 'patafundi-api',
-    database,
-    env: config.nodeEnv,
+    build: {
+      sha: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'local',
+      deployId: process.env.RENDER_DEPLOY_ID || null,
+      env: config.nodeEnv,
+    },
+    uptimeSeconds: Math.round(process.uptime()),
+    startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+    subsystems: {
+      database,
+      storage,
+      email,
+      mpesa,
+    },
   });
 });
 
