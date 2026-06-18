@@ -20,18 +20,120 @@ const demoUsers = [
   { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Demo Admin', role: 'admin', phone: '254712000003' },
 ];
 
-async function execSql(db, sql) {
-  const withoutLineComments = sql
+/**
+ * Split a SQL script into executable statements.
+ * Respects:
+ *   - single-line `--` comments and full-line `/* ... *​/` comments (stripped)
+ *   - single and double quoted strings (with `''` escaping)
+ *   - dollar-quoted function bodies ($tag$ ... $tag$) including nested content
+ *   - trailing semicolons that terminate statements
+ * Naive splitting on `;` breaks function bodies that contain `;` inside `$$`,
+ * which is why migrations like 006_fraud_detection_system.sql fail on PGlite.
+ */
+function splitSqlStatements(sql) {
+  const statements = [];
+  let buf = '';
+
+  // Strip full-line `--` comments before parsing — preserves line/col for error msgs.
+  sql = sql
     .split('\n')
-    .filter((line) => !line.trim().startsWith('--'))
+    .map((line) => (line.trim().startsWith('--') ? '' : line))
     .join('\n');
-  const statements = withoutLineComments
-    .split(/;\s*(?:\n|$)/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+
+  let i = 0;
+  const n = sql.length;
+
+  while (i < n) {
+    const ch = sql[i];
+    const next = i + 1 < n ? sql[i + 1] : '';
+
+    // Line comment mid-statement — skip to end of line.
+    if (ch === '-' && next === '-') {
+      while (i < n && sql[i] !== '\n') i++;
+      continue;
+    }
+
+    // Block comment — skip to closing.
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < n && !(sql[i] === '*' && sql[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+
+    // Single-quoted string
+    if (ch === "'") {
+      buf += ch;
+      i++;
+      while (i < n) {
+        buf += sql[i];
+        if (sql[i] === "'" && i + 1 < n && sql[i + 1] === "'") { buf += sql[i + 1]; i += 2; continue; }
+        if (sql[i] === "'") { i++; break; }
+        i++;
+      }
+      continue;
+    }
+
+    // Double-quoted identifier
+    if (ch === '"') {
+      buf += ch;
+      i++;
+      while (i < n) {
+        buf += sql[i];
+        if (sql[i] === '"' && i + 1 < n && sql[i + 1] === '"') { buf += sql[i + 1]; i += 2; continue; }
+        if (sql[i] === '"') { i++; break; }
+        i++;
+      }
+      continue;
+    }
+
+    // Dollar-quoted string — $tag$ ... $tag$ (tag may be empty: $$ ... $$)
+    if (ch === '$') {
+      const tagMatch = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i));
+      if (tagMatch) {
+        const tag = tagMatch[0];
+        buf += tag;
+        i += tag.length;
+        const closeIdx = sql.indexOf(tag, i);
+        if (closeIdx === -1) {
+          buf += sql.slice(i);
+          i = n;
+        } else {
+          buf += sql.slice(i, closeIdx + tag.length);
+          i = closeIdx + tag.length;
+        }
+        continue;
+      }
+    }
+
+    // Statement terminator
+    if (ch === ';') {
+      const stmt = buf.trim();
+      if (stmt) statements.push(stmt);
+      buf = '';
+      i++;
+      continue;
+    }
+
+    buf += ch;
+    i++;
+  }
+  const tail = buf.trim();
+  if (tail) statements.push(tail);
+  return statements;
+}
+
+async function execSql(db, sql) {
+  const statements = splitSqlStatements(sql);
   for (const statement of statements) {
     if (/create\s+extension\s+if\s+not\s+exists\s+pgcrypto/i.test(statement)) continue;
-    await db.exec(`${statement};`);
+    try {
+      await db.exec(`${statement};`);
+    } catch (err) {
+      const preview = statement.slice(0, 80).replace(/\s+/g, ' ');
+      err.message = `${err.message} (while executing: ${preview}…)`;
+      throw err;
+    }
   }
 }
 
@@ -136,18 +238,24 @@ async function ensurePostgresDatabase(databaseUrl) {
     await pool.end();
     return true;
   } catch (error) {
-    if (!/database .* does not exist/i.test(error.message)) throw error;
-    const parsed = new URL(databaseUrl.replace(/^postgresql:/, 'http:'));
-    const dbName = parsed.pathname.replace(/^\//, '');
-    const adminUrl = databaseUrl.replace(`/${dbName}`, '/postgres');
-    const admin = new pg.Pool(getPgPoolConfig(adminUrl, { connectionTimeoutMillis: 3000 }));
-    try {
-      await admin.query(`create database "${dbName.replace(/"/g, '""')}"`);
-      console.log(`[PataFundi] Created database ${dbName}`);
-    } finally {
-      await admin.end();
+    // Database doesn't exist yet — try to create it from the maintenance DB.
+    if (/database .* does not exist/i.test(error.message)) {
+      const parsed = new URL(databaseUrl.replace(/^postgresql:/, 'http:'));
+      const dbName = parsed.pathname.replace(/^\//, '');
+      const adminUrl = databaseUrl.replace(`/${dbName}`, '/postgres');
+      const admin = new pg.Pool(getPgPoolConfig(adminUrl, { connectionTimeoutMillis: 3000 }));
+      try {
+        await admin.query(`create database "${dbName.replace(/"/g, '""')}"`);
+        console.log(`[PataFundi] Created database ${dbName}`);
+      } finally {
+        await admin.end();
+      }
+      return true;
     }
-    return true;
+    // Any other connection failure (ECONNREFUSED, wrong protocol, bad URL, etc.)
+    // should not crash the server — fall through to embedded DB instead.
+    console.warn(`[PataFundi] PostgreSQL unreachable (${error.message}); falling back to embedded DB`);
+    return false;
   }
 }
 
@@ -158,6 +266,14 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
     return false;
   }
 
+  // Only treat DATABASE_URL as Postgres if it looks like a Postgres URL.
+  // Otherwise (e.g. file: URIs, sqlite, mongodb) skip straight to embedded fallback.
+  const looksPostgres = /^postgres(ql)?:\/\//i.test(databaseUrl);
+  if (!looksPostgres) {
+    if (required) throw new Error('DATABASE_URL is not a valid PostgreSQL connection string');
+    return false;
+  }
+
   if (process.env.NODE_ENV === 'production' && isLocalDatabaseUrl(databaseUrl)) {
     const msg = 'DATABASE_URL must not point to localhost in production';
     if (required) throw new Error(msg);
@@ -165,7 +281,11 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
     return false;
   }
 
-  await ensurePostgresDatabase(databaseUrl);
+  const reachable = await ensurePostgresDatabase(databaseUrl);
+  if (!reachable) {
+    if (required) throw new Error('PostgreSQL database is unreachable');
+    return false;
+  }
   const pool = new pg.Pool(getPgPoolConfig(databaseUrl));
   try {
     await pool.query('select 1');

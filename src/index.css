@@ -163,3 +163,25 @@
 /* Smooth page transitions */
 .page-enter { opacity: 0; transform: translateY(8px); }
 .page-enter-active { opacity: 1; transform: translateY(0); transition: opacity 250ms, transform 250ms; }
+
+/* ============================================================
+   Reduced-motion support — accessibility requirement.
+   When the user has set prefers-reduced-motion: reduce at the OS
+   level, all CSS-driven animations are shortened to a near-instant
+   transition and infinite animations are stopped. Framer Motion
+   separately honors this via the useReducedMotion() hook in
+   src/lib/motion.ts.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-float,
+  .animate-pulse-slow,
+  .animate-shimmer {
+    animation: none !important;
+  }
+}

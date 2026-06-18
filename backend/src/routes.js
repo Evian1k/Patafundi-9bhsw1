@@ -178,7 +178,7 @@ router.get('/jobs/:jobId/photos/:photoId/signed-url', authRequired, requireJobPh
 router.get('/disputes/:disputeId/files', authRequired, requireDisputeAccess, asyncHandler(storage.getDisputeFiles));
 router.get('/storage/profile/:userId/signed-url', authRequired, requireProfilePhotoAccess, asyncHandler(storage.getProfilePhotoSignedUrl));
 router.get('/storage/chat/:attachmentId/signed-url', authRequired, asyncHandler(storage.getChatAttachmentSignedUrl));
-router.get('/storage/local/:key(*)', authRequired, asyncHandler(storage.serveLocalFile));
+router.get('/storage/local/*splat', authRequired, asyncHandler(storage.serveLocalFile));
 
 router.get('/verification/challenges', authRequired, requireFundiAccount, asyncHandler(verification.getLivenessChallenges));
 router.post('/verification/liveness/start', authRequired, requireFundiAccount, asyncHandler(verification.startLiveness));

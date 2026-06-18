@@ -130,10 +130,56 @@ export async function getProfilePhotoSignedUrl(req, res) {
 }
 
 export async function serveLocalFile(req, res) {
-  const r2Key = decodeURIComponent(req.params.key || '');
-  if (!r2Key || r2Key.includes('..')) throw forbidden('Invalid path');
+  // Express 5 wildcard route '/storage/local/*splat' may return a comma-joined
+  // path in some versions of path-to-regexp. Reconstruct from the original URL
+  // to be safe — extract everything after '/api/storage/local/'.
+  const prefix = '/api/storage/local/';
+  const idx = req.originalUrl.indexOf(prefix);
+  let r2Key = '';
+  if (idx !== -1) {
+    r2Key = decodeURIComponent(req.originalUrl.slice(idx + prefix.length).split('?')[0]);
+  } else {
+    r2Key = decodeURIComponent(req.params.splat || req.params[0] || req.params.key || '');
+  }
+  if (!r2Key || r2Key.includes('..') || r2Key.includes('\0')) throw forbidden('Invalid path');
 
+  // Verification documents: admin only (already enforced via route middleware, but double-check here).
   if (r2Key.startsWith('verification/') && req.user.role !== 'admin') throw forbidden('Admin only');
+
+  // Job photos / dispute evidence / chat attachments: caller must be an involved party or admin.
+  // This prevents enumeration of other users' files when running with the local-fallback
+  // storage provider (when R2 is not configured). With R2 configured, files are returned via
+  // signed URLs that already require per-resource authorization upstream.
+  const jobMatch = r2Key.match(/^jobs\/([0-9a-f-]{36})\//i);
+  if (jobMatch) {
+    const jobId = jobMatch[1];
+    const job = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
+    if (!job.rows[0]) throw notFound('Not found');
+    if (req.user.role !== 'admin' && job.rows[0].customer_id !== req.user.id && job.rows[0].fundi_id !== req.user.id) {
+      throw forbidden('Not allowed to access this file');
+    }
+  }
+
+  const chatMatch = r2Key.match(/^chat\/([0-9a-f-]{36})\//i);
+  if (chatMatch) {
+    const jobId = chatMatch[1];
+    const job = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
+    if (!job.rows[0]) throw notFound('Not found');
+    if (req.user.role !== 'admin' && job.rows[0].customer_id !== req.user.id && job.rows[0].fundi_id !== req.user.id) {
+      throw forbidden('Not allowed to access this file');
+    }
+  }
+
+  // Profile photos: caller must be admin, the photo owner, OR an approved fundi whose
+  // profile photo is publicly listed. We delegate to the same check as the signed-URL endpoint.
+  const profileMatch = r2Key.match(/^profiles\/public\/([0-9a-f-]{36})\//i);
+  if (profileMatch) {
+    const targetUserId = profileMatch[1];
+    if (req.user.role !== 'admin' && req.user.id !== targetUserId) {
+      const approved = await query(`select 1 from fundis where user_id = $1 and approval_status = 'approved'`, [targetUserId]);
+      if (!approved.rows[0]) throw forbidden('Not allowed');
+    }
+  }
 
   const buffer = await getObjectBuffer(r2Key);
   res.setHeader('Cache-Control', 'private, no-store');

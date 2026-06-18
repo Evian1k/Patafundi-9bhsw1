@@ -20,6 +20,12 @@ export async function requireApprovedFundi(req, res, next) {
       await logAccessDecision(req, 'requireApprovedFundi:admin_bypass');
       return next();
     }
+    if (req.user?.role === 'fundi_pending') {
+      await logAccessDecision(req, 'requireApprovedFundi:pending', {
+        reason: 'account_under_review',
+      });
+      throw forbidden('Your account is under review. You will be notified once an admin approves your application.');
+    }
     if (req.user?.role !== 'fundi') {
       await logAccessDecision(req, 'requireApprovedFundi:role_denied', {
         reason: 'role_must_be_fundi',
@@ -33,7 +39,13 @@ export async function requireApprovedFundi(req, res, next) {
     const approvalStatus = fundi.rows[0]?.approval_status;
     if (approvalStatus !== 'approved') {
       await logAccessDecision(req, 'requireApprovedFundi:approval_denied', { approvalStatus });
-      throw forbidden('Your fundi account is pending admin approval');
+      if (approvalStatus === 'pending') {
+        throw forbidden('Your account is under review. You will be notified once an admin approves your application.');
+      }
+      if (approvalStatus === 'rejected') {
+        throw forbidden('Your fundi application was rejected. Please contact support.');
+      }
+      throw forbidden('Your account is under review.');
     }
     req.fundiProfile = fundi.rows[0];
     await logAccessDecision(req, 'requireApprovedFundi:allowed', { approvalStatus });

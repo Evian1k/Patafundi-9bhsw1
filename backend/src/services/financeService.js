@@ -1,3 +1,5 @@
+import { query } from '../db.js';
+
 const DEFAULT_PAYMENTS = {
   commissionRate: 0.15,
   commissionType: 'percentage',
@@ -16,7 +18,8 @@ function money(value) {
 }
 
 export async function getPaymentSettings(client) {
-  const result = await client.query(`select value from platform_settings where key = 'global'`);
+  const db = client || { query };
+  const result = await db.query(`select value from platform_settings where key = 'global'`);
   const settings = result.rows[0]?.value || {};
   return { ...DEFAULT_PAYMENTS, ...(settings.payments || {}) };
 }

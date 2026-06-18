@@ -407,6 +407,10 @@ export async function rejectFundi(req, res) {
     [req.params.id, req.body?.reason || null],
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
+  // Demote the user role so JWT claims reflect the rejected state and
+  // refresh tokens are revoked to force re-authentication.
+  await query(`update users set role = 'fundi_pending', updated_at = now() where id = $1 and role <> 'admin'`, [result.rows[0].user_id]);
+  await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [result.rows[0].user_id]);
   await auditLog({ userId: req.user.id, action: 'admin.fundi.reject', entityType: 'fundi', entityId: result.rows[0].id });
   res.json({ success: true, fundi: result.rows[0] });
 }
@@ -418,6 +422,8 @@ export async function suspendFundi(req, res) {
     [req.params.id, req.body?.reason || null],
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
+  // Force the suspended fundi to re-authenticate by revoking active sessions.
+  await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [result.rows[0].user_id]);
   await auditLog({ userId: req.user.id, action: 'admin.fundi.suspend', entityType: 'fundi', entityId: result.rows[0].id });
   res.json({ success: true, fundi: result.rows[0] });
 }

@@ -7,6 +7,7 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
@@ -26,9 +27,35 @@ services:
         fromDatabase:
           name: patafundi-db
           property: connectionString
+      # Cloudflare R2 — private bucket, signed URLs only
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: patafundi
+      # M-Pesa Daraja — leave sync:false so secrets never land in the blueprint
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_CALLBACK_URL
+        sync: false
+      - key: MPESA_CALLBACK_SECRET
+        generateValue: true
+      # Render deploy metadata (auto-populated by Render)
+      - key: RENDER_GIT_COMMIT
+        value: ""
 
 databases:
   - name: patafundi-db
     plan: free
     databaseName: patafundi
     user: patafundi
+    ipAllowList: []  # allow only Render services

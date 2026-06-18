@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -6,7 +6,7 @@ export const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts. Try again later.' },
-  keyGenerator: (req) => `${req.ip}:${req.body?.email || req.path}`,
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.body?.email || req.path}`,
 });
 
 export const otpRateLimit = rateLimit({
@@ -15,7 +15,7 @@ export const otpRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many OTP attempts. Try again later.' },
-  keyGenerator: (req) => `${req.ip}:${req.body?.email || 'unknown'}`,
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.body?.email || 'unknown'}`,
 });
 
 export const paymentWebhookRateLimit = rateLimit({

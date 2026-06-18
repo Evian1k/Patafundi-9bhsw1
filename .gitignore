@@ -27,3 +27,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local file storage fallback (dev only — production uses Cloudflare R2)
+backend/uploads/
+
+# PGlite dev database
+.pgdata/
+
+# Local E2E audit artifacts
+E2E_AUDIT_RESULTS.json

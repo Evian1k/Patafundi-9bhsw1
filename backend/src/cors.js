@@ -9,8 +9,12 @@ const LOCAL_ORIGINS = [
   'http://localhost:5173',
 ];
 
-/** Vercel production + preview deployments */
-const VERCEL_ORIGIN_RE = /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$/i;
+/**
+ * Vercel preview deployments for THIS project only.
+ * Format: <commit-or-branch>.patafundi.vercel.app OR patafundi-<env>.vercel.app
+ * We do NOT allow arbitrary *.vercel.app — anyone can deploy to that domain.
+ */
+const VERCEL_PREVIEW_RE = /^https:\/\/([a-z0-9-]+\.)?patafundi(-[a-z0-9]+)?\.vercel\.app$/i;
 
 const PRODUCTION_ORIGINS = [
   'https://patafundi.vercel.app',
@@ -23,9 +27,11 @@ export function getAllowedOrigins() {
 }
 
 export function isOriginAllowed(origin) {
+  // Missing Origin header: same-origin browser request or non-browser client (curl).
+  // Browsers ALWAYS set Origin on credentialed cross-site requests, so this is safe.
   if (!origin) return true;
   if (getAllowedOrigins().has(origin)) return true;
-  if (VERCEL_ORIGIN_RE.test(origin)) return true;
+  if (VERCEL_PREVIEW_RE.test(origin)) return true;
   return false;
 }
 
