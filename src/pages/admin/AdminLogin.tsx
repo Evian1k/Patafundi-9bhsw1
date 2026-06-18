@@ -118,7 +118,7 @@ export default function AdminLogin() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@patafundi.com"
+                  placeholder="you@patafundi.com"
                   className="pl-10 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary"
                   required
                   disabled={loading}

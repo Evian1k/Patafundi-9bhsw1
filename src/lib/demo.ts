@@ -44,7 +44,7 @@ export const demoJobs = [
 
 export const demoUser = {
   id: 'demo-user-1',
-  email: 'demo@patafundi.com',
+  email: 'demo@example.com',
   fullName: 'Demo Customer',
   role: 'customer',
   phone: '+254700000001',

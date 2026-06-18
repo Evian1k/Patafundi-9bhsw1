@@ -577,14 +577,12 @@ const Auth = () => {
                 </div>
               )}
 
-              {/* Demo account hint */}
-              {mode === "login" && (
+              {/* Demo account hint — dev only, credentials never appear in production bundle */}
+              {import.meta.env.DEV && mode === "login" && (
                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
                   <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Demo accounts:</span><br />
-                    Customer: <code className="text-primary">demo@patafundi.com</code> / <code className="text-primary">Demo@2024!</code><br />
-                    Fundi: <code className="text-primary">fundi@patafundi.com</code> / <code className="text-primary">Fundi@2024!</code><br />
-                    Admin: <code className="text-primary">admin@patafundi.com</code> / <code className="text-primary">Admin@2024!</code>
+                    <span className="font-medium text-foreground">Demo accounts:</span>{" "}
+                    <Link to="/demo" className="text-primary underline">View all 10 demo accounts →</Link>
                   </p>
                 </div>
               )}

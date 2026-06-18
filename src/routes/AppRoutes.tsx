@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedAdminRoute } from "@/routes/guards";
 
@@ -49,14 +50,25 @@ import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
 import StaffLayout from "@/components/staff/StaffLayout";
 import StaffOverview from "@/pages/staff/StaffOverview";
 import StaffDataTable from "@/pages/staff/StaffDataTable";
-import DemoPage from "@/pages/DemoPage";
+
+// Demo page is dev-only. In production builds, the route returns 404
+// and the DemoPage component (with demo credentials) is tree-shaken out
+// of the bundle via the dynamic import + SHOW_DEMO guard.
+const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
+const DemoPage = SHOW_DEMO ? lazy(() => import("@/pages/DemoPage")) : null;
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
-      <Route path="/demo" element={<DemoPage />} />
+      <Route path="/demo" element={
+        SHOW_DEMO && DemoPage ? (
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
+            <DemoPage />
+          </Suspense>
+        ) : <NotFound />
+      } />
       <Route path="/register/customer" element={<Auth />} />
       <Route path="/register/fundi" element={<FundiRegister />} />
 
