@@ -186,6 +186,25 @@ process.on('uncaughtException', (error) => {
 
 logProductionConfigWarnings();
 
+// ── Startup banner: print DB status so developers know exactly what's happening ──
+const dbUrlSet = Boolean(config.databaseUrl);
+const dbUrlSource = dbUrlSet ? (config.databaseUrl.includes('localhost') ? 'local' : config.databaseUrl.includes('neon') ? 'Neon' : config.databaseUrl.includes('supabase') ? 'Supabase' : 'cloud') : 'none';
+console.log('');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('  PataFundi API — starting...');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log(`  Environment:    ${config.nodeEnv}`);
+console.log(`  DATABASE_URL:   ${dbUrlSet ? `set (${dbUrlSource})` : 'NOT SET — will use PGlite embedded DB'}`);
+if (!dbUrlSet && config.nodeEnv !== 'production') {
+  console.log('');
+  console.log('  ⚠️  No DATABASE_URL found. The server will try PGlite (embedded Postgres).');
+  console.log('     If PGlite crashes on your machine, get a FREE cloud Postgres:');
+  console.log('     → https://neon.tech  (30 seconds, no credit card)');
+  console.log('     Then put DATABASE_URL=postgresql://... in your .env file.');
+}
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+console.log('');
+
 try {
   await ensureDevDatabase();
 } catch (error) {
