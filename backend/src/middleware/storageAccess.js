@@ -1,6 +1,7 @@
 import { query } from '../db.js';
 import { forbidden, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
+import { hasPermission } from './rbac.js';
 
 function clientIp(req) {
   return req.get('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
@@ -29,10 +30,21 @@ async function logDocumentAccess(req, { documentType, documentId, action = 'view
   });
 }
 
-/** Fundi verification docs: admin ONLY */
+/**
+ * Fundi verification docs: admin-only.
+ * Accepts 'super_admin' (platform owner) and 'admin' (ops manager), plus
+ * any staff role with the can_view_verification_documents permission.
+ * This fixes the bug where super_admin was blocked because the check
+ * only allowed role === 'admin' (the seeded owner is now super_admin).
+ */
 export async function requireAdminDocumentAccess(req, res, next) {
   try {
-    if (req.user?.role !== 'admin') throw forbidden('Verification documents are admin-only');
+    const staffRoles = new Set(['super_admin', 'admin', 'fraud_analyst', 'auditor']);
+    const isStaff = staffRoles.has(req.user?.role);
+    const hasPerm = await hasPermission(req, 'can_view_verification_documents');
+    if (!isStaff && !hasPerm) {
+      throw forbidden('Verification documents are admin-only');
+    }
     next();
   } catch (err) {
     next(err);
