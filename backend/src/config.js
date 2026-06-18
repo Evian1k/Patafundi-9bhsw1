@@ -62,7 +62,10 @@ export const config = {
 
 export function requireConfig(value, name) {
   if (!value) {
-    const error = new Error(`${name} is not configured`);
+    const hint = name === 'JWT_SECRET' || name === 'REFRESH_TOKEN_SECRET'
+      ? `${name} is not configured. Create a .env file in the project root with:\n  ${name}=any-random-string-at-least-32-characters-long\nSee .env.example for the full list of required variables.`
+      : `${name} is not configured. See .env.example for details.`;
+    const error = new Error(hint);
     error.status = 503;
     throw error;
   }
@@ -70,13 +73,30 @@ export function requireConfig(value, name) {
 }
 
 export function logProductionConfigWarnings() {
-  if (!isProduction) return;
-
+  // Run in both dev and production so developers see missing config early.
   const missing = [];
   if (!config.databaseUrl) missing.push('DATABASE_URL');
   if (!config.jwtSecret) missing.push('JWT_SECRET');
-  if (!config.mpesa.callbackSecret) missing.push('MPESA_CALLBACK_SECRET (required before accepting live payments)');
+  if (!config.refreshSecret) missing.push('REFRESH_TOKEN_SECRET');
   if (missing.length) {
-    console.error(`[PataFundi API] Missing required production env: ${missing.join(', ')}`);
+    console.error('');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('  ⚠️  MISSING REQUIRED ENVIRONMENT VARIABLES');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error(`  Missing: ${missing.join(', ')}`);
+    console.error('');
+    console.error('  Fix: Create a .env file in the project root with these variables.');
+    console.error('  See .env.example for the full template.');
+    console.error('');
+    if (missing.includes('DATABASE_URL')) {
+      console.error('  DATABASE_URL: Get a free cloud Postgres from https://neon.tech');
+      console.error('    (30 seconds, no credit card, works on Windows/Mac/Linux)');
+    }
+    if (missing.includes('JWT_SECRET') || missing.includes('REFRESH_TOKEN_SECRET')) {
+      console.error('  JWT_SECRET / REFRESH_TOKEN_SECRET: Any random string 32+ characters.');
+      console.error('    Example: JWT_SECRET=my-dev-secret-32-chars-minimum-xxxxx');
+    }
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('');
   }
 }
