@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "vite",
-    "dev:backend": "node backend/scripts/ensure-dev-db.js && node backend/src/server.js",
+    "dev:backend": "node backend/src/server.js",
     "dev:full": "npm run dev",
     "prestart": "node backend/scripts/bootstrap-production-db.js",
     "start": "node backend/src/server.js",

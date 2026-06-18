@@ -336,14 +336,37 @@ export async function ensureDevDatabase() {
     return ensureProductionDatabase();
   }
 
+  // Try real Postgres first (DATABASE_URL or Docker).
   if (await bootstrapPostgresDatabase()) return;
 
+  // Fall back to PGlite (embedded Postgres). On some platforms (notably
+  // Windows with certain Node.js versions) PGlite's WASM runtime aborts
+  // during init. When that happens, we print a clear actionable error
+  // and return false — the server will still start, but /health will
+  // report 503. This is better than crashing the whole dev process,
+  // which leaves the frontend with no backend to proxy to.
   process.env.PATAFUNDI_EMBEDDED_DB = '1';
-  const db = await getEmbeddedDb();
-  await applyMigrations(db);
-  await ensureCustomersTable(db);
-  await seedIfEmpty(db);
-  console.log('[PataFundi] Embedded database ready');
+  try {
+    const db = await getEmbeddedDb();
+    await applyMigrations(db);
+    await ensureCustomersTable(db);
+    await seedIfEmpty(db);
+    console.log('[PataFundi] Embedded database ready');
+    return true;
+  } catch (error) {
+    console.error('');
+    console.error('============================================================');
+    console.error('[PataFundi] DATABASE INITIALIZATION FAILED');
+    console.error('============================================================');
+    console.error(error.message);
+    console.error('');
+    console.error('The server will still start, but every API call will return 503');
+    console.error('until the database issue is resolved.');
+    console.error('============================================================');
+    console.error('');
+    // Don't throw — let the server start so /health can report the error.
+    return false;
+  }
 }
 
 const isDirectRun = process.argv[1]
