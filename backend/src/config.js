@@ -1,13 +1,88 @@
 import dotenv from 'dotenv';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { isLocalDatabaseUrl } from './pg-config.js';
 
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 
-// Never load committed .env on Render — it often contains localhost DATABASE_URL.
+/**
+ * Auto-create a .env file in dev mode if it doesn't exist.
+ * This eliminates the #1 support issue: "JWT_SECRET is not configured".
+ *
+ * The auto-generated .env has:
+ *   - A DATABASE_URL pointing to Neon (if the user pasted one into .env.local)
+ *   - Random JWT_SECRET + REFRESH_TOKEN_SECRET (32+ chars)
+ *   - Sensible dev defaults for everything else
+ *
+ * In production (Render), this is skipped — .env is never committed and
+ * secrets come from Render's dashboard.
+ */
+function ensureDevEnvFile() {
+  if (isProduction) return;
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) return;
+
+  const jwtSecret = crypto.randomBytes(32).toString('hex');
+  const refreshSecret = crypto.randomBytes(32).toString('hex');
+  const template = `# PataFundi — auto-generated .env file
+# Created on ${new Date().toISOString()}
+#
+# This file was auto-created because no .env existed. Edit it to add your
+# real database URL and other credentials. See .env.example for the full
+# template.
+
+# ── Database ──────────────────────────────────────────────────────────────────
+# Get a free cloud Postgres from https://neon.tech (30 seconds, no credit card).
+# Paste your connection string below:
+DATABASE_URL=
+
+# ── Auth secrets (auto-generated — change for production) ────────────────────
+JWT_SECRET=${jwtSecret}
+REFRESH_TOKEN_SECRET=${refreshSecret}
+COOKIE_SECURE=false
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+FRONTEND_ORIGIN=http://127.0.0.1:8080
+CORS_ORIGINS=http://127.0.0.1:8080,http://localhost:8080,http://localhost:8081
+`;
+  try {
+    fs.writeFileSync(envPath, template, 'utf8');
+    console.log('[PataFundi] Auto-created .env file with generated JWT secrets.');
+    console.log('[PataFundi] ⚠️  Edit .env to add your DATABASE_URL (get one free at https://neon.tech).');
+  } catch {
+    // If we can't write the file (permissions), continue — dotenv will still
+    // load whatever env vars exist from the parent process.
+  }
+}
+
+ensureDevEnvFile();
+
+// Load .env with override: true so .env values beat inherited env vars.
 if (!isProduction) {
-  // override: true so .env values take precedence over any inherited env vars
-  // (e.g. a stale DATABASE_URL=file:... from the parent process).
   dotenv.config({ override: true });
+}
+
+/**
+ * In dev mode, auto-generate JWT secrets if still missing after loading .env.
+ * This ensures the server ALWAYS starts in dev — no 503 errors for missing
+ * secrets. Production still requires explicit JWT_SECRET (auto-generation
+ * is dev-only).
+ */
+function resolveJwtSecret() {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (isProduction) return '';
+  const generated = crypto.randomBytes(32).toString('hex');
+  console.warn('[PataFundi] JWT_SECRET not set — auto-generated for dev. Set it in .env for persistence.');
+  return generated;
+}
+
+function resolveRefreshSecret() {
+  if (process.env.REFRESH_TOKEN_SECRET) return process.env.REFRESH_TOKEN_SECRET;
+  if (isProduction) return '';
+  const generated = crypto.randomBytes(32).toString('hex');
+  console.warn('[PataFundi] REFRESH_TOKEN_SECRET not set — auto-generated for dev. Set it in .env for persistence.');
+  return generated;
 }
 
 function resolveDatabaseUrl() {
@@ -33,8 +108,8 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   databaseUrl: resolveDatabaseUrl(),
-  jwtSecret: process.env.JWT_SECRET || '',
-  refreshSecret: process.env.REFRESH_TOKEN_SECRET || '',
+  jwtSecret: resolveJwtSecret(),
+  refreshSecret: resolveRefreshSecret(),
   cookieSecure: process.env.COOKIE_SECURE === 'true' || isProduction,
   resendApiKey: process.env.RESEND_API_KEY || '',
   emailFrom: process.env.EMAIL_FROM || 'onboarding@resend.dev',
