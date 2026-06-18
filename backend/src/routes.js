@@ -147,6 +147,44 @@ router.post('/admin/users/:id/disable', authRequired, requireRole('admin'), asyn
 router.get('/admin/settings', authRequired, requireRole('admin'), asyncHandler(admin.getSettings));
 router.put('/admin/settings', authRequired, requireRole('admin'), asyncHandler(admin.updateSettings));
 
+// ============================================================
+// Enterprise RBAC — permission-scoped staff endpoints
+// ============================================================
+import { requirePermission, requireAnyPermission } from './middleware/rbac.js';
+import * as rbac from './controllers/rbacController.js';
+
+// Any staff member can list their own permissions (for frontend UI gating).
+router.get('/staff/me/permissions', authRequired, asyncHandler(rbac.listMyPermissions));
+
+// Super-admin only: list all roles + permissions + assign/revoke.
+router.get('/admin/roles', authRequired, requirePermission('can_manage_roles'), asyncHandler(rbac.listRoles));
+router.get('/admin/roles/:role/permissions', authRequired, requirePermission('can_manage_roles'), asyncHandler(rbac.listRolePermissions));
+router.post('/admin/users/:id/permissions', authRequired, requirePermission('can_manage_roles'), asyncHandler(rbac.setUserPermission));
+router.delete('/admin/users/:id/permissions/:code', authRequired, requirePermission('can_manage_roles'), asyncHandler(rbac.removeUserPermission));
+router.post('/admin/users/:id/role', authRequired, requirePermission('can_promote_users'), asyncHandler(rbac.setUserRole));
+
+// Permission-scoped admin routes (in addition to the existing requireRole('admin') ones above).
+// These allow non-admin staff (support_agent, fraud_analyst, finance_team, etc.)
+// to access specific endpoints without full admin access.
+router.get('/staff/fraud/dashboard', authRequired, requirePermission('can_view_fraud_dashboard'), asyncHandler(fraud.fraudDashboard));
+router.get('/staff/fraud/alerts', authRequired, requirePermission('can_view_fraud_dashboard'), asyncHandler(fraud.listFraudAlerts));
+router.post('/staff/fraud/actions', authRequired, requirePermission('can_resolve_alerts'), asyncHandler(fraud.adminFraudAction));
+
+router.get('/staff/disputes', authRequired, requirePermission('can_view_disputes'), asyncHandler(disputes.listDisputes));
+router.post('/staff/disputes/:id/resolve', authRequired, requirePermission('can_resolve_disputes'), asyncHandler(disputes.resolveDispute));
+
+router.get('/staff/payments', authRequired, requirePermission('can_view_payments'), asyncHandler(admin.listTable('payments', 'payments')));
+router.get('/staff/revenue', authRequired, requirePermission('can_view_revenue'), asyncHandler(admin.revenueDashboard));
+router.post('/staff/escrow/:jobId/release', authRequired, requirePermission('can_release_escrow'), asyncHandler(payouts.releaseEscrow));
+router.post('/staff/payouts/:id/complete', authRequired, requirePermission('can_complete_payouts'), asyncHandler(payouts.completePayout));
+
+router.get('/staff/jobs', authRequired, requirePermission('can_view_all_jobs'), asyncHandler(admin.listJobs));
+router.get('/staff/fundis', authRequired, requirePermission('can_view_fundis'), asyncHandler(admin.listTable('fundis', 'fundis')));
+router.post('/staff/fundis/:id/approve', authRequired, requirePermission('can_approve_fundis'), asyncHandler(admin.approveFundi));
+router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_suspend_fundis'), asyncHandler(admin.suspendFundi));
+
+router.get('/staff/audit-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(admin.listTable('audit_logs', 'logs')));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));

@@ -110,6 +110,11 @@ export async function authRequired(req, _res, next) {
 export function requireRole(...roles) {
   return (req, _res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
+      // Backward compat: 'admin' role check also accepts 'super_admin'
+      // (the platform owner). New code should use requirePermission() instead.
+      if (roles.includes('admin') && req.user?.role === 'super_admin') {
+        return next();
+      }
       logAccessDecision(req, 'requireRole:denied', { requiredRoles: roles }).catch(() => {});
       return next(forbidden());
     }
