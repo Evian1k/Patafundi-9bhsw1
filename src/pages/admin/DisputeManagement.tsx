@@ -165,7 +165,6 @@ export default function AdminDisputeManagement() {
     if (token) realtimeService.connect(token);
 
     const onNewDispute = (payload: Record<string, unknown>) => {
-      console.log("[AdminDisputes] New dispute opened:", payload);
       setNewBadgeCount((n) => n + 1);
       toast("New dispute opened", {
         description: `${String(payload?.customerName ?? "A customer")} filed a dispute`,

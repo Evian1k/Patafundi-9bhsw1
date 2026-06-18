@@ -88,7 +88,7 @@ export async function sendOtpEmail({ to, code, purpose = 'register' }) {
       console.error('[email] Resend API error:', result.error);
       return { sent: false, reason: result.error.message || 'resend_error' };
     }
-    console.log(`[email] OTP sent to ${recipient} (purpose=${purpose}, id=${result.data?.id || 'n/a'})`);
+    console.log(`[email] OTP sent (purpose=${purpose}, id=${result.data?.id || 'n/a'})`);
     return { sent: true, id: result.data?.id };
   } catch (err) {
     console.error('[email] Failed to send OTP email:', err);
