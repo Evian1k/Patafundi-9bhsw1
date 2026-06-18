@@ -18,6 +18,10 @@ import { isLocalDatabaseUrl } from './pg-config.js';
 import { checkCommissionProtection, runPatternDetection } from './services/fraudService.js';
 
 const app = express();
+// Trust the first proxy hop (Render's load balancer) so req.ip reflects
+// the real client IP. Required for rate-limit keyGenerator and for the
+// M-Pesa webhook loopback check to work correctly in production.
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: {

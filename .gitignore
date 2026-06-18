@@ -36,3 +36,4 @@ backend/uploads/
 
 # Local E2E audit artifacts
 E2E_AUDIT_RESULTS.json
+FULL_AUDIT_RESULTS.json

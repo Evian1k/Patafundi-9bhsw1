@@ -83,7 +83,14 @@ export function verifyWebhookSignature(rawBody, signature) {
 
 export function verifyCallbackSecret(req) {
   if (!config.mpesa.callbackSecret) {
-    return config.nodeEnv !== 'production';
+    // Dev convenience: allow unsigned callbacks ONLY from loopback.
+    // Production requires MPESA_CALLBACK_SECRET to be set (enforced separately
+    // by requireCallbackSecretInProduction). This prevents a misconfigured
+    // NODE_ENV=development deploy from accepting external unsigned callbacks.
+    if (config.nodeEnv === 'production') return false;
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    const isLoopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
+    return isLoopback;
   }
   const provided = req.get('x-mpesa-callback-secret') || req.body?.callbackSecret;
   if (!provided) return false;
