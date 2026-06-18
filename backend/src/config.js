@@ -5,7 +5,9 @@ const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 
 // Never load committed .env on Render — it often contains localhost DATABASE_URL.
 if (!isProduction) {
-  dotenv.config();
+  // override: true so .env values take precedence over any inherited env vars
+  // (e.g. a stale DATABASE_URL=file:... from the parent process).
+  dotenv.config({ override: true });
 }
 
 function resolveDatabaseUrl() {
