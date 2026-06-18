@@ -22,12 +22,17 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 async function findNearestFundis(latitude, longitude, skill, limit = 5) {
+  // SECURITY: same visibility filters as searchFundis — enforced server-side.
+  //   u.role = 'fundi' + u.status = 'active' + f.approval_status = 'approved' + f.online = true
+  // A disabled/banned/pending fundi can NEVER receive a job match.
+  const baseWhere = `u.role = 'fundi' and u.status = 'active' and f.approval_status = 'approved' and f.online = true`;
+
   if (latitude == null || longitude == null) {
     const fallback = await query(
       `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score
        from fundis f join users u on u.id = f.user_id
-       where f.approval_status = 'approved' and f.online = true
-       order by f.rating desc limit $1`,
+       where ${baseWhere}
+       order by f.rating desc nulls last, f.trust_score desc nulls last limit $1`,
       [limit],
     );
     return fallback.rows.map((row) => ({ ...row, distanceKm: null }));
@@ -36,7 +41,7 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
     `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
             f.latitude, f.longitude
      from fundis f join users u on u.id = f.user_id
-     where f.approval_status = 'approved' and f.online = true
+     where ${baseWhere}
        and f.latitude is not null and f.longitude is not null`,
   );
   return result.rows
@@ -49,7 +54,12 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
       const needle = String(skill).toLowerCase();
       return (row.skills || []).some((s) => String(s).toLowerCase() === needle);
     })
-    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .sort((a, b) => {
+      // Distance first, then rating, then trust score.
+      if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+      if (Number(b.rating || 0) !== Number(a.rating || 0)) return Number(b.rating || 0) - Number(a.rating || 0);
+      return Number(b.trust_score || 0) - Number(a.trust_score || 0);
+    })
     .slice(0, limit);
 }
 

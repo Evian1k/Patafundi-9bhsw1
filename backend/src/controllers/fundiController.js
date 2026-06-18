@@ -111,24 +111,68 @@ export async function searchFundis(req, res) {
   const latitude = req.query.latitude == null ? null : Number(req.query.latitude);
   const longitude = req.query.longitude == null ? null : Number(req.query.longitude);
   const skill = req.query.skill ? String(req.query.skill).toLowerCase() : null;
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit || 25)));
+
+  // SECURITY: every visibility filter is enforced server-side.
+  //   users.role = 'fundi'           → excludes fundi_pending, customer, admin
+  //   users.status = 'active'        → excludes disabled/banned users
+  //   f.approval_status = 'approved' → excludes pending/rejected/suspended
+  //   f.online = true                → excludes offline fundis
+  //   f.latitude IS NOT NULL         → excludes fundis without a location
+  // No frontend filter can bypass this — the SQL is the source of truth.
   const result = await query(
     `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
       f.latitude, f.longitude, f.location_accuracy,
-      f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge
-     from fundis f join users u on u.id = f.user_id
-     where f.approval_status = 'approved' and f.online = true
-     order by f.rating desc limit 25`,
+      f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge,
+      f.updated_at as last_active,
+      (select count(*) from jobs j where j.fundi_id = f.user_id and j.status = 'completed')::int as completed_jobs
+     from fundis f
+     join users u on u.id = f.user_id
+     where u.role = 'fundi'
+       and u.status = 'active'
+       and f.approval_status = 'approved'
+       and f.online = true
+       and f.latitude is not null
+       and f.longitude is not null
+     order by f.rating desc nulls last, f.trust_score desc nulls last
+     limit $1`,
+    [limit],
   );
+
   const fundis = await Promise.all(result.rows
     .filter((row) => !skill || row.skills?.map((s) => String(s).toLowerCase()).includes(skill))
     .map(async (row) => {
-      const distanceKm = Number.isFinite(latitude) && Number.isFinite(longitude) && row.latitude != null && row.longitude != null
+      const distanceKm = Number.isFinite(latitude) && Number.isFinite(longitude)
         ? haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude))
         : null;
       const photoUrls = await resolveProfilePhotoUrls(row);
-      return { ...publicFundiShape(row, photoUrls), distanceKm };
+      return {
+        ...publicFundiShape(row, photoUrls),
+        distanceKm,
+        completedJobs: row.completed_jobs || 0,
+        lastActive: row.last_active,
+      };
     }));
-  fundis.sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
+
+  // Ranking formula: distance first, then rating, then trust score, then completed jobs.
+  // Closer = better; higher rating/trust/jobs = better.
+  fundis.sort((a, b) => {
+    // If we have distance, sort by distance first (closest first).
+    if (a.distanceKm != null && b.distanceKm != null && a.distanceKm !== b.distanceKm) {
+      return a.distanceKm - b.distanceKm;
+    }
+    // No distance or tied → fall back to rating.
+    if (Number(b.rating || 0) !== Number(a.rating || 0)) {
+      return Number(b.rating || 0) - Number(a.rating || 0);
+    }
+    // Tied rating → trust score.
+    if (Number(b.trustScore || 0) !== Number(a.trustScore || 0)) {
+      return Number(b.trustScore || 0) - Number(a.trustScore || 0);
+    }
+    // Tied trust → completed jobs.
+    return Number(b.completedJobs || 0) - Number(a.completedJobs || 0);
+  });
+
   res.json({ success: true, fundis });
 }
 
