@@ -44,7 +44,7 @@ export async function fraudReport(req, res) {
   res.json({ success: true, detection, message: 'Report received' });
 }
 
-export async function genericList(key) {
+export function genericList(key) {
   return (_req, res) => {
     const data = {
       posts: [

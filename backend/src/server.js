@@ -42,7 +42,16 @@ app.use(express.json({
   },
 }));
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
+// Global per-IP rate limit. In development the limit is raised so that
+// automated test suites can exercise the full API in a single minute;
+// production keeps the conservative 120/min cap.
+const globalRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: config.nodeEnv === 'production' ? 120 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalRateLimit);
 app.use('/api/auth/login', authRateLimit);
 app.use('/api/auth/register', authRateLimit);
 app.use('/api/auth/forgot-password', authRateLimit);
