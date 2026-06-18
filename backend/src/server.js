@@ -148,16 +148,20 @@ app.use((error, _req, res, _next) => {
   let status = error.status || 500;
   let message = error.message || 'Internal server error';
 
-  if (/ECONNREFUSED|connect ECONNREFUSED|Connection terminated|timeout expired|not available/i.test(message)) {
+  // Database-related errors → 503 (service unavailable), not 500.
+  // This tells the frontend "the server is up but the DB is down" so it
+  // can show a proper "service unavailable" message instead of a generic error.
+  if (
+    /ECONNREFUSED|connect ECONNREFUSED|Connection terminated|timeout expired|not available/i.test(message)
+    || /ENOTFOUND|ETIMEDOUT|EHOSTUNREACH/i.test(message)
+    || /PGlite failed|Aborted\(\)|embedded.*failed/i.test(message)
+    || /Database unavailable|database.*unreachable/i.test(message)
+    || /relation .* does not exist/i.test(message)
+  ) {
     status = 503;
     message = config.nodeEnv === 'production'
-      ? 'Database unavailable. Verify DATABASE_URL on Render (PostgreSQL, not localhost).'
-      : 'Database unavailable. Start PostgreSQL or run: npm run dev';
-  } else if (/relation .* does not exist/i.test(message)) {
-    status = 503;
-    message = config.nodeEnv === 'production'
-      ? 'Database not initialized. Check Render deploy logs for migration errors.'
-      : 'Database not initialized. Run: npm run db:setup';
+      ? 'Database unavailable. Verify DATABASE_URL on Render.'
+      : 'Database unavailable. Start PostgreSQL (docker compose up -d) or set DATABASE_URL to a cloud Postgres. See .env.example for details.';
   } else if (/invalid input syntax for type uuid/i.test(message)) {
     status = 400;
     message = 'Invalid id format';

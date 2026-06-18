@@ -15,9 +15,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
 
 const demoUsers = [
+  // Public platform users
   { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },
   { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000002' },
-  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Demo Admin', role: 'super_admin', phone: '254712000003' },
+  // Internal staff (enterprise RBAC — see migration 009)
+  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Super Admin', role: 'super_admin', phone: '254712000003' },
+  { email: 'ops@patafundi.com', password: 'Ops@2024!', fullName: 'Ops Manager', role: 'admin', phone: '254712000004' },
+  { email: 'support@patafundi.com', password: 'Support@2024!', fullName: 'Support Agent', role: 'support_agent', phone: '254712000005' },
+  { email: 'fraud@patafundi.com', password: 'Fraud@2024!', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712000006' },
+  { email: 'finance@patafundi.com', password: 'Finance@2024!', fullName: 'Finance Team', role: 'finance_team', phone: '254712000007' },
+  { email: 'dispatch@patafundi.com', password: 'Dispatch@2024!', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712000008' },
+  { email: 'devops@patafundi.com', password: 'Devops@2024!', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712000009' },
+  { email: 'auditor@patafundi.com', password: 'Auditor@2024!', fullName: 'Auditor', role: 'auditor', phone: '254712000010' },
 ];
 
 /**
