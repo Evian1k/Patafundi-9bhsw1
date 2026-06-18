@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api";
 
 interface DemoAccount {
   email: string;
@@ -157,14 +158,16 @@ export default function DemoPage() {
   const quickLogin = async (account: DemoAccount) => {
     setLoggingIn(account.email);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: account.email, password: account.password }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      // Use apiClient.login() so the token is stored in localStorage
+      // and the auth session is set. Without this, the dashboard pages
+      // can't make authenticated API calls (they'd get 401/403).
+      const data = await apiClient.login(account.email, account.password) as {
+        success?: boolean;
+        message?: string;
+        user?: { role?: string };
+        token?: string;
+      };
+      if (!data.success) {
         toast.error(data.message || "Login failed");
         return;
       }
@@ -180,8 +183,8 @@ export default function DemoPage() {
       } else {
         navigate("/");
       }
-    } catch (e) {
-      toast.error("Login failed — is the backend running?");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Login failed — is the backend running?");
     } finally {
       setLoggingIn(null);
     }
