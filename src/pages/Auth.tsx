@@ -633,6 +633,18 @@ const Auth = () => {
               </button>
             </div>
           )}
+
+          {/* Demo accounts link — dev convenience */}
+          {import.meta.env.DEV && (
+            <div className="mt-4 text-center text-xs">
+              <Link
+                to="/demo"
+                className="text-muted-foreground/70 hover:text-primary inline-flex items-center gap-1"
+              >
+                🧪 View demo accounts
+              </Link>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

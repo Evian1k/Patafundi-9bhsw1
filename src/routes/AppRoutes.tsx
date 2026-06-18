@@ -49,12 +49,14 @@ import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
 import StaffLayout from "@/components/staff/StaffLayout";
 import StaffOverview from "@/pages/staff/StaffOverview";
 import StaffDataTable from "@/pages/staff/StaffDataTable";
+import DemoPage from "@/pages/DemoPage";
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/demo" element={<DemoPage />} />
       <Route path="/register/customer" element={<Auth />} />
       <Route path="/register/fundi" element={<FundiRegister />} />
 
