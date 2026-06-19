@@ -93,6 +93,10 @@ app.use('/api/payments/daraja-callback', paymentWebhookRateLimit);
 app.use('/api/maps', mapsRateLimit);
 app.use(csrfProtection);
 
+// Maintenance mode — blocks customer/fundi access when enabled, allows staff
+import { maintenanceCheck } from './middleware/maintenanceMode.js';
+app.use(maintenanceCheck);
+
 app.get('/', (_req, res) => {
   res.json({
     status: 'API running',

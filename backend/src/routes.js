@@ -310,6 +310,32 @@ router.delete('/favorites/fundis/:fundiId', authRequired, asyncHandler(security.
 router.get('/admin/integrations', authRequired, requireRole('admin'), asyncHandler(security.listApiIntegrations));
 router.post('/admin/integrations/:service/test', authRequired, requireRole('admin'), asyncHandler(security.testApiIntegration));
 
+// ============================================================
+// Push notifications + SMS — device registration + status
+// ============================================================
+import { registerDeviceToken, unregisterDeviceToken, getPushStatus } from './services/pushService.js';
+import { getSmsStatus, sendSms } from './services/smsService.js';
+
+router.post('/devices/register', authRequired, asyncHandler(async (req, res) => {
+  const { token, platform = 'web' } = req.body || {};
+  if (!token) throw badRequest('Device token is required');
+  await registerDeviceToken({ userId: req.user.id, token, platform });
+  res.status(201).json({ success: true });
+}));
+
+router.delete('/devices/:token', authRequired, asyncHandler(async (req, res) => {
+  await unregisterDeviceToken(req.params.token);
+  res.json({ success: true });
+}));
+
+router.get('/notifications/push/status', authRequired, asyncHandler(async (_req, res) => {
+  res.json({ success: true, ...getPushStatus() });
+}));
+
+router.get('/notifications/sms/status', authRequired, asyncHandler(async (_req, res) => {
+  res.json({ success: true, ...getSmsStatus() });
+}));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
