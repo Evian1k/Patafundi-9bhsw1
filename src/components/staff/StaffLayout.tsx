@@ -31,6 +31,7 @@ const STAFF_NAV = [
     section: "Operations",
     items: [
       { label: "Overview", href: "/staff/admin", icon: Shield, permission: "can_view_metrics", roles: ["super_admin", "admin"] },
+      { label: "Live Operations", href: "/staff/operations", icon: Activity, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Fundis", href: "/staff/admin/fundis", icon: Wrench, permission: "can_view_fundis", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Jobs", href: "/staff/admin/jobs", icon: Package, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Users", href: "/staff/admin/users", icon: Users, permission: "can_view_users", roles: ["super_admin", "admin", "support_agent"] },
@@ -41,6 +42,7 @@ const STAFF_NAV = [
     items: [
       { label: "Payments", href: "/staff/finance", icon: DollarSign, permission: "can_view_payments", roles: ["super_admin", "admin", "finance_team"] },
       { label: "Revenue", href: "/staff/finance/revenue", icon: DollarSign, permission: "can_view_revenue", roles: ["super_admin", "admin", "finance_team"] },
+      { label: "Commission Control", href: "/staff/commission", icon: DollarSign, permission: "can_manage_system", roles: ["super_admin"] },
     ],
   },
   {
@@ -48,6 +50,13 @@ const STAFF_NAV = [
     items: [
       { label: "Fraud Dashboard", href: "/staff/fraud", icon: AlertTriangle, permission: "can_view_fraud_dashboard", roles: ["super_admin", "admin", "fraud_analyst"] },
       { label: "Disputes", href: "/staff/support/disputes", icon: Headphones, permission: "can_view_disputes", roles: ["super_admin", "admin", "support_agent"] },
+    ],
+  },
+  {
+    section: "Administration",
+    items: [
+      { label: "Staff Management", href: "/staff/staff-mgmt", icon: Users, permission: "can_manage_roles", roles: ["super_admin"] },
+      { label: "AI Command Center", href: "/staff/ai", icon: AlertTriangle, permission: "can_view_fraud_dashboard", roles: ["super_admin"] },
     ],
   },
   {
