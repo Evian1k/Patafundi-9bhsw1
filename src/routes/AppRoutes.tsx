@@ -52,6 +52,7 @@ import StaffOverview from "@/pages/staff/StaffOverview";
 import StaffDataTable from "@/pages/staff/StaffDataTable";
 import StaffLogin from "@/pages/staff/StaffLogin";
 import ExecutiveDashboard from "@/pages/staff/ExecutiveDashboard";
+import AICommandCenter from "@/pages/staff/AICommandCenter";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -139,6 +140,7 @@ export default function AppRoutes() {
       <Route path="/staff" element={<StaffLayout />}>
         <Route index element={<StaffOverview />} />
         <Route path="executive" element={<ExecutiveDashboard />} />
+        <Route path="ai" element={<AICommandCenter />} />
         <Route path="operations" element={<StaffOverview />} />
         <Route path="support" element={<StaffOverview />} />
         <Route path="fraud" element={

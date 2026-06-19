@@ -185,6 +185,19 @@ router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_su
 
 router.get('/staff/audit-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(admin.listTable('audit_logs', 'logs')));
 
+// ============================================================
+// AI Command Center — SUPER_ADMIN ONLY
+// The AI NEVER performs actions. It only analyzes and recommends.
+// All actions require super_admin approval via existing admin endpoints.
+// ============================================================
+import * as ai from './controllers/aiController.js';
+
+router.get('/ai/dashboard', authRequired, requireRole('admin'), asyncHandler(ai.aiDashboard));
+router.post('/ai/run', authRequired, requireRole('admin'), asyncHandler(ai.runAnalysis));
+router.get('/ai/recommendations', authRequired, requireRole('admin'), asyncHandler(ai.listRecommendations));
+router.post('/ai/recommendations/:id/review', authRequired, requireRole('admin'), asyncHandler(ai.reviewRecommendation));
+router.get('/ai/insights/:category', authRequired, requireRole('admin'), asyncHandler(ai.getCategoryInsights));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
