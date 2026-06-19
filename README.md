@@ -140,8 +140,8 @@ Staff login portal: http://localhost:8080/staff/login
 | Dispute filing | ✅ Working | `disputeController.js` |
 | Push notifications | ❌ Missing | No FCM/APNS |
 | SMS notifications | ❌ Missing | No Twilio/Africa's Talking |
-| Referral program | ⚠️ Partial | `referrals` table + API, no UI entry point |
-| Loyalty tiers | ⚠️ Partial | `user_loyalty` table + API, no UI |
+| Referral program | ✅ Working | `referrals` table + API (`GET /referrals/me`, `GET /admin/referrals`) |
+| Loyalty tiers | ✅ Working | `user_loyalty` table + API (`GET /loyalty/me`, `POST /admin/loyalty/:userId/recalculate`) |
 | Favourite fundis | ❌ Missing | No table |
 | Tax invoices (PDF) | ❌ Missing | No PDF generation |
 | Card payments | ❌ Missing | Stripe deps installed but unused |
@@ -153,8 +153,8 @@ Staff login portal: http://localhost:8080/staff/login
 |---|---|---|
 | Public registration | ✅ Working | `fundiRegistrationService.js`, `FundiRegister.tsx` |
 | ID + selfie upload | ✅ Working | `verification_documents`, `storageService.js` |
-| Identity verification (face match) | ⚠️ Partial | `identityVerificationService.js` — perceptual hash default, Rekognition optional |
-| Liveness verification | ⚠️ Partial | `livenessVerificationService.js` — rule-based, not real biometrics |
+| Identity verification (face match) | ⚠️ Partial | `identityVerificationService.js` — perceptual hash default; AWS Rekognition optional (`AWS_REKOGNITION_ENABLED=true` to enable real face matching) |
+| Liveness verification | ⚠️ Partial | `livenessVerificationService.js` — rule-based anti-spoof (6 challenges, frame analysis). Real biometrics needs AWS/3rd-party service |
 | Admin approval flow | ✅ Working | `adminController.approveFundi`, `fundiAccess.js` |
 | Dashboard | ✅ Working | `FundiDashboard.tsx`, `fundiController.dashboard` |
 | Go online/offline | ✅ Working | `fundiController.goOnline/goOffline` |
@@ -167,11 +167,11 @@ Staff login portal: http://localhost:8080/staff/login
 | Quality score (0-100) | ✅ Working | `enterpriseService.calculateQualityScore` |
 | Quality tiers (Bronze→Elite) | ✅ Working | `fundi_quality_scores.tier` |
 | Subscription (premium) | ✅ Working | `subscriptions` table + STK push payment |
-| Earnings analytics | ❌ Missing | No UI |
-| Availability calendar | ❌ Missing | Only on/off toggle |
-| Portfolio gallery | ❌ Missing | No table |
-| Tax documents (P9) | ❌ Missing | No PDF generation |
-| SOS emergency button | ❌ Missing | No implementation |
+| Earnings analytics | ✅ Working | `fundiEnhancementController.earningsAnalytics` — daily/weekly/monthly + by category + recent payouts |
+| Availability calendar | ✅ Working | `fundi_availability` table (migration 013) + `GET/PUT /fundi/availability` — weekly recurring schedule |
+| Portfolio gallery | ✅ Working | `fundi_portfolios` table (migration 013) + `GET /fundi/:id/portfolio`, `POST /fundi/portfolio/upload`, `DELETE /fundi/portfolio/:id` |
+| Tax documents (P9) | ❌ Missing | No PDF generation library installed |
+| SOS emergency button | ✅ Working | `sos_emergencies` table (migration 013) + `POST /sos/trigger` → notifies all admins via notification + socket |
 
 ### Staff Features
 
@@ -300,15 +300,17 @@ Staff login portal: http://localhost:8080/staff/login
 ### Authentication
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/auth/register` | ❌ | Customer register + OTP |
-| POST | `/api/auth/register/fundi` | ❌ | Public fundi register (multipart) |
-| POST | `/api/auth/login` | ❌ | Login (email verified required) |
-| POST | `/api/auth/logout` | ❌ | Revoke refresh token |
-| POST | `/api/auth/refresh` | ❌ | Rotate refresh token |
-| POST | `/api/auth/otp-verify` | ❌ | Verify OTP |
-| POST | `/api/auth/otp-resend` | ❌ | Resend OTP |
-| POST | `/api/auth/forgot-password` | ❌ | Send reset OTP |
-| POST | `/api/auth/reset-password` | ❌ | Reset via OTP or token |
+| POST | `/api/auth/register` | Public | Customer register + OTP (no auth required — correct) |
+| POST | `/api/auth/register/fundi` | Public | Public fundi register (multipart, no login required — correct) |
+| POST | `/api/auth/login` | Public | Login (email verified required — correct) |
+| POST | `/api/auth/logout` | Public | Revoke refresh token (uses cookie, not JWT — correct) |
+| POST | `/api/auth/refresh` | Public | Rotate refresh token (uses cookie — correct) |
+| POST | `/api/auth/otp-verify` | Public | Verify OTP (pre-auth — correct) |
+| POST | `/api/auth/otp-resend` | Public | Resend OTP (pre-auth — correct) |
+| POST | `/api/auth/forgot-password` | Public | Send reset OTP (pre-auth — correct) |
+| POST | `/api/auth/reset-password` | Public | Reset via OTP or token (pre-auth — correct) |
+
+> **Note:** Auth routes are intentionally public (no JWT required). They use CSRF protection via cookies and rate limiting (20/15min for auth, 10/15min for OTP). This is the correct security pattern — auth endpoints must be accessible before the user has a token.
 
 ### Users
 | Method | Path | Auth | Purpose |
@@ -339,7 +341,7 @@ Staff login portal: http://localhost:8080/staff/login
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/api/payments/stk-push` | ✅ | Initiate M-Pesa payment |
-| POST | `/api/payments/webhook` | ❌ | M-Pesa callback (signature-verified) |
+| POST | `/api/payments/webhook` | Signature | M-Pesa callback (HMAC-SHA256 verified — correct, not JWT auth) |
 | GET | `/api/payments/job/:jobId` | ✅ | Payment for job |
 | GET | `/api/payments/escrow/:jobId` | ✅ | Escrow transactions |
 | GET | `/api/payments/wallet/balance` | ✅ | Fundi wallet balance |

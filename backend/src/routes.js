@@ -256,6 +256,28 @@ router.get('/admin/staff', authRequired, requirePerm('can_manage_roles'), asyncH
   res.json({ success: true, staff: result.rows });
 }));
 
+// ============================================================
+// Fundi Enhancements — portfolio, SOS, availability, earnings
+// ============================================================
+import * as fundiEnh from './controllers/fundiEnhancementController.js';
+
+// Portfolio (public view + fundi upload)
+router.get('/fundi/:fundiId/portfolio', asyncHandler(fundiEnh.listPortfolio));
+router.post('/fundi/portfolio/upload', authRequired, requireFundiAccount, imageUpload.single('image'), asyncHandler(fundiEnh.uploadPortfolioItem));
+router.delete('/fundi/portfolio/:id', authRequired, requireFundiAccount, asyncHandler(fundiEnh.deletePortfolioItem));
+
+// SOS Emergency
+router.post('/sos/trigger', authRequired, asyncHandler(fundiEnh.triggerSOS));
+router.get('/admin/sos', authRequired, requireRole('admin'), asyncHandler(fundiEnh.listSOS));
+router.post('/admin/sos/:id/resolve', authRequired, requireRole('admin'), asyncHandler(fundiEnh.resolveSOS));
+
+// Availability schedule
+router.get('/fundi/availability', authRequired, requireFundiAccount, asyncHandler(fundiEnh.getAvailability));
+router.put('/fundi/availability', authRequired, requireFundiAccount, asyncHandler(fundiEnh.updateAvailability));
+
+// Earnings analytics
+router.get('/fundi/earnings/analytics', authRequired, requireApprovedFundi, asyncHandler(fundiEnh.earningsAnalytics));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
