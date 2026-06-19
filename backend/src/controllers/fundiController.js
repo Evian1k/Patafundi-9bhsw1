@@ -223,8 +223,34 @@ export async function dashboard(req, res) {
 }
 
 export async function status(req, res) {
-  const result = await query('select online, latitude, longitude, location_accuracy, approval_status from fundis where user_id = $1', [req.user.id]);
-  res.json({ success: true, status: { ...(result.rows[0] || { online: false }), subscriptionActive: true, daysLeft: 30 } });
+  const result = await query(
+    `select f.online, f.latitude, f.longitude, f.location_accuracy, f.approval_status,
+            f.subscription_active, f.subscription_expires_at, f.premium_plan,
+            case
+              when f.subscription_expires_at > now() then true
+              else false
+            end as subscription_active_calc,
+            case
+              when f.subscription_expires_at > now() then extract(day from f.subscription_expires_at - now())::int
+              else 0
+            end as days_left
+     from fundis f where f.user_id = $1`,
+    [req.user.id],
+  );
+  const row = result.rows[0] || { online: false };
+  res.json({
+    success: true,
+    status: {
+      online: row.online,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      location_accuracy: row.location_accuracy,
+      approval_status: row.approval_status,
+      subscriptionActive: row.subscription_active_calc || false,
+      daysLeft: row.days_left || 0,
+      premiumPlan: row.premium_plan || null,
+    },
+  });
 }
 
 async function requireApprovedFundi(userId, role) {
