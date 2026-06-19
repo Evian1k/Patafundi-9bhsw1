@@ -142,10 +142,18 @@ export async function help(_req, res) {
       { id: 'customers', title: 'Customers' },
       { id: 'fundis', title: 'Fundis' },
       { id: 'payments', title: 'Payments and escrow' },
+      { id: 'safety', title: 'Safety' },
+      { id: 'account', title: 'Account' },
     ],
     faqs: [
-      { question: 'How is payment protected?', answer: 'Customer payments are held in escrow until completion is confirmed.' },
-      { question: 'Can I pay outside PataFundi?', answer: 'No. Off-platform payments are blocked to protect both sides.' },
+      { id: 'faq-1', question: 'How is payment protected?', answer: 'Customer payments are held in escrow until completion is confirmed. The fundi only gets paid after you confirm the job is done.', category: 'payments' },
+      { id: 'faq-2', question: 'Can I pay outside PataFundi?', answer: 'No. Off-platform payments are blocked to protect both sides. Sharing phone numbers or M-Pesa details in chat triggers fraud alerts.', category: 'payments' },
+      { id: 'faq-3', question: 'How do I hire a fundi?', answer: 'Create a job with your service category, location, and description. Nearby approved fundis will be matched automatically.', category: 'customers' },
+      { id: 'faq-4', question: 'How do I become a fundi?', answer: 'Register at /register/fundi, upload your ID and selfie, verify your email with OTP, and wait for admin approval.', category: 'fundis' },
+      { id: 'faq-5', question: 'How long does fundi approval take?', answer: 'Usually within 24 hours. You will receive an email notification once your application is reviewed.', category: 'fundis' },
+      { id: 'faq-6', question: 'Is my data safe?', answer: 'Yes. Your ID documents are stored in a private bucket with signed URLs. Only admin staff can view them. All access is logged.', category: 'safety' },
+      { id: 'faq-7', question: 'How do I reset my password?', answer: 'Click "Forgot password" on the login page. You will receive a 6-digit code via email to reset your password.', category: 'account' },
+      { id: 'faq-8', question: 'What if I have a dispute with a fundi?', answer: 'File a dispute from your job page. Our support team will review it and the escrow will be frozen until resolution.', category: 'customers' },
     ],
   });
 }

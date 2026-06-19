@@ -27,8 +27,13 @@ export default function LiveOperations() {
       ]);
       setFundis(fundiData.fundis || []);
       setJobs(jobData.jobs || []);
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      // If 403/401, stop polling — the auto-refresh in apiClient will handle redirect
+      const status = (err as any)?.status;
+      if (status === 403 || status === 401) {
+        return; // don't throw, just stop fetching
+      }
+      // ignore other errors
     } finally {
       setLoading(false);
     }
@@ -42,10 +47,17 @@ export default function LiveOperations() {
         if (!staffRoles.includes(me?.user?.role)) { navigate("/staff"); return; }
       } catch { navigate("/staff/login"); return; }
       fetchData();
-      const interval = setInterval(fetchData, 15_000);
-      return () => clearInterval(interval);
     })();
-  }, [navigate, fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
+  // Auto-refresh every 15s, but only if we successfully loaded data before
+  useEffect(() => {
+    if (fundis.length === 0 && jobs.length === 0) return; // don't poll if nothing loaded yet
+    const interval = setInterval(fetchData, 15_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fundis.length, jobs.length]);
 
   const onlineFundis = fundis.filter((f) => f.latitude && f.longitude);
   const activeJobs = jobs.filter((j) => !["completed", "cancelled", "failed"].includes(j.status));

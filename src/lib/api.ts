@@ -109,6 +109,38 @@ class ApiClient {
         continue;
       }
 
+      if (response.status === 401 && this.token && attempt === 0) {
+        // JWT expired — try to refresh once, then retry the original request
+        try {
+          const refreshed = await this.refreshToken();
+          if (refreshed) {
+            config.headers = config.headers || {};
+            (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+            continue; // retry with new token
+          }
+        } catch {
+          // refresh failed — clear token, redirect to login
+          this.setToken(null);
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {
+            window.location.href = '/auth';
+          }
+        }
+      }
+
+      if (response.status === 403 && this.token && attempt === 0) {
+        // 403 could mean the token is valid but role changed — try refresh
+        try {
+          const refreshed = await this.refreshToken();
+          if (refreshed) {
+            config.headers = config.headers || {};
+            (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+            continue;
+          }
+        } catch {
+          // ignore — let the 403 propagate
+        }
+      }
+
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
         throw new ApiError(errorBody?.message || response.statusText || 'Request failed', response.status);
@@ -118,6 +150,28 @@ class ApiClient {
     }
 
     throw new ApiError(UNAVAILABLE_MSG, 0);
+  }
+
+  // ── Token refresh ─────────────────────────────────────────────────────
+  /** Attempts to refresh the JWT access token using the httpOnly refresh cookie. */
+  async refreshToken(): Promise<boolean> {
+    try {
+      const url = buildApiUrl('/auth/refresh');
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      if (data?.token) {
+        this.setToken(data.token);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────
