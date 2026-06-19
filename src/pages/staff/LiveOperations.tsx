@@ -28,32 +28,42 @@ export default function LiveOperations() {
       setFundis(fundiData.fundis || []);
       setJobs(jobData.jobs || []);
     } catch (err: unknown) {
-      // If 403/401, stop polling — the auto-refresh in apiClient will handle redirect
       const status = (err as any)?.status;
       if (status === 403 || status === 401) {
-        return; // don't throw, just stop fetching
+        // Permission denied or token expired — STOP polling entirely.
+        // Don't retry, don't loop. The user needs to re-login or they
+        // don't have permission for this page.
+        return;
       }
-      // ignore other errors
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         const me = await apiClient.getCurrentUser();
         const staffRoles = ["super_admin", "admin", "dispatch_team", "support_agent"];
-        if (!staffRoles.includes(me?.user?.role)) { navigate("/staff"); return; }
-      } catch { navigate("/staff/login"); return; }
-      fetchData();
+        if (!staffRoles.includes(me?.user?.role)) {
+          navigate("/staff");
+          return;
+        }
+      } catch {
+        navigate("/staff/login");
+        return;
+      }
+      if (!cancelled) fetchData();
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  // Auto-refresh every 15s, but only if we successfully loaded data before
+  // Auto-refresh every 15s, but ONLY if data was successfully loaded.
+  // If we got a 403/401, we never set fundis/jobs, so this never starts.
   useEffect(() => {
-    if (fundis.length === 0 && jobs.length === 0) return; // don't poll if nothing loaded yet
+    if (fundis.length === 0 && jobs.length === 0) return;
     const interval = setInterval(fetchData, 15_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps

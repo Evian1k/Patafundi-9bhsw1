@@ -127,19 +127,9 @@ class ApiClient {
         }
       }
 
-      if (response.status === 403 && this.token && attempt === 0) {
-        // 403 could mean the token is valid but role changed — try refresh
-        try {
-          const refreshed = await this.refreshToken();
-          if (refreshed) {
-            config.headers = config.headers || {};
-            (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
-            continue;
-          }
-        } catch {
-          // ignore — let the 403 propagate
-        }
-      }
+      // 403 = Forbidden (permission denied) — do NOT retry, just throw.
+      // Refreshing the token won't help because the user's role/permissions
+      // haven't changed. Let the caller handle the 403 gracefully.
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
