@@ -56,6 +56,8 @@ import AICommandCenter from "@/pages/staff/AICommandCenter";
 import StaffManagement from "@/pages/staff/StaffManagement";
 import CommissionControl from "@/pages/staff/CommissionControl";
 import LiveOperations from "@/pages/staff/LiveOperations";
+import SecurityCenter from "@/pages/staff/SecurityCenter";
+import SystemSettings from "@/pages/staff/SystemSettings";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -144,6 +146,8 @@ export default function AppRoutes() {
         <Route index element={<StaffOverview />} />
         <Route path="executive" element={<ExecutiveDashboard />} />
         <Route path="ai" element={<AICommandCenter />} />
+        <Route path="security" element={<SecurityCenter />} />
+        <Route path="system" element={<SystemSettings />} />
         <Route path="staff-mgmt" element={<StaffManagement />} />
         <Route path="commission" element={<CommissionControl />} />
         <Route path="operations" element={<LiveOperations />} />

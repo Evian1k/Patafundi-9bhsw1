@@ -260,6 +260,28 @@ server.listen(port, host, () => {
   };
   runFraudJobs();
   setInterval(runFraudJobs, 15 * 60 * 1000);
+
+  // Scheduled job scheduler — activates scheduled jobs when their time arrives
+  const runScheduledJobs = async () => {
+    try {
+      const { query } = await import('./db.js');
+      const due = await query(
+        `update jobs set status = 'matching' where status = 'scheduled' and scheduled_at <= now() returning id, customer_id`,
+      );
+      if (due.rows.length > 0) {
+        console.log(`[scheduler] Activated ${due.rows.length} scheduled job(s)`);
+        for (const job of due.rows) {
+          const { emitEvent } = await import('./realtime.js');
+          emitEvent('job:status', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
+          emitEvent('job:created', { jobId: job.id, status: 'matching' }, `user:${job.customer_id}`);
+        }
+      }
+    } catch (err) {
+      console.error('[scheduler] error:', err.message);
+    }
+  };
+  runScheduledJobs();
+  setInterval(runScheduledJobs, 60 * 1000); // check every minute
 });
 
 server.on('error', (error) => {
