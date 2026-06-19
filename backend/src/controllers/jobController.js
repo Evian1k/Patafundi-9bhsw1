@@ -136,10 +136,11 @@ export async function createJob(req, res) {
   if (!serviceCategory || !description) throw badRequest('Service category and description are required');
   const latitude = body.latitude || body.customer_latitude || null;
   const longitude = body.longitude || body.customer_longitude || null;
+  const scheduledAt = body.scheduledDate || body.scheduled_at || null;
   const result = await query(
     `insert into jobs (customer_id, service_category, description, location_name, customer_latitude,
-      customer_longitude, status, urgency, estimated_price)
-     values ($1, $2, $3, $4, $5, $6, 'matching', $7, $8) returning *`,
+      customer_longitude, status, urgency, estimated_price, scheduled_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
     [
       req.user.id,
       serviceCategory,
@@ -148,8 +149,10 @@ export async function createJob(req, res) {
       || body.locationName || body.location_name || body.location || body.address || '',
       latitude,
       longitude,
+      scheduledAt ? 'scheduled' : 'matching',
       body.urgency || 'normal',
       body.estimatedPrice || body.estimated_price || null,
+      scheduledAt,
     ],
   );
   const job = result.rows[0];

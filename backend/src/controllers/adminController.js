@@ -109,13 +109,161 @@ export async function dashboard(req, res) {
   });
 }
 
+/**
+ * GET /api/admin/reports — returns chartData + topFundis for the Reports page.
+ * Fixes the frontend/backend shape mismatch (C9 from gap analysis).
+ * Supports ?range=today|7d|30d|90d|year
+ */
+export async function reports(req, res) {
+  const range = String(req.query.range || '30d');
+  let interval;
+  if (range === 'today') interval = '1 day';
+  else if (range === '7d') interval = '7 days';
+  else if (range === '30d') interval = '30 days';
+  else if (range === '90d') interval = '90 days';
+  else interval = '365 days';
+
+  const [chartData, topFundis, summary] = await Promise.all([
+    // Daily chart data: jobs + revenue per day
+    query(
+      `select date_trunc('day', j.created_at) as date,
+              count(*)::int as jobs,
+              coalesce(sum(p.amount), 0)::numeric as revenue,
+              count(distinct j.customer_id)::int as customers,
+              count(distinct j.fundi_id) filter (where j.fundi_id is not null)::int as fundis
+       from jobs j
+       left join payments p on p.job_id = j.id and p.status = 'completed'
+       where j.created_at > now() - interval '${interval}'
+       group by 1 order by 1`,
+    ),
+    // Top fundis by completed jobs
+    query(
+      `select f.user_id, u.full_name as name,
+              count(j.id)::int as job_count,
+              coalesce(avg(r.rating), 0)::numeric(3,2) as rating,
+              coalesce(sum(coalesce(j.final_price, j.estimated_price, 0)), 0)::numeric as total_earnings
+       from fundis f
+       join users u on u.id = f.user_id
+       left join jobs j on j.fundi_id = f.user_id and j.status = 'completed'
+       left join reviews r on r.job_id = j.id
+       where f.approval_status = 'approved'
+       group by f.user_id, u.full_name
+       order by job_count desc limit 10`,
+    ),
+    // Summary stats
+    query(
+      `select
+         (select count(*)::int from users) as total_users,
+         (select count(*)::int from users where created_at > now() - interval '${interval}') as new_users,
+         (select count(*)::int from fundis where approval_status = 'approved') as approved_fundis,
+         (select count(*)::int from jobs where created_at > now() - interval '${interval}') as total_jobs,
+         (select count(*)::int from jobs where status = 'completed' and created_at > now() - interval '${interval}') as completed_jobs,
+         (select coalesce(sum(amount), 0)::numeric from payments where status = 'completed' and created_at > now() - interval '${interval}') as total_revenue,
+         (select count(*)::int from disputes where status = 'open') as open_disputes`,
+    ),
+  ]);
+
+  res.json({
+    success: true,
+    chartData: chartData.rows.map((r) => ({
+      date: r.date,
+      jobs: r.jobs,
+      revenue: Number(r.revenue),
+      customers: r.customers,
+      fundis: r.fundis,
+    })),
+    topFundis: topFundis.rows.map((r) => ({
+      id: r.user_id,
+      name: r.name,
+      jobCount: r.job_count,
+      rating: Number(r.rating),
+      totalEarnings: Number(r.total_earnings || 0),
+    })),
+    summary: summary.rows[0],
+  });
+}
+
 export function listTable(table, key) {
-  return async (_req, res) => {
+  return async (req, res) => {
     if (!tableSelects[table]) throw badRequest('Unsupported admin table');
     const orderCol = tableOrderBy[table] || 'created_at';
-    const result = await query(`${tableSelects[table]} order by ${orderCol} desc limit 100`);
+
+    // ── Pagination ──
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+    const offset = (page - 1) * limit;
+
+    // ── Search / Filter ──
+    // Supports ?q= (free-text ILIKE on text columns) and ?action= / ?status= (exact match)
+    const search = String(req.query.q || '').trim();
+    const actionFilter = String(req.query.action || '').trim();
+    const statusFilter = String(req.query.status || '').trim();
+    const severityFilter = String(req.query.severity || '').trim();
+
+    const params = [];
+    const filters = [];
+
+    // Table-specific search columns
+    const searchColumns = {
+      audit_logs: ['action', 'entity_type', 'entity_id::text'],
+      fraud_alerts: ['alert_type', 'detected_pattern', 'message_preview'],
+      trust_scores: ['level'],
+      notifications: ['type', 'title', 'body'],
+      payments: ['mpesa_receipt_number', 'status', 'escrow_status'],
+      escrow_transactions: ['type', 'status'],
+    };
+
+    if (search && searchColumns[table]) {
+      const cols = searchColumns[table];
+      const searchClauses = cols.map((col) => {
+        params.push(`%${search}%`);
+        return `${col} ilike $${params.length}`;
+      });
+      filters.push(`(${searchClauses.join(' or ')})`);
+    }
+
+    // Exact-match filters
+    if (actionFilter && table === 'audit_logs') {
+      params.push(actionFilter);
+      filters.push(`action = $${params.length}`);
+    }
+    if (statusFilter && ['fraud_alerts', 'payments', 'escrow_transactions'].includes(table)) {
+      params.push(statusFilter);
+      filters.push(`status = $${params.length}`);
+    }
+    if (severityFilter && table === 'fraud_alerts') {
+      params.push(severityFilter);
+      filters.push(`severity = $${params.length}`);
+    }
+
+    const where = filters.length ? `where ${filters.join(' and ')}` : '';
+    const baseQuery = tableSelects[table];
+
+    // Count total (for pagination metadata)
+    const countResult = await query(
+      `select count(*)::int as total from (${baseQuery} ${where}) as sub`,
+      params,
+    );
+    const total = countResult.rows[0]?.total || 0;
+
+    // Fetch page
+    params.push(limit, offset);
+    const result = await query(
+      `${baseQuery} ${where} order by ${orderCol} desc limit $${params.length - 1} offset $${params.length}`,
+      params,
+    );
+
     const rows = table === 'fundis' ? result.rows.map(publicFundi) : result.rows;
-    res.json({ success: true, [key]: rows, pagination: { page: 1, limit: 100, total: rows.length, pages: 1 } });
+    res.json({
+      success: true,
+      [key]: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   };
 }
 

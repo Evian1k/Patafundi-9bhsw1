@@ -125,8 +125,8 @@ router.post('/admin/payouts/:id/complete', authRequired, requireRole('admin'), a
 router.get('/admin/disputes', authRequired, requireRole('admin'), asyncHandler(disputes.listDisputes));
 router.post('/admin/disputes/:id/resolve', authRequired, requireRole('admin'), asyncHandler(disputes.resolveDispute));
 router.get('/admin/audit-logs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('audit_logs', 'logs')));
-router.get('/admin/reports', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
-router.get('/admin/reports/analytics', authRequired, requireRole('admin'), asyncHandler(admin.dashboard));
+router.get('/admin/reports', authRequired, requireRole('admin'), asyncHandler(admin.reports));
+router.get('/admin/reports/analytics', authRequired, requireRole('admin'), asyncHandler(admin.reports));
 router.get('/admin/revenue', authRequired, requireRole('admin'), asyncHandler(admin.revenueDashboard));
 router.get('/admin/fraud/dashboard', authRequired, requireRole('admin'), asyncHandler(fraud.fraudDashboard));
 router.get('/admin/fraud/alerts', authRequired, requireRole('admin'), asyncHandler(fraud.listFraudAlerts));
@@ -201,9 +201,29 @@ router.get('/ai/insights/:category', authRequired, requireRole('admin'), asyncHa
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
-router.post('/subscriptions/activate', authRequired, (_req, res) => res.json({ success: true }));
+router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
+  const { plan = 'monthly', amount = 500 } = req.body || {};
+  if (!req.user || req.user.role !== 'fundi') {
+    return res.status(403).json({ success: false, message: 'Only fundis can activate subscriptions' });
+  }
+  const { query } = await import('./db.js');
+  const result = await query(
+    `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at)
+     values ($1, $2, $3, 'active', now(), now() + interval '30 days')
+     returning *`,
+    [req.user.id, plan, amount],
+  );
+  await query(
+    `update fundis set subscription_active = true, subscription_expires_at = now() + interval '30 days',
+      premium_plan = $2, updated_at = now() where user_id = $1`,
+    [req.user.id, plan],
+  );
+  res.status(201).json({ success: true, subscription: result.rows[0] });
+}));
 
 router.post('/support/ticket', asyncHandler(content.supportTicket));
+router.get('/admin/support/tickets', authRequired, requireRole('admin'), asyncHandler(content.listSupportTickets));
+router.patch('/admin/support/tickets/:id', authRequired, requireRole('admin'), asyncHandler(content.updateSupportTicket));
 router.post('/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.get('/blog', asyncHandler(content.genericList('posts')));
