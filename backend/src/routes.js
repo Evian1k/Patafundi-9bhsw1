@@ -260,23 +260,57 @@ router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
 router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
-  const { plan = 'monthly', amount = 500 } = req.body || {};
   if (!req.user || req.user.role !== 'fundi') {
     return res.status(403).json({ success: false, message: 'Only fundis can activate subscriptions' });
   }
+  const { plan = 'monthly', amount = 500, mpesaNumber, idempotencyKey } = req.body || {};
+  if (!mpesaNumber) {
+    return res.status(400).json({ success: false, message: 'M-Pesa number required for subscription payment' });
+  }
   const { query } = await import('./db.js');
-  const result = await query(
+  const { assertValidMpesaPhone, initiateStkPush } = await import('./services/mpesaService.js');
+  const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
+  const key = idempotencyKey || crypto.randomUUID();
+
+  // Create subscription as 'pending' — not active until payment confirmed
+  const subResult = await query(
     `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at)
-     values ($1, $2, $3, 'active', now(), now() + interval '30 days')
+     values ($1, $2, $3, 'pending', now(), now() + interval '30 days')
      returning *`,
     [req.user.id, plan, amount],
   );
-  await query(
-    `update fundis set subscription_active = true, subscription_expires_at = now() + interval '30 days',
-      premium_plan = $2, updated_at = now() where user_id = $1`,
-    [req.user.id, plan],
-  );
-  res.status(201).json({ success: true, subscription: result.rows[0] });
+
+  // Initiate M-Pesa STK push for the subscription fee
+  try {
+    const daraja = await initiateStkPush({
+      phone: mpesaNumber,
+      amount,
+      accountReference: `SUB-${req.user.id.slice(0, 8)}`,
+      transactionDesc: `PataFundi ${plan} subscription`,
+    });
+
+    // Store checkout_request_id on the subscription for webhook matching
+    await query(
+      `update subscriptions set metadata = jsonb_set(coalesce(metadata, '{}'::jsonb), '{checkout_request_id}', $2::text)
+       where id = $1`,
+      [subResult.rows[0].id, JSON.stringify(daraja.CheckoutRequestID)],
+    );
+
+    res.status(202).json({
+      success: true,
+      subscriptionId: subResult.rows[0].id,
+      checkoutRequestId: daraja.CheckoutRequestID,
+      message: 'Subscription payment initiated. Complete the M-Pesa prompt to activate.',
+    });
+  } catch (err) {
+    // M-Pesa failed — mark subscription as failed
+    await query(`update subscriptions set status = 'expired' where id = $1`, [subResult.rows[0].id]);
+    res.status(502).json({
+      success: false,
+      message: 'M-Pesa STK push failed. Try again or contact support.',
+      subscriptionId: subResult.rows[0].id,
+    });
+  }
 }));
 
 router.post('/support/ticket', asyncHandler(content.supportTicket));

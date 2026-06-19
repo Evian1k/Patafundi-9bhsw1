@@ -14,7 +14,7 @@ import { BrandLogo } from "@/assets/logo";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters").regex(/[A-Za-z]/, "Must include letters").regex(/\d/, "Must include numbers"),
 });
 
 const signupSchema = loginSchema.extend({

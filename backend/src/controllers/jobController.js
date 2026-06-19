@@ -393,9 +393,20 @@ export async function completeJob(req, res) {
     actorId: req.user.id,
     actorRole: req.user.role,
   });
-  emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
+  // Deliver the OTP to the customer via socket + notification so they can confirm completion.
+  await query(
+    `insert into notifications (user_id, type, title, body, data)
+     values ($1, 'job_completion_otp', 'Job Complete — Confirm with Code', $2, $3::jsonb)`,
+    [
+      job.customer_id,
+      `Your fundi has completed the job. Use code ${otp} to confirm completion.`,
+      JSON.stringify({ jobId: job.id, otp }),
+    ],
+  );
+  emitEvent('job:completed', { jobId: req.params.id, completionOtp: otp }, `job:${req.params.id}`);
+  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]), completionOtp: otp }, `job:${req.params.id}`);
+  emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true, completionOtp: otp });
 }
 
 export async function confirmCompletion(req, res) {

@@ -57,10 +57,11 @@ export default function AdminLogin() {
         throw new Error("Login failed — no user returned.");
       }
 
-      if (response.user.role !== "admin") {
-        // Clear the token — non-admin should not persist
+      const staffRoles = ["admin", "super_admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];
+      if (!staffRoles.includes(response.user.role)) {
+        // Clear the token — non-staff should not persist
         apiClient.setToken(null);
-        throw new Error("Access denied. This account does not have admin privileges.");
+        throw new Error("Access denied. This account does not have staff privileges.");
       }
 
       toast.success("Admin login successful!");
