@@ -83,7 +83,7 @@ async function findValidOtp(email, purpose) {
 }
 
 export async function register(req, res) {
-  const { email, password, fullName, phone } = req.body || {};
+  const { email, password, fullName, phone, referralCode } = req.body || {};
   const role = 'customer';
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
   requireStrongPassword(password);
@@ -108,10 +108,36 @@ export async function register(req, res) {
       [inserted.rows[0].id],
     );
     await client.query(
+      `insert into user_loyalty (user_id, tier, points, jobs_completed, total_spent) values ($1, 'bronze', 0, 0, 0)`,
+      [inserted.rows[0].id],
+    );
+    await client.query(
       `insert into otp_codes (user_id, purpose, code_hash, expires_at)
        values ($1, 'register', $2, now() + interval '10 minutes')`,
       [inserted.rows[0].id, await bcrypt.hash(otpCode, 10)],
     );
+
+    // Process referral code if provided
+    if (referralCode) {
+      const referrer = await client.query(
+        'select referrer_id from referrals where referral_code = $1 and status = $2',
+        [referralCode, 'pending'],
+      );
+      if (referrer.rows[0]) {
+        // This new user is the referee — link them
+        await client.query(
+          'update referrals set referee_id = $1, status = $2 where referrer_id = $3 and referral_code = $4',
+          [inserted.rows[0].id, 'completed', referrer.rows[0].referrer_id, referralCode],
+        );
+        // Reward the referrer with a notification
+        await client.query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'referral_completed', 'Referral Reward!', 'Someone joined PataFundi using your code! You earned KES 100.', $2::jsonb)`,
+          [referrer.rows[0].referrer_id, JSON.stringify({ refereeId: inserted.rows[0].id, reward: 100 })],
+        );
+      }
+    }
+
     return inserted.rows[0];
   });
   await auditLog({ userId: user.id, action: 'auth.register', entityType: 'user', entityId: user.id });
