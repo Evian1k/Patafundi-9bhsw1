@@ -34,6 +34,7 @@ export default function FundiNavigationMap({
         fundi={animatedFundi}
         routePath={routePath}
         height={height}
+        viewMode="fundi"
         overlay={(
           <div className="pf-map-overlay-card">
             <div className="flex items-center justify-between gap-3">

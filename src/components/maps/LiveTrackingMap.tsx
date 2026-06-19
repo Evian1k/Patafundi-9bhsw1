@@ -44,6 +44,8 @@ interface LiveTrackingMapProps {
   overlay?: React.ReactNode;
   autoFit?: boolean;
   showPulse?: boolean;
+  /** 'customer' = customer tracking fundi (default), 'fundi' = fundi navigating to customer */
+  viewMode?: 'customer' | 'fundi';
 }
 
 export default function LiveTrackingMap({
@@ -56,6 +58,7 @@ export default function LiveTrackingMap({
   overlay,
   autoFit = true,
   showPulse = true,
+  viewMode = 'customer',
 }: LiveTrackingMapProps) {
   const { isLoaded, hasApiKey, useGoogleMaps } = useGoogleMapsReady();
   const googleActive = useGoogleMaps && hasApiKey;
@@ -74,8 +77,18 @@ export default function LiveTrackingMap({
     return [];
   }, [routePath, customer, fundi]);
 
-  const customerIcon = useMemo(() => createGoogleMarkerIcon('customer', 'You'), [isLoaded]);
-  const fundiIcon = useMemo(() => createGoogleMarkerIcon('fundi', 'Fundi'), [isLoaded]);
+  // When fundi is viewing, swap labels: fundi = "You", customer = "Customer"
+  const fundiLabel = viewMode === 'fundi' ? 'You' : 'Fundi';
+  const customerLabel = viewMode === 'fundi' ? 'Customer' : 'You';
+  // When fundi is viewing, use blue for self (like "you" in Uber), orange for destination
+  const fundiIcon = useMemo(
+    () => viewMode === 'fundi' ? createGoogleMarkerIcon('customer', fundiLabel) : createGoogleMarkerIcon('fundi', fundiLabel),
+    [isLoaded, viewMode, fundiLabel],
+  );
+  const customerIcon = useMemo(
+    () => viewMode === 'fundi' ? createGoogleMarkerIcon('fundi', customerLabel) : createGoogleMarkerIcon('customer', customerLabel),
+    [isLoaded, viewMode, customerLabel],
+  );
 
   const onLoad = useCallback((loadedMap: google.maps.Map) => setMap(loadedMap), []);
   const onUnmount = useCallback(() => setMap(null), []);
@@ -104,6 +117,7 @@ export default function LiveTrackingMap({
         overlay={overlay}
         autoFit={autoFit}
         showPulse={showPulse}
+        viewMode={viewMode}
       />
     );
   }
@@ -177,10 +191,10 @@ export default function LiveTrackingMap({
           />
         )}
         {customer && customerIcon && (
-          <Marker position={toLatLng(customer)} icon={customerIcon} title="Your location" />
+          <Marker position={toLatLng(customer)} icon={customerIcon} title={customerLabel} />
         )}
         {fundi && fundiIcon && (
-          <Marker position={toLatLng(fundi)} icon={fundiIcon} title="Fundi" />
+          <Marker position={toLatLng(fundi)} icon={fundiIcon} title={fundiLabel} />
         )}
       </GoogleMap>
 

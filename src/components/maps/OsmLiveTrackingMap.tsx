@@ -47,6 +47,8 @@ interface OsmLiveTrackingMapProps {
   overlay?: React.ReactNode;
   autoFit?: boolean;
   showPulse?: boolean;
+  /** 'customer' = customer tracking fundi (default), 'fundi' = fundi navigating to customer */
+  viewMode?: 'customer' | 'fundi';
 }
 
 export default function OsmLiveTrackingMap({
@@ -59,6 +61,7 @@ export default function OsmLiveTrackingMap({
   overlay,
   autoFit = true,
   showPulse = true,
+  viewMode = 'customer',
 }: OsmLiveTrackingMapProps) {
   const [theme, setTheme] = useState<MapTheme>(defaultTheme);
   const [map, setMap] = useState<L.Map | null>(null);
@@ -77,8 +80,17 @@ export default function OsmLiveTrackingMap({
     return [];
   }, [routePath, customer, fundi]);
 
-  const customerIcon = useMemo(() => createOsmMarkerIcon('customer', 'You'), []);
-  const fundiIcon = useMemo(() => createOsmMarkerIcon('fundi', 'Fundi'), []);
+  // When fundi is viewing, swap labels: fundi = "You", customer = "Customer"
+  const fundiLabel = viewMode === 'fundi' ? 'You' : 'Fundi';
+  const customerLabel = viewMode === 'fundi' ? 'Customer' : 'You';
+  const customerIcon = useMemo(
+    () => viewMode === 'fundi' ? createOsmMarkerIcon('fundi', customerLabel) : createOsmMarkerIcon('customer', customerLabel),
+    [viewMode, customerLabel],
+  );
+  const fundiIcon = useMemo(
+    () => viewMode === 'fundi' ? createOsmMarkerIcon('customer', fundiLabel) : createOsmMarkerIcon('fundi', fundiLabel),
+    [viewMode, fundiLabel],
+  );
 
   const recenter = () => {
     if (!map || fitPoints.length === 0) return;
