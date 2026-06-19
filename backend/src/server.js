@@ -32,7 +32,33 @@ const io = new SocketIOServer(server, {
 
 attachRealtime(io);
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://maps.googleapis.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://maps.googleapis.com', 'https://*.tile.openstreetmap.org', 'https://*.cloudflarestorage.com'],
+      connectSrc: ["'self'", 'https://api.safaricom.co.ke', 'https://maps.googleapis.com', 'wss:', 'ws:'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  permissionsPolicy: {
+    policy: { geolocation: ["'self'"], camera: ["'self'"], microphone: ["'none'"] },
+  },
+}));
 app.use(cors({
   origin: corsOriginCallback,
   credentials: true,

@@ -278,6 +278,38 @@ router.put('/fundi/availability', authRequired, requireFundiAccount, asyncHandle
 // Earnings analytics
 router.get('/fundi/earnings/analytics', authRequired, requireApprovedFundi, asyncHandler(fundiEnh.earningsAnalytics));
 
+// ============================================================
+// Security Center — 2FA, feature flags, sessions, favorites, API integrations
+// ============================================================
+import * as security from './controllers/securityController.js';
+
+// 2FA (any authenticated user can set up their own)
+router.post('/security/2fa/setup', authRequired, asyncHandler(security.setup2FAReq));
+router.post('/security/2fa/verify', authRequired, asyncHandler(security.verify2FASetupReq));
+router.post('/security/2fa/disable', authRequired, asyncHandler(security.disable2FAReq));
+router.post('/security/2fa/regenerate-recovery', authRequired, asyncHandler(security.regenerateRecoveryReq));
+
+// Feature flags (admin only)
+router.get('/admin/feature-flags', authRequired, requireRole('admin'), asyncHandler(security.listFeatureFlags));
+router.put('/admin/feature-flags', authRequired, requirePerm('can_manage_system'), asyncHandler(security.toggleFeatureFlag));
+
+// Session management
+router.get('/security/sessions', authRequired, asyncHandler(security.getActiveSessions));
+router.delete('/security/sessions/:id', authRequired, asyncHandler(security.terminateSession));
+router.delete('/security/sessions', authRequired, asyncHandler(security.terminateAllSessions));
+
+// Login history
+router.get('/security/login-history', authRequired, asyncHandler(security.getLoginHistory));
+
+// Favorite fundis (customer only)
+router.get('/favorites/fundis', authRequired, asyncHandler(security.listFavoriteFundis));
+router.post('/favorites/fundis', authRequired, asyncHandler(security.addFavoriteFundi));
+router.delete('/favorites/fundis/:fundiId', authRequired, asyncHandler(security.removeFavoriteFundi));
+
+// API integrations (admin only)
+router.get('/admin/integrations', authRequired, requireRole('admin'), asyncHandler(security.listApiIntegrations));
+router.post('/admin/integrations/:service/test', authRequired, requireRole('admin'), asyncHandler(security.testApiIntegration));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));

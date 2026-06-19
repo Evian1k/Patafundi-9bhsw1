@@ -24,6 +24,9 @@
     "setup:logo": "node scripts/process-brand-logo.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.750.0",
+    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@electric-sql/pglite": "^0.5.1",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.9.0",
@@ -63,9 +66,6 @@
     "@stripe/stripe-js": "^7.4.0",
     "@tanstack/react-query": "^5.56.2",
     "@tanstack/react-query-devtools": "^5.90.2",
-    "@aws-sdk/client-s3": "^3.750.0",
-    "@aws-sdk/client-rekognition": "^3.750.0",
-    "@aws-sdk/s3-request-presigner": "^3.750.0",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.0",
@@ -90,6 +90,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.1.1",
     "next-themes": "^0.3.0",
+    "otplib": "^13.4.1",
     "pg": "^8.21.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
