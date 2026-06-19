@@ -100,39 +100,34 @@ export async function fraudReport(req, res) {
 }
 
 export function genericList(key) {
-  return (_req, res) => {
-    const data = {
-      posts: [
-        {
-          slug: 'staying-safe-with-home-service-bookings',
-          title: 'Staying safe with home service bookings',
-          excerpt: 'Practical checks customers and fundis can use before, during, and after a job.',
-          publishedAt: '2026-06-01',
-        },
-      ],
-      jobs: [
-        {
-          id: 'operations-support-associate',
-          title: 'Operations Support Associate',
-          location: 'Nairobi, Kenya',
-          type: 'Full-time',
-        },
-      ],
+  return async (_req, res) => {
+    const tableMap = {
+      posts: { table: 'blog_posts', columns: 'slug, title, excerpt, published_at, author' },
+      jobs: { table: 'career_jobs', columns: 'id, title, department, location, type, status' },
     };
-    res.json({ success: true, [key]: data[key] || [] });
+    const config = tableMap[key];
+    if (!config) {
+      // Fallback to hardcoded for unknown keys
+      const data = { posts: [], jobs: [] };
+      return res.json({ success: true, [key]: data[key] || [] });
+    }
+    try {
+      const result = await query(`select ${config.columns} from ${config.table} where status = 'published' or status = 'open' order by created_at desc`);
+      res.json({ success: true, [key]: result.rows });
+    } catch {
+      // Table might not exist yet — return empty
+      res.json({ success: true, [key]: [] });
+    }
   };
 }
 
 export async function blogPost(req, res) {
-  const posts = [
-    {
-      slug: 'staying-safe-with-home-service-bookings',
-      title: 'Staying safe with home service bookings',
-      body: 'Use in-app chat, keep payment in escrow, and report off-platform payment requests immediately.',
-      publishedAt: '2026-06-01',
-    },
-  ];
-  res.json({ success: true, post: posts.find((post) => post.slug === req.params.slug) || null });
+  try {
+    const result = await query('select * from blog_posts where slug = $1 and status = $2', [req.params.slug, 'published']);
+    res.json({ success: true, post: result.rows[0] || null });
+  } catch {
+    res.json({ success: true, post: null });
+  }
 }
 
 export async function help(_req, res) {
@@ -159,6 +154,14 @@ export async function help(_req, res) {
 }
 
 export async function policy(req, res) {
+  try {
+    const result = await query('select * from policies where slug = $1 and status = $2', [req.params.slug, 'active']);
+    if (result.rows[0]) {
+      res.json({ success: true, policy: result.rows[0] });
+      return;
+    }
+  } catch { /* table might not exist */ }
+  // Fallback to hardcoded
   const policies = {
     privacy: { slug: 'privacy', title: 'Privacy Policy', body: 'PataFundi stores account, job, payment, and safety data needed to operate the platform.' },
     terms: { slug: 'terms', title: 'Terms of Service', body: 'Users must keep communication and payments on-platform and comply with local law.' },
@@ -168,6 +171,21 @@ export async function policy(req, res) {
 }
 
 export async function service(req, res) {
+  try {
+    const result = await query('select * from service_categories where slug = $1 and is_active = true', [req.params.slug]);
+    if (result.rows[0]) {
+      // Also fetch approved fundis for this service
+      const fundis = await query(
+        `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score
+         from fundis f join users u on u.id = f.user_id
+         where f.approval_status = 'approved' and $1 = any(f.skills)
+         limit 10`,
+        [result.rows[0].title],
+      );
+      res.json({ success: true, service: result.rows[0], fundis: fundis.rows });
+      return;
+    }
+  } catch { /* table might not exist */ }
   const services = {
     plumbing: { slug: 'plumbing', title: 'Plumbing', description: 'Leaks, fixtures, drainage, and urgent plumbing repairs.' },
     electrical: { slug: 'electrical', title: 'Electrical', description: 'Fault diagnosis, wiring, lighting, and appliance electrical work.' },
