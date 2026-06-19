@@ -40,12 +40,17 @@ function formatTime(iso?: string) {
 
 function normalizeMessage(msg: ChatMessage, currentUserId?: string) {
   const senderId = msg.sender_id || msg.senderId;
+  const content = msg.body || msg.content || msg.text || '';
+  const timestamp = msg.created_at || msg.createdAt || msg.timestamp;
+  // Fallback ID: if no id from server, generate one from sender+content+timestamp
+  // so dedup works even when socket payload and API response have different shapes
+  const id = msg.id || `${senderId}-${content.slice(0, 20)}-${timestamp}`;
   return {
-    id: msg.id,
+    id,
     senderId,
     senderName: msg.sender_name || msg.senderName,
-    content: msg.body || msg.content || msg.text || '',
-    timestamp: msg.created_at || msg.createdAt || msg.timestamp,
+    content,
+    timestamp,
     isOwn: senderId === currentUserId,
   };
 }
@@ -153,7 +158,13 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
     try {
       const res = await apiClient.sendJobMessage(jobId, text) as { message?: ChatMessage };
       if (res.message) {
-        setMessages((prev) => [...prev, normalizeMessage(res.message!, currentUserId)]);
+        const normalized = normalizeMessage(res.message, currentUserId);
+        setMessages((prev) => {
+          // Dedup: don't add if a message with the same ID already exists
+          // (the socket event may have already added it)
+          if (normalized.id && prev.some((p) => p.id === normalized.id)) return prev;
+          return [...prev, normalized];
+        });
       }
       setInput('');
     } catch (error) {

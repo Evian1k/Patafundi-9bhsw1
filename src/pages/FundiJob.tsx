@@ -161,8 +161,16 @@ export default function FundiJob() {
       setJob((prev) => prev ? { ...prev, status: nextStatus } : prev);
       const labels = { on_the_way: 'On the way!', arrived: 'Arrived!', in_progress: 'Work started!' };
       toast.success(labels[nextStatus]);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to update status');
+    } catch (e: unknown) {
+      const err = e as { message?: string; status?: number };
+      if (err?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        navigate('/auth');
+      } else if (err?.status === 403) {
+        toast.error('Your account may not be approved yet. Wait for admin approval.');
+      } else {
+        toast.error(err?.message || 'Failed to update status. Check your connection.');
+      }
     }
   };
 
