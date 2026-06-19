@@ -50,6 +50,8 @@ import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
 import StaffLayout from "@/components/staff/StaffLayout";
 import StaffOverview from "@/pages/staff/StaffOverview";
 import StaffDataTable from "@/pages/staff/StaffDataTable";
+import StaffLogin from "@/pages/staff/StaffLogin";
+import ExecutiveDashboard from "@/pages/staff/ExecutiveDashboard";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -130,9 +132,46 @@ export default function AppRoutes() {
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
 
+      {/* Staff login portal — rejects customer/fundi accounts */}
+      <Route path="/staff/login" element={<StaffLogin />} />
+
       {/* Staff dashboards (enterprise RBAC — permission-scoped) */}
       <Route path="/staff" element={<StaffLayout />}>
         <Route index element={<StaffOverview />} />
+        <Route path="executive" element={<ExecutiveDashboard />} />
+        <Route path="operations" element={<StaffOverview />} />
+        <Route path="support" element={<StaffOverview />} />
+        <Route path="fraud" element={
+          <StaffDataTable resource="fraud-alerts" title="Fraud Alerts"
+            columns={[
+              { key: "alert_type", label: "Type" },
+              { key: "severity", label: "Severity" },
+              { key: "status", label: "Status" },
+              { key: "created_at", label: "Detected", render: (r) => new Date(r.created_at).toLocaleString() },
+            ]}
+          />
+        } />
+        <Route path="finance" element={
+          <StaffDataTable resource="payments" title="Payments"
+            columns={[
+              { key: "amount", label: "Amount (KES)" },
+              { key: "status", label: "Status" },
+              { key: "escrow_status", label: "Escrow" },
+              { key: "created_at", label: "Date", render: (r) => new Date(r.created_at).toLocaleDateString() },
+            ]}
+          />
+        } />
+        <Route path="dispatch" element={<StaffOverview />} />
+        <Route path="devops" element={<StaffOverview />} />
+        <Route path="audit" element={
+          <StaffDataTable resource="audit-logs" title="Audit Logs"
+            columns={[
+              { key: "action", label: "Action" },
+              { key: "entity_type", label: "Entity" },
+              { key: "created_at", label: "Time", render: (r) => new Date(r.created_at).toLocaleString() },
+            ]}
+          />
+        } />
         <Route path="admin" element={<StaffOverview />} />
         <Route path="admin/fundis" element={
           <StaffDataTable resource="fundis" title="Fundi Management"
