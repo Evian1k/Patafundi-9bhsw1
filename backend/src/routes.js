@@ -198,6 +198,64 @@ router.get('/ai/recommendations', authRequired, requireRole('admin'), asyncHandl
 router.post('/ai/recommendations/:id/review', authRequired, requireRole('admin'), asyncHandler(ai.reviewRecommendation));
 router.get('/ai/insights/:category', authRequired, requireRole('admin'), asyncHandler(ai.getCategoryInsights));
 
+// ============================================================
+// Enterprise Systems — Phase 3-9 features
+// ============================================================
+import * as enterprise from './controllers/enterpriseController.js';
+import { requirePermission as requirePerm } from './middleware/rbac.js';
+
+// Quality scores (Phase 4)
+router.get('/fundi/:fundiId/quality', authRequired, asyncHandler(enterprise.getFundiQuality));
+router.post('/admin/quality/recalculate', authRequired, requireRole('admin'), asyncHandler(enterprise.recalculateQuality));
+router.post('/admin/quality/:fundiId/calculate', authRequired, requireRole('admin'), asyncHandler(enterprise.calculateFundiQuality));
+
+// Internal notes (Phase 7) — staff only
+router.post('/staff/notes', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.createNote));
+router.get('/staff/notes/:entityType/:entityId', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.listNotes));
+router.delete('/staff/notes/:id', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.deleteNote));
+
+// Referrals (Phase 8)
+router.get('/referrals/me', authRequired, asyncHandler(enterprise.getMyReferrals));
+router.get('/admin/referrals', authRequired, requireRole('admin'), asyncHandler(enterprise.listReferrals));
+
+// Loyalty (Phase 9)
+router.get('/loyalty/me', authRequired, asyncHandler(enterprise.getMyLoyalty));
+router.post('/admin/loyalty/:userId/recalculate', authRequired, requireRole('admin'), asyncHandler(enterprise.recalculateLoyalty));
+
+// Escalations (Phase 6)
+router.post('/staff/escalations', authRequired, asyncHandler(enterprise.createEscalationReq));
+router.post('/staff/escalations/:id/resolve', authRequired, asyncHandler(enterprise.resolveEscalationReq));
+router.get('/staff/escalations', authRequired, asyncHandler(enterprise.listEscalationsReq));
+
+// SLA (Phase 6)
+router.get('/staff/sla/breaches', authRequired, requirePerm('can_view_logs'), asyncHandler(enterprise.getSlaBreachesReq));
+
+// Commission control (Phase 3) — super_admin only
+router.get('/admin/commission/history', authRequired, requirePerm('can_manage_system'), asyncHandler(enterprise.getCommissionHistoryReq));
+router.put('/admin/commission/rate', authRequired, requirePerm('can_manage_system'), asyncHandler(enterprise.updateCommissionRate));
+router.post('/admin/commission/simulate', authRequired, requireRole('admin'), asyncHandler(enterprise.simulateCommission));
+
+// Staff management (Phase 2) — list all users with role filter
+router.get('/admin/staff', authRequired, requirePerm('can_manage_roles'), asyncHandler(async (req, res) => {
+  const { query: q } = await import('./db.js');
+  const role = req.query.role;
+  const staffRoles = ['super_admin', 'admin', 'support_agent', 'fraud_analyst', 'finance_team', 'dispatch_team', 'devops_engineer', 'auditor'];
+  const params = [];
+  let where = `where role = any($1)`;
+  params.push(staffRoles);
+  if (role) {
+    params.push(role);
+    where += ` and role = $2`;
+  }
+  const result = await q(
+    `select id, email, full_name, phone, role, status, trust_score, created_at, updated_at
+     from users ${where}
+     order by created_at desc limit 100`,
+    params,
+  );
+  res.json({ success: true, staff: result.rows });
+}));
+
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));

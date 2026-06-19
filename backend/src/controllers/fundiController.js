@@ -125,9 +125,12 @@ export async function searchFundis(req, res) {
       f.latitude, f.longitude, f.location_accuracy,
       f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge,
       f.updated_at as last_active,
-      (select count(*) from jobs j where j.fundi_id = f.user_id and j.status = 'completed')::int as completed_jobs
+      (select count(*) from jobs j where j.fundi_id = f.user_id and j.status = 'completed')::int as completed_jobs,
+      coalesce(qs.overall_score, 0) as quality_score,
+      qs.tier as quality_tier
      from fundis f
      join users u on u.id = f.user_id
+     left join fundi_quality_scores qs on qs.fundi_id = f.id
      where u.role = 'fundi'
        and u.status = 'active'
        and f.approval_status = 'approved'
@@ -150,26 +153,31 @@ export async function searchFundis(req, res) {
         ...publicFundiShape(row, photoUrls),
         distanceKm,
         completedJobs: row.completed_jobs || 0,
+        qualityScore: Number(row.quality_score || 0),
+        qualityTier: row.quality_tier || null,
         lastActive: row.last_active,
       };
     }));
 
-  // Ranking formula: distance first, then rating, then trust score, then completed jobs.
-  // Closer = better; higher rating/trust/jobs = better.
+  // Ranking formula (Phase 4: Smart Fundi Ranking):
+  // 1. Distance (closest first)
+  // 2. Quality score (if available — from fundi_quality_scores table)
+  // 3. Rating
+  // 4. Trust score
+  // 5. Completion rate (completedJobs)
   fundis.sort((a, b) => {
-    // If we have distance, sort by distance first (closest first).
     if (a.distanceKm != null && b.distanceKm != null && a.distanceKm !== b.distanceKm) {
       return a.distanceKm - b.distanceKm;
     }
-    // No distance or tied → fall back to rating.
+    if (Number(b.qualityScore || 0) !== Number(a.qualityScore || 0)) {
+      return Number(b.qualityScore || 0) - Number(a.qualityScore || 0);
+    }
     if (Number(b.rating || 0) !== Number(a.rating || 0)) {
       return Number(b.rating || 0) - Number(a.rating || 0);
     }
-    // Tied rating → trust score.
     if (Number(b.trustScore || 0) !== Number(a.trustScore || 0)) {
       return Number(b.trustScore || 0) - Number(a.trustScore || 0);
     }
-    // Tied trust → completed jobs.
     return Number(b.completedJobs || 0) - Number(a.completedJobs || 0);
   });
 
