@@ -11,13 +11,20 @@ const LOCAL_ORIGINS = [
 
 /**
  * Vercel preview deployments for THIS project only.
- * Format: <commit-or-branch>.patafundi.vercel.app OR patafundi-<env>.vercel.app
- * We do NOT allow arbitrary *.vercel.app — anyone can deploy to that domain.
+ * Allows any of these formats:
+ *   - patafundi.vercel.app                          (legacy personal project)
+ *   - patafundi-<hash>.vercel.app                   (personal project with branch/commit hash)
+ *   - patafundi-<slug>-<hash>-<team>.vercel.app     (team project — multiple hyphenated segments)
+ *
+ * The regex requires the hostname to START with "patafundi" so arbitrary
+ * *.vercel.app deployments (which anyone can create) are NOT allowed.
  */
-const VERCEL_PREVIEW_RE = /^https:\/\/([a-z0-9-]+\.)?patafundi(-[a-z0-9]+)?\.vercel\.app$/i;
+const VERCEL_PREVIEW_RE = /^https:\/\/([a-z0-9-]+\.)?patafundi(-[a-z0-9-]+)*\.vercel\.app$/i;
 
 const PRODUCTION_ORIGINS = [
   'https://patafundi.vercel.app',
+  'https://patafundi-9bhsw1.vercel.app',
+  'https://patafundi-9bhsw1-6emkangdl-evian1ks-projects.vercel.app',
 ];
 
 export function getAllowedOrigins() {
