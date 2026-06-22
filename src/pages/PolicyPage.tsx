@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import Markdown from "@/components/content/Markdown";
 import { apiClient } from "@/lib/api";
 
-type PolicySection = { id: string; title: string; content: string; order: number };
-type Policy = { slug: string; title: string; version: string; updated_at?: string; sections: PolicySection[] };
+type Policy = {
+  slug: string;
+  title: string;
+  body: string;
+  version?: number;
+  category?: string;
+  updated_at?: string;
+};
 
 export default function PolicyPage({ slug: slugProp }: { slug?: string }) {
   const params = useParams();
@@ -38,21 +44,35 @@ export default function PolicyPage({ slug: slugProp }: { slug?: string }) {
             {[1,2,3].map(i => <div key={i} className="h-8 bg-muted rounded animate-shimmer" />)}
           </div>
         ) : error ? (
-          <div className="text-center py-16"><p className="text-destructive">{error}</p></div>
+          <div className="text-center py-16">
+            <p className="text-destructive mb-4">{error}</p>
+            <Link to="/" className="text-primary hover:underline">← Back to home</Link>
+          </div>
         ) : policy ? (
           <div>
             <h1 className="text-4xl font-display font-bold mb-2">{policy.title}</h1>
-            <p className="text-sm text-muted-foreground mb-8">Version {policy.version}</p>
-            <div className="space-y-8">
-              {policy.sections?.map((s) => (
-                <div key={s.id} className="p-6 bg-card rounded-2xl border border-border/50">
-                  <h2 className="text-xl font-semibold mb-4">{s.title}</h2>
-                  <Markdown content={s.content} />
-                </div>
-              ))}
+            <p className="text-sm text-muted-foreground mb-8">
+              {policy.version && <>Version {policy.version}</>}
+              {policy.updated_at && <> · Last updated {new Date(policy.updated_at).toLocaleDateString()}</>}
+            </p>
+            <div className="prose prose-slate max-w-none">
+              <Markdown content={policy.body} />
+            </div>
+            <div className="mt-12 pt-8 border-t border-border/30 text-center">
+              <p className="text-sm text-muted-foreground mb-2">
+                Questions about this policy?
+              </p>
+              <Link to="/contact-support" className="text-primary hover:underline">
+                Contact Support →
+              </Link>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="text-center py-16">
+            <p className="text-muted-foreground mb-4">Policy not found.</p>
+            <Link to="/" className="text-primary hover:underline">← Back to home</Link>
+          </div>
+        )}
       </div>
     </SiteLayout>
   );

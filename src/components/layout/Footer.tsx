@@ -28,15 +28,37 @@ const Footer = () => {
       { name: "Help Center", href: "/help" },
       { name: "Safety Guidelines", href: "/safety-guidelines" },
       { name: "Refund Policy", href: "/refund-policy" },
+      { name: "Contact Support", href: "/contact-support" },
+      { name: "Report a Problem", href: "/report-problem" },
+      { name: "Live Chat", href: "/contact-support" },
+    ],
+    legal: [
       { name: "Terms of Service", href: "/terms" },
       { name: "Privacy Policy", href: "/privacy" },
       { name: "Cookies Policy", href: "/cookies" },
-      { name: "Contact Support", href: "/contact-support" },
-      { name: "Report a Problem", href: "/report-problem" },
-    ],
-    rules: [
       { name: "Platform Rules", href: "/platform-rules" },
       { name: "Enforcement Policy", href: "/enforcement" },
+      { name: "Community Guidelines", href: "/community-guidelines" },
+    ],
+    enterprise: [
+      { name: "Security Center", href: "/security-center" },
+      { name: "Compliance Center", href: "/compliance-center" },
+      { name: "AML Policy", href: "/aml-policy" },
+      { name: "KYC Policy", href: "/kyc-policy" },
+      { name: "Escrow Policy", href: "/escrow-policy" },
+      { name: "SLA", href: "/sla" },
+      { name: "Data Retention", href: "/data-retention" },
+      { name: "Incident Response", href: "/incident-response" },
+      { name: "Transparency Report", href: "/transparency-report" },
+      { name: "Accessibility", href: "/accessibility" },
+    ],
+    business: [
+      { name: "Vendor Policy", href: "/vendor-policy" },
+      { name: "Insurance Policy", href: "/insurance-policy" },
+      { name: "Business Verification", href: "/business-verification" },
+      { name: "Partner Program", href: "/partner-program" },
+      { name: "Affiliate Program", href: "/affiliate-program" },
+      { name: "API Documentation", href: "/api-documentation" },
     ],
     forPros: [
       { name: "Become a Fundi", href: "/fundi/register" },
@@ -119,31 +141,55 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Rules & For Pros */}
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-semibold text-background mb-3 text-sm">Rules & Policies</h4>
-              <ul className="space-y-2">
-                {footerLinks.rules.map((link) => (
-                  <li key={link.name}>
-                    <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          {/* Legal */}
+          <div>
+            <h4 className="font-semibold text-background mb-3 text-sm">Legal</h4>
+            <ul className="space-y-2">
+              {footerLinks.legal.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* For Pros */}
+          <div>
+            <h4 className="font-semibold text-background mb-3 text-sm">For Professionals</h4>
+            <ul className="space-y-2">
+              {footerLinks.forPros.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Enterprise & Business rows */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 pt-8 border-t border-background/10">
+          <div>
+            <h4 className="font-semibold text-background mb-3 text-sm">Enterprise & Compliance</h4>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {footerLinks.enterprise.map((link) => (
+                <Link key={link.name} to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                  {link.name}
+                </Link>
+              ))}
             </div>
-            <div>
-              <h4 className="font-semibold text-background mb-3 text-sm">For Professionals</h4>
-              <ul className="space-y-2">
-                {footerLinks.forPros.map((link) => (
-                  <li key={link.name}>
-                    <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-background mb-3 text-sm">Business & Partnerships</h4>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {footerLinks.business.map((link) => (
+                <Link key={link.name} to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                  {link.name}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

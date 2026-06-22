@@ -125,6 +125,25 @@ export default function AppRoutes() {
       <Route path="/enforcement" element={<PolicyPage slug="enforcement" />} />
       <Route path="/policies/:slug" element={<PolicyPage />} />
 
+      {/* Enterprise policy pages */}
+      <Route path="/community-guidelines" element={<PolicyPage slug="community-guidelines" />} />
+      <Route path="/escrow-policy" element={<PolicyPage slug="escrow-policy" />} />
+      <Route path="/aml-policy" element={<PolicyPage slug="aml-policy" />} />
+      <Route path="/kyc-policy" element={<PolicyPage slug="kyc-policy" />} />
+      <Route path="/security-center" element={<PolicyPage slug="security-center" />} />
+      <Route path="/incident-response" element={<PolicyPage slug="incident-response" />} />
+      <Route path="/sla" element={<PolicyPage slug="sla" />} />
+      <Route path="/data-retention" element={<PolicyPage slug="data-retention" />} />
+      <Route path="/accessibility" element={<PolicyPage slug="accessibility" />} />
+      <Route path="/transparency-report" element={<PolicyPage slug="transparency-report" />} />
+      <Route path="/compliance-center" element={<PolicyPage slug="compliance-center" />} />
+      <Route path="/vendor-policy" element={<PolicyPage slug="vendor-policy" />} />
+      <Route path="/insurance-policy" element={<PolicyPage slug="insurance-policy" />} />
+      <Route path="/business-verification" element={<PolicyPage slug="business-verification" />} />
+      <Route path="/partner-program" element={<PolicyPage slug="partner-program" />} />
+      <Route path="/affiliate-program" element={<PolicyPage slug="affiliate-program" />} />
+      <Route path="/api-documentation" element={<PolicyPage slug="api-documentation" />} />
+
       <Route path="/fundi/register" element={<Navigate to="/register/fundi" replace />} />
       <Route path="/fundi/pending" element={<FundiPendingApproval />} />
       <Route path="/fundi" element={<FundiDashboard />} />
