@@ -84,22 +84,26 @@ export async function listRecommendations(req, res) {
 /** POST /api/ai/recommendations/:id/review — mark as reviewed */
 export async function reviewRecommendation(req, res) {
   const { action = 'reviewed', note = null } = req.body || {};
-  if (!['reviewed', 'dismissed', 'actioned'].includes(action)) {
-    throw badRequest('Invalid action. Use: reviewed, dismissed, or actioned');
+  // 'approve' = 'actioned' (super_admin agrees and will act)
+  // 'reject' = 'dismissed' (super_admin disagrees)
+  // 'reviewed' = noted but no decision yet
+  const normalizedAction = action === 'approve' ? 'actioned' : action === 'reject' ? 'dismissed' : action;
+  if (!['reviewed', 'dismissed', 'actioned'].includes(normalizedAction)) {
+    throw badRequest('Invalid action. Use: approve, reject, reviewed, dismissed, or actioned');
   }
   const result = await query(
     `update ai_recommendations
      set status = $2, reviewed_by = $3, reviewed_at = now(), action_taken = $4
      where id = $1 returning *`,
-    [req.params.id, action, req.user.id, note],
+    [req.params.id, normalizedAction, req.user.id, note],
   );
   if (!result.rows[0]) throw notFound('Recommendation not found');
   await auditLog({
     userId: req.user.id,
-    action: `ai.review_${action}`,
+    action: `ai.review_${normalizedAction}`,
     entityType: 'ai_recommendation',
     entityId: req.params.id,
-    metadata: { note, category: result.rows[0].category },
+    metadata: { note, category: result.rows[0].category, originalAction: action },
   });
   res.json({ success: true, recommendation: result.rows[0] });
 }

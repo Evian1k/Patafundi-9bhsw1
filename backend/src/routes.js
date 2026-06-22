@@ -164,6 +164,12 @@ router.post('/admin/users/:id/permissions', authRequired, requirePermission('can
 router.delete('/admin/users/:id/permissions/:code', authRequired, requirePermission('can_manage_roles'), asyncHandler(rbac.removeUserPermission));
 router.post('/admin/users/:id/role', authRequired, requirePermission('can_promote_users'), asyncHandler(rbac.setUserRole));
 
+// Staff management (super_admin only)
+router.post('/admin/staff', authRequired, requirePermission('can_create_staff'), asyncHandler(rbac.createStaff));
+router.post('/admin/staff/:id/suspend', authRequired, requirePermission('can_suspend_staff'), asyncHandler(rbac.suspendStaff));
+router.post('/admin/staff/:id/reinstate', authRequired, requirePermission('can_suspend_staff'), asyncHandler(rbac.reinstateStaff));
+router.post('/admin/users/:id/ban', authRequired, requirePermission('can_ban_permanently'), asyncHandler(rbac.banUserPermanently));
+
 // Permission-scoped admin routes (in addition to the existing requireRole('admin') ones above).
 // These allow non-admin staff (support_agent, fraud_analyst, finance_team, etc.)
 // to access specific endpoints without full admin access.

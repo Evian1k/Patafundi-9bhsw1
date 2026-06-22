@@ -60,6 +60,13 @@ import LiveOperations from "@/pages/staff/LiveOperations";
 import SecurityCenter from "@/pages/staff/SecurityCenter";
 import SystemSettings from "@/pages/staff/SystemSettings";
 import ReferralCampaigns from "@/pages/staff/ReferralCampaigns";
+import GrowthDashboard from "@/pages/staff/GrowthDashboard";
+import FinanceDashboard from "@/pages/staff/FinanceDashboard";
+import FraudDashboard from "@/pages/staff/FraudDashboard";
+import DispatchDashboard from "@/pages/staff/DispatchDashboard";
+import SupportDashboard from "@/pages/staff/SupportDashboard";
+import DevOpsDashboard from "@/pages/staff/DevOpsDashboard";
+import LoyaltyCampaigns from "@/pages/staff/LoyaltyCampaigns";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -231,7 +238,15 @@ export default function AppRoutes() {
             ]}
           />
         } />
-        <Route path="finance/revenue" element={<StaffOverview />} />
+        <Route path="finance/revenue" element={<FinanceDashboard />} />
+        <Route path="finance/dashboard" element={<FinanceDashboard />} />
+        <Route path="growth" element={<GrowthDashboard />} />
+        <Route path="fraud/dashboard" element={<FraudDashboard />} />
+        <Route path="dispatch/dashboard" element={<DispatchDashboard />} />
+        <Route path="support/dashboard" element={<SupportDashboard />} />
+        <Route path="devops/dashboard" element={<DevOpsDashboard />} />
+        <Route path="loyalty" element={<LoyaltyCampaigns />} />
+        <Route path="loyalty/campaigns" element={<LoyaltyCampaigns />} />
         <Route path="referrals" element={<ReferralCampaigns />} />
         <Route path="referrals/campaigns" element={<ReferralCampaigns />} />
         <Route path="fraud" element={

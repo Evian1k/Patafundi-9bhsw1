@@ -170,3 +170,136 @@ export async function setUserRole(req, res) {
 
   res.json({ success: true, message: `Role changed to ${role}`, previousRole: target.rows[0].role });
 }
+
+/**
+ * POST /admin/staff — create a new staff account.
+ * Super_admin only (can_create_staff permission).
+ * Body: { email, password, fullName, phone, role }
+ * Role must be a staff role (not super_admin, not customer, not fundi).
+ */
+export async function createStaff(req, res) {
+  const { email, password, fullName, phone, role } = req.body || {};
+  if (!email || !password || !fullName || !role) {
+    throw badRequest('email, password, fullName, and role are required');
+  }
+  if (!VALID_STAFF_ROLES.includes(role)) {
+    throw badRequest(`Invalid staff role: ${role}. Valid: ${VALID_STAFF_ROLES.join(', ')}`);
+  }
+  if (role === 'super_admin') {
+    throw forbidden('super_admin role cannot be created via API');
+  }
+
+  const bcrypt = (await import('bcryptjs')).default;
+  const crypto = await import('node:crypto');
+
+  // Check if email already exists
+  const existing = await query('select id from users where lower(email) = lower($1)', [email]);
+  if (existing.rows[0]) throw badRequest('Email is already registered');
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const otpCode = String(crypto.randomInt(100000, 999999));
+
+  const result = await query(
+    `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
+     values (lower($1), $2, $3, $4, $5, 'active', now())
+     returning id, email, full_name, phone, role, status`,
+    [email, passwordHash, fullName, phone || null, role],
+  );
+  const user = result.rows[0];
+
+  // Initialize trust + fraud scores
+  await query(`insert into trust_scores (user_id, score, level) values ($1, 100, 'standard') on conflict do nothing`, [user.id]);
+  await query(`insert into user_fraud_scores (user_id, fraud_score, risk_level) values ($1, 0, 'low') on conflict do nothing`, [user.id]);
+
+  await auditLog({
+    userId: req.user.id,
+    action: 'staff.create',
+    entityType: 'user',
+    entityId: user.id,
+    metadata: { email, role, fullName },
+  });
+
+  res.status(201).json({ success: true, user, message: `Staff account created with role: ${role}` });
+}
+
+/**
+ * POST /admin/staff/:id/suspend — suspend a staff account.
+ * Super_admin only (can_suspend_staff permission).
+ * Cannot suspend super_admin accounts.
+ */
+export async function suspendStaff(req, res) {
+  const { reason } = req.body || {};
+  const target = await query('select id, role, email, status from users where id = $1', [req.params.id]);
+  if (!target.rows[0]) throw notFound('User not found');
+  if (target.rows[0].role === 'super_admin') {
+    throw forbidden('Cannot suspend super_admin account');
+  }
+  if (!isStaffRole(target.rows[0].role)) {
+    throw forbidden('Can only suspend staff accounts');
+  }
+
+  await query('update users set status = $2, updated_at = now() where id = $1', [req.params.id, 'suspended']);
+
+  // Revoke all active sessions
+  await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [req.params.id]);
+
+  await auditLog({
+    userId: req.user.id,
+    action: 'staff.suspend',
+    entityType: 'user',
+    entityId: req.params.id,
+    metadata: { reason, email: target.rows[0].email, role: target.rows[0].role },
+  });
+
+  res.json({ success: true, message: `Staff account suspended: ${target.rows[0].email}` });
+}
+
+/**
+ * POST /admin/staff/:id/ reinstate — reinstate a suspended staff account.
+ * Super_admin only.
+ */
+export async function reinstateStaff(req, res) {
+  const target = await query('select id, role, email, status from users where id = $1', [req.params.id]);
+  if (!target.rows[0]) throw notFound('User not found');
+
+  await query('update users set status = $2, updated_at = now() where id = $1', [req.params.id, 'active']);
+
+  await auditLog({
+    userId: req.user.id,
+    action: 'staff.reinstate',
+    entityType: 'user',
+    entityId: req.params.id,
+    metadata: { email: target.rows[0].email, role: target.rows[0].role },
+  });
+
+  res.json({ success: true, message: `Staff account reinstated: ${target.rows[0].email}` });
+}
+
+/**
+ * POST /admin/users/:id/ban — permanently ban a user.
+ * Super_admin only (can_ban_permanently permission).
+ * Cannot ban super_admin accounts.
+ */
+export async function banUserPermanently(req, res) {
+  const { reason } = req.body || {};
+  const target = await query('select id, role, email, status from users where id = $1', [req.params.id]);
+  if (!target.rows[0]) throw notFound('User not found');
+  if (target.rows[0].role === 'super_admin') {
+    throw forbidden('Cannot ban super_admin account');
+  }
+
+  await query('update users set status = $2, updated_at = now() where id = $1', [req.params.id, 'banned']);
+
+  // Revoke all sessions
+  await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [req.params.id]);
+
+  await auditLog({
+    userId: req.user.id,
+    action: 'user.ban_permanent',
+    entityType: 'user',
+    entityId: req.params.id,
+    metadata: { reason, email: target.rows[0].email, role: target.rows[0].role },
+  });
+
+  res.json({ success: true, message: `User permanently banned: ${target.rows[0].email}` });
+}

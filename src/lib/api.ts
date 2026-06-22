@@ -743,6 +743,45 @@ class ApiClient {
       body: JSON.stringify({ origin, destination }),
     });
   }
+
+  // ── Staff Management (super_admin) ──────────────────────────────────────
+  async createStaff(data: { email: string; password: string; fullName: string; phone?: string; role: string }) {
+    return this.request('/admin/staff', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async suspendStaff(userId: string, reason?: string) {
+    return this.request(`/admin/staff/${userId}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+  async reinstateStaff(userId: string) {
+    return this.request(`/admin/staff/${userId}/reinstate`, { method: 'POST' });
+  }
+  async banUserPermanently(userId: string, reason?: string) {
+    return this.request(`/admin/users/${userId}/ban`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+  async setUserRole(userId: string, role: string) {
+    return this.request(`/admin/users/${userId}/role`, { method: 'POST', body: JSON.stringify({ role }) });
+  }
+  async listRoles() { return this.request('/admin/roles'); }
+  async listRolePermissions(role: string) { return this.request(`/admin/roles/${role}/permissions`); }
+  async setUserPermission(userId: string, code: string, granted: boolean) {
+    return this.request(`/admin/users/${userId}/permissions`, { method: 'POST', body: JSON.stringify({ code, granted }) });
+  }
+
+  // ── AI Command Center ───────────────────────────────────────────────────
+  async getAiDashboard() { return this.request('/ai/dashboard'); }
+  async runAiAnalysis() { return this.request('/ai/run', { method: 'POST' }); }
+  async listAiRecommendations(params: { status?: string; category?: string } = {}) {
+    const q = new URLSearchParams(params as Record<string, string>).toString();
+    return this.request(`/ai/recommendations${q ? `?${q}` : ''}`);
+  }
+  async reviewAiRecommendation(recId: string, action: 'approve' | 'reject' | 'reviewed', note?: string) {
+    return this.request(`/ai/recommendations/${recId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ action, note }),
+    });
+  }
+  async getAdminReportsAnalytics(days = 30) {
+    return this.request(`/admin/reports/analytics?days=${days}`);
+  }
 }
 
 export const apiClient = new ApiClient();
