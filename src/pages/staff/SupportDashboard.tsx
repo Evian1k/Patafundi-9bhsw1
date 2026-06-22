@@ -7,11 +7,11 @@ import { apiClient } from "@/lib/api";
 import { Ticket, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
 export default function SupportDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.request("/admin/support/tickets?limit=100").catch(() => ({ tickets: [] }))
+    apiClient.request("/staff/support/tickets?limit=100").catch(() => ({ tickets: [] }))
       .then((d: any) => {
         const tickets = d?.tickets || [];
         setData({
@@ -27,7 +27,7 @@ export default function SupportDashboard() {
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading support dashboard…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
+  // data is always defined (initialized with empty defaults)
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">

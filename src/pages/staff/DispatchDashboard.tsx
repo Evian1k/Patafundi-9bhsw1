@@ -8,7 +8,7 @@ import { apiClient } from "@/lib/api";
 import { Package, UserCheck, UserX, Clock, Map } from "lucide-react";
 
 export default function DispatchDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function DispatchDashboard() {
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading dispatch dashboard…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
+  // data is always defined (initialized with empty defaults)
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">

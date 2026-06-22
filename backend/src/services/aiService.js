@@ -366,7 +366,7 @@ export async function analyzePlatformHealth() {
     jobs: jobs.rows[0],
     disputes: disputes.rows[0],
     fraudAlerts: fraudAlerts.rows[0],
-    pendingPayouts: { count: Number(payouts.rows[0]?.total || 0), amount: Number(payouts.rows[0]?.amount || 0) },
+    pendingPayouts: { count: Number(pendingPayouts.rows[0]?.total || 0), amount: Number(pendingPayouts.rows[0]?.amount || 0) },
     recommendations,
   };
 }

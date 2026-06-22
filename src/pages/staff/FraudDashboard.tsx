@@ -7,57 +7,84 @@ import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { AlertTriangle, CreditCard, Gift, Users, TrendingUp } from "lucide-react";
 
+interface FraudData {
+  suspiciousAccounts: number;
+  suspiciousPayments: number;
+  referralAbuse: number;
+  multipleAccounts: number;
+  fraudTrends: Array<{ date: string; count: number }>;
+  suspendedUsers: number;
+  fraudByRegion: Array<{ region: string; count: number }>;
+}
+
+const EMPTY_DATA: FraudData = {
+  suspiciousAccounts: 0,
+  suspiciousPayments: 0,
+  referralAbuse: 0,
+  multipleAccounts: 0,
+  fraudTrends: [],
+  suspendedUsers: 0,
+  fraudByRegion: [],
+};
+
 export default function FraudDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<FraudData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      apiClient.getFraudDashboard(),
+      apiClient.getFraudDashboard().catch(() => null),
       apiClient.getReferralAnalytics().catch(() => null),
     ])
       .then(([fraud, referral]: any) => {
+        // Backend response shape: { success, dashboard: { fraudAlerts: { open, critical, total }, fraudScores: { critical, high, monitored }, suspiciousJobs, commissionDebts, ... } }
         const f = fraud?.dashboard || fraud || {};
         const r = referral?.overview || {};
         setData({
           suspiciousAccounts: f.fraudAlerts?.open || f.alerts?.open || 0,
-          suspiciousPayments: f.suspiciousPayments || 0,
+          suspiciousPayments: f.suspiciousJobs || 0,
           referralAbuse: r.fraud_attempts || 0,
-          multipleAccounts: f.multipleAccounts || 0,
+          multipleAccounts: f.fraudScores?.critical || 0,
           fraudTrends: f.trends || [],
-          suspendedUsers: f.suspended || 0,
+          suspendedUsers: f.fraudScores?.high || 0,
           fraudByRegion: f.byRegion || [],
         });
       })
-      .catch(() => {})
+      .catch(() => setError("Failed to load fraud data"))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading fraud dashboard…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Fraud Dashboard</h1>
       <p className="text-slate-500 text-sm mb-6">Trust & Safety — suspicious activity monitoring</p>
 
+      {error && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+          {error} — showing partial data
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card icon={AlertTriangle} label="Suspicious Accounts" value={data.suspiciousAccounts} color="text-red-600" bg="bg-red-50" />
-        <Card icon={CreditCard} label="Suspicious Payments" value={data.suspiciousPayments} color="text-amber-600" bg="bg-amber-50" />
+        <Card icon={CreditCard} label="Suspicious Jobs" value={data.suspiciousPayments} color="text-amber-600" bg="bg-amber-50" />
         <Card icon={Gift} label="Referral Abuse" value={data.referralAbuse} color="text-purple-600" bg="bg-purple-50" />
-        <Card icon={Users} label="Multiple Accounts" value={data.multipleAccounts} color="text-pink-600" bg="bg-pink-50" />
+        <Card icon={Users} label="High-Risk Users" value={data.multipleAccounts} color="text-pink-600" bg="bg-pink-50" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl p-6 border border-slate-100">
           <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-red-500" /> Fraud Trends
+            <TrendingUp className="w-4 h-4 text-red-500" /> Fraud Alerts
           </h3>
           {data.fraudTrends.length === 0 ? (
-            <p className="text-sm text-slate-400 py-4 text-center">No fraud detected 🎉</p>
+            <p className="text-sm text-slate-400 py-4 text-center">No fraud trends data yet</p>
           ) : (
             <div className="space-y-1">
-              {data.fraudTrends.slice(-7).map((t: any, i: number) => (
+              {data.fraudTrends.slice(-7).map((t, i) => (
                 <div key={i} className="flex justify-between text-xs">
                   <span className="text-slate-500">{new Date(t.date).toLocaleDateString()}</span>
                   <span className="font-medium text-red-600">{t.count} alerts</span>
@@ -67,9 +94,9 @@ export default function FraudDashboard() {
           )}
         </div>
         <div className="bg-white rounded-2xl p-6 border border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">Suspended Users</h3>
-          <div className="text-3xl font-bold text-red-600">{data.suspendedUsers}</div>
-          <p className="text-xs text-slate-500 mt-1">Total accounts suspended for fraud</p>
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Monitored Users</h3>
+          <div className="text-3xl font-bold text-amber-600">{data.suspendedUsers}</div>
+          <p className="text-xs text-slate-500 mt-1">Users with elevated risk scores</p>
         </div>
       </div>
     </div>

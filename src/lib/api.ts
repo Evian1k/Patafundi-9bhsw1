@@ -569,8 +569,8 @@ class ApiClient {
   }
 
   // ── Admin ────────────────────────────────────────────────────────────────
-  async getAdminStats() { return this.request('/admin/dashboard'); }
-  async getAdminDashboard() { return this.request('/admin/dashboard'); }
+  async getAdminStats() { return this.request('/staff/dashboard'); }
+  async getAdminDashboard() { return this.request('/staff/dashboard'); }
   async getStaffPermissions() { return this.request('/staff/me/permissions'); }
 
   // ── Referral System (voucher-based) ─────────────────────────────────────
@@ -657,7 +657,10 @@ class ApiClient {
   async getSecurityOverview() { return this.request('/admin/security/overview'); }
 
   async getFraudDashboard(period = '30d') {
-    return this.request(`/admin/fraud/dashboard?period=${period}`);
+    // Use /staff/fraud/dashboard (permission-based) instead of /admin/fraud/dashboard
+    // (role-based) so fraud_analyst and other staff with can_view_fraud_dashboard
+    // can access it without needing the 'admin' role.
+    return this.request(`/staff/fraud/dashboard?period=${period}`);
   }
 
   async getFraudAlerts(params: { period?: string; severity?: string; status?: string } = {}) {
@@ -780,7 +783,7 @@ class ApiClient {
     });
   }
   async getAdminReportsAnalytics(days = 30) {
-    return this.request(`/admin/reports/analytics?days=${days}`);
+    return this.request(`/staff/reports/analytics?days=${days}`);
   }
 }
 

@@ -192,6 +192,12 @@ router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_su
 
 router.get('/staff/audit-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(admin.listTable('audit_logs', 'logs')));
 
+// Permission-based dashboard access (alternative to /admin/dashboard which requires 'admin' role)
+router.get('/staff/dashboard', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.dashboard));
+router.get('/staff/reports/analytics', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.reports));
+router.get('/staff/revenue', authRequired, requirePermission('can_view_revenue'), asyncHandler(admin.revenueDashboard));
+router.get('/staff/support/tickets', authRequired, requirePermission('can_view_tickets'), asyncHandler(content.listSupportTickets));
+
 // ============================================================
 // AI Command Center — SUPER_ADMIN ONLY
 // The AI NEVER performs actions. It only analyzes and recommends.

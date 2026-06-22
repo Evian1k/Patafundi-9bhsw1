@@ -19,13 +19,13 @@ interface FinanceData {
 }
 
 export default function FinanceDashboard() {
-  const [data, setData] = useState<FinanceData | null>(null);
+  const [data, setData] = useState<FinanceData>({ revenueToday: 0, revenueMonth: 0, escrowBalance: 0, pendingPayouts: 0, refundRequests: 0, commissionRevenue: 0, dailyRevenue: [], payoutTrends: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       apiClient.getAdminDashboard(),
-      apiClient.request("/admin/revenue").catch(() => null),
+      apiClient.request("/staff/revenue").catch(() => null),
     ])
       .then(([dash, rev]: any) => {
         const stats = dash?.stats || {};
@@ -46,7 +46,7 @@ export default function FinanceDashboard() {
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading finance dashboard…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
+  // data is always defined (initialized with empty defaults)
 
   const fmt = (n: number) => `KES ${Number(n).toLocaleString()}`;
 

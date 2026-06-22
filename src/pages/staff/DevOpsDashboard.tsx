@@ -8,7 +8,7 @@ import { apiClient } from "@/lib/api";
 import { Cpu, MemoryStick, Database, Zap, Activity, AlertTriangle } from "lucide-react";
 
 export default function DevOpsDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function DevOpsDashboard() {
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading devops dashboard…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
+  // data is always defined (initialized with empty defaults)
 
   const fmtUptime = (s: number) => {
     if (s < 60) return `${Math.floor(s)}s`;

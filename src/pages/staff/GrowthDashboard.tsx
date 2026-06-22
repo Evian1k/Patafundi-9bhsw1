@@ -21,7 +21,7 @@ interface GrowthData {
 }
 
 export default function GrowthDashboard() {
-  const [data, setData] = useState<GrowthData | null>(null);
+  const [data, setData] = useState<GrowthData>({ overview: { total_users: 0, new_users_30d: 0, total_jobs: 0, new_jobs_30d: 0, total_revenue: 0, revenue_30d: 0, customer_retention: 0, fundi_retention: 0 }, chartData: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function GrowthDashboard() {
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Loading growth analytics…</div>;
-  if (!data) return <div className="p-8 text-slate-400">No data available</div>;
+  // data is always defined (initialized with empty defaults)
 
   const o = data.overview;
   const fmt = (n: number) => Number(n).toLocaleString();
