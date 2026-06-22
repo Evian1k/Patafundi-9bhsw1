@@ -287,14 +287,15 @@ server.listen(port, host, () => {
   // Runs every minute to check if the current time falls within a
   // scheduled maintenance window (default: Wednesday 2-4 AM EAT).
   // Auto-toggles the maintenance_mode feature flag.
-  try {
-    const { runScheduledMaintenanceCheck } = await import('./services/scheduledMaintenanceService.js');
-    runScheduledMaintenanceCheck();
-    setInterval(runScheduledMaintenanceCheck, 60 * 1000);
-    console.log('[maintenance] scheduled maintenance checker started (default: Wednesday 2-4 AM EAT)');
-  } catch (err) {
-    console.warn('[maintenance] could not start scheduler:', err.message);
-  }
+  import('./services/scheduledMaintenanceService.js')
+    .then(({ runScheduledMaintenanceCheck }) => {
+      runScheduledMaintenanceCheck();
+      setInterval(runScheduledMaintenanceCheck, 60 * 1000);
+      console.log('[maintenance] scheduled maintenance checker started (default: Wednesday 2-4 AM EAT)');
+    })
+    .catch((err) => {
+      console.warn('[maintenance] could not start scheduler:', err.message);
+    });
 });
 
 server.on('error', (error) => {
