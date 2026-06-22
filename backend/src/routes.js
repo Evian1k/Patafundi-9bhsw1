@@ -307,6 +307,18 @@ router.post('/security/2fa/regenerate-recovery', authRequired, asyncHandler(secu
 router.get('/admin/feature-flags', authRequired, requireRole('admin'), asyncHandler(security.listFeatureFlags));
 router.put('/admin/feature-flags', authRequired, requirePerm('can_manage_system'), asyncHandler(security.toggleFeatureFlag));
 
+// Scheduled maintenance (Wednesday window)
+router.get('/admin/maintenance/schedule', authRequired, requireRole('admin'), asyncHandler(async (req, res) => {
+  const { getMaintenanceSchedule, isInMaintenanceWindow } = await import('./services/scheduledMaintenanceService.js');
+  const schedule = await getMaintenanceSchedule();
+  res.json({ success: true, schedule, currentlyInWindow: isInMaintenanceWindow(schedule) });
+}));
+router.put('/admin/maintenance/schedule', authRequired, requirePerm('can_manage_system'), asyncHandler(async (req, res) => {
+  const { setMaintenanceSchedule } = await import('./services/scheduledMaintenanceService.js');
+  const schedule = await setMaintenanceSchedule(req.body || {}, req.user.id);
+  res.json({ success: true, schedule });
+}));
+
 // Session management
 router.get('/security/sessions', authRequired, asyncHandler(security.getActiveSessions));
 router.delete('/security/sessions/:id', authRequired, asyncHandler(security.terminateSession));

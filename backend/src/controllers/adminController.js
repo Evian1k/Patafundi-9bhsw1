@@ -688,18 +688,29 @@ const defaultSettings = {
 
 export async function getSettings(_req, res) {
   const result = await query(`select value from platform_settings where key = 'global'`);
-  res.json({ success: true, settings: result.rows[0]?.value || defaultSettings });
+  const settings = result.rows[0]?.value || defaultSettings;
+  // Sync maintenanceMode from the real feature_flags table so the
+  // admin settings checkbox reflects the actual platform state.
+  try {
+    const flag = await query(`select is_enabled from feature_flags where key = 'maintenance_mode'`);
+    settings.maintenanceMode = flag.rows[0]?.is_enabled === true;
+  } catch { /* feature_flags table may not exist in very old installs */ }
+  res.json({ success: true, settings });
 }
 
 export async function updateSettings(req, res) {
   const nextSettings = req.body || {};
   if (typeof nextSettings !== 'object' || Array.isArray(nextSettings)) throw badRequest('Settings payload must be an object');
+
+  // Extract maintenanceMode — it's handled separately via feature_flags
+  const { maintenanceMode, ...restSettings } = nextSettings;
+
   const merged = {
     ...defaultSettings,
-    ...nextSettings,
-    payments: { ...defaultSettings.payments, ...(nextSettings.payments || {}) },
-    security: { ...defaultSettings.security, ...(nextSettings.security || {}) },
-    operations: { ...defaultSettings.operations, ...(nextSettings.operations || {}) },
+    ...restSettings,
+    payments: { ...defaultSettings.payments, ...(restSettings.payments || {}) },
+    security: { ...defaultSettings.security, ...(restSettings.security || {}) },
+    operations: { ...defaultSettings.operations, ...(restSettings.operations || {}) },
   };
   const result = await query(
     `insert into platform_settings (key, value, updated_by)
@@ -708,6 +719,24 @@ export async function updateSettings(req, res) {
      returning value`,
     [JSON.stringify(merged), req.user.id],
   );
+
+  // Sync maintenanceMode to the REAL feature_flags table
+  if (typeof maintenanceMode === 'boolean') {
+    try {
+      await query(
+        `insert into feature_flags (key, label, is_enabled, category, updated_by, updated_at)
+         values ('maintenance_mode', 'Maintenance Mode', $1, 'maintenance', $2, now())
+         on conflict (key) do update set is_enabled = excluded.is_enabled, updated_by = excluded.updated_by, updated_at = now()`,
+        [maintenanceMode, req.user.id],
+      );
+      await auditLog({ userId: req.user.id, action: 'system.feature_flag', entityType: 'feature_flag', entityId: 'maintenance_mode', metadata: { enabled: maintenanceMode } });
+    } catch (e) {
+      console.warn('[settings] could not sync maintenance_mode to feature_flags:', e.message);
+    }
+  }
+
   await auditLog({ userId: req.user.id, action: 'admin.settings.update', entityType: 'platform_settings', metadata: merged });
-  res.json({ success: true, settings: result.rows[0].value });
+  const finalSettings = result.rows[0].value;
+  finalSettings.maintenanceMode = maintenanceMode ?? false;
+  res.json({ success: true, settings: finalSettings });
 }
