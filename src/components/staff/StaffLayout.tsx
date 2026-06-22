@@ -94,18 +94,34 @@ export default function StaffLayout() {
       try {
         const data = await apiClient.getStaffPermissions() as { role: string; permissions: string[] };
         if (!data || !data.role) {
-          navigate("/auth");
+          navigate("/staff/login");
+          return;
+        }
+        // Security: if a non-staff role (customer/fundi) somehow reaches here,
+        // redirect them to the customer auth page (not staff login)
+        const staffRoles = ["super_admin", "admin", "ops_manager", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];
+        if (!staffRoles.includes(data.role)) {
+          await apiClient.logout().catch(() => {});
+          navigate("/auth", { replace: true });
           return;
         }
         setRole(data.role);
         setPermissions(new Set(data.permissions || []));
       } catch {
-        navigate("/auth");
+        navigate("/staff/login");
       } finally {
         setLoading(false);
       }
     })();
   }, [navigate]);
+
+  const handleSignOut = async () => {
+    // Security: actually log out (revoke refresh token + clear cookies)
+    // before redirecting. This prevents the back button from re-entering
+    // the staff dashboard with a still-valid session.
+    await apiClient.logout().catch(() => {});
+    navigate("/staff/login", { replace: true });
+  };
 
   const canSee = (item: { permission: string; roles: string[] }) => {
     if (role === "super_admin") return true;
@@ -184,7 +200,7 @@ export default function StaffLayout() {
         </nav>
         <div className="p-4 border-t border-slate-800">
           <button
-            onClick={() => navigate("/auth")}
+            onClick={handleSignOut}
             className="flex items-center gap-2 text-sm text-slate-400 hover:text-white"
           >
             <LogOut className="w-4 h-4" /> Sign out
@@ -229,6 +245,15 @@ export default function StaffLayout() {
                 </div>
               );
             })}
+            {/* Mobile sign-out */}
+            <div className="mt-4 pt-4 border-t border-slate-800">
+              <button
+                onClick={() => { setMenuOpen(false); handleSignOut(); }}
+                className="flex items-center gap-2 text-sm text-slate-400 hover:text-white"
+              >
+                <LogOut className="w-4 h-4" /> Sign out
+              </button>
+            </div>
           </div>
         </div>
       )}
