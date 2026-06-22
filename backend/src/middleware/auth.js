@@ -68,6 +68,7 @@ export async function optionalAuth(req, _res, next) {
     const payload = jwt.verify(token, config.jwtSecret, {
       issuer: 'patafundi-api',
       audience: 'patafundi-web',
+      algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
       'select id, email, full_name, phone, role, status, trust_score from users where id = $1',
@@ -90,6 +91,7 @@ export async function authRequired(req, _res, next) {
     const payload = jwt.verify(token, config.jwtSecret, {
       issuer: 'patafundi-api',
       audience: 'patafundi-web',
+      algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
       'select id, email, full_name, phone, role, status, trust_score from users where id = $1',

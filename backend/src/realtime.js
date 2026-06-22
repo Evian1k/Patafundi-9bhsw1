@@ -45,13 +45,47 @@ async function canAccessJobRoom(userId, role, jobId) {
   return job.customer_id === userId || job.fundi_id === userId;
 }
 
+// ── Per-IP connection rate limiting ─────────────────────────────────
+// Prevents a single IP from opening hundreds of socket connections
+// (DoS mitigation). Max 10 concurrent connections per IP.
+const ipConnectionCounts = new Map();
+const MAX_CONNECTIONS_PER_IP = 10;
+const CONNECTION_WINDOW_MS = 60_000;
+
+function cleanupConnectionCounts() {
+  const now = Date.now();
+  for (const [ip, entry] of ipConnectionCounts) {
+    if (now - entry.firstSeen > CONNECTION_WINDOW_MS) {
+      ipConnectionCounts.delete(ip);
+    }
+  }
+}
+
 export function attachRealtime(io) {
   ioRef = io;
   io.use((socket, next) => {
     try {
+      // ── Connection rate limit per IP ──────────────────────────────
+      const ip = socket.handshake.address || 'unknown';
+      cleanupConnectionCounts();
+      const entry = ipConnectionCounts.get(ip) || { count: 0, firstSeen: Date.now() };
+      if (entry.count >= MAX_CONNECTIONS_PER_IP) {
+        return next(new Error('Too many connections from this IP'));
+      }
+      entry.count++;
+      ipConnectionCounts.set(ip, entry);
+      socket.on('disconnect', () => {
+        const e = ipConnectionCounts.get(ip);
+        if (e) {
+          e.count = Math.max(0, e.count - 1);
+          if (e.count === 0) ipConnectionCounts.delete(ip);
+        }
+      });
+
+      // ── JWT auth ──────────────────────────────────────────────────
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
       if (!token || !config.jwtSecret) return next(new Error('Authentication required'));
-      const payload = jwt.verify(token, config.jwtSecret, { issuer: 'patafundi-api', audience: 'patafundi-web' });
+      const payload = jwt.verify(token, config.jwtSecret, { issuer: 'patafundi-api', audience: 'patafundi-web', algorithms: ['HS256'] });
       socket.userId = payload.sub;
       socket.userRole = payload.role;
       next();

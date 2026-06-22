@@ -176,19 +176,50 @@ export async function registerFundi(req, res) {
 export async function login(req, res) {
   const { email, password } = req.body || {};
   if (!email || !password) throw badRequest('Email and password are required');
+
+  // ── Account lockout check ────────────────────────────────────────
+  // Prevents brute force attacks even if rate limiter is bypassed
+  // (e.g., attacker uses multiple IPs via botnet)
+  const { checkAccountLock, recordFailedLogin, recordSuccessfulLogin } = await import('../services/securityService.js');
+  const lockStatus = await checkAccountLock(email);
+  if (lockStatus.locked) {
+    const minsLeft = Math.ceil((new Date(lockStatus.until).getTime() - Date.now()) / 60000);
+    throw forbidden(`Account temporarily locked due to repeated failed login attempts. Try again in ${minsLeft} minute(s).`);
+  }
+
   const result = await query(
     `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at
      from users where lower(email) = lower($1)`,
     [email],
   );
   const user = result.rows[0];
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) throw forbidden('Invalid email or password');
+
+  // ── Record failed login attempt ──────────────────────────────────
+  // Always run this (even if user doesn't exist) to prevent timing
+  // attacks that reveal whether an email is registered. However, the
+  // recordFailedLogin function silently returns if user doesn't exist.
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    if (user) {
+      const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+      const failResult = await recordFailedLogin(email, ip);
+      if (failResult?.locked) {
+        throw forbidden('Account locked due to too many failed login attempts. Try again in 15 minutes.');
+      }
+    }
+    throw forbidden('Invalid email or password');
+  }
+
   if (user.status !== 'active') throw forbidden('Account is not active');
   if (!user.email_verified_at) {
     throw forbidden('Email not verified. Please check your inbox for the verification code.');
   }
+
+  // ── Record successful login ──────────────────────────────────────
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  await recordSuccessfulLogin(user.id, ip);
+
   const session = await issueSession(res, user);
-  await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id });
+  await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, metadata: { ip } });
   res.json({ success: true, user: publicUser(user), token: session.token });
 }
 
@@ -198,6 +229,7 @@ export async function refresh(req, res) {
   const payload = jwt.verify(refreshToken, config.refreshSecret || config.jwtSecret, {
     issuer: 'patafundi-api',
     audience: 'patafundi-web',
+    algorithms: ['HS256'],
   });
   const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const result = await query(

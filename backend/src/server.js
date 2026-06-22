@@ -28,6 +28,13 @@ const io = new SocketIOServer(server, {
     origin: corsOriginCallback,
     credentials: true,
   },
+  // ── DoS protection ────────────────────────────────────────────────
+  maxHttpBufferSize: 1e6, // 1MB max per message (prevents memory exhaustion)
+  pingTimeout: 30000, // close connection if no ping response in 30s
+  pingInterval: 25000, // ping every 25s to keep connection alive
+  connectTimeout: 10000, // 10s to establish connection
+  // connection rate limiting
+  // (handled in io.use middleware — reject if IP has too many connections)
 });
 
 attachRealtime(io);
