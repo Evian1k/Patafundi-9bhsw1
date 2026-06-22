@@ -149,10 +149,26 @@ export async function recordSuccessfulLogin(userId, ip) {
 // ============================================================
 // 3. Feature Flags
 // ============================================================
+// CRITICAL: For maintenance_mode, default to FALSE (off) when the flag
+// doesn't exist or the DB query fails. Defaulting to TRUE locks everyone
+// out of the platform if the DB has a connection hiccup — fail OPEN,
+// not fail CLOSED.
+const FLAGS_DEFAULT_OFF = new Set(['maintenance_mode']);
+
 export async function isFeatureEnabled(key) {
-  const result = await query('select is_enabled from feature_flags where key = $1', [key]);
-  if (!result.rows[0]) return true; // default: enabled if flag doesn't exist
-  return result.rows[0].is_enabled;
+  try {
+    const result = await query('select is_enabled from feature_flags where key = $1', [key]);
+    if (!result.rows[0]) {
+      // Flag doesn't exist — use safe default
+      return !FLAGS_DEFAULT_OFF.has(key);
+    }
+    return result.rows[0].is_enabled;
+  } catch (err) {
+    // DB query failed — fail OPEN (feature enabled, maintenance OFF)
+    // This prevents a DB hiccup from locking everyone out of the platform
+    console.warn(`[featureFlags] query failed for "${key}", defaulting to ${!FLAGS_DEFAULT_OFF.has(key)}:`, err.message);
+    return !FLAGS_DEFAULT_OFF.has(key);
+  }
 }
 
 export async function getAllFeatureFlags() {

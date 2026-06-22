@@ -15,10 +15,10 @@ import { isFeatureEnabled } from '../services/securityService.js';
 
 const STAFF_ROLES = new Set(['super_admin', 'admin', 'support_agent', 'fraud_analyst', 'finance_team', 'dispatch_team', 'devops_engineer', 'auditor']);
 
-// Cache the maintenance flag for 30 seconds to avoid hitting the DB on every request
+// Cache the maintenance flag for 10 seconds to balance DB load vs responsiveness
 let cachedMaintenanceMode = false;
 let lastChecked = 0;
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 10_000;
 
 async function isMaintenanceMode() {
   const now = Date.now();
@@ -26,7 +26,14 @@ async function isMaintenanceMode() {
     return cachedMaintenanceMode;
   }
   lastChecked = now;
-  cachedMaintenanceMode = await isFeatureEnabled('maintenance_mode');
+  try {
+    cachedMaintenanceMode = await isFeatureEnabled('maintenance_mode');
+  } catch (err) {
+    // DB query failed — fail OPEN (maintenance OFF)
+    // Never lock users out due to a DB error
+    console.warn('[maintenance] could not check maintenance_mode, defaulting to OFF:', err.message);
+    cachedMaintenanceMode = false;
+  }
   return cachedMaintenanceMode;
 }
 
