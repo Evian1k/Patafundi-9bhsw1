@@ -88,23 +88,31 @@ function publicFundi(row) {
 }
 
 export async function dashboard(req, res) {
-  const [users, jobs, payments, disputes, revenue] = await Promise.all([
+  const [users, jobs, payments, disputes, revenue, fundis, pendingFundis] = await Promise.all([
     query('select count(*)::int as total from users'),
     query('select count(*)::int as total from jobs'),
     query(`select coalesce(sum(amount),0)::numeric as total from payments where status = 'completed'`),
     query(`select count(*)::int as total from disputes where status = 'open'`),
     revenueSummaryQuery(),
+    query(`select count(*)::int as total from fundis where approval_status = 'approved'`),
+    query(`select count(*)::int as total from fundis where approval_status = 'pending'`),
   ]);
   res.json({
     success: true,
     stats: {
       users: users.rows[0].total,
       jobs: jobs.rows[0].total,
-      revenue: Number(payments.rows[0].total),
+      // Use revenue_ledger (commission + fees) as the authoritative platform revenue.
+      // Falls back to payment sum if revenue_ledger has no entries (fresh install).
+      revenue: revenue.totals.lifetimeRevenue > 0
+        ? revenue.totals.lifetimeRevenue
+        : Number(payments.rows[0].total),
       platformRevenue: revenue.totals.lifetimeRevenue,
       netProfit: revenue.totals.netProfit,
       openDisputes: disputes.rows[0].total,
       revenueBreakdown: revenue,
+      fundis: fundis.rows[0].total,
+      pendingFundis: pendingFundis.rows[0].total,
     },
   });
 }

@@ -565,6 +565,33 @@ class ApiClient {
 
   // ── Admin ────────────────────────────────────────────────────────────────
   async getAdminStats() { return this.request('/admin/dashboard'); }
+  async getAdminDashboard() { return this.request('/admin/dashboard'); }
+  async getStaffPermissions() { return this.request('/staff/me/permissions'); }
+
+  // ── Referral System (voucher-based) ─────────────────────────────────────
+  async getMyReferralDashboard() { return this.request('/referrals/me'); }
+  async validateReferralCode(code: string) {
+    return this.request('/referrals/validate', { method: 'POST', body: JSON.stringify({ code }) });
+  }
+  async listReferralCampaigns() { return this.request('/referrals/campaigns'); }
+  async createReferralCampaign(data: any) {
+    return this.request('/referrals/campaigns', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateReferralCampaignStatus(campaignId: string, status: 'active' | 'paused' | 'disabled' | 'expired') {
+    return this.request(`/referrals/campaigns/${campaignId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  }
+  async getReferralAnalytics(period = '30d') {
+    return this.request(`/referrals/analytics?period=${period}`);
+  }
+  async getReferralFraudEvents(status = 'pending', limit = 50) {
+    return this.request(`/referrals/fraud?status=${status}&limit=${limit}`);
+  }
+  async reviewReferralFraudEvent(eventId: string, reviewStatus: 'confirmed_fraud' | 'false_positive', reviewNotes: string) {
+    return this.request(`/referrals/fraud/${eventId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reviewStatus, reviewNotes }),
+    });
+  }
 
   async getAdminFundis(page = 1, status = 'pending') {
     return this.request(`/admin/fundis?page=${page}&status=${status}`);

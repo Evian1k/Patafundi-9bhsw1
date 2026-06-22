@@ -8,14 +8,24 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Wrench, Package, DollarSign, AlertTriangle, Users, Activity } from "lucide-react";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
+import { apiClient } from "@/lib/api";
 
 interface Stats {
   fundis?: number;
+  pendingFundis?: number;
   jobs?: number;
   revenue?: number;
+  platformRevenue?: number;
+  netProfit?: number;
   fraudAlerts?: number;
   users?: number;
+  openDisputes?: number;
 }
+
+const fmt = (n: number | undefined): string => {
+  if (n === undefined || n === null || Number.isNaN(n)) return "—";
+  return n.toLocaleString();
+};
 
 export default function StaffOverview() {
   const reduceMotion = useReducedMotion();
@@ -27,32 +37,45 @@ export default function StaffOverview() {
   useEffect(() => {
     (async () => {
       try {
-        const permRes = await fetch("/api/staff/me/permissions", { credentials: "include" });
-        const permData = await permRes.json();
-        setRole(permData.role);
+        // Use apiClient (configured with VITE_API_URL) — works on Vercel + dev
+        const permData = await apiClient.getStaffPermissions().catch(() => ({ role: "", permissions: [] })) as { role: string; permissions: string[] };
+        setRole(permData.role || "");
         setPermissions(new Set(permData.permissions || []));
 
-        // Fetch stats based on permissions
         const promises: Promise<void>[] = [];
         if (permData.role === "super_admin" || permData.permissions?.includes("can_view_metrics")) {
           promises.push(
-            fetch("/api/admin/dashboard", { credentials: "include" })
-              .then(r => r.json())
-              .then(d => setStats(s => ({ ...s, fundis: d.stats?.fundis, jobs: d.stats?.jobs, revenue: d.stats?.revenue, users: d.stats?.users })))
+            apiClient.getAdminDashboard()
+              .then((d: any) => {
+                const s = d?.stats || {};
+                setStats(prev => ({
+                  ...prev,
+                  fundis: s.fundis,
+                  pendingFundis: s.pendingFundis,
+                  jobs: s.jobs,
+                  revenue: s.revenue,
+                  platformRevenue: s.platformRevenue,
+                  netProfit: s.netProfit,
+                  users: s.users,
+                  openDisputes: s.openDisputes,
+                }));
+              })
               .catch(() => {})
           );
         }
         if (permData.permissions?.includes("can_view_fraud_dashboard")) {
           promises.push(
-            fetch("/api/staff/fraud/dashboard", { credentials: "include" })
-              .then(r => r.json())
-              .then(d => setStats(s => ({ ...s, fraudAlerts: d.dashboard?.fraudAlerts?.open })))
+            apiClient.getFraudDashboard()
+              .then((d: any) => {
+                const open = d?.dashboard?.fraudAlerts?.open ?? d?.fraudAlerts?.open ?? 0;
+                setStats(prev => ({ ...prev, fraudAlerts: open }));
+              })
               .catch(() => {})
           );
         }
         await Promise.all(promises);
       } catch {
-        // ignore
+        // ignore — dashboard shows "—" placeholders
       } finally {
         setLoading(false);
       }
@@ -65,13 +88,13 @@ export default function StaffOverview() {
 
   const cards: Array<{ label: string; value: string | number; icon: React.ElementType; href?: string; perm?: string }> = [];
   if (role === "super_admin" || permissions.has("can_view_metrics")) {
-    cards.push({ label: "Total Fundis", value: stats.fundis ?? "—", icon: Wrench, href: "/staff/admin/fundis", perm: "can_view_fundis" });
-    cards.push({ label: "Total Jobs", value: stats.jobs ?? "—", icon: Package, href: "/staff/admin/jobs", perm: "can_view_all_jobs" });
-    cards.push({ label: "Revenue (KES)", value: stats.revenue?.toLocaleString() ?? "—", icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
-    cards.push({ label: "Users", value: stats.users ?? "—", icon: Users, href: "/staff/admin/users", perm: "can_view_users" });
+    cards.push({ label: "Total Fundis", value: fmt(stats.fundis), icon: Wrench, href: "/staff/admin/fundis", perm: "can_view_fundis" });
+    cards.push({ label: "Total Jobs", value: fmt(stats.jobs), icon: Package, href: "/staff/admin/jobs", perm: "can_view_all_jobs" });
+    cards.push({ label: "Revenue (KES)", value: fmt(stats.revenue), icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
+    cards.push({ label: "Users", value: fmt(stats.users), icon: Users, href: "/staff/admin/users", perm: "can_view_users" });
   }
   if (permissions.has("can_view_fraud_dashboard")) {
-    cards.push({ label: "Open Fraud Alerts", value: stats.fraudAlerts ?? "—", icon: AlertTriangle, href: "/staff/fraud" });
+    cards.push({ label: "Open Fraud Alerts", value: fmt(stats.fraudAlerts), icon: AlertTriangle, href: "/staff/fraud" });
   }
 
   const containerVariants = reduceMotion ? {} : stagger;

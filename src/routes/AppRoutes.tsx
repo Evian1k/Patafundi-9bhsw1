@@ -58,6 +58,7 @@ import CommissionControl from "@/pages/staff/CommissionControl";
 import LiveOperations from "@/pages/staff/LiveOperations";
 import SecurityCenter from "@/pages/staff/SecurityCenter";
 import SystemSettings from "@/pages/staff/SystemSettings";
+import ReferralCampaigns from "@/pages/staff/ReferralCampaigns";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -229,6 +230,8 @@ export default function AppRoutes() {
           />
         } />
         <Route path="finance/revenue" element={<StaffOverview />} />
+        <Route path="referrals" element={<ReferralCampaigns />} />
+        <Route path="referrals/campaigns" element={<ReferralCampaigns />} />
         <Route path="fraud" element={
           <StaffDataTable resource="fraud-alerts" title="Fraud Alerts"
             columns={[

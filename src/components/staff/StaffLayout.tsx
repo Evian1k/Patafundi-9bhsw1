@@ -21,10 +21,11 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Shield, Users, Wrench, DollarSign, AlertTriangle, Headphones,
-  Package, Activity, ScrollText, LogOut, Menu, X,
+  Package, Activity, ScrollText, LogOut, Menu, X, Gift,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useReducedMotion } from "@/lib/motion";
+import { apiClient } from "@/lib/api";
 
 const STAFF_NAV = [
   {
@@ -43,6 +44,7 @@ const STAFF_NAV = [
       { label: "Payments", href: "/staff/finance", icon: DollarSign, permission: "can_view_payments", roles: ["super_admin", "admin", "finance_team"] },
       { label: "Revenue", href: "/staff/finance/revenue", icon: DollarSign, permission: "can_view_revenue", roles: ["super_admin", "admin", "finance_team"] },
       { label: "Commission Control", href: "/staff/commission", icon: DollarSign, permission: "can_manage_system", roles: ["super_admin"] },
+      { label: "Referral Campaigns", href: "/staff/referrals", icon: Gift, permission: "can_view_referral_analytics", roles: ["super_admin", "admin", "finance_team", "fraud_analyst"] },
     ],
   },
   {
@@ -82,12 +84,11 @@ export default function StaffLayout() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/staff/me/permissions", { credentials: "include" });
-        if (!res.ok) {
+        const data = await apiClient.getStaffPermissions() as { role: string; permissions: string[] };
+        if (!data || !data.role) {
           navigate("/auth");
           return;
         }
-        const data = await res.json();
         setRole(data.role);
         setPermissions(new Set(data.permissions || []));
       } catch {

@@ -137,6 +137,31 @@ export async function createJob(req, res) {
   const latitude = body.latitude || body.customer_latitude || null;
   const longitude = body.longitude || body.customer_longitude || null;
   const scheduledAt = body.scheduledDate || body.scheduled_at || null;
+
+  // ── Referral voucher application ────────────────────────────────────
+  // If the customer requests to use a voucher AND has an active voucher,
+  // apply the discount to the job's estimated_price.
+  // Single-use, non-stackable, validated server-side.
+  let voucherApplied = null;
+  let finalPrice = body.estimatedPrice || body.estimated_price || null;
+  if (body.useReferralVoucher === true && finalPrice && Number(finalPrice) > 0) {
+    try {
+      const { applyVoucherToJob, confirmVoucherRedemption } = await import('../services/referralService.js');
+      const result = await applyVoucherToJob(req.user.id, Number(finalPrice), 0);
+      if (result.applied) {
+        finalPrice = Math.max(0, Number(finalPrice) - Number(result.discount));
+        voucherApplied = {
+          voucherId: result.voucherId,
+          voucherCode: result.voucherCode,
+          discountKes: result.discount,
+          discountPercentage: result.discountPercentage,
+        };
+      }
+    } catch (err) {
+      console.warn('[referral] voucher application failed (non-blocking):', err.message);
+    }
+  }
+
   const result = await query(
     `insert into jobs (customer_id, service_category, description, location_name, customer_latitude,
       customer_longitude, status, urgency, estimated_price, scheduled_at)
@@ -151,7 +176,7 @@ export async function createJob(req, res) {
       longitude,
       scheduledAt ? 'scheduled' : 'matching',
       body.urgency || 'normal',
-      body.estimatedPrice || body.estimated_price || null,
+      finalPrice,
       scheduledAt,
     ],
   );
@@ -165,7 +190,7 @@ export async function createJob(req, res) {
     eventType: 'job_created',
     actorId: req.user.id,
     actorRole: req.user.role,
-    metadata: { serviceCategory, urgency: body.urgency || 'normal' },
+    metadata: { serviceCategory, urgency: body.urgency || 'normal', voucherApplied },
   });
   await recordTimelineEvent({
     jobId: job.id,
@@ -173,6 +198,23 @@ export async function createJob(req, res) {
     actorId: req.user.id,
     actorRole: req.user.role,
   });
+
+  // ── Confirm voucher redemption (after job is created) ──────────────
+  if (voucherApplied) {
+    try {
+      const { confirmVoucherRedemption } = await import('../services/referralService.js');
+      await confirmVoucherRedemption({
+        voucherId: voucherApplied.voucherId,
+        jobId: job.id,
+        userId: req.user.id,
+        originalPrice: Number(body.estimatedPrice || body.estimated_price || 0),
+        discountApplied: voucherApplied.discountKes,
+        ipAddress: req.ip,
+      });
+    } catch (err) {
+      console.warn('[referral] voucher redemption confirmation failed (non-blocking):', err.message);
+    }
+  }
   if (body.description) {
     const scan = await scanContent({
       content: body.description,
@@ -436,6 +478,20 @@ export async function confirmCompletion(req, res) {
     actorRole: req.user.role,
   });
   emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+
+  // ── Referral voucher issuance ────────────────────────────────────────
+  // After a job is confirmed completed + paid, check if the customer was a
+  // referee whose first paid job this is. If so, issue a discount voucher
+  // to the referrer (subject to fraud checks).
+  // Non-blocking — failures here must not break the job completion flow.
+  try {
+    const { processJobCompletionForReferral } = await import('../services/referralService.js');
+    const jobValue = Number(job.final_price || job.estimated_price || 0);
+    await processJobCompletionForReferral(req.params.id, req.user.id, jobValue);
+  } catch (err) {
+    console.warn('[referral] voucher issuance failed (non-blocking):', err.message);
+  }
+
   res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
