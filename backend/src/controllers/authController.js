@@ -117,24 +117,36 @@ export async function register(req, res) {
       [inserted.rows[0].id, await bcrypt.hash(otpCode, 10)],
     );
 
-    // Process referral code if provided
+    // Process referral code if provided (new voucher-based system)
+    // This creates a 'pending' referral row. The voucher is issued only
+    // after the referee verifies email + completes first paid job.
     if (referralCode) {
-      const referrer = await client.query(
-        'select referrer_id from referrals where referral_code = $1 and status = $2',
-        [referralCode, 'pending'],
-      );
-      if (referrer.rows[0]) {
-        // This new user is the referee — link them
-        await client.query(
-          'update referrals set referee_id = $1, status = $2 where referrer_id = $3 and referral_code = $4',
-          [inserted.rows[0].id, 'completed', referrer.rows[0].referrer_id, referralCode],
+      try {
+        const { validateReferralCode, createReferral } = await import('../services/referralService.js');
+        const ipAddress = req.ip || req.socket?.remoteAddress || null;
+        const deviceFingerprint = req.get('X-Device-Fingerprint') || null;
+        const validation = await validateReferralCode(
+          referralCode,
+          inserted.rows[0].id,
+          email,
+          phone || null,
+          ipAddress,
+          deviceFingerprint,
         );
-        // Reward the referrer with a notification
-        await client.query(
-          `insert into notifications (user_id, type, title, body, data)
-           values ($1, 'referral_completed', 'Referral Reward!', 'Someone joined PataFundi using your code! You earned KES 100.', $2::jsonb)`,
-          [referrer.rows[0].referrer_id, JSON.stringify({ refereeId: inserted.rows[0].id, reward: 100 })],
-        );
+        if (validation.valid) {
+          await createReferral({
+            referrerId: validation.referrerId,
+            refereeId: inserted.rows[0].id,
+            code: referralCode.toUpperCase().trim(),
+            campaignId: validation.campaignId,
+            ipAddress,
+            deviceFingerprint,
+          });
+        }
+        // If invalid, silently ignore — don't fail registration
+      } catch (err) {
+        console.warn('[referral] could not process referral code during registration:', err.message);
+        // Don't fail registration if referral processing fails
       }
     }
 

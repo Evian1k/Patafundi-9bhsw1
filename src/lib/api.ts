@@ -170,10 +170,10 @@ class ApiClient {
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────
-  async register(email: string, password: string, fullName: string, phone: string | null = null, role = 'customer') {
+  async register(email: string, password: string, fullName: string, phone: string | null = null, role = 'customer', referralCode: string | null = null) {
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, fullName, phone, role }),
+      body: JSON.stringify({ email, password, fullName, phone, role, referralCode }),
       includeAuth: false,
     });
   }

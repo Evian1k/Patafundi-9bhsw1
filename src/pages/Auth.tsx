@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 import { apiClient } from "@/lib/api";
@@ -50,7 +50,7 @@ const Auth = () => {
   const [otpCode, setOtpCode] = useState("");
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", referralCode: "" });
   const [forgotData, setForgotData] = useState({ email: "", password: "", confirmPassword: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -79,7 +79,13 @@ const Auth = () => {
     if (token && !explicitMode) {
       routeAfterAuth().catch(() => navigate("/dashboard"));
     }
-  }, [navigate, routeAfterAuth, searchParams]);
+    // Pre-fill referral code from URL (?ref=PF-XXXXXX) — supports share links
+    const refCode = searchParams.get("ref");
+    if (refCode && !formData.referralCode) {
+      setFormData(prev => ({ ...prev, referralCode: refCode.toUpperCase().trim() }));
+      if (mode !== "signup") setMode("signup");
+    }
+  }, [navigate, routeAfterAuth, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist OTP session
   useEffect(() => {
@@ -109,7 +115,14 @@ const Auth = () => {
       const validatedData = schema.parse(formData);
 
       if (mode === "signup") {
-        const reg = await apiClient.register(validatedData.email, validatedData.password, formData.name) as {
+        const reg = await apiClient.register(
+          validatedData.email,
+          validatedData.password,
+          formData.name,
+          null,
+          'customer',
+          formData.referralCode || null,
+        ) as {
           message?: string;
           devOtp?: string;
         };
@@ -559,6 +572,28 @@ const Auth = () => {
                 </div>
                 {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
               </div>
+
+              {mode === "signup" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Referral Code <span className="text-muted-foreground text-xs">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={formData.referralCode || ""}
+                      onChange={(e) => setFormData({ ...formData, referralCode: e.target.value.toUpperCase().trim() })}
+                      placeholder="PF-XXXXXX"
+                      className="w-full h-12 pl-10 pr-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-sm font-mono uppercase"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Have a friend's referral code? Enter it to earn them a discount voucher when you complete your first job.
+                  </p>
+                </div>
+              )}
 
               {mode === "login" && (
                 <div className="text-right">
