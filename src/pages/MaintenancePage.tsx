@@ -2,9 +2,13 @@
  * MaintenancePage — shown to customers and fundis when the platform
  * is in maintenance mode. Staff (admin, super_admin, etc.) bypass
  * maintenance mode and never see this page.
+ *
+ * This page includes a "Staff Login" button so that admin/super_admin
+ * can still log in during maintenance to maintain the system.
  */
 import { motion } from "framer-motion";
-import { Wrench, Clock, Shield } from "lucide-react";
+import { Wrench, Clock, Shield, UserCog } from "lucide-react";
+import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export default function MaintenancePage() {
@@ -65,7 +69,18 @@ export default function MaintenancePage() {
             Try Again
           </button>
 
-          <p className="text-xs text-slate-400 mt-4">
+          {/* Staff login link — allows admin/super_admin to log in during maintenance */}
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <Link
+              to="/staff/login"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary transition-colors"
+            >
+              <UserCog className="w-3.5 h-3.5" />
+              Staff Login
+            </Link>
+          </div>
+
+          <p className="text-xs text-slate-400 mt-3">
             If this persists, follow us on social media for updates.
           </p>
         </div>

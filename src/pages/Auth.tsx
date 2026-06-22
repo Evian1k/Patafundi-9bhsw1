@@ -643,6 +643,16 @@ const Auth = () => {
               </Link>
             </div>
           )}
+
+          {/* Staff login link — allows staff to access the system during maintenance */}
+          <div className="mt-3 text-center text-xs">
+            <Link
+              to="/staff/login"
+              className="text-muted-foreground/70 hover:text-primary inline-flex items-center gap-1"
+            >
+              Staff Login →
+            </Link>
+          </div>
         </motion.div>
       </div>
     </div>
