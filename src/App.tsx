@@ -6,6 +6,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GoogleMapsProvider } from "@/components/maps/GoogleMapsProvider";
 import NetworkReconnectBanner from "@/components/system/NetworkReconnectBanner";
+import MaintenanceGuard from "@/components/system/MaintenanceGuard";
+import MaintenanceBanner from "@/components/system/MaintenanceBanner";
 import { AppRoutes } from "@/routes";
 
 const App = () => {
@@ -25,8 +27,11 @@ const App = () => {
         <Sonner richColors position="top-center" />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <GoogleMapsProvider>
-            <NetworkReconnectBanner />
-            <AppRoutes />
+            <MaintenanceGuard>
+              <MaintenanceBanner />
+              <NetworkReconnectBanner />
+              <AppRoutes />
+            </MaintenanceGuard>
           </GoogleMapsProvider>
         </BrowserRouter>
       </TooltipProvider>

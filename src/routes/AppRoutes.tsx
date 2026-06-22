@@ -4,6 +4,7 @@ import { ProtectedAdminRoute } from "@/routes/guards";
 
 import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
+import MaintenancePage from "@/pages/MaintenancePage";
 import Dashboard from "@/pages/Dashboard";
 import CreateJob from "@/pages/CreateJob";
 import FundiRegister from "@/pages/FundiRegister";
@@ -71,6 +72,7 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/maintenance" element={<MaintenancePage />} />
       <Route path="/demo" element={
         SHOW_DEMO && DemoPage ? (
           <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>

@@ -132,8 +132,13 @@ class ApiClient {
       // haven't changed. Let the caller handle the 403 gracefully.
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-        throw new ApiError(errorBody?.message || response.statusText || 'Request failed', response.status);
+        const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string; maintenanceMode?: boolean };
+        const err = new ApiError(errorBody?.message || response.statusText || 'Request failed', response.status);
+        // Attach maintenance flag so the frontend can show a maintenance page
+        // instead of a generic error. Backend returns maintenanceMode: true
+        // when the maintenance_mode feature flag is enabled.
+        (err as any).maintenanceMode = errorBody?.maintenanceMode === true;
+        throw err;
       }
 
       return response.json();
