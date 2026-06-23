@@ -184,10 +184,9 @@ app.use((req, res) => {
 app.use((error, _req, res, _next) => {
   let status = error.status || 500;
   let message = error.message || 'Internal server error';
+  let errorType = 'general';
 
   // Database-related errors → 503 (service unavailable), not 500.
-  // This tells the frontend "the server is up but the DB is down" so it
-  // can show a proper "service unavailable" message instead of a generic error.
   if (
     /ECONNREFUSED|connect ECONNREFUSED|Connection terminated|timeout expired|not available/i.test(message)
     || /ENOTFOUND|ETIMEDOUT|EHOSTUNREACH/i.test(message)
@@ -196,6 +195,7 @@ app.use((error, _req, res, _next) => {
     || /relation .* does not exist/i.test(message)
   ) {
     status = 503;
+    errorType = 'database';
     message = config.nodeEnv === 'production'
       ? 'Database unavailable. Verify DATABASE_URL on Render.'
       : 'Database unavailable. Start PostgreSQL (docker compose up -d) or set DATABASE_URL to a cloud Postgres. See .env.example for details.';
@@ -204,11 +204,39 @@ app.use((error, _req, res, _next) => {
     message = 'Invalid id format';
   } else if (/is not configured/i.test(message)) {
     status = 503;
+    errorType = 'system';
+  } else if (/payment|mpesa|stk.push|daraja/i.test(message)) {
+    errorType = 'payment';
+  } else if (/rate limit|too many/i.test(message)) {
+    errorType = 'rate_limit';
+  } else if (status === 401 || status === 403) {
+    errorType = 'security';
+  } else if (status >= 500) {
+    errorType = 'system';
   }
 
   if (status >= 500) {
     console.error('[PataFundi API]', message);
   }
+
+  // ── Notify staff of significant errors ────────────────────────────
+  // Logs to error_logs table + creates notifications for relevant staff.
+  // Non-blocking — never let this crash the request.
+  import('./services/errorNotificationService.js')
+    .then(({ logErrorAndNotifyStaff }) => {
+      logErrorAndNotifyStaff({
+        type: errorType,
+        statusCode: status,
+        message,
+        stack: error.stack,
+        path: _req.path,
+        method: _req.method,
+        userId: _req.user?.id || null,
+        ip: _req.ip,
+        userAgent: _req.get('User-Agent'),
+      });
+    })
+    .catch(() => { /* ignore — never crash the request */ });
 
   res.status(status).json({ success: false, message });
 });

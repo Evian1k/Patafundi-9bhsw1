@@ -40,9 +40,24 @@ class ApiClient {
     this.token = token;
     if (typeof localStorage !== 'undefined') {
       if (token) localStorage.setItem('auth_token', token);
-      else localStorage.removeItem('auth_token');
+      else {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+      }
     }
     if (!token) clearAuthSession();
+  }
+
+  /** Store refresh token for cross-origin use (Vercel → Render) */
+  setRefreshToken(token: string | null) {
+    if (typeof localStorage !== 'undefined') {
+      if (token) localStorage.setItem('refresh_token', token);
+      else localStorage.removeItem('refresh_token');
+    }
+  }
+
+  private getRefreshToken(): string | null {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem('refresh_token') : null;
   }
 
   private syncTokenFromStorage(): string | null {
@@ -148,19 +163,24 @@ class ApiClient {
   }
 
   // ── Token refresh ─────────────────────────────────────────────────────
-  /** Attempts to refresh the JWT access token using the httpOnly refresh cookie. */
+  /** Attempts to refresh the JWT access token.
+   *  Sends refresh token in body (cross-origin) + cookie (same-origin). */
   async refreshToken(): Promise<boolean> {
     try {
       const url = buildApiUrl('/auth/refresh');
+      const storedRefresh = this.getRefreshToken();
       const response = await fetch(url, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: storedRefresh }),
       });
       if (!response.ok) return false;
       const data = await response.json();
       if (data?.token) {
         this.setToken(data.token);
+        // Store new refresh token if returned
+        if (data?.refreshToken) this.setRefreshToken(data.refreshToken);
         return true;
       }
       return false;
@@ -224,9 +244,11 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
       includeAuth: false,
-    }) as { token?: string };
+    }) as { token?: string; refreshToken?: string };
     if (data?.token) {
       this.setToken(data.token);
+      // Store refresh token for cross-origin refresh (Vercel → Render)
+      if (data?.refreshToken) this.setRefreshToken(data.refreshToken);
       const user = (data as { user?: Record<string, unknown> }).user;
       if (user?.id) setAuthSession(String(user.id), String(user.role || 'customer'));
     }
@@ -234,8 +256,17 @@ class ApiClient {
   }
 
   async logout() {
-    try { await this.request('/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
-    finally { this.setToken(null); }
+    try {
+      const storedRefresh = this.getRefreshToken();
+      await this.request('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken: storedRefresh }),
+      });
+    } catch { /* ignore */ }
+    finally {
+      this.setRefreshToken(null);
+      this.setToken(null);
+    }
   }
 
   async forgotPassword(email: string) {

@@ -192,6 +192,23 @@ router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_su
 
 router.get('/staff/audit-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(admin.listTable('audit_logs', 'logs')));
 
+// Error logs — staff with can_view_logs can view system errors
+router.get('/staff/error-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(async (req, res) => {
+  const { query: q } = await import('./db.js');
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const resolved = req.query.resolved === 'true' ? 'true' : (req.query.resolved === 'false' ? 'false' : null);
+  const where = resolved ? `where resolved = ${resolved}` : '';
+  const result = await q(`select * from error_logs ${where} order by created_at desc limit $1`, [limit]);
+  res.json({ success: true, errors: result.rows });
+}));
+
+// Resolve error — mark as resolved
+router.post('/staff/error-logs/:id/resolve', authRequired, requirePermission('can_view_logs'), asyncHandler(async (req, res) => {
+  const { query: q } = await import('./db.js');
+  await q('update error_logs set resolved = true, resolved_by = $2, resolved_at = now() where id = $1', [req.params.id, req.user.id]);
+  res.json({ success: true, message: 'Error marked as resolved' });
+}));
+
 // Permission-based dashboard access (alternative to /admin/dashboard which requires 'admin' role)
 router.get('/staff/dashboard', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.dashboard));
 router.get('/staff/reports/analytics', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.reports));

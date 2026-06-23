@@ -232,7 +232,12 @@ export async function login(req, res) {
 
   const session = await issueSession(res, user);
   await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, metadata: { ip } });
-  res.json({ success: true, user: publicUser(user), token: session.token });
+  // Return BOTH access token and refresh token in JSON body.
+  // The refresh token is also set as an httpOnly cookie for same-origin use,
+  // but cross-origin deployments (Vercel frontend → Render backend) cannot
+  // use cookies due to sameSite:'strict'. The frontend stores the refresh
+  // token in localStorage and sends it in the request body to /auth/refresh.
+  res.json({ success: true, user: publicUser(user), token: session.token, refreshToken: session.refreshToken });
 }
 
 export async function refresh(req, res) {
@@ -256,7 +261,8 @@ export async function refresh(req, res) {
   if (!user.email_verified_at) throw forbidden('Email not verified');
   await query('update refresh_tokens set revoked_at = now() where token_hash = $1', [refreshHash]);
   const session = await issueSession(res, user);
-  res.json({ success: true, token: session.token, user: publicUser(user) });
+  // Return new refresh token too so frontend can update its stored token
+  res.json({ success: true, token: session.token, refreshToken: session.refreshToken, user: publicUser(user) });
 }
 
 export async function logout(req, res) {
