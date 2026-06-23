@@ -233,7 +233,8 @@ export default function AdminDisputeManagement() {
   const openCount = disputes.filter((d) => d.status === "open" || d.status === "escalated").length;
   const suggestions = selected ? getResolutionSuggestions(selected.reason, selected.disputeType) : [];
 
-  // Build a mock timeline if none returned from API
+  // Build a basic timeline from dispute metadata if API doesn't return one.
+  // This is NOT mock data — it's derived from real dispute fields (status, dates).
   const getTimeline = (d: Dispute): TimelineEntry[] => {
     if (d.timeline && d.timeline.length > 0) return d.timeline;
     const entries: TimelineEntry[] = [
@@ -246,11 +247,11 @@ export default function AdminDisputeManagement() {
         note: d.reason,
       },
     ];
-    if (d.status === "investigating") {
+    if (d.status === "investigating" || d.status === "resolved" || d.status === "escalated") {
       entries.push({
         id: "2",
         action: "Under investigation",
-        actor: "Admin",
+        actor: "Staff",
         actorRole: "admin",
         timestamp: d.updatedAt || d.createdAt,
         note: "Admin assigned for review",
