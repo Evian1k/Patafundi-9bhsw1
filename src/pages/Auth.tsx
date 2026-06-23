@@ -679,15 +679,20 @@ const Auth = () => {
             </div>
           )}
 
-          {/* Staff login link — allows staff to access the system during maintenance */}
-          <div className="mt-3 text-center text-xs">
-            <Link
-              to="/staff/login"
-              className="text-muted-foreground/70 hover:text-primary inline-flex items-center gap-1"
-            >
-              Staff Login →
-            </Link>
-          </div>
+          {/* Staff login link — DEV ONLY (not visible on deployed production site).
+              Staff access /staff/login directly via URL. The link is shown in
+              local dev for convenience but removed from production builds
+              so customers don't see it. */}
+          {import.meta.env.DEV && (
+            <div className="mt-3 text-center text-xs">
+              <Link
+                to="/staff/login"
+                className="text-muted-foreground/70 hover:text-primary inline-flex items-center gap-1"
+              >
+                Staff Login →
+              </Link>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>
