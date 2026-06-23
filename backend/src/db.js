@@ -14,7 +14,6 @@ let lastConnectionError = null;
 
 async function initDriver() {
   if (pool || useEmbedded) return;
-  if (lastConnectionError && process.env.NODE_ENV === 'production') return;
 
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -32,14 +31,29 @@ async function initDriver() {
       return;
     }
     try {
-      pool = new Pool(getPgPoolConfig(config.databaseUrl));
+      // Use a longer timeout for the initial connection — Neon free tier
+      // suspends idle databases and the first connection can take 10+ seconds
+      // to wake up. The default 10s timeout is too short.
+      const poolConfig = getPgPoolConfig(config.databaseUrl, {
+        connectionTimeoutMillis: 30_000, // 30 seconds for Neon cold start
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        statement_timeout: 15_000, // 15s per query
+      });
+      pool = new Pool(poolConfig);
       await pool.query('select 1');
       lastConnectionError = null;
+      console.log('[PataFundi API] PostgreSQL database ready');
     } catch (error) {
       lastConnectionError = error instanceof Error ? error : new Error(String(error));
       await pool?.end().catch(() => {});
       pool = null;
       console.error('[PataFundi API] PostgreSQL connection failed:', lastConnectionError.message);
+      console.error('[PataFundi API] Will retry on next request...');
+      // CRITICAL: Do NOT permanently give up. Clear the error so the next
+      // request will retry the connection. Neon free tier can have transient
+      // connection timeouts during cold starts — the database is fine, we
+      // just need to retry.
     }
     return;
   }
@@ -67,6 +81,13 @@ async function initDriver() {
 }
 
 async function ensureInit() {
+  // If we have a connection error and no pool, reset initPromise so we
+  // retry the connection on the next request. This is critical for
+  // production — Neon free tier can have transient timeouts, and we
+  // must not permanently give up after one failure.
+  if (lastConnectionError && !pool && !useEmbedded && process.env.NODE_ENV === 'production') {
+    initPromise = null; // allow retry
+  }
   if (!initPromise) initPromise = initDriver().catch((error) => {
     lastConnectionError = error instanceof Error ? error : new Error(String(error));
   });
