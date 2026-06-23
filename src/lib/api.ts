@@ -125,7 +125,10 @@ class ApiClient {
       }
 
       if (response.status === 401 && this.token && attempt === 0) {
-        // JWT expired — try to refresh once, then retry the original request
+        // JWT expired — try to refresh ONCE, then retry the original request.
+        // If refresh fails, CLEAR the token and redirect to login.
+        // CRITICAL: Do NOT retry on refresh failure — that causes an infinite
+        // loop of 401 → refresh → 403 → retry → 401...
         try {
           const refreshed = await this.refreshToken();
           if (refreshed) {
@@ -133,12 +136,20 @@ class ApiClient {
             (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
             continue; // retry with new token
           }
-        } catch {
-          // refresh failed — clear token, redirect to login
+          // Refresh returned false (no refresh token, or refresh failed)
+          // Clear everything and redirect to login
           this.setToken(null);
           if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {
             window.location.href = '/auth';
           }
+          throw new ApiError('Session expired. Please log in again.', 401);
+        } catch (refreshErr) {
+          // Refresh threw an error — clear token, redirect to login
+          this.setToken(null);
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth')) {
+            window.location.href = '/auth';
+          }
+          throw new ApiError('Session expired. Please log in again.', 401);
         }
       }
 
@@ -164,22 +175,32 @@ class ApiClient {
 
   // ── Token refresh ─────────────────────────────────────────────────────
   /** Attempts to refresh the JWT access token.
-   *  Sends refresh token in body (cross-origin) + cookie (same-origin). */
+   *  Sends refresh token in body (cross-origin) + cookie (same-origin).
+   *  Returns false if no refresh token is stored (user needs to log in). */
   async refreshToken(): Promise<boolean> {
     try {
-      const url = buildApiUrl('/auth/refresh');
       const storedRefresh = this.getRefreshToken();
+      // If there's no stored refresh token, don't even try the API call.
+      // This happens when a user has an old session from before the refresh
+      // token fix. Return false immediately so the caller redirects to login.
+      if (!storedRefresh) {
+        return false;
+      }
+      const url = buildApiUrl('/auth/refresh');
       const response = await fetch(url, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: storedRefresh }),
       });
-      if (!response.ok) return false;
+      if (!response.ok) {
+        // Refresh failed — clear the invalid refresh token
+        this.setRefreshToken(null);
+        return false;
+      }
       const data = await response.json();
       if (data?.token) {
         this.setToken(data.token);
-        // Store new refresh token if returned
         if (data?.refreshToken) this.setRefreshToken(data.refreshToken);
         return true;
       }
