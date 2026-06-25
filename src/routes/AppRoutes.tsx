@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { ProtectedAdminRoute } from "@/routes/guards";
+import { ProtectedAdminRoute, ProtectedCustomerRoute, ProtectedFundiRoute } from "@/routes/guards";
 
 import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
@@ -98,11 +98,11 @@ export default function AppRoutes() {
       <Route path="/customer" element={<Navigate to="/dashboard" replace />} />
       <Route path="/profile" element={<Navigate to="/settings" replace />} />
 
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/create-job" element={<CreateJob />} />
-      <Route path="/job/:jobId/tracking" element={<JobTracking />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/disputes" element={<DisputeCenter />} />
+      <Route path="/dashboard" element={<ProtectedCustomerRoute element={<Dashboard />} />} />
+      <Route path="/create-job" element={<ProtectedCustomerRoute element={<CreateJob />} />} />
+      <Route path="/job/:jobId/tracking" element={<ProtectedCustomerRoute element={<JobTracking />} />} />
+      <Route path="/settings" element={<ProtectedCustomerRoute element={<Settings />} />} />
+      <Route path="/disputes" element={<ProtectedCustomerRoute element={<DisputeCenter />} />} />
 
       <Route path="/services/:slug" element={<ServicePage />} />
 
@@ -150,14 +150,14 @@ export default function AppRoutes() {
       <Route path="/api-documentation" element={<PolicyPage slug="api-documentation" />} />
 
       <Route path="/fundi/register" element={<Navigate to="/register/fundi" replace />} />
-      <Route path="/fundi/pending" element={<FundiPendingApproval />} />
-      <Route path="/fundi" element={<FundiDashboard />} />
-      <Route path="/fundi/job/:jobId" element={<FundiJob />} />
-      <Route path="/fundi/job/active" element={<FundiJob />} />
-      <Route path="/fundi/wallet" element={<FundiWallet />} />
-      <Route path="/fundi/disputes" element={<DisputeCenter />} />
-      <Route path="/fundi/resources" element={<FundiResources />} />
-      <Route path="/fundi/app" element={<FundiApp />} />
+      <Route path="/fundi/pending" element={<ProtectedFundiRoute element={<FundiPendingApproval />} />} />
+      <Route path="/fundi" element={<ProtectedFundiRoute element={<FundiDashboard />} />} />
+      <Route path="/fundi/job/:jobId" element={<ProtectedFundiRoute element={<FundiJob />} />} />
+      <Route path="/fundi/job/active" element={<ProtectedFundiRoute element={<FundiJob />} />} />
+      <Route path="/fundi/wallet" element={<ProtectedFundiRoute element={<FundiWallet />} />} />
+      <Route path="/fundi/disputes" element={<ProtectedFundiRoute element={<DisputeCenter />} />} />
+      <Route path="/fundi/resources" element={<ProtectedFundiRoute element={<FundiResources />} />} />
+      <Route path="/fundi/app" element={<ProtectedFundiRoute element={<FundiApp />} />} />
 
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<Navigate to="/admin/login" replace />} />

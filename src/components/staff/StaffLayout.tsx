@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Shield, Users, Wrench, DollarSign, AlertTriangle, Headphones,
@@ -141,17 +141,8 @@ export default function StaffLayout() {
   }
 
   if (role === "customer" || role === "fundi" || role === "fundi_pending") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Access Denied</h1>
-          <p className="text-slate-600 mt-2">This area is for staff members only.</p>
-          <Link to="/dashboard" className="mt-4 inline-block text-primary hover:underline">
-            Go to your dashboard →
-          </Link>
-        </div>
-      </div>
-    );
+    // Non-staff trying to access staff area → redirect to their own dashboard
+    return <Navigate to={role === "fundi" ? "/fundi" : "/dashboard"} replace />;
   }
 
   const sidebarVariants = reduceMotion
