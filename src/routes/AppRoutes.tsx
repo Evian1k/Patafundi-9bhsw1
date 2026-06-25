@@ -69,6 +69,8 @@ import DevOpsDashboard from "@/pages/staff/DevOpsDashboard";
 import LoyaltyCampaigns from "@/pages/staff/LoyaltyCampaigns";
 import EmergencyControls from "@/pages/staff/EmergencyControls";
 import StaffProductivity from "@/pages/staff/StaffProductivity";
+import InternalMessages from "@/pages/staff/InternalMessages";
+import StatusPage from "@/pages/StatusPage";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -82,6 +84,7 @@ export default function AppRoutes() {
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/maintenance" element={<MaintenancePage />} />
+      <Route path="/status" element={<StatusPage />} />
       <Route path="/demo" element={
         SHOW_DEMO && DemoPage ? (
           <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
@@ -270,6 +273,7 @@ export default function AppRoutes() {
         <Route path="loyalty/campaigns" element={<LoyaltyCampaigns />} />
         <Route path="emergency" element={<EmergencyControls />} />
         <Route path="productivity" element={<StaffProductivity />} />
+        <Route path="messages" element={<InternalMessages />} />
         <Route path="referrals" element={<ReferralCampaigns />} />
         <Route path="referrals/campaigns" element={<ReferralCampaigns />} />
         <Route path="fraud" element={

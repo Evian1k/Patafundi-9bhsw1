@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+dist-ssr
+*.local
+.pgdata
+.pgserve.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local file storage fallback (dev only — production uses Cloudflare R2)
+backend/uploads/
+
+# PGlite dev database
+.pgdata/
+
+# Local E2E audit artifacts
+E2E_AUDIT_RESULTS.json
+FULL_AUDIT_RESULTS.json

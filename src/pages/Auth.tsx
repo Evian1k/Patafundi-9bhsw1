@@ -595,6 +595,24 @@ const Auth = () => {
                 </div>
               )}
 
+              {mode === "signup" && (
+                <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="termsAccept"
+                    checked={formData.acceptTerms || false}
+                    onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-border"
+                  />
+                  <label htmlFor="termsAccept" className="text-xs text-muted-foreground leading-relaxed">
+                    I agree to the{" "}
+                    <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>,{" "}
+                    <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>, and{" "}
+                    <Link to="/cookies" className="text-primary hover:underline">Cookies Policy</Link>.
+                  </label>
+                </div>
+              )}
+
               {mode === "login" && (
                 <div className="text-right">
                   <button

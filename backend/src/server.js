@@ -331,6 +331,17 @@ server.listen(port, host, () => {
     .catch((err) => {
       console.warn('[maintenance] could not start scheduler:', err.message);
     });
+
+  // ── Data retention cleanup ───────────────────────────────────────
+  // Runs daily to clean up expired data per Data Retention Policy
+  import('./services/dataRetentionService.js')
+    .then(({ runDataRetentionCleanup }) => {
+      // Run cleanup after 5 minutes of startup, then every 24 hours
+      setTimeout(() => runDataRetentionCleanup(), 5 * 60 * 1000);
+      setInterval(runDataRetentionCleanup, 24 * 60 * 60 * 1000);
+      console.log('[retention] data retention cleanup scheduled (daily)');
+    })
+    .catch(() => {});
 });
 
 server.on('error', (error) => {

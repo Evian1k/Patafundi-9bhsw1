@@ -6,22 +6,25 @@ import { config } from '../config.js';
 import { badRequest, forbidden } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 import { sendOtpEmail } from '../services/emailService.js';
-import { verifyOtpWithLockout } from '../services/fraudService.js';
-import { createFundiRegistration } from '../services/fundiRegistrationService.js';
-import { clearAuthCookies, setAuthCookies, signAccessToken, signRefreshToken } from '../middleware/auth.js';
+import { encrypt, decrypt } from '../services/encryptionService.js';
 
+/** Decrypt phone for user response (PII protection) */
 function publicUser(user) {
+  if (!user) return null;
   return {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
-    phone: user.phone,
+    phone: user.phone ? decrypt(user.phone) : null,
     role: user.role,
     status: user.status,
     trustScore: user.trust_score,
     emailVerified: Boolean(user.email_verified_at),
   };
 }
+import { verifyOtpWithLockout } from '../services/fraudService.js';
+import { createFundiRegistration } from '../services/fundiRegistrationService.js';
+import { clearAuthCookies, setAuthCookies, signAccessToken, signRefreshToken } from '../middleware/auth.js';
 
 async function issueSession(res, user) {
   const token = signAccessToken(user);
@@ -97,7 +100,7 @@ export async function register(req, res) {
       `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
        values (lower($1), $2, $3, $4, $5, 'active', null)
        returning id, email, full_name, phone, role, status, trust_score, email_verified_at`,
-      [email, passwordHash, fullName, phone, role],
+      [email, passwordHash, fullName, phone ? encrypt(phone) : null, role],
     );
     await client.query(
       `insert into trust_scores (user_id, score, level) values ($1, 100, 'standard')`,

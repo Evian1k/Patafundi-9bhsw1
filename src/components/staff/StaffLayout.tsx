@@ -68,6 +68,7 @@ const STAFF_NAV = [
       { label: "Staff Management", href: "/staff/staff-mgmt", icon: Users, permission: "can_manage_roles", roles: ["super_admin"] },
       { label: "Emergency Controls", href: "/staff/emergency", icon: Shield, permission: "can_use_emergency_controls", roles: ["super_admin"] },
       { label: "Staff Productivity", href: "/staff/productivity", icon: Users, permission: "can_view_staff_productivity", roles: ["super_admin", "devops_engineer"] },
+      { label: "Internal Messages", href: "/staff/messages", icon: Headphones, permission: "can_use_internal_messaging", roles: ["super_admin", "admin", "ops_manager", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"] },
       { label: "Security Center", href: "/staff/security", icon: Shield, permission: "can_view_logs", roles: ["super_admin", "auditor", "devops_engineer"] },
       { label: "System Settings", href: "/staff/system", icon: Shield, permission: "can_manage_system", roles: ["super_admin", "devops_engineer"] },
     ],
