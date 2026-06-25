@@ -232,6 +232,7 @@ router.get('/ai/insights/:category', authRequired, requireRole('admin'), asyncHa
 // Enterprise Systems — Phase 3-9 features
 // ============================================================
 import * as enterprise from './controllers/enterpriseController.js';
+import * as ent2 from './controllers/enterpriseController2.js';
 import { requirePermission as requirePerm } from './middleware/rbac.js';
 
 // Quality scores (Phase 4)
@@ -503,3 +504,46 @@ router.get('/trust/:userId', authRequired, asyncHandler(async (req, res) => {
   const result = await query('select * from trust_scores where user_id = $1', [req.params.userId]);
   res.json({ success: true, trust: result.rows[0] || null });
 }));
+
+// ============================================================
+// Enterprise Completeness — DR, GDPR, Productivity, Messaging, Emergency
+// ============================================================
+
+// ── Disaster Recovery ──────────────────────────────────────────
+router.post('/admin/backups', authRequired, requirePerm('can_manage_backups'), asyncHandler(ent2.createBackupHandler));
+router.get('/admin/backups', authRequired, requirePerm('can_manage_backups'), asyncHandler(ent2.listBackupsHandler));
+router.post('/admin/backups/:id/restore', authRequired, requirePerm('can_manage_backups'), asyncHandler(ent2.restoreBackupHandler));
+
+// ── GDPR ───────────────────────────────────────────────────────
+router.post('/gdpr/export', authRequired, asyncHandler(ent2.requestDataExportHandler));
+router.post('/gdpr/deletion', authRequired, asyncHandler(ent2.requestDataDeletionHandler));
+router.get('/admin/gdpr-requests', authRequired, requirePerm('can_manage_gdpr_requests'), asyncHandler(ent2.listGdprRequestsHandler));
+router.post('/admin/gdpr-requests/:id/process', authRequired, requirePerm('can_manage_gdpr_requests'), asyncHandler(ent2.processGdprRequestHandler));
+
+// ── Staff Productivity ─────────────────────────────────────────
+router.get('/staff/productivity/me', authRequired, asyncHandler(ent2.getMyProductivityHandler));
+router.get('/staff/productivity/department/:department', authRequired, requirePerm('can_view_staff_productivity'), asyncHandler(ent2.getDepartmentProductivityHandler));
+router.get('/staff/productivity/all', authRequired, requirePerm('can_view_staff_productivity'), asyncHandler(ent2.getAllStaffProductivityHandler));
+
+// ── Internal Messaging ─────────────────────────────────────────
+router.get('/staff/messages/channels', authRequired, requirePerm('can_use_internal_messaging'), asyncHandler(ent2.listChannelsHandler));
+router.post('/staff/messages/send', authRequired, requirePerm('can_use_internal_messaging'), asyncHandler(ent2.sendMessageHandler));
+router.get('/staff/messages/channel/:channelId', authRequired, requirePerm('can_use_internal_messaging'), asyncHandler(ent2.getChannelMessagesHandler));
+router.get('/staff/messages/dm/:userId', authRequired, requirePerm('can_use_internal_messaging'), asyncHandler(ent2.getDirectMessagesHandler));
+router.post('/staff/messages/:id/read', authRequired, requirePerm('can_use_internal_messaging'), asyncHandler(ent2.markMessageReadHandler));
+
+// ── Emergency Controls ─────────────────────────────────────────
+router.get('/admin/emergency/status', authRequired, requirePerm('can_use_emergency_controls'), asyncHandler(ent2.getEmergencyStatusHandler));
+router.post('/admin/emergency/toggle', authRequired, requirePerm('can_use_emergency_controls'), asyncHandler(ent2.toggleEmergencyHandler));
+
+// ── Category Commissions ───────────────────────────────────────
+router.get('/admin/commission-overrides', authRequired, requirePerm('can_manage_commission_overrides'), asyncHandler(ent2.getCategoryCommissionsHandler));
+router.put('/admin/commission-overrides', authRequired, requirePerm('can_manage_commission_overrides'), asyncHandler(ent2.updateCategoryCommissionHandler));
+
+// ── Staff Lifecycle ────────────────────────────────────────────
+router.post('/admin/staff/:id/reset-password', authRequired, requirePerm('can_reset_staff_password'), asyncHandler(ent2.resetStaffPasswordHandler));
+router.post('/admin/users/:id/force-logout', authRequired, requirePerm('can_force_logout'), asyncHandler(ent2.forceLogoutHandler));
+router.post('/admin/staff/:id/require-2fa', authRequired, requirePerm('can_require_2fa'), asyncHandler(ent2.require2FAHandler));
+
+// ── System Health ──────────────────────────────────────────────
+router.get('/admin/system-health', authRequired, requirePerm('can_view_health'), asyncHandler(ent2.getSystemHealthHandler));

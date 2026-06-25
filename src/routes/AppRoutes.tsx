@@ -67,6 +67,8 @@ import DispatchDashboard from "@/pages/staff/DispatchDashboard";
 import SupportDashboard from "@/pages/staff/SupportDashboard";
 import DevOpsDashboard from "@/pages/staff/DevOpsDashboard";
 import LoyaltyCampaigns from "@/pages/staff/LoyaltyCampaigns";
+import EmergencyControls from "@/pages/staff/EmergencyControls";
+import StaffProductivity from "@/pages/staff/StaffProductivity";
 
 // Demo page is dev-only. In production builds, the route returns 404
 // and the DemoPage component (with demo credentials) is tree-shaken out
@@ -266,6 +268,8 @@ export default function AppRoutes() {
         <Route path="devops/dashboard" element={<DevOpsDashboard />} />
         <Route path="loyalty" element={<LoyaltyCampaigns />} />
         <Route path="loyalty/campaigns" element={<LoyaltyCampaigns />} />
+        <Route path="emergency" element={<EmergencyControls />} />
+        <Route path="productivity" element={<StaffProductivity />} />
         <Route path="referrals" element={<ReferralCampaigns />} />
         <Route path="referrals/campaigns" element={<ReferralCampaigns />} />
         <Route path="fraud" element={

@@ -66,6 +66,8 @@ const STAFF_NAV = [
       { label: "Growth Dashboard", href: "/staff/growth", icon: Activity, permission: "can_view_growth_dashboard", roles: ["super_admin"] },
       { label: "AI Command Center", href: "/staff/ai", icon: AlertTriangle, permission: "can_view_ai_command_center", roles: ["super_admin"] },
       { label: "Staff Management", href: "/staff/staff-mgmt", icon: Users, permission: "can_manage_roles", roles: ["super_admin"] },
+      { label: "Emergency Controls", href: "/staff/emergency", icon: Shield, permission: "can_use_emergency_controls", roles: ["super_admin"] },
+      { label: "Staff Productivity", href: "/staff/productivity", icon: Users, permission: "can_view_staff_productivity", roles: ["super_admin", "devops_engineer"] },
       { label: "Security Center", href: "/staff/security", icon: Shield, permission: "can_view_logs", roles: ["super_admin", "auditor", "devops_engineer"] },
       { label: "System Settings", href: "/staff/system", icon: Shield, permission: "can_manage_system", roles: ["super_admin", "devops_engineer"] },
     ],
