@@ -23,7 +23,7 @@ const Header = () => {
     : { initial: { opacity: 0, height: 0 }, animate: { opacity: 1, height: "auto" }, exit: { opacity: 0, height: 0 } };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-xl border-b border-border/40">
+    <header className="app-header bg-background/95 backdrop-blur-xl border-b border-border/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <BrandLogo size="sm" />
 

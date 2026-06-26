@@ -9,6 +9,7 @@ import NetworkReconnectBanner from "@/components/system/NetworkReconnectBanner";
 import MaintenanceGuard from "@/components/system/MaintenanceGuard";
 import MaintenanceBanner from "@/components/system/MaintenanceBanner";
 import CookieConsent from "@/components/system/CookieConsent";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { AppRoutes } from "@/routes";
 
 const App = () => {
@@ -32,6 +33,7 @@ const App = () => {
               <MaintenanceBanner />
               <NetworkReconnectBanner />
               <AppRoutes />
+              <MobileBottomNav />
               <CookieConsent />
             </MaintenanceGuard>
           </GoogleMapsProvider>
