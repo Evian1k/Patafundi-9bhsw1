@@ -3,9 +3,9 @@ import Footer from "@/components/layout/Footer";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 has-bottom-nav">{children}</main>
+      <main className="flex-1">{children}</main>
       <Footer />
     </div>
   );
