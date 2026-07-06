@@ -236,7 +236,7 @@ export async function login(req, res) {
   // ── Fraud Prevention: Device + IP + Impossible Travel ───────────
   // Non-blocking — failures here don't prevent login
   try {
-    const { recordDeviceFingerprint, checkIpReputation, recordLoginEvent, checkBlacklist } = await import('../services/fraudPreventionService.js');
+    const { recordDeviceFingerprint, checkIpReputation, recordLoginEvent, checkBlacklistBatch } = await import('../services/fraudPreventionService.js');
     const userAgent = req.get('User-Agent');
     const deviceFingerprint = req.get('X-Device-Fingerprint');
     const deviceId = deviceFingerprint || crypto.createHash('sha256').update(userAgent || 'unknown').digest('hex').substring(0, 32);

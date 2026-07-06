@@ -210,14 +210,14 @@ export async function updateGeoControls(updates, updatedBy) {
   const merged = { ...current, ...updates };
   await query(
     `update geo_controls set
-      max_radius_km = $2, emergency_radius_km = $3, min_distance_km = $4,
-      travel_fee_per_km = $5, night_fee = $6, emergency_fee = $7,
-      international_enabled = $8, cross_county_enabled = $9, cross_country_enabled = $10,
-      disaster_mode = $11, disaster_radius_multiplier = $12,
-      updated_by = $13, updated_at = now()
+      max_radius_km = $1, emergency_radius_km = $2, min_distance_km = $3,
+      travel_fee_per_km = $4, night_fee = $5, emergency_fee = $6,
+      international_enabled = $7, cross_county_enabled = $8, cross_country_enabled = $9,
+      disaster_mode = $10, disaster_radius_multiplier = $11,
+      updated_by = $12, updated_at = now()
      where id = 1`,
     [
-      merged.id, merged.max_radius_km, merged.emergency_radius_km, merged.min_distance_km,
+      merged.max_radius_km, merged.emergency_radius_km, merged.min_distance_km,
       merged.travel_fee_per_km, merged.night_fee, merged.emergency_fee,
       merged.international_enabled, merged.cross_county_enabled, merged.cross_country_enabled,
       merged.disaster_mode, merged.disaster_radius_multiplier, updatedBy,
@@ -332,22 +332,35 @@ export async function createInternationalBookingRequest(customerId, data) {
     `insert into international_bookings
       (customer_id, destination_country, destination_city, destination_address, service_needed, expected_budget, start_date, end_date, notes)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *`,
-    [customerId, data.destinationCountry, data.destinationCity, data.destinationAddress,
-     data.serviceNeeded, data.expectedBudget, data.startDate, data.endDate, data.notes],
+    [
+      customerId,
+      data.destinationCountry || null,
+      data.destinationCity || null,
+      data.destinationAddress || null,
+      data.serviceNeeded || null,
+      data.expectedBudget || null,
+      data.startDate || null,
+      data.endDate || null,
+      data.notes || null,
+    ],
   );
 
-  // Notify support team
-  const supportStaff = await query(
-    `select id from users where role in ('super_admin', 'support_agent') and status = 'active'`,
-  );
-  for (const s of supportStaff.rows) {
-    await query(
-      `insert into notifications (user_id, type, title, message, data)
-       values ($1, 'international_booking', 'International Booking Request',
-       'Customer requested international service to ${data.destinationCountry}, ${data.destinationCity}',
-       $2::jsonb)`,
-      [s.id, JSON.stringify({ bookingId: result.rows[0].id, customerId })],
+  // Notify support team (non-blocking — don't fail the booking if notification fails)
+  try {
+    const supportStaff = await query(
+      `select id from users where role in ('super_admin', 'support_agent') and status = 'active'`,
     );
+    for (const s of supportStaff.rows) {
+      await query(
+        `insert into notifications (user_id, type, title, message, data)
+         values ($1, 'international_booking', 'International Booking Request',
+         $2, $3::jsonb)`,
+        [s.id, `Customer requested international service to ${data.destinationCountry || 'unknown'}, ${data.destinationCity || 'unknown'}`,
+         JSON.stringify({ bookingId: result.rows[0].id, customerId })],
+      );
+    }
+  } catch (err) {
+    console.warn('[geo] international booking notification failed (non-blocking):', err.message);
   }
 
   return result.rows[0];
