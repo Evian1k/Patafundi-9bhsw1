@@ -621,3 +621,73 @@ router.post('/geo/international-bookings/:id/review', authRequired, requirePerm(
 // Geo zones (super_admin)
 router.get('/geo/zones', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.listGeoZonesHandler));
 router.post('/geo/zones', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.createGeoZoneHandler));
+
+// ============================================================
+// Phase 2 Enterprise Operations (20 modules)
+// ============================================================
+import * as p2 from './controllers/enterpriseController3.js';
+
+// Disaster Recovery
+router.get('/enterprise/dr', authRequired, requirePerm('can_view_system_health'), asyncHandler(p2.drDashboardHandler));
+
+// Incident Command Center
+router.post('/enterprise/incidents', authRequired, requirePerm('can_manage_incidents'), asyncHandler(p2.createIncidentHandler));
+router.get('/enterprise/incidents', authRequired, requirePerm('can_manage_incidents'), asyncHandler(p2.listIncidentsHandler));
+router.get('/enterprise/incidents/:id', authRequired, requirePerm('can_manage_incidents'), asyncHandler(p2.getIncidentHandler));
+router.post('/enterprise/incidents/:id/update', authRequired, requirePerm('can_manage_incidents'), asyncHandler(p2.incidentUpdateHandler));
+router.post('/enterprise/incidents/:id/resolve', authRequired, requirePerm('can_manage_incidents'), asyncHandler(p2.resolveIncidentHandler));
+
+// Internal CRM
+router.get('/enterprise/crm/customer/:userId', authRequired, requirePerm('can_view_crm'), asyncHandler(p2.customerCRMHandler));
+router.get('/enterprise/crm/fundi/:userId', authRequired, requirePerm('can_view_crm'), asyncHandler(p2.fundiCRMHandler));
+router.post('/enterprise/crm/notes', authRequired, requirePerm('can_view_crm'), asyncHandler(p2.addCRMNoteHandler));
+
+// Feature Flags (enhanced)
+router.get('/enterprise/feature-flags', authRequired, asyncHandler(p2.getFeatureFlagsHandler));
+router.post('/enterprise/feature-flags/toggle', authRequired, requirePerm('can_manage_feature_flags'), asyncHandler(p2.toggleFeatureFlagHandler));
+router.post('/enterprise/feature-flags/override', authRequired, requirePerm('can_manage_feature_flags'), asyncHandler(p2.featureFlagOverrideHandler));
+
+// Business Analytics
+router.get('/enterprise/analytics', authRequired, requirePerm('can_view_analytics'), asyncHandler(p2.analyticsHandler));
+
+// Audit Timeline
+router.get('/enterprise/audit-timeline/:entityType/:entityId', authRequired, requirePerm('can_view_audit_timeline'), asyncHandler(p2.auditTimelineHandler));
+
+// Fraud Heatmap
+router.get('/enterprise/fraud-heatmap', authRequired, requirePerm('can_view_fraud_heatmap'), asyncHandler(p2.fraudHeatmapHandler));
+
+// Queue System
+router.get('/enterprise/queues', authRequired, requirePerm('can_manage_queues'), asyncHandler(p2.queueStatusHandler));
+router.get('/enterprise/queues/jobs', authRequired, requirePerm('can_manage_queues'), asyncHandler(p2.queueJobsHandler));
+router.post('/enterprise/queues/:id/retry', authRequired, requirePerm('can_manage_queues'), asyncHandler(p2.retryQueueJobHandler));
+
+// HR Management
+router.get('/enterprise/hr/employees', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.listEmployeesHandler));
+router.post('/enterprise/hr/employees', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.createEmployeeHandler));
+router.post('/enterprise/hr/leave', authRequired, asyncHandler(p2.requestLeaveHandler));
+router.post('/enterprise/hr/leave/:id/approve', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.approveLeaveHandler));
+
+// Marketplace Intelligence
+router.get('/enterprise/market-intelligence', authRequired, requirePerm('can_view_marketplace_intelligence'), asyncHandler(p2.marketIntelHandler));
+
+// ML Pricing
+router.get('/enterprise/ml-pricing', authRequired, requirePerm('can_manage_ml_pricing'), asyncHandler(p2.mlPricingModelsHandler));
+router.post('/enterprise/ml-pricing/calculate', authRequired, asyncHandler(p2.calculatePriceHandler));
+router.post('/enterprise/ml-pricing/:id/approve', authRequired, requirePerm('can_manage_ml_pricing'), asyncHandler(p2.approveMLPricingHandler));
+
+// Image Moderation
+router.post('/enterprise/image-moderation', authRequired, asyncHandler(p2.submitModerationHandler));
+router.get('/enterprise/image-moderation', authRequired, requirePerm('can_moderate_images'), asyncHandler(p2.moderationQueueHandler));
+router.post('/enterprise/image-moderation/:id', authRequired, requirePerm('can_moderate_images'), asyncHandler(p2.moderateImageHandler));
+
+// System Health
+router.get('/enterprise/system-health', authRequired, requirePerm('can_view_system_health'), asyncHandler(p2.systemHealthHandler));
+
+// Public Status Page (no auth)
+router.get('/enterprise/public-status', asyncHandler(p2.publicStatusHandler));
+
+// AI CEO Report
+router.get('/enterprise/ceo-report', authRequired, requirePerm('can_view_ceo_reports'), asyncHandler(p2.ceoReportHandler));
+
+// API Versions
+router.get('/enterprise/api-versions', authRequired, asyncHandler(p2.apiVersionsHandler));
