@@ -547,3 +547,42 @@ router.post('/admin/staff/:id/require-2fa', authRequired, requirePerm('can_requi
 
 // ── System Health ──────────────────────────────────────────────
 router.get('/admin/system-health', authRequired, requirePerm('can_view_health'), asyncHandler(ent2.getSystemHealthHandler));
+
+// ============================================================
+// Fraud Prevention — 7 Systems
+// ============================================================
+import * as fp from './controllers/fraudPreventionController.js';
+
+// Device Fingerprinting
+router.post('/fraud/device-fingerprint', authRequired, asyncHandler(fp.submitDeviceFingerprint));
+router.get('/fraud/device-history', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.getDeviceHistoryHandler));
+
+// IP Reputation
+router.get('/fraud/ip-reputation/:ip', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.getIpReputation));
+router.post('/fraud/ip-report', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.reportIpHandler));
+
+// Login History (Impossible Travel)
+router.get('/fraud/login-history', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.getLoginHistory));
+
+// GPS Spoof Detection
+router.post('/fraud/gps-validate', authRequired, asyncHandler(fp.submitGpsValidation));
+router.get('/fraud/gps-history/:userId', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.getGpsHistory));
+
+// Blacklist
+router.post('/fraud/blacklist/check', authRequired, asyncHandler(fp.checkBlacklistHandler));
+router.post('/fraud/blacklist/check-batch', authRequired, asyncHandler(fp.checkBlacklistBatchHandler));
+router.get('/fraud/blacklist', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.listBlacklistHandler));
+router.post('/fraud/blacklist', authRequired, requirePerm('can_manage_blacklist'), asyncHandler(fp.addBlacklistHandler));
+router.delete('/fraud/blacklist', authRequired, requirePerm('can_manage_blacklist'), asyncHandler(fp.removeBlacklistHandler));
+
+// Behavioral Risk
+router.get('/fraud/behavioral-risk', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.getBehavioralRiskHandler));
+router.post('/fraud/behavioral-risk/recalculate', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.recalculateRiskHandler));
+
+// Payment Fraud
+router.get('/fraud/payment-fraud', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.getPaymentFraudHandler));
+router.post('/fraud/payment-fraud/check', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.checkPaymentFraudHandler));
+router.post('/fraud/payment-fraud/:id/resolve', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.resolvePaymentFraudHandler));
+
+// Overview Dashboard
+router.get('/fraud/overview', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.getFraudPreventionOverviewHandler));

@@ -286,6 +286,16 @@ export async function location(req, res) {
   await requireApprovedFundi(req.user.id, req.user.role);
   const { latitude, longitude, accuracy = null, jobId = null } = req.body || {};
   if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
+
+  // ── Fraud Prevention: GPS Spoof Detection ────────────────────
+  // Non-blocking — logs the validation but doesn't stop location update
+  try {
+    const { validateGpsLocation } = await import('../services/fraudPreventionService.js');
+    await validateGpsLocation(req.user.id, { latitude, longitude, accuracy, jobId });
+  } catch (err) {
+    console.warn('[fraudPrevention] GPS validation failed (non-blocking):', err.message);
+  }
+
   const active = await transaction(async (client) => {
     await client.query(
       `update fundis set online = true, latitude = $2, longitude = $3, location_accuracy = $4, updated_at = now()

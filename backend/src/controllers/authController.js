@@ -233,6 +233,50 @@ export async function login(req, res) {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   await recordSuccessfulLogin(user.id, ip);
 
+  // ── Fraud Prevention: Device + IP + Impossible Travel ───────────
+  // Non-blocking — failures here don't prevent login
+  try {
+    const { recordDeviceFingerprint, checkIpReputation, recordLoginEvent, checkBlacklist } = await import('../services/fraudPreventionService.js');
+    const userAgent = req.get('User-Agent');
+    const deviceFingerprint = req.get('X-Device-Fingerprint');
+    const deviceId = deviceFingerprint || crypto.createHash('sha256').update(userAgent || 'unknown').digest('hex').substring(0, 32);
+
+    // Check blacklist (email, IP, device)
+    const blacklistHits = await checkBlacklistBatch([
+      { type: 'email', value: email.toLowerCase() },
+      { type: 'ip', value: ip },
+      { type: 'device', value: deviceId },
+    ]);
+    if (Object.keys(blacklistHits).length > 0) {
+      const firstHit = Object.values(blacklistHits)[0];
+      await auditLog({ userId: user.id, action: 'fraud.blacklisted_login_attempt', entityType: 'user', entityId: user.id, metadata: { ip, blacklistHits } });
+      throw forbidden(`Account blocked: ${firstHit.reason}. Contact support if you believe this is an error.`);
+    }
+
+    // Record device fingerprint
+    if (deviceFingerprint) {
+      await recordDeviceFingerprint(user.id, {
+        deviceId,
+        browserFingerprint: req.get('X-Browser-Fingerprint'),
+        userAgent,
+        platform: req.get('X-Platform'),
+        screenSize: req.get('X-Screen-Size'),
+        timezone: req.get('X-Timezone'),
+        language: req.get('X-Language'),
+        ipAddress: ip,
+      });
+    }
+
+    // Check IP reputation
+    await checkIpReputation(ip);
+
+    // Record login event (checks impossible travel)
+    await recordLoginEvent(user.id, ip, { deviceId, userAgent });
+  } catch (err) {
+    if (err.status === 403) throw err; // re-throw blacklist blocks
+    console.warn('[fraudPrevention] login check failed (non-blocking):', err.message);
+  }
+
   const session = await issueSession(res, user);
   await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, metadata: { ip } });
   // Return BOTH access token and refresh token in JSON body.
