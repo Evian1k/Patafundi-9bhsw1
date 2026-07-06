@@ -586,3 +586,38 @@ router.post('/fraud/payment-fraud/:id/resolve', authRequired, requirePerm('can_i
 
 // Overview Dashboard
 router.get('/fraud/overview', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.getFraudPreventionOverviewHandler));
+
+// ============================================================
+// Geo Matching & Geographic Restrictions
+// ============================================================
+import * as geo from './controllers/geoMatchingController.js';
+
+// Smart matching (customer-facing)
+router.post('/geo/find-fundis', authRequired, asyncHandler(geo.findFundisHandler));
+router.post('/geo/surge-pricing', authRequired, asyncHandler(geo.surgePricingHandler));
+
+// Fundi travel settings (fundi-facing)
+router.get('/geo/travel-settings', authRequired, asyncHandler(geo.getTravelSettingsHandler));
+router.put('/geo/travel-settings', authRequired, asyncHandler(geo.updateTravelSettingsHandler));
+
+// CEO geo controls (super_admin)
+router.get('/geo/controls', authRequired, asyncHandler(geo.getGeoControlsHandler));
+router.put('/geo/controls', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.updateGeoControlsHandler));
+
+// Blocked regions (super_admin)
+router.get('/geo/blocked-regions', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.listBlockedRegionsHandler));
+router.post('/geo/blocked-regions', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.addBlockedRegionHandler));
+router.delete('/geo/blocked-regions/:id', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.removeBlockedRegionHandler));
+
+// Service radius rules (super_admin view, staff can read)
+router.get('/geo/service-radius', authRequired, asyncHandler(geo.getServiceRadiusRulesHandler));
+router.put('/geo/service-radius', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.updateServiceRadiusRuleHandler));
+
+// International bookings
+router.post('/geo/international-booking', authRequired, asyncHandler(geo.createIntlBookingHandler));
+router.get('/geo/international-bookings', authRequired, requirePerm('can_approve_international'), asyncHandler(geo.listIntlBookingsHandler));
+router.post('/geo/international-bookings/:id/review', authRequired, requirePerm('can_approve_international'), asyncHandler(geo.reviewIntlBookingHandler));
+
+// Geo zones (super_admin)
+router.get('/geo/zones', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.listGeoZonesHandler));
+router.post('/geo/zones', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.createGeoZoneHandler));
