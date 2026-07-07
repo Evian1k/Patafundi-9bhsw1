@@ -11,6 +11,7 @@ let useEmbedded = false;
 let initPromise = null;
 /** @type {Error | null} */
 let lastConnectionError = null;
+let consecutiveFailures = 0;
 
 async function initDriver() {
   if (pool || useEmbedded) return;
@@ -31,29 +32,24 @@ async function initDriver() {
       return;
     }
     try {
-      // Use a longer timeout for the initial connection — Neon free tier
-      // suspends idle databases and the first connection can take 10+ seconds
-      // to wake up. The default 10s timeout is too short.
       const poolConfig = getPgPoolConfig(config.databaseUrl, {
-        connectionTimeoutMillis: 30_000, // 30 seconds for Neon cold start
+        connectionTimeoutMillis: 30_000,
         max: 10,
         idleTimeoutMillis: 30_000,
-        statement_timeout: 15_000, // 15s per query
+        statement_timeout: 15_000,
       });
       pool = new Pool(poolConfig);
       await pool.query('select 1');
       lastConnectionError = null;
+      consecutiveFailures = 0;
       console.log('[PataFundi API] PostgreSQL database ready');
     } catch (error) {
       lastConnectionError = error instanceof Error ? error : new Error(String(error));
       await pool?.end().catch(() => {});
       pool = null;
-      console.error('[PataFundi API] PostgreSQL connection failed:', lastConnectionError.message);
+      consecutiveFailures++;
+      console.error(`[PataFundi API] PostgreSQL connection failed (attempt ${consecutiveFailures}):`, lastConnectionError.message);
       console.error('[PataFundi API] Will retry on next request...');
-      // CRITICAL: Do NOT permanently give up. Clear the error so the next
-      // request will retry the connection. Neon free tier can have transient
-      // connection timeouts during cold starts — the database is fine, we
-      // just need to retry.
     }
     return;
   }
@@ -82,19 +78,59 @@ async function initDriver() {
 
 async function ensureInit() {
   // If we have a connection error and no pool, reset initPromise so we
-  // retry the connection on the next request. This is critical for
-  // production — Neon free tier can have transient timeouts, and we
-  // must not permanently give up after one failure.
-  if (lastConnectionError && !pool && !useEmbedded && process.env.NODE_ENV === 'production') {
+  // retry the connection on the next request.
+  if (lastConnectionError && !pool && !useEmbedded) {
     initPromise = null; // allow retry
   }
   if (!initPromise) initPromise = initDriver().catch((error) => {
     lastConnectionError = error instanceof Error ? error : new Error(String(error));
   });
   await initPromise;
-  if (lastConnectionError && process.env.NODE_ENV === 'production' && !pool && !useEmbedded) {
-    throw lastConnectionError;
+  if (lastConnectionError && !pool && !useEmbedded) {
+    const error = lastConnectionError;
+    error.status = 503;
+    throw error;
   }
+}
+
+/**
+ * Destroy the current pool and reset state so the next request
+ * creates a fresh pool. Called when a query fails with a connection
+ * error (Neon suspended, network issue, etc.).
+ */
+async function destroyPool() {
+  if (pool) {
+    await pool.end().catch(() => {});
+    pool = null;
+  }
+  initPromise = null;
+  lastConnectionError = new Error('Database connection lost — reconnecting');
+}
+
+/**
+ * Check if an error is a connection-level error (not a SQL error).
+ * These errors mean the pool's connections are dead and we need to
+ * destroy the pool and create a new one.
+ */
+function isConnectionError(error) {
+  const msg = (error?.message || '').toLowerCase();
+  return (
+    msg.includes('connection terminated') ||
+    msg.includes('connection timeout') ||
+    msg.includes('connection refused') ||
+    msg.includes('connection ended') ||
+    msg.includes('connection reset') ||
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused') ||
+    msg.includes('etimedout') ||
+    msg.includes('enoent') ||
+    msg.includes('socket hung up') ||
+    msg.includes('terminated due to connection timeout') ||
+    msg.includes('database unavailable') ||
+    msg.includes('the server does not support ssl connections') ||
+    // Neon-specific: "connection terminated" when Neon suspends
+    msg.includes('terminating connection due to connection timeout')
+  );
 }
 
 export { pool };
@@ -111,7 +147,23 @@ export async function query(sql, params = []) {
     error.status = 503;
     throw error;
   }
-  return pool.query(sql, params);
+
+  try {
+    return await pool.query(sql, params);
+  } catch (error) {
+    // CRITICAL FIX: If this is a connection-level error (not a SQL error),
+    // the pool's connections are dead. Destroy the pool so the next request
+    // creates a fresh pool and reconnects. This fixes the issue where Neon
+    // suspends the database and the pool holds dead connections forever.
+    if (isConnectionError(error)) {
+      console.warn('[PataFundi API] Connection error detected, destroying pool for reconnect:', error.message);
+      await destroyPool();
+      // Set 503 status so the frontend knows it's a temporary DB issue
+      error.status = 503;
+      error.message = 'Database temporarily unavailable. Retrying...';
+    }
+    throw error;
+  }
 }
 
 export async function transaction(work) {
@@ -135,6 +187,7 @@ export async function transaction(work) {
     error.status = 503;
     throw error;
   }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -143,6 +196,12 @@ export async function transaction(work) {
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
+    // If connection error during transaction, destroy pool
+    if (isConnectionError(error)) {
+      console.warn('[PataFundi API] Connection error during transaction, destroying pool:', error.message);
+      await destroyPool();
+      error.status = 503;
+    }
     throw error;
   } finally {
     client.release();
@@ -157,9 +216,6 @@ export async function healthcheck() {
       }
       if (isLocalDatabaseUrl(config.databaseUrl)) {
         return { configured: true, ok: false, error: 'DATABASE_URL points to localhost' };
-      }
-      if (lastConnectionError && !pool) {
-        return { configured: true, ok: false, error: lastConnectionError.message, mode: 'postgres' };
       }
     }
 
@@ -179,8 +235,21 @@ export async function healthcheck() {
         mode: 'postgres',
       };
     }
-    const result = await pool.query('select 1 as ok');
-    return { configured: true, ok: result.rows[0]?.ok === 1, mode: 'postgres' };
+
+    try {
+      const result = await pool.query('select 1 as ok');
+      return { configured: true, ok: result.rows[0]?.ok === 1, mode: 'postgres' };
+    } catch (error) {
+      // Health check query failed — pool is dead, destroy it
+      console.warn('[PataFundi API] Health check query failed, destroying pool:', error.message);
+      await destroyPool();
+      return {
+        configured: true,
+        ok: false,
+        error: error.message,
+        mode: 'postgres',
+      };
+    }
   } catch (error) {
     return {
       configured: Boolean(config.databaseUrl),
