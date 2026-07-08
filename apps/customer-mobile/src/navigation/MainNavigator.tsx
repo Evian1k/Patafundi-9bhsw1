@@ -24,6 +24,21 @@ import { FavoritesScreen } from '../screens/FavoritesScreen';
 import { ReferEarnScreen } from '../screens/ReferEarnScreen';
 import { AboutScreen } from '../screens/AboutScreen';
 import { SecurityCenterScreen } from '../screens/SecurityCenterScreen';
+import { TrustCenterScreen } from '../screens/TrustCenterScreen';
+import { SafetyPromiseScreen } from '../screens/SafetyPromiseScreen';
+import { VerifiedFundisScreen } from '../screens/VerifiedFundisScreen';
+import { PaymentProtectionScreen } from '../screens/PaymentProtectionScreen';
+import { PricingExplainedScreen } from '../screens/PricingExplainedScreen';
+import { EmergencySosScreen } from '../screens/EmergencySosScreen';
+import { ReferralProgramScreen } from '../screens/ReferralProgramScreen';
+import { LoyaltyProgramScreen } from '../screens/LoyaltyProgramScreen';
+import { ReleaseNotesScreen } from '../screens/ReleaseNotesScreen';
+import { AppUpdateRequiredScreen } from '../screens/AppUpdateRequiredScreen';
+import { MaintenanceModeScreen } from '../screens/MaintenanceModeScreen';
+import { NoInternetScreen } from '../screens/NoInternetScreen';
+import { ErrorScreen } from '../screens/ErrorScreen';
+import { AccountSuspendedScreen } from '../screens/AccountSuspendedScreen';
+import { AppealScreen } from '../screens/AppealScreen';
 
 export type HomeStackParamList = {
   Home: undefined;
@@ -63,6 +78,21 @@ export type ProfileStackParamList = {
   ReferEarn: undefined;
   About: undefined;
   SecurityCenter: undefined;
+  TrustCenter: undefined;
+  SafetyPromise: undefined;
+  VerifiedFundis: undefined;
+  PaymentProtection: undefined;
+  PricingExplained: undefined;
+  EmergencySos: undefined;
+  ReferralProgram: undefined;
+  LoyaltyProgram: undefined;
+  ReleaseNotes: undefined;
+  AppUpdateRequired: { mandatory?: boolean; version?: string; message?: string } | undefined;
+  MaintenanceMode: { message?: string; estimatedCompletion?: string } | undefined;
+  NoInternet: undefined;
+  Error: { type?: '404' | '500' | 'timeout' | 'permission' | 'generic'; message?: string; onRetry?: () => void } | undefined;
+  AccountSuspended: { reason?: string; caseId?: string; nextReviewDate?: string } | undefined;
+  Appeal: { caseId?: string } | undefined;
 };
 
 export type MainTabParamList = {
@@ -134,6 +164,21 @@ function ProfileStackScreen(): JSX.Element {
       <ProfileStack.Screen name="ReferEarn" component={ReferEarnScreen} options={{ title: 'Refer & Earn' }} />
       <ProfileStack.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
       <ProfileStack.Screen name="SecurityCenter" component={SecurityCenterScreen} options={{ title: 'Security' }} />
+      <ProfileStack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ title: 'Trust & Safety' }} />
+      <ProfileStack.Screen name="SafetyPromise" component={SafetyPromiseScreen} options={{ title: 'Safety Promise' }} />
+      <ProfileStack.Screen name="VerifiedFundis" component={VerifiedFundisScreen} options={{ title: 'Verified Fundis' }} />
+      <ProfileStack.Screen name="PaymentProtection" component={PaymentProtectionScreen} options={{ title: 'Payment Protection' }} />
+      <ProfileStack.Screen name="PricingExplained" component={PricingExplainedScreen} options={{ title: 'How Pricing Works' }} />
+      <ProfileStack.Screen name="EmergencySos" component={EmergencySosScreen} options={{ title: 'Emergency SOS' }} />
+      <ProfileStack.Screen name="ReferralProgram" component={ReferralProgramScreen} options={{ title: 'Referral Program' }} />
+      <ProfileStack.Screen name="LoyaltyProgram" component={LoyaltyProgramScreen} options={{ title: 'Loyalty Program' }} />
+      <ProfileStack.Screen name="ReleaseNotes" component={ReleaseNotesScreen} options={{ title: 'Release Notes' }} />
+      <ProfileStack.Screen name="AppUpdateRequired" component={AppUpdateRequiredScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="MaintenanceMode" component={MaintenanceModeScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="NoInternet" component={NoInternetScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="Error" component={ErrorScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="AccountSuspended" component={AccountSuspendedScreen} options={{ headerShown: false }} />
+      <ProfileStack.Screen name="Appeal" component={AppealScreen} options={{ title: 'Submit Appeal' }} />
     </ProfileStack.Navigator>
   );
 }

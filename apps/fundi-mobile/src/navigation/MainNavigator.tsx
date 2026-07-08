@@ -20,6 +20,9 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { FundiHelpCenterScreen } from '../screens/FundiHelpCenterScreen';
 import { FundiAboutScreen } from '../screens/FundiAboutScreen';
 import { LegalPageScreen } from '../screens/LegalPageScreen';
+import { FundiTrustCenterScreen } from '../screens/FundiTrustCenterScreen';
+import { FundiSafetyPromiseScreen } from '../screens/FundiSafetyPromiseScreen';
+import { FundiEmergencySosScreen } from '../screens/FundiEmergencySosScreen';
 
 export type DashboardStackParamList = {
   Dashboard: undefined;
@@ -50,6 +53,9 @@ export type ProfileStackParamList = {
   HelpCenter: undefined;
   About: undefined;
   LegalPage: { slug: string; title: string };
+  FundiTrustCenter: undefined;
+  FundiSafetyPromise: undefined;
+  FundiEmergencySos: undefined;
 };
 
 export type MainTabParamList = {
@@ -112,6 +118,9 @@ function ProfileStackScreen(): JSX.Element {
         component={LegalPageScreen}
         options={({ route }) => ({ title: (route.params as { title?: string } | undefined)?.title ?? 'Legal' })}
       />
+      <ProfileStack.Screen name="FundiTrustCenter" component={FundiTrustCenterScreen} options={{ title: 'Trust & Safety' }} />
+      <ProfileStack.Screen name="FundiSafetyPromise" component={FundiSafetyPromiseScreen} options={{ title: 'Safety Promise' }} />
+      <ProfileStack.Screen name="FundiEmergencySos" component={FundiEmergencySosScreen} options={{ title: 'Emergency SOS' }} />
     </ProfileStack.Navigator>
   );
 }

@@ -112,6 +112,32 @@ export function SettingsScreen({ navigation }: any): JSX.Element {
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
+      <Text style={styles.sectionLabel}>Updates</Text>
+      <View style={styles.legalCard}>
+        <TouchableOpacity
+          style={[styles.legalRow, styles.legalRowBorder]}
+          onPress={() => navigation.navigate('ReleaseNotes')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.menuLeft}>
+            <Ionicons name="newspaper-outline" size={20} color={colors.primary} />
+            <Text style={styles.menuLabel}>Release Notes</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.legalRow}
+          onPress={() => navigation.navigate('AppUpdateRequired', { mandatory: false, version: '', message: '' })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.menuLeft}>
+            <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
+            <Text style={styles.menuLabel}>App Update Check</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
       <Text style={styles.sectionLabel}>Legal</Text>
       <View style={styles.legalCard}>
         {LEGAL_LINKS.map((link, idx) => (

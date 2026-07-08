@@ -36,6 +36,7 @@ const MENU: MenuItem[] = [
   { label: 'Reviews', icon: 'star-outline', route: 'Reviews' },
   { label: 'Earnings', icon: 'bar-chart-outline', route: 'Earnings' },
   { label: 'Verification', icon: 'shield-checkmark-outline', route: 'Verification' },
+  { label: 'Trust & Safety', icon: 'shield-checkmark-outline', route: 'FundiTrustCenter' },
   { label: 'Help Center', icon: 'help-circle-outline', route: 'HelpCenter' },
   { label: 'About', icon: 'information-circle-outline', route: 'About' },
   { label: 'Settings', icon: 'settings-outline', route: 'Settings' },
