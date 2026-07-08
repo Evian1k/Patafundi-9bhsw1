@@ -592,6 +592,7 @@ router.get('/fraud/overview', authRequired, requirePerm('can_view_fraud_preventi
 // Geo Matching & Geographic Restrictions
 // ============================================================
 import * as geo from './controllers/geoMatchingController.js';
+import * as pricing from './controllers/pricingController.js';
 
 // Smart matching (customer-facing)
 router.post('/geo/find-fundis', authRequired, asyncHandler(geo.findFundisHandler));
@@ -692,3 +693,27 @@ router.get('/enterprise/ceo-report', authRequired, requirePerm('can_view_ceo_rep
 
 // API Versions
 router.get('/enterprise/api-versions', authRequired, asyncHandler(p2.apiVersionsHandler));
+
+// ============================================================
+// Enterprise Pricing Engine — Platform-calculated prices (no customer budgets)
+// ============================================================
+
+// Customer-facing: calculate a price quote (auth required)
+router.post('/pricing/calculate', authRequired, asyncHandler(pricing.calculatePrice));
+
+// Public: list service base prices
+router.get('/pricing/services', asyncHandler(pricing.listServicePrices));
+
+// Admin: get full pricing config
+router.get('/pricing/config', authRequired, requireRole('admin'), asyncHandler(pricing.getPricingConfig));
+
+// Admin: update service base price
+router.put('/pricing/services/:category', authRequired, requireRole('admin'), asyncHandler(pricing.updateServicePrice));
+
+// Admin: update global multipliers
+router.put('/pricing/config', authRequired, requireRole('admin'), asyncHandler(pricing.updatePricingConfig));
+
+// Admin: AI pricing recommendations
+router.get('/pricing/recommendations', authRequired, requireRole('admin'), asyncHandler(pricing.listRecommendations));
+router.post('/pricing/recommendations/generate', authRequired, requireRole('admin'), asyncHandler(pricing.generateRecommendations));
+router.post('/pricing/recommendations/:id/review', authRequired, requireRole('admin'), asyncHandler(pricing.reviewRecommendation));

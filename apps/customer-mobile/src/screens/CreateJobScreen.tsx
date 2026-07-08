@@ -1,3 +1,14 @@
+/**
+ * CreateJobScreen — Customer creates a job request.
+ *
+ * PRICING MODEL: Customers NEVER set a budget. The platform calculates
+ * the price automatically using the pricing engine (base price + distance +
+ * time + weather + demand + complexity + emergency).
+ *
+ * Flow: Category → Description → Complexity → Urgency → Location → Photos →
+ *       [Platform calculates price] → Customer accepts price → Job posted
+ */
+
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -23,6 +34,7 @@ import {
   gradients,
   SERVICE_CATEGORIES,
 } from '@patafundi/shared';
+import type { PriceBreakdown } from '@patafundi/shared';
 
 interface PhotoAsset {
   uri: string;
@@ -30,17 +42,30 @@ interface PhotoAsset {
   name?: string;
 }
 
+const COMPLEXITY_OPTIONS = [
+  { value: 'simple',  label: 'Simple',  desc: 'Quick fix, basic repair',           mult: '1.0x' },
+  { value: 'medium',  label: 'Medium',  desc: 'Standard job, moderate effort',     mult: '1.25x' },
+  { value: 'complex', label: 'Complex', desc: 'Multi-step, specialized skills',    mult: '1.75x' },
+  { value: 'expert',  label: 'Expert',  desc: 'Advanced expertise required',       mult: '2.5x' },
+] as const;
+
 export function CreateJobScreen({ navigation, route }: any): JSX.Element {
   const preselected: string | undefined = route?.params?.category;
   const [category, setCategory] = useState<string | null>(preselected ?? null);
   const [description, setDescription] = useState('');
-  const [budget, setBudget] = useState('');
+  const [complexity, setComplexity] = useState<'simple' | 'medium' | 'complex' | 'expert'>('simple');
   const [urgency, setUrgency] = useState<'normal' | 'emergency'>('normal');
   const [address, setAddress] = useState('');
+  const [county, setCounty] = useState('');
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [photos, setPhotos] = useState<PhotoAsset[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Pricing
+  const [priceQuote, setPriceQuote] = useState<PriceBreakdown | null>(null);
+  const [calculating, setCalculating] = useState(false);
+  const [priceAccepted, setPriceAccepted] = useState(false);
 
   useEffect(() => {
     if (preselected) setCategory(preselected);
@@ -61,6 +86,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       if (geo.length > 0) {
         const g = geo[0];
         setAddress([g.name, g.street, g.city, g.region].filter(Boolean).join(', '));
+        setCounty(g.region || g.city || '');
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to get location';
@@ -100,7 +126,8 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (): Promise<void> => {
+  // ── Calculate platform price ──────────────────────────────
+  const calculateQuote = async (): Promise<void> => {
     if (!category) {
       Alert.alert('Select category', 'Please choose a service category.');
       return;
@@ -113,15 +140,39 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       Alert.alert('Location required', 'Please detect your location.');
       return;
     }
+    setCalculating(true);
+    setPriceAccepted(false);
+    try {
+      const response = await apiClient.calculatePrice({
+        serviceCategory: category,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        county: county || undefined,
+        isEmergency: urgency === 'emergency',
+        complexity,
+      });
+      setPriceQuote(response.price);
+    } catch (e: any) {
+      Alert.alert('Pricing error', e?.message || 'Could not calculate price. Please try again.');
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  // ── Post the job with accepted price ──────────────────────
+  const handleSubmit = async (): Promise<void> => {
+    if (!priceQuote || !priceAccepted) {
+      Alert.alert('Accept price', 'Please calculate and accept the price first.');
+      return;
+    }
     setSubmitting(true);
     try {
       const { job } = await apiClient.createJob({
-        serviceCategory: category,
+        serviceCategory: category!,
         description: description.trim(),
-        estimatedPrice: budget ? Number(budget) : undefined,
         urgency,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        latitude: coords!.latitude,
+        longitude: coords!.longitude,
         address: address.trim() || undefined,
       });
       if (photos.length > 0) {
@@ -142,6 +193,8 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
     }
   };
 
+  const canCalculate = category && description.trim() && coords;
+
   return (
     <ScrollView
       style={styles.container}
@@ -156,10 +209,16 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
             <TouchableOpacity
               key={cat.slug}
               style={[styles.categoryCard, selected ? styles.categorySelected : null]}
-              onPress={() => setCategory(cat.slug)}
+              onPress={() => { setCategory(cat.slug); setPriceQuote(null); }}
             >
-              <Text style={styles.categoryIcon}>{cat.icon}</Text>
-              <Text style={styles.categoryLabel}>{cat.label}</Text>
+              <Ionicons
+                name={cat.icon as any}
+                size={24}
+                color={selected ? colors.primary : cat.color}
+              />
+              <Text style={[styles.categoryLabel, selected ? styles.categoryLabelSelected : null]}>
+                {cat.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -169,7 +228,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       <TextInput
         style={styles.textarea}
         value={description}
-        onChangeText={setDescription}
+        onChangeText={(v) => { setDescription(v); setPriceQuote(null); }}
         placeholder="Describe the job, what needs fixing, when you're available..."
         placeholderTextColor={colors.textSecondary}
         multiline
@@ -177,28 +236,46 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
         textAlignVertical="top"
       />
 
-      <Text style={styles.label}>Budget (KES, optional)</Text>
-      <TextInput
-        style={styles.input}
-        value={budget}
-        onChangeText={setBudget}
-        placeholder="500"
-        keyboardType="number-pad"
-      />
+      <Text style={styles.label}>Complexity</Text>
+      <Text style={styles.hint}>Affects the base price — be honest for accurate quotes</Text>
+      <View style={styles.complexityGrid}>
+        {COMPLEXITY_OPTIONS.map((opt) => {
+          const selected = complexity === opt.value;
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.complexityCard, selected ? styles.complexitySelected : null]}
+              onPress={() => { setComplexity(opt.value); setPriceQuote(null); }}
+            >
+              <View style={styles.complexityHeader}>
+                <Text style={[styles.complexityLabel, selected ? styles.complexityLabelSelected : null]}>
+                  {opt.label}
+                </Text>
+                <Text style={[styles.complexityMult, selected ? styles.complexityMultSelected : null]}>
+                  {opt.mult}
+                </Text>
+              </View>
+              <Text style={[styles.complexityDesc, selected ? styles.complexityDescSelected : null]}>
+                {opt.desc}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <Text style={styles.label}>Urgency</Text>
       <View style={styles.urgencyRow}>
         <TouchableOpacity
           style={[styles.urgencyBtn, urgency === 'normal' ? { borderColor: colors.accent, backgroundColor: colors.accent + '15' } : null]}
-          onPress={() => setUrgency('normal')}
+          onPress={() => { setUrgency('normal'); setPriceQuote(null); }}
         >
           <Text style={[styles.urgencyText, { color: urgency === 'normal' ? colors.accent : colors.textSecondary }]}>Normal</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.urgencyBtn, urgency === 'emergency' ? { borderColor: colors.error, backgroundColor: colors.error + '15' } : null]}
-          onPress={() => setUrgency('emergency')}
+          onPress={() => { setUrgency('emergency'); setPriceQuote(null); }}
         >
-          <Text style={[styles.urgencyText, { color: urgency === 'emergency' ? colors.error : colors.textSecondary }]}>Emergency</Text>
+          <Text style={[styles.urgencyText, { color: urgency === 'emergency' ? colors.error : colors.textSecondary }]}>Emergency (+15%)</Text>
         </TouchableOpacity>
       </View>
 
@@ -237,184 +314,232 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
         ) : null}
       </View>
 
-      <TouchableOpacity onPress={handleSubmit} disabled={submitting} activeOpacity={0.85}>
-        <LinearGradient
-          colors={[gradients.primary.start, gradients.primary.end]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.btn}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.primaryForeground} />
-          ) : (
-            <Text style={styles.btnText}>Post Job</Text>
+      {/* ── Price Quote Section ─────────────────────────────── */}
+      {priceQuote ? (
+        <View style={styles.priceCard}>
+          <View style={styles.priceHeader}>
+            <Ionicons name="pricetag" size={20} color={colors.primary} />
+            <Text style={styles.priceTitle}>Your Price Quote</Text>
+          </View>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Service cost</Text>
+            <Text style={styles.priceValue}>KES {priceQuote.serviceCost.toLocaleString()}</Text>
+          </View>
+          {priceQuote.travelFee > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Travel fee ({priceQuote.distanceKm} km)</Text>
+              <Text style={styles.priceValue}>KES {priceQuote.travelFee.toLocaleString()}</Text>
+            </View>
           )}
-        </LinearGradient>
-      </TouchableOpacity>
+          {priceQuote.emergencyFee > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Emergency fee</Text>
+              <Text style={styles.priceValue}>KES {priceQuote.emergencyFee.toLocaleString()}</Text>
+            </View>
+          )}
+          {priceQuote.surgeMultiplier > 1.0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Surge ({Math.round((priceQuote.surgeMultiplier - 1) * 100)}%)</Text>
+              <Text style={styles.priceValue}>+{Math.round((priceQuote.surgeMultiplier - 1) * 100)}%</Text>
+            </View>
+          )}
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Platform fee</Text>
+            <Text style={styles.priceValue}>KES {priceQuote.platformFee.toLocaleString()}</Text>
+          </View>
+
+          <View style={styles.priceDivider} />
+
+          <View style={styles.priceTotalRow}>
+            <Text style={styles.priceTotalLabel}>Total</Text>
+            <Text style={styles.priceTotalValue}>KES {priceQuote.total.toLocaleString()}</Text>
+          </View>
+
+          <View style={styles.priceMetaRow}>
+            <View style={styles.priceMetaItem}>
+              <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.priceMetaText}>~{priceQuote.estimatedDurationMinutes} min</Text>
+            </View>
+            <View style={styles.priceMetaItem}>
+              <Ionicons name="navigate-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.priceMetaText}>ETA {priceQuote.etaMinutes} min</Text>
+            </View>
+          </View>
+
+          {priceQuote.factors.timeReasons.length > 0 && (
+            <Text style={styles.priceNote}>
+              Includes: {priceQuote.factors.timeReasons.join(', ')} pricing
+            </Text>
+          )}
+        </View>
+      ) : null}
+
+      {/* ── Action Buttons ──────────────────────────────────── */}
+      {!priceQuote ? (
+        <TouchableOpacity onPress={calculateQuote} disabled={!canCalculate || calculating} activeOpacity={0.85}>
+          <LinearGradient
+            colors={canCalculate ? [gradients.accent.start, gradients.accent.end] : ['#E7E5E4', '#E7E5E4']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.btn}
+          >
+            {calculating ? (
+              <ActivityIndicator color={colors.textLight} />
+            ) : (
+              <>
+                <Ionicons name="calculator-outline" size={20} color={colors.textLight} />
+                <Text style={styles.btnText}>Get Price Quote</Text>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : !priceAccepted ? (
+        <View style={styles.acceptRow}>
+          <TouchableOpacity
+            style={styles.declineBtn}
+            onPress={() => { setPriceQuote(null); setPriceAccepted(false); }}
+          >
+            <Text style={styles.declineText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPriceAccepted(true)}
+            activeOpacity={0.85}
+            style={{ flex: 1 }}
+          >
+            <LinearGradient
+              colors={[gradients.primary.start, gradients.primary.end]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.btn}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.textLight} />
+              <Text style={styles.btnText}>Accept Price</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View>
+          <View style={styles.acceptedBanner}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={styles.acceptedText}>Price accepted — KES {priceQuote.total.toLocaleString()}</Text>
+          </View>
+          <TouchableOpacity onPress={handleSubmit} disabled={submitting} activeOpacity={0.85}>
+            <LinearGradient
+              colors={[gradients.primary.start, gradients.primary.end]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.btn}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <>
+                  <Ionicons name="send-outline" size={20} color={colors.textLight} />
+                  <Text style={styles.btnText}>Post Job</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <Text style={styles.platformNote}>
+        <Ionicons name="information-circle-outline" size={12} color={colors.textSecondary} />
+        {'  '}Prices are calculated by PataFundi based on service, distance, time, and demand. You never overpay.
+      </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: spacing.lg,
-  },
-  label: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: 6,
-    marginTop: spacing.md,
-    fontWeight: '500',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
+  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  label: { fontFamily: fonts.sans, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 6, marginTop: spacing.md, fontWeight: '500' },
+  hint: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textTertiary || colors.textSecondary, marginBottom: 8, marginTop: -2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   categoryCard: {
-    width: '31%',
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    width: '31%', backgroundColor: colors.card, borderRadius: borderRadius.lg,
+    padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm,
+    borderWidth: 1.5, borderColor: colors.border, gap: 4,
   },
-  categorySelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + '15',
-  },
-  categoryIcon: {
-    fontSize: 26,
-    marginBottom: 4,
-  },
-  categoryLabel: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.xs,
-    color: colors.text,
-    textAlign: 'center',
-  },
+  categorySelected: { borderColor: colors.primary, backgroundColor: colors.primary + '15' },
+  categoryLabel: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.text, textAlign: 'center' },
+  categoryLabelSelected: { color: colors.primary, fontWeight: '600' },
   textarea: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: 12,
-    backgroundColor: colors.card,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.md,
-    color: colors.text,
-    minHeight: 100,
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg,
+    padding: 12, backgroundColor: colors.card, fontFamily: fonts.sans,
+    fontSize: fontSize.md, color: colors.text, minHeight: 100,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: 12,
-    backgroundColor: colors.card,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.md,
-    color: colors.text,
+  complexityGrid: { gap: spacing.sm },
+  complexityCard: {
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: borderRadius.lg,
+    padding: spacing.md, backgroundColor: colors.card,
   },
-  urgencyRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
+  complexitySelected: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  complexityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  complexityLabel: { fontFamily: fonts.sans, fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  complexityLabelSelected: { color: colors.primary },
+  complexityMult: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary, fontWeight: '600' },
+  complexityMultSelected: { color: colors.primary },
+  complexityDesc: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  complexityDescSelected: { color: colors.text },
+  urgencyRow: { flexDirection: 'row', gap: spacing.sm },
   urgencyBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: colors.card,
+    flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: borderRadius.md,
+    paddingVertical: 12, alignItems: 'center', backgroundColor: colors.card,
   },
-  urgencyText: {
-    fontFamily: fonts.sans,
-    fontWeight: '600',
-    fontSize: fontSize.md,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  urgencyText: { fontFamily: fonts.sans, fontWeight: '600', fontSize: fontSize.md },
+  locationRow: { flexDirection: 'row', alignItems: 'center' },
   locateBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: 12,
-    backgroundColor: colors.card,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg,
+    padding: 12, backgroundColor: colors.card,
   },
-  locateText: {
-    flex: 1,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.md,
-    color: colors.text,
-    marginLeft: 8,
-  },
-  coordsText: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
+  locateText: { flex: 1, fontFamily: fonts.sans, fontSize: fontSize.md, color: colors.text, marginLeft: 8 },
+  coordsText: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 4 },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   photoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    width: 72, height: 72, borderRadius: borderRadius.md, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
-  removePhoto: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.pill,
-  },
+  removePhoto: { position: 'absolute', top: -6, right: -6, backgroundColor: colors.card, borderRadius: borderRadius.pill },
   addPhoto: {
-    width: 72,
-    height: 72,
-    borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 72, height: 72, borderRadius: borderRadius.md, borderWidth: 1.5,
+    borderColor: colors.primary, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center',
   },
-  addPhotoText: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.xs,
-    color: colors.primary,
-    marginTop: 2,
+  addPhotoText: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.primary, marginTop: 2 },
+  priceCard: {
+    backgroundColor: colors.card, borderRadius: borderRadius.xl, padding: spacing.lg,
+    marginTop: spacing.md, borderWidth: 1, borderColor: colors.border,
   },
+  priceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md },
+  priceTitle: { fontFamily: fonts.display, fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  priceLabel: { fontFamily: fonts.sans, fontSize: fontSize.sm, color: colors.textSecondary },
+  priceValue: { fontFamily: fonts.sans, fontSize: fontSize.sm, fontWeight: '500', color: colors.text },
+  priceDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
+  priceTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  priceTotalLabel: { fontFamily: fonts.display, fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  priceTotalValue: { fontFamily: fonts.display, fontSize: fontSize.xxl, fontWeight: '800', color: colors.primary },
+  priceMetaRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
+  priceMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  priceMetaText: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary },
+  priceNote: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textTertiary || colors.textSecondary, marginTop: spacing.sm, fontStyle: 'italic' },
   btn: {
-    borderRadius: borderRadius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: spacing.xl,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: borderRadius.md, paddingVertical: 14, marginTop: spacing.xl,
   },
-  btnText: {
-    color: colors.primaryForeground,
-    fontFamily: fonts.sans,
-    fontWeight: '700',
-    fontSize: fontSize.lg,
+  btnText: { color: colors.primaryForeground, fontFamily: fonts.sans, fontWeight: '700', fontSize: fontSize.lg },
+  acceptRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, alignItems: 'center' },
+  declineBtn: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
+  declineText: { fontFamily: fonts.sans, fontSize: fontSize.md, fontWeight: '600', color: colors.textSecondary },
+  acceptedBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.md,
+    backgroundColor: colors.successLight || colors.success + '15', borderRadius: borderRadius.md, marginTop: spacing.xl,
+  },
+  acceptedText: { fontFamily: fonts.sans, fontSize: fontSize.md, fontWeight: '600', color: colors.success },
+  platformNote: {
+    fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary,
+    textAlign: 'center', marginTop: spacing.lg, paddingHorizontal: spacing.md, lineHeight: 18,
   },
 });

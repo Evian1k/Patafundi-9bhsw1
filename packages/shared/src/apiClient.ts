@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
-import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, Referral, Loyalty, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult } from './types';
+import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, Referral, Loyalty, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
 
 function resolveBaseUrl(): string {
   const FALLBACK = 'https://patafundi-9bhsw1.onrender.com';
@@ -161,6 +161,23 @@ class ApiClient {
   // Geo
   findFundis(lat: number, lng: number, serviceCategory: string, isEmergency = false): Promise<GeoFindFundisResult> { return this.request('/geo/find-fundis', { method: 'POST', body: JSON.stringify({ latitude: lat, longitude: lng, serviceCategory, isEmergency }) }); }
   getSurgePricing(basePrice: number, distanceKm: number, isEmergency = false, isNight = false): Promise<SurgePricingResult> { return this.request('/geo/surge-pricing', { method: 'POST', body: JSON.stringify({ basePrice, distanceKm, isEmergency, isNight }) }); }
+
+  // ── Pricing Engine (platform-calculated, no customer budgets) ──
+  calculatePrice(params: {
+    serviceCategory: string;
+    latitude?: number;
+    longitude?: number;
+    county?: string;
+    isEmergency?: boolean;
+    isImmediate?: boolean;
+    complexity?: 'simple' | 'medium' | 'complex' | 'expert';
+    weatherCondition?: string | null;
+    scheduledFor?: string | null;
+    fundiId?: string | null;
+  }): Promise<{ success: boolean; calculationId: string; price: PriceBreakdown }> {
+    return this.request('/pricing/calculate', { method: 'POST', body: JSON.stringify(params) });
+  }
+  listServicePrices(): Promise<{ success: boolean; services: any[] }> { return this.request('/pricing/services'); }
 
   // Referral + Loyalty
   getReferralDashboard(): Promise<Referral> { return this.request('/referrals/me'); }

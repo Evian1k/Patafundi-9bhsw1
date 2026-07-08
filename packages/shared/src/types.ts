@@ -22,3 +22,32 @@ export interface GeoFindFundisResult { fundis: Array<{ fundiId: string; fullName
 export interface SurgePricingResult { basePrice: number; surgeMultiplier: number; finalPrice: number; breakdown: { distance: number; time: number; surge: number; serviceFee: number; }; }
 export interface AuthResponse { success: boolean; token?: string; refreshToken?: string; user?: User; devOtp?: string; requires2FA?: boolean; message?: string; }
 export interface ApiError extends Error { status?: number; maintenanceMode?: boolean; code?: string; }
+
+
+// ── Pricing Engine ────────────────────────────────────────────
+export interface PriceBreakdown {
+  serviceCost: number;
+  travelFee: number;
+  emergencyFee: number;
+  timeMultiplier: number;
+  weatherMultiplier: number;
+  surgeMultiplier: number;
+  platformFee: number;
+  estimatedDurationMinutes: number;
+  etaMinutes: number;
+  total: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  fundiEarnings: number;
+  distanceKm: number;
+  factors: {
+    complexity: 'simple' | 'medium' | 'complex' | 'expert';
+    countyAdjustment: number;
+    timeReasons: string[];
+    weatherReason: string | null;
+    demandMultiplier: number;
+    eventMultiplier: number;
+    isEmergency: boolean;
+    isImmediate: boolean;
+  };
+}
