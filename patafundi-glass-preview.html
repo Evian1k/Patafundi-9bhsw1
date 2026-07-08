@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PataFundi — Glass Edition | Interactive Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --primary: #F97316;
+    --primary-dark: #C2410C;
+    --accent: #1E9E8A;
+    --accent-dark: #0E6B5C;
+    --bg: #FBFAF8;
+    --card: rgba(255, 255, 255, 0.65);
+    --text: #1C1917;
+    --text-2: #6B6560;
+    --border: rgba(255, 255, 255, 0.3);
+    --success: #27A35F;
+    --warning: #FBBF24;
+    --error: #EF4444;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 24px;
+    --r-pill: 999px;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background:
+      radial-gradient(at 20% 20%, rgba(249, 115, 22, 0.4) 0%, transparent 50%),
+      radial-gradient(at 80% 80%, rgba(30, 158, 138, 0.4) 0%, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(251, 191, 36, 0.2) 0%, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(249, 115, 22, 0.25) 0%, transparent 40%),
+      radial-gradient(at 10% 90%, rgba(30, 158, 138, 0.25) 0%, transparent 40%),
+      linear-gradient(135deg, #FBFAF8 0%, #F5EFE6 100%);
+    min-height: 100vh;
+    color: var(--text);
+    overflow-x: hidden;
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  /* ===== Glass surfaces ===== */
+  .glass {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  }
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  }
+  .glass-primary {
+    background: rgba(249, 115, 22, 0.18);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+  }
+  .glass-teal {
+    background: rgba(30, 158, 138, 0.18);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(30, 158, 138, 0.25);
+  }
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+  .glass-warn {
+    background: rgba(251, 191, 36, 0.18);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+  }
+  .glass-success {
+    background: rgba(39, 163, 95, 0.18);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(39, 163, 95, 0.3);
+  }
+  .glass-error {
+    background: rgba(239, 68, 68, 0.15);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+
+  /* ===== Page layout ===== */
+  .page {
+    min-height: 100vh;
+    padding: 32px 24px 60px;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .page-header .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+    margin-bottom: 14px;
+  }
+  .page-header .badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+  }
+  .page-header h1 {
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1.05;
+    background: linear-gradient(135deg, #1C1917 0%, #C2410C 60%, #F97316 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+  .page-header p {
+    color: var(--text-2);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .app-toggle {
+    display: inline-flex;
+    padding: 6px;
+    border-radius: var(--r-pill);
+    margin-top: 22px;
+    gap: 4px;
+  }
+  .app-toggle button {
+    border: none;
+    background: transparent;
+    padding: 11px 26px;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .app-toggle button.active {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35);
+  }
+  .app-toggle button svg { width: 16px; height: 16px; }
+
+  .page-main {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  /* ===== Screen list (sidebar) ===== */
+  .screen-list {
+    border-radius: var(--r-xl);
+    padding: 20px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    position: sticky;
+    top: 24px;
+  }
+  .screen-list::-webkit-scrollbar { width: 6px; }
+  .screen-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+  .screen-list h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-2);
+    margin-bottom: 12px;
+    padding: 0 6px;
+  }
+  .screen-list .group + .group { margin-top: 18px; }
+  .screen-list button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    margin-bottom: 2px;
+  }
+  .screen-list button:hover { background: rgba(255,255,255,0.5); }
+  .screen-list button.active {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(249, 115, 22, 0.1));
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    font-weight: 600;
+  }
+  .screen-list button .num {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.06);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-2);
+    flex-shrink: 0;
+  }
+  .screen-list button.active .num {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  /* ===== Phone frame ===== */
+  .phone-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: linear-gradient(145deg, #2a2a2c 0%, #1a1a1c 50%, #0f0f10 100%);
+    border-radius: 55px;
+    padding: 9px;
+    box-shadow:
+      inset 0 0 0 2px rgba(255,255,255,0.08),
+      0 0 0 2px #3a3a3c,
+      0 35px 70px rgba(0, 0, 0, 0.35),
+      0 15px 35px rgba(0, 0, 0, 0.25),
+      0 0 80px rgba(249, 115, 22, 0.08);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 52px;
+    background: linear-gradient(145deg, #3a3a3c 0%, transparent 30%, transparent 70%, #1a1a1c 100%);
+    z-index: 0;
+  }
+
+  .phone-bezel {
+    width: 100%;
+    height: 100%;
+    border-radius: 47px;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg);
+    z-index: 1;
+  }
+
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 35px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 200;
+  }
+
+  .status-bar {
+    height: 54px;
+    padding: 18px 32px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    position: relative;
+    z-index: 100;
+    color: var(--text);
+  }
+  .status-bar.dark { color: #fff; }
+  .status-bar .time {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+  }
+  .status-bar .icons {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .status-bar .icons svg { display: block; }
+
+  .screen-content {
+    height: calc(100% - 54px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    background: transparent;
+  }
+  .screen-content::-webkit-scrollbar { display: none; }
+  .screen-content { scrollbar-width: none; }
+
+  .screen {
+    min-height: 100%;
+    padding-bottom: 0;
+    animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    position: relative;
+  }
+  .screen.back { animation: slideInLeft 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
+  .screen.tab { animation: fadeIn 0.25s ease-out; }
+
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+  }
+
+  .home-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 134px;
+    height: 5px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 3px;
+    z-index: 200;
+  }
+
+  .screen-label {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .screen-label .name {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .screen-label .hint {
+    font-size: 12px;
+    color: var(--text-2);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .screen-label .hint svg { width: 13px; height: 13px; opacity: 0.7; }
+
+  /* ===== Screen building blocks ===== */
+  .scr-pad { padding: 0 20px 100px; }
+  .scr-pad-tight { padding: 0 20px 20px; }
+
+  /* Nav bar */
+  .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px 16px;
+    gap: 12px;
+  }
+  .nav-bar .nav-btn {
+    width: 38px; height: 38px;
+    border-radius: var(--r-pill);
+    border: none;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .nav-bar .nav-btn:active { transform: scale(0.92); }
+  .nav-bar .nav-btn svg { width: 20px; height: 20px; }
+  .nav-bar .nav-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    flex: 1;
+    text-align: center;
+  }
+  .nav-bar .nav-spacer { width: 38px; flex-shrink: 0; }
+
+  /* Inputs */
+  .g-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    border: 1px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--text);
+    transition: all 0.2s ease;
+    outline: none;
+  }
+  .g-input::placeholder { color: var(--text-2); opacity: 0.7; }
+  .g-input:focus {
+    background: rgba(255,255,255,0.85);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+  }
+  .g-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 7px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 15px 20px;
+    border-radius: var(--r-md);
+    border: none;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
+  }
+  .btn-teal {
+    background: linear-gradient(135deg, #1E9E8A 0%, #0E6B5C 100%);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(30, 158, 138, 0.35);
+  }
+  .btn-outline-teal {
+    background: rgba(30, 158, 138, 0.1);
+    color: var(--accent-dark);
+    border: 1.5px solid var(--accent);
+  }
+  .btn-outline-red {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    border: 1.5px solid var(--error);
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #27A35F 0%, #1a7a45 100%);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(39, 163, 95, 0.35);
+  }
+  .btn-ghost {
+    background: rgba(255,255,255,0.6);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  /* Chip */
+  .chip {
+    padding: 7px 14px;
+    border-radius: var(--r-pill);
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .chip.active {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(249,115,22,0.3);
+  }
+  .chip-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 0;
+    margin: 0 -20px;
+    padding: 2px 20px;
+  }
+  .chip-row::-webkit-scrollbar { display: none; }
+
+  /* Cards */
+  .card { border-radius: var(--r-lg); padding: 16px; }
+  .card-tap { cursor: pointer; transition: transform 0.15s ease; }
+  .card-tap:active { transform: scale(0.98); }
+
+  .grad-text {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .grad-text-teal {
+    background: linear-gradient(135deg, #1E9E8A 0%, #0E6B5C 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Bottom tab bar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 84px;
+    padding: 10px 12px 24px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.5);
+    z-index: 50;
+  }
+  .tab-bar .tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 0;
+    cursor: pointer;
+    color: var(--text-2);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    transition: color 0.2s ease;
+  }
+  .tab-bar .tab svg { width: 24px; height: 24px; }
+  .tab-bar .tab.active { color: var(--primary); }
+  .tab-bar .tab.active svg { filter: drop-shadow(0 2px 6px rgba(249,115,22,0.4)); }
+
+  /* Service grid */
+  .svc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .svc-card {
+    border-radius: var(--r-md);
+    padding: 14px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .svc-card:active { transform: scale(0.95); }
+  .svc-card .emoji { font-size: 26px; display: block; margin-bottom: 6px; }
+  .svc-card .lbl { font-size: 11px; font-weight: 600; color: var(--text); }
+
+  /* Avatar */
+  .avatar {
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .avatar-grad-orange {
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+  }
+  .avatar-grad-teal {
+    background: linear-gradient(135deg, #1E9E8A 0%, #0E6B5C 100%);
+  }
+
+  /* OTP boxes */
+  .otp-row {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .otp-box {
+    flex: 1;
+    aspect-ratio: 1;
+    max-width: 44px;
+    border-radius: var(--r-md);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(10px);
+    text-align: center;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    outline: none;
+  }
+  .otp-box.filled {
+    background: rgba(249,115,22,0.12);
+    border-color: var(--primary);
+  }
+
+  /* Stars */
+  .stars { display: inline-flex; gap: 6px; }
+  .stars svg { width: 32px; height: 32px; cursor: pointer; }
+
+  /* Map area */
+  .map {
+    height: 200px;
+    border-radius: var(--r-lg);
+    background:
+      radial-gradient(at 30% 40%, rgba(30,158,138,0.5) 0%, transparent 40%),
+      radial-gradient(at 70% 60%, rgba(249,115,22,0.4) 0%, transparent 40%),
+      linear-gradient(135deg, #d4e8e4 0%, #e8d4c4 100%);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .map::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .map::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(120deg, transparent 40%, rgba(30,158,138,0.35) 50%, transparent 60%);
+  }
+  .map-pin {
+    position: absolute;
+    z-index: 5;
+    width: 28px; height: 28px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  }
+  .map-pin.orange { background: linear-gradient(135deg, #F97316, #C2410C); }
+  .map-pin.teal { background: linear-gradient(135deg, #1E9E8A, #0E6B5C); }
+  .map-pin .dot {
+    width: 10px; height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    transform: rotate(45deg);
+  }
+  .map-route {
+    position: absolute;
+    z-index: 2;
+    height: 3px;
+    background: linear-gradient(90deg, #F97316, #1E9E8A);
+    transform-origin: left center;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.15);
+  }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 8px; bottom: 8px;
+    width: 2px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 1px;
+  }
+  .tl-item {
+    position: relative;
+    padding-bottom: 16px;
+  }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-dot {
+    position: absolute;
+    left: -23px; top: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.1);
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .tl-item.active .tl-dot {
+    background: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary), 0 0 10px rgba(249,115,22,0.5);
+  }
+  .tl-item.done .tl-dot { background: var(--success); }
+  .tl-item .tl-title { font-size: 13px; font-weight: 600; }
+  .tl-item .tl-time { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+
+  /* Chat */
+  .chat-msg {
+    max-width: 75%;
+    padding: 11px 15px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .chat-msg.other {
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: var(--text);
+  }
+  .chat-msg.me {
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    background: linear-gradient(135deg, #F97316 0%, #C2410C 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(249,115,22,0.3);
+  }
+  .chat-list { display: flex; flex-direction: column; padding: 12px 16px; }
+
+  /* Bar chart */
+  .bars { display: flex; gap: 8px; align-items: flex-end; height: 90px; padding: 8px 4px 0; }
+  .bar {
+    flex: 1;
+    background: linear-gradient(180deg, #F97316 0%, #C2410C 100%);
+    border-radius: 4px 4px 2px 2px;
+    min-height: 8px;
+    position: relative;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    width: 52px; height: 30px;
+    border-radius: var(--r-pill);
+    background: rgba(0,0,0,0.15);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.25s ease;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: transform 0.25s ease;
+  }
+  .toggle.on { background: var(--success); }
+  .toggle.on::after { transform: translateX(22px); }
+
+  /* Segmented control */
+  .segment {
+    display: flex;
+    padding: 4px;
+    border-radius: var(--r-pill);
+    background: rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+  }
+  .segment button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .segment button.active {
+    background: #fff;
+    color: var(--text);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* Misc */
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; }
+  .col { display: flex; flex-direction: column; }
+  .gap-4 { gap: 4px; }
+  .gap-6 { gap: 6px; }
+  .gap-8 { gap: 8px; }
+  .gap-10 { gap: 10px; }
+  .gap-12 { gap: 12px; }
+  .gap-14 { gap: 14px; }
+  .gap-16 { gap: 16px; }
+  .gap-20 { gap: 20px; }
+  .mt-4 { margin-top: 4px; }
+  .mt-8 { margin-top: 8px; }
+  .mt-12 { margin-top: 12px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-20 { margin-top: 20px; }
+  .mt-24 { margin-top: 24px; }
+  .mb-8 { margin-bottom: 8px; }
+  .mb-12 { margin-bottom: 12px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-20 { margin-bottom: 20px; }
+  .text-xs { font-size: 11px; }
+  .text-sm { font-size: 13px; }
+  .text-base { font-size: 15px; }
+  .text-lg { font-size: 17px; }
+  .text-xl { font-size: 20px; }
+  .text-2xl { font-size: 24px; }
+  .text-3xl { font-size: 30px; }
+  .font-semibold { font-weight: 600; }
+  .font-bold { font-weight: 700; }
+  .font-extrabold { font-weight: 800; }
+  .text-2 { color: var(--text-2); }
+  .text-center { text-align: center; }
+  .flex-1 { flex: 1; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+    margin-bottom: 10px;
+  }
+
+  /* Click affordance */
+  [data-nav], [data-back], [data-tab], .card-tap, .chip, .svc-card, .tab, button { cursor: pointer; }
+
+  /* Mobile responsive */
+  @media (max-width: 1100px) {
+    .page-main { grid-template-columns: 1fr; gap: 24px; }
+    .screen-list { position: relative; top: 0; max-height: 300px; order: 2; }
+    .phone-wrapper { order: 1; }
+  }
+  @media (max-width: 460px) {
+    .phone { transform: scale(0.85); transform-origin: top center; }
+    .page { padding: 20px 12px 40px; }
+    .page-header h1 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <div class="glass badge"><span class="dot"></span> Live Preview</div>
+    <h1>PataFundi — Glass Edition</h1>
+    <p>Interactive preview · tap buttons to navigate · 19 screens</p>
+    <div class="app-toggle glass" id="appToggle">
+      <button class="active" data-app="customer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+        Customer App
+      </button>
+      <button data-app="fundi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Fundi App
+      </button>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <aside class="screen-list glass" id="screenList"></aside>
+    <div class="phone-wrapper">
+      <div class="phone">
+        <div class="phone-bezel">
+          <div class="dynamic-island"></div>
+          <div class="status-bar" id="statusBar">
+            <span class="time">9:41</span>
+            <div class="icons">
+              <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.5c2.1 0 4 .8 5.5 2.1l1.4-1.6C12.9 1.3 10.5.4 8 .4S3.1 1.3 1.1 3L2.5 4.6C4 3.3 5.9 2.5 8 2.5z"/><path d="M8 6.2c1.1 0 2.1.4 2.9 1.1l1.4-1.6C11.1 4.7 9.6 4.1 8 4.1s-3.1.6-4.3 1.6l1.4 1.6c.8-.7 1.8-1.1 2.9-1.1z"/><path d="M8 9.4l1.8-2C9.2 7 8.6 6.8 8 6.8s-1.2.2-1.8.6l1.8 2z"/></svg>
+              <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/><rect x="23.5" y="4" width="1.5" height="5" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+            </div>
+          </div>
+          <div class="screen-content" id="screenContent"></div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="screen-label">
+        <div class="name" id="screenName">Home</div>
+        <div class="hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          tap buttons to navigate through screens
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   PataFundi Glass Edition — Interactive Preview
+   ============================================================ */
+
+/* ---------- Icon library ---------- */
+const I = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  homeFill: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2z"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  starOutline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+  mapPin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  shieldCheck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>',
+  navigate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  trending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+};
+
+/* ---------- Status bar icons (color-adaptive) ---------- */
+function statusBarIcons() {
+  return `<svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.5c2.1 0 4 .8 5.5 2.1l1.4-1.6C12.9 1.3 10.5.4 8 .4S3.1 1.3 1.1 3L2.5 4.6C4 3.3 5.9 2.5 8 2.5z"/><path d="M8 6.2c1.1 0 2.1.4 2.9 1.1l1.4-1.6C11.1 4.7 9.6 4.1 8 4.1s-3.1.6-4.3 1.6l1.4 1.6c.8-.7 1.8-1.1 2.9-1.1z"/><path d="M8 9.4l1.8-2C9.2 7 8.6 6.8 8 6.8s-1.2.2-1.8.6l1.8 2z"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x="0.5" y="0.5" width="22" height="12" rx="3" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="19" height="9" rx="1.5" fill="currentColor"/><rect x="23.5" y="4" width="1.5" height="5" rx="0.5" fill="currentColor" opacity="0.5"/></svg>`;
+}
+
+/* ---------- Tab bar ---------- */
+function tabBar(active, isFundi) {
+  const tabs = isFundi
+    ? [
+        { id: 'dashboard', label: 'Dashboard', icon: I.home },
+        { id: 'fundiJobs', label: 'Jobs', icon: I.briefcase },
+        { id: 'fundiWallet', label: 'Wallet', icon: I.wallet },
+        { id: 'fundiProfile', label: 'Profile', icon: I.user },
+      ]
+    : [
+        { id: 'home', label: 'Home', icon: I.home },
+        { id: 'jobs', label: 'Jobs', icon: I.briefcase },
+        { id: 'wallet', label: 'Wallet', icon: I.wallet },
+        { id: 'profile', label: 'Profile', icon: I.user },
+      ];
+  return `<div class="tab-bar">
+    ${tabs.map(t => `<button class="tab ${t.id === active ? 'active' : ''}" data-tab="${t.id}">${t.icon}<span>${t.label}</span></button>`).join('')}
+  </div>`;
+}
+
+/* ---------- Nav bar ---------- */
+function navBar(title, opts = {}) {
+  const right = opts.right || '';
+  return `<div class="nav-bar">
+    <button class="nav-btn" data-back>${I.arrowLeft}</button>
+    <div class="nav-title">${title}</div>
+    <div class="nav-spacer">${right}</div>
+  </div>`;
+}
+
+/* ============================================================
+   CUSTOMER APP SCREENS
+   ============================================================ */
+
+const customerScreens = {
+  login: {
+    title: 'Login',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad" style="padding-top:60px; min-height:100%; display:flex; flex-direction:column; justify-content:center;">
+        <div style="text-align:center; margin-bottom:32px;">
+          <div class="avatar avatar-grad-orange" style="width:72px; height:72px; font-size:30px; margin:0 auto 16px; box-shadow:0 12px 30px rgba(249,115,22,0.4);">P</div>
+          <h1 class="text-3xl font-extrabold grad-text">PataFundi</h1>
+          <p class="text-sm text-2 mt-4">Find trusted fundis in minutes</p>
+        </div>
+        <div class="glass card col gap-14">
+          <div>
+            <label class="g-label">Email</label>
+            <input class="g-input" type="email" placeholder="john@example.com" value="john@example.com">
+          </div>
+          <div>
+            <label class="g-label">Password</label>
+            <input class="g-input" type="password" placeholder="••••••••" value="password">
+          </div>
+          <button class="btn btn-primary" data-nav="home">Sign In</button>
+          <div class="text-center text-sm text-2">
+            Don't have an account? <span class="grad-text font-semibold" data-nav="register" style="cursor:pointer;">Sign up</span>
+          </div>
+        </div>
+        <div class="text-center text-xs text-2 mt-20">
+          By continuing you agree to our Terms & Privacy Policy
+        </div>
+      </div>`,
+  },
+
+  register: {
+    title: 'Register',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad" style="padding-top:40px;">
+        <div style="text-align:center; margin-bottom:24px;">
+          <h1 class="text-2xl font-extrabold">Create Account</h1>
+          <p class="text-sm text-2 mt-4">Join PataFundi today</p>
+        </div>
+        <div class="glass card col gap-12">
+          <div>
+            <label class="g-label">Full Name</label>
+            <input class="g-input" placeholder="John Doe" value="John Doe">
+          </div>
+          <div>
+            <label class="g-label">Email</label>
+            <input class="g-input" type="email" placeholder="john@example.com" value="john@example.com">
+          </div>
+          <div>
+            <label class="g-label">Phone</label>
+            <div class="row gap-8">
+              <div class="g-input" style="width:90px; flex:none; display:flex; align-items:center; gap:6px; font-weight:600;">🇰🇪 +254</div>
+              <input class="g-input flex-1" placeholder="712 345 678" value="712 345 678">
+            </div>
+          </div>
+          <div>
+            <label class="g-label">Password</label>
+            <input class="g-input" type="password" placeholder="Create a password" value="password">
+          </div>
+          <div>
+            <label class="g-label">Referral Code (optional)</label>
+            <input class="g-input" placeholder="JOHN2024" value="JOHN2024">
+          </div>
+          <div class="mt-4"><button class="btn btn-primary" data-nav="otp">Sign Up</button></div>
+          <div class="text-center text-sm text-2">
+            Already have an account? <span class="grad-text font-semibold" data-nav="login" style="cursor:pointer;">Sign in</span>
+          </div>
+        </div>
+      </div>`,
+  },
+
+  otp: {
+    title: 'OTP Verification',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad" style="padding-top:60px; min-height:100%; display:flex; flex-direction:column; justify-content:center;">
+        <div style="text-align:center; margin-bottom:32px;">
+          <div class="glass-primary card" style="display:inline-flex; width:72px; height:72px; border-radius:50%; align-items:center; justify-content:center; margin-bottom:16px;">
+            <div style="width:32px; color:var(--primary);">${I.mail}</div>
+          </div>
+          <h1 class="text-2xl font-extrabold">Verify Your Email</h1>
+          <p class="text-sm text-2 mt-4">Enter the 6-digit code sent to<br><strong>john@example.com</strong></p>
+        </div>
+        <div class="glass card col gap-16">
+          <div class="otp-row">
+            <input class="otp-box filled" maxlength="1" value="4">
+            <input class="otp-box filled" maxlength="1" value="2">
+            <input class="otp-box filled" maxlength="1" value="8">
+            <input class="otp-box filled" maxlength="1" value="9">
+            <input class="otp-box filled" maxlength="1" value="1">
+            <input class="otp-box filled" maxlength="1" value="7">
+          </div>
+          <button class="btn btn-primary" data-nav="home">Verify</button>
+          <div class="text-center text-sm text-2">
+            Didn't get a code? <span class="grad-text font-semibold" style="cursor:pointer;">Resend in 0:42</span>
+          </div>
+        </div>
+      </div>`,
+  },
+
+  home: {
+    title: 'Home',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <div class="row-between mb-16">
+          <div class="row gap-12">
+            <div class="avatar avatar-grad-orange" style="width:44px; height:44px; font-size:16px;">J</div>
+            <div class="col">
+              <div class="text-xs text-2 font-semibold" style="text-transform:uppercase; letter-spacing:0.04em;">Welcome back</div>
+              <div class="text-lg font-bold">Hello, John 👋</div>
+            </div>
+          </div>
+          <button class="nav-btn glass" data-nav="notifications" style="position:relative;">
+            ${I.bell}
+            <span style="position:absolute; top:8px; right:9px; width:8px; height:8px; background:var(--error); border-radius:50%; border:2px solid #fff;"></span>
+          </button>
+        </div>
+
+        <div class="card card-tap glass-primary mb-16" data-nav="createJob" style="background:linear-gradient(135deg, rgba(249,115,22,0.85), rgba(194,65,12,0.9)); border:none; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:20px;">
+          <div class="col gap-4">
+            <div class="text-xl font-bold" style="color:#fff;">Create New Job</div>
+            <div class="text-sm" style="color:rgba(255,255,255,0.85);">Post a job and get matched</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.25); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+            <div style="width:20px; color:#fff;">${I.plus}</div>
+          </div>
+        </div>
+
+        <div class="row-between mb-12">
+          <div class="section-title" style="margin:0;">Services</div>
+          <div class="text-xs font-semibold text-2">See all</div>
+        </div>
+        <div class="svc-grid mb-20">
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">🔧</span><span class="lbl">Plumbing</span></div>
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">⚡</span><span class="lbl">Electrical</span></div>
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">🏠</span><span class="lbl">Carpentry</span></div>
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">🎨</span><span class="lbl">Painting</span></div>
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">🧹</span><span class="lbl">Cleaning</span></div>
+          <div class="svc-card glass" data-nav="createJob"><span class="emoji">❄️</span><span class="lbl">AC Repair</span></div>
+        </div>
+
+        <div class="row-between mb-12">
+          <div class="section-title" style="margin:0;">Recent Jobs</div>
+          <div class="text-xs font-semibold grad-text" data-nav="jobs" style="cursor:pointer;">See all</div>
+        </div>
+        <div class="col gap-10 mb-20">
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:36px; height:36px; border-radius:10px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; font-size:18px;">🔧</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Leaking Kitchen Sink</div>
+                  <div class="text-xs text-2">Plumbing · Westlands</div>
+                </div>
+              </div>
+              <span class="chip active" style="font-size:10px; padding:4px 10px;">In Progress</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span>Budget: KES 2,500</span>
+              <span>Today, 2:30 PM</span>
+            </div>
+          </div>
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; font-size:18px;">⚡</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Broken Socket Replacement</div>
+                  <div class="text-xs text-2">Electrical · Kilimani</div>
+                </div>
+              </div>
+              <span class="chip" style="font-size:10px; padding:4px 10px; background:rgba(39,163,95,0.15); color:var(--success); border-color:rgba(39,163,95,0.3);">Completed</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span>Budget: KES 1,200</span>
+              <span>Yesterday</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card glass-teal card-tap" data-nav="wallet" style="display:flex; align-items:center; gap:14px;">
+          <div style="background:linear-gradient(135deg,#1E9E8A,#0E6B5C); width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#fff;">
+            <div style="width:24px;">${I.gift}</div>
+          </div>
+          <div class="col flex-1">
+            <div class="text-sm font-bold" style="color:var(--accent-dark);">Refer & Earn KES 500</div>
+            <div class="text-xs text-2">Share your code JOHN2024</div>
+          </div>
+          <div style="width:22px; color:var(--accent);">${I.chevronRight}</div>
+        </div>
+      </div>
+      ${tabBar('home', false)}`,
+  },
+
+  createJob: {
+    title: 'Create Job',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad">
+        ${navBar('Create New Job')}
+        <div class="col gap-16">
+          <div>
+            <label class="g-label">Select Category</label>
+            <div class="svc-grid">
+              <div class="svc-card glass-primary" style="border:2px solid var(--primary);"><span class="emoji">🔧</span><span class="lbl" style="color:var(--primary-dark);">Plumbing</span></div>
+              <div class="svc-card glass"><span class="emoji">⚡</span><span class="lbl">Electrical</span></div>
+              <div class="svc-card glass"><span class="emoji">🏠</span><span class="lbl">Carpentry</span></div>
+              <div class="svc-card glass"><span class="emoji">🎨</span><span class="lbl">Painting</span></div>
+              <div class="svc-card glass"><span class="emoji">🧹</span><span class="lbl">Cleaning</span></div>
+              <div class="svc-card glass"><span class="emoji">❄️</span><span class="lbl">AC Repair</span></div>
+            </div>
+          </div>
+          <div>
+            <label class="g-label">Description</label>
+            <textarea class="g-input" rows="3" style="resize:none; font-family:inherit;">Kitchen sink is leaking under the cabinet, water pooling on floor. Need urgent fix.</textarea>
+          </div>
+          <div>
+            <label class="g-label">Budget (KES)</label>
+            <input class="g-input" value="2,500" style="font-weight:600; font-size:18px;">
+          </div>
+          <div>
+            <label class="g-label">Urgency</label>
+            <div class="btn-row">
+              <div class="chip glass-teal active" style="flex:1; text-align:center; padding:14px; font-size:14px; border:2px solid var(--accent); color:var(--accent-dark);">
+                <div class="row gap-8" style="justify-content:center;"><div style="width:16px;">${I.clock}</div> Normal</div>
+              </div>
+              <div class="chip glass-error" style="flex:1; text-align:center; padding:14px; font-size:14px; border:2px solid var(--error); color:var(--error);">
+                <div class="row gap-8" style="justify-content:center;"><div style="width:16px;">${I.alert}</div> Emergency</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="g-label">Location</label>
+            <div class="glass card row gap-12">
+              <div style="width:28px; color:var(--primary);">${I.mapPin}</div>
+              <div class="col flex-1">
+                <div class="text-sm font-semibold">Westlands, Nairobi</div>
+                <div class="text-xs text-2">Waiyaki Way, Suite 12</div>
+              </div>
+              <div class="text-xs font-semibold grad-text">Change</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" data-nav="jobTracking" style="font-size:16px; padding:17px;">Post Job</button>
+        </div>
+      </div>`,
+  },
+
+  jobs: {
+    title: 'Jobs',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <h2 class="text-xl font-extrabold mb-16">My Jobs</h2>
+        <div class="chip-row mb-16">
+          <div class="chip active">All</div>
+          <div class="chip">Active</div>
+          <div class="chip">Completed</div>
+          <div class="chip">Cancelled</div>
+        </div>
+        <div class="col gap-12">
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">🔧</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Leaking Kitchen Sink</div>
+                  <div class="text-xs text-2">Plumbing · Westlands</div>
+                </div>
+              </div>
+              <span class="chip active" style="font-size:10px; padding:4px 10px;">In Progress</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span class="font-semibold" style="color:var(--text);">KES 2,500</span>
+              <span>Today, 2:30 PM</span>
+            </div>
+          </div>
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">⚡</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Socket Replacement</div>
+                  <div class="text-xs text-2">Electrical · Kilimani</div>
+                </div>
+              </div>
+              <span class="chip" style="font-size:10px; padding:4px 10px; background:rgba(39,163,95,0.15); color:var(--success); border-color:rgba(39,163,95,0.3);">Completed</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span class="font-semibold" style="color:var(--text);">KES 1,200</span>
+              <span>Yesterday</span>
+            </div>
+          </div>
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">🎨</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Wall Painting</div>
+                  <div class="text-xs text-2">Painting · Lavington</div>
+                </div>
+              </div>
+              <span class="chip" style="font-size:10px; padding:4px 10px; background:rgba(39,163,95,0.15); color:var(--success); border-color:rgba(39,163,95,0.3);">Completed</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span class="font-semibold" style="color:var(--text);">KES 8,000</span>
+              <span>3 days ago</span>
+            </div>
+          </div>
+          <div class="glass card card-tap" data-nav="jobTracking">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(239,68,68,0.12); display:flex; align-items:center; justify-content:center; font-size:20px;">🧹</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Deep House Cleaning</div>
+                  <div class="text-xs text-2">Cleaning · Karen</div>
+                </div>
+              </div>
+              <span class="chip" style="font-size:10px; padding:4px 10px; background:rgba(239,68,68,0.12); color:var(--error); border-color:rgba(239,68,68,0.25);">Cancelled</span>
+            </div>
+            <div class="row-between text-xs text-2">
+              <span class="font-semibold" style="color:var(--text);">KES 3,500</span>
+              <span>Last week</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${tabBar('jobs', false)}`,
+  },
+
+  jobTracking: {
+    title: 'Job Tracking',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad">
+        ${navBar('Job Tracking')}
+        <div class="map mb-16">
+          <div class="map-pin orange" style="top:55%; left:25%;"><div class="dot"></div></div>
+          <div class="map-pin teal" style="top:30%; left:65%;"><div class="dot"></div></div>
+          <div class="map-route" style="top:42%; left:25%; width:50%; transform:rotate(-30deg);"></div>
+        </div>
+        <div class="card glass-primary mb-16" style="padding:18px;">
+          <div class="row-between mb-12">
+            <span class="chip active" style="font-size:11px;">● Fundi On The Way</span>
+            <span class="text-xs text-2">ETA 15 min</span>
+          </div>
+          <div class="row gap-12">
+            <div class="avatar avatar-grad-teal" style="width:50px; height:50px; font-size:18px;">J</div>
+            <div class="col flex-1">
+              <div class="text-base font-bold">James Mwangi</div>
+              <div class="row gap-6 text-xs text-2">
+                <span>⭐ 4.8</span><span>·</span><span>147 jobs</span><span>·</span><span>Verified</span>
+              </div>
+            </div>
+            <button class="nav-btn glass-teal" data-nav="chat" style="color:var(--accent-dark);">${I.chat}</button>
+          </div>
+        </div>
+        <div class="section-title">Job Timeline</div>
+        <div class="timeline glass card mb-16">
+          <div class="tl-item done"><div class="tl-dot"></div><div class="tl-title">Job Posted</div><div class="tl-time">2:30 PM · Today</div></div>
+          <div class="tl-item done"><div class="tl-dot"></div><div class="tl-title">Fundi Accepted</div><div class="tl-time">2:35 PM · James Mwangi</div></div>
+          <div class="tl-item active"><div class="tl-dot"></div><div class="tl-title">Fundi On The Way</div><div class="tl-time">2:42 PM · ETA 15 min</div></div>
+          <div class="tl-item"><div class="tl-dot"></div><div class="tl-title" style="color:var(--text-2)">Work In Progress</div><div class="tl-time">Pending</div></div>
+        </div>
+        <div class="section-title">Job Details</div>
+        <div class="glass card mb-16">
+          <div class="row gap-8 mb-8">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">🔧</div>
+            <div class="flex-1">
+              <div class="text-sm font-bold">Leaking Kitchen Sink</div>
+              <div class="text-xs text-2">Plumbing</div>
+            </div>
+            <div class="text-base font-extrabold grad-text">KES 2,500</div>
+          </div>
+          <div class="text-xs text-2 mb-8">Kitchen sink leaking under cabinet, water pooling on floor.</div>
+          <div class="row gap-8 text-xs text-2">
+            <div style="width:14px;">${I.mapPin}</div>
+            <span>Westlands, Nairobi · Waiyaki Way</span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-outline-teal" data-nav="chat">${I.chat} Chat</button>
+          <button class="btn btn-outline-red">Cancel</button>
+        </div>
+      </div>`,
+  },
+
+  chat: {
+    title: 'Chat',
+    hasTabBar: false,
+    render: () => `
+      <div style="display:flex; flex-direction:column; height:100%;">
+        <div class="nav-bar" style="padding:8px 16px 12px;">
+          <button class="nav-btn glass" data-back>${I.arrowLeft}</button>
+          <div class="row gap-10" style="flex:1; justify-content:center;">
+            <div class="avatar avatar-grad-teal" style="width:36px; height:36px; font-size:13px;">J</div>
+            <div class="col">
+              <div class="text-sm font-bold">James Mwangi</div>
+              <div class="text-xs" style="color:var(--success);">● Online</div>
+            </div>
+          </div>
+          <button class="nav-btn glass">${I.phone}</button>
+        </div>
+        <div class="chat-list flex-1" style="flex:1; overflow-y:auto;">
+          <div class="chat-msg other">Hi, I'm on my way. ETA 15 min.</div>
+          <div class="chat-msg other">I'll bring the replacement parts with me.</div>
+          <div class="chat-msg me">Great! The leak is under the kitchen sink.</div>
+          <div class="chat-msg me">I'll be home, just ring the bell.</div>
+          <div class="chat-msg other">Almost there! 🚗</div>
+          <div class="chat-msg other">Please have the area cleared so I can access the pipes easily.</div>
+          <div class="chat-msg me">Done! See you soon.</div>
+        </div>
+        <div class="glass row gap-10" style="margin:0 16px 24px; padding:8px 8px 8px 16px; border-radius:var(--r-pill);">
+          <input class="g-input" placeholder="Type a message..." style="flex:1; border:none; background:transparent; padding:8px 0; font-size:14px;">
+          <button class="btn btn-primary" style="width:42px; height:42px; padding:0; border-radius:50%; flex:none;">${I.send}</button>
+        </div>
+      </div>`,
+  },
+
+  review: {
+    title: 'Review',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad" style="padding-top:40px;">
+        ${navBar('Leave a Review')}
+        <div style="text-align:center; margin-bottom:24px;">
+          <div class="avatar avatar-grad-teal" style="width:72px; height:72px; font-size:28px; margin:0 auto 12px;">J</div>
+          <h2 class="text-xl font-extrabold">How was James?</h2>
+          <p class="text-sm text-2 mt-4">Plumbing · Leaking Kitchen Sink</p>
+        </div>
+        <div class="glass card col gap-16">
+          <div style="text-align:center;">
+            <label class="g-label" style="text-align:center;">Tap to rate</label>
+            <div class="stars" style="justify-content:center;">
+              <span style="color:var(--warning);">${I.star}</span>
+              <span style="color:var(--warning);">${I.star}</span>
+              <span style="color:var(--warning);">${I.star}</span>
+              <span style="color:var(--warning);">${I.star}</span>
+              <span style="color:rgba(0,0,0,0.15);">${I.starOutline}</span>
+            </div>
+            <div class="text-sm font-semibold mt-8">4.0 · Good Service</div>
+          </div>
+          <div>
+            <label class="g-label">Comment</label>
+            <textarea class="g-input" rows="4" placeholder="Share your experience..." style="resize:none; font-family:inherit;">James was professional and arrived on time. Fixed the leak quickly and cleaned up after. Would recommend!</textarea>
+          </div>
+          <button class="btn btn-primary" data-nav="home">Submit Review</button>
+        </div>
+      </div>`,
+  },
+
+  wallet: {
+    title: 'Wallet',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <h2 class="text-xl font-extrabold mb-16">Wallet</h2>
+        <div class="card glass-teal mb-16 card-tap" style="padding:18px;">
+          <div class="row-between mb-8">
+            <div class="text-xs font-semibold" style="color:var(--accent-dark); text-transform:uppercase; letter-spacing:0.05em;">Your Referral Code</div>
+            <div style="width:18px; color:var(--accent);">${I.share}</div>
+          </div>
+          <div class="text-2xl font-extrabold" style="color:var(--accent-dark); letter-spacing:0.05em;">JOHN2024</div>
+          <div class="text-xs text-2 mt-4">Share & earn KES 500 per referral</div>
+        </div>
+        <div class="card mb-16" style="background:linear-gradient(135deg, #1E9E8A 0%, #0E6B5C 100%); border:none; color:#fff; padding:20px;">
+          <div class="row gap-10 mb-8">
+            <div style="background:rgba(255,255,255,0.2); width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff;">
+              <div style="width:22px;">${I.gift}</div>
+            </div>
+            <div>
+              <div class="text-xs" style="color:rgba(255,255,255,0.8); text-transform:uppercase; letter-spacing:0.05em;">Loyalty Tier</div>
+              <div class="text-lg font-extrabold" style="color:#fff;">Gold Tier</div>
+            </div>
+          </div>
+          <div class="text-3xl font-extrabold" style="color:#fff;">1,250 <span class="text-base font-semibold" style="opacity:0.85;">pts</span></div>
+          <div class="text-xs mt-4" style="color:rgba(255,255,255,0.8);">250 pts to Platinum 🏆</div>
+          <div style="height:6px; background:rgba(255,255,255,0.2); border-radius:3px; margin-top:8px; overflow:hidden;">
+            <div style="width:75%; height:100%; background:#fff; border-radius:3px;"></div>
+          </div>
+        </div>
+        <div class="section-title">Payment History</div>
+        <div class="col gap-10">
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(39,163,95,0.15); display:flex; align-items:center; justify-content:center; color:var(--success); font-size:18px;">↓</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Job Payment Received</div>
+              <div class="text-xs text-2">Socket Replacement · Yesterday</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--success);">+KES 1,200</div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:18px;">↑</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Job Payment Sent</div>
+              <div class="text-xs text-2">Wall Painting · 3 days ago</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--primary);">-KES 8,000</div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:18px;">🎁</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Referral Bonus</div>
+              <div class="text-xs text-2">Friend joined · Last week</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--success);">+KES 500</div>
+          </div>
+        </div>
+      </div>
+      ${tabBar('wallet', false)}`,
+  },
+
+  profile: {
+    title: 'Profile',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <div class="glass card mb-16" style="text-align:center; padding:24px 20px;">
+          <div class="avatar avatar-grad-orange" style="width:80px; height:80px; font-size:32px; margin:0 auto 12px; box-shadow:0 10px 24px rgba(249,115,22,0.3);">J</div>
+          <h2 class="text-xl font-extrabold">John Doe</h2>
+          <div class="text-xs text-2 mt-4">john@example.com · +254 712 345 678</div>
+          <div class="card glass-success mt-12" style="padding:12px; display:inline-flex; align-items:center; gap:10px;">
+            <div style="width:20px; color:var(--success);">${I.shieldCheck}</div>
+            <div class="text-left">
+              <div class="text-xs text-2 font-semibold" style="text-transform:uppercase; letter-spacing:0.04em;">Trust Score</div>
+              <div class="text-lg font-extrabold" style="color:var(--success);">100 / 100</div>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-8">
+          <div class="glass card card-tap row-between" data-nav="settings">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary);"><div style="width:18px;">${I.edit}</div></div><span class="text-sm font-semibold">Edit Profile</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent);"><div style="width:18px;">${I.mapPin}</div></div><span class="text-sm font-semibold">Saved Places</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between" data-nav="jobs">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; color:var(--warning);"><div style="width:18px;">${I.briefcase}</div></div><span class="text-sm font-semibold">Job History</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(239,68,68,0.12); display:flex; align-items:center; justify-content:center; color:var(--error);"><div style="width:18px;">${I.alert}</div></div><span class="text-sm font-semibold">Disputes</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between" data-nav="notifications">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary);"><div style="width:18px;">${I.bell}</div></div><span class="text-sm font-semibold">Notifications</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent);"><div style="width:18px;">${I.help}</div></div><span class="text-sm font-semibold">Support</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between" data-nav="settings">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(15,23,42,0.08); display:flex; align-items:center; justify-content:center; color:var(--text);"><div style="width:18px;">${I.settings}</div></div><span class="text-sm font-semibold">Settings</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+        </div>
+        <button class="btn btn-outline-red mt-16">${I.logout} Sign Out</button>
+      </div>
+      ${tabBar('profile', false)}`,
+  },
+
+  notifications: {
+    title: 'Notifications',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad">
+        ${navBar('Notifications', { right: '<span class="text-xs font-semibold grad-text" style="cursor:pointer;">Mark all read</span>' })}
+        <div class="col gap-10">
+          <div class="glass card row gap-12" style="position:relative;">
+            <span style="position:absolute; top:14px; right:14px; width:8px; height:8px; background:var(--primary); border-radius:50%;"></span>
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary); flex-shrink:0;"><div style="width:20px;">${I.briefcase}</div></div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Fundi On The Way 🚗</div>
+              <div class="text-xs text-2 mt-4">James Mwangi is heading to your location. ETA 15 minutes.</div>
+              <div class="text-xs text-2 mt-4" style="opacity:0.7;">2 min ago</div>
+            </div>
+          </div>
+          <div class="glass card row gap-12" style="position:relative;">
+            <span style="position:absolute; top:14px; right:14px; width:8px; height:8px; background:var(--primary); border-radius:50%;"></span>
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent); flex-shrink:0;"><div style="width:20px;">${I.gift}</div></div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Referral Bonus Earned! 🎉</div>
+              <div class="text-xs text-2 mt-4">You earned KES 500 — your friend just signed up.</div>
+              <div class="text-xs text-2 mt-4" style="opacity:0.7;">1 hour ago</div>
+            </div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(39,163,95,0.15); display:flex; align-items:center; justify-content:center; color:var(--success); flex-shrink:0;"><div style="width:20px;">${I.check}</div></div>
+            <div class="col flex-1">
+              <div class="text-sm font-semibold">Job Completed ✅</div>
+              <div class="text-xs text-2 mt-4">Socket Replacement is done. Leave a review!</div>
+              <div class="text-xs text-2 mt-4" style="opacity:0.7;">Yesterday</div>
+            </div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:42px; height:42px; border-radius:12px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; color:var(--warning); flex-shrink:0;"><div style="width:20px;">${I.star}</div></div>
+            <div class="col flex-1">
+              <div class="text-sm font-semibold">Loyalty Upgrade — Gold! 🏆</div>
+              <div class="text-xs text-2 mt-4">You reached Gold Tier. Enjoy exclusive perks.</div>
+              <div class="text-xs text-2 mt-4" style="opacity:0.7;">2 days ago</div>
+            </div>
+          </div>
+        </div>
+      </div>`,
+  },
+
+  settings: {
+    title: 'Settings',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad">
+        ${navBar('Settings')}
+        <div class="section-title">Account</div>
+        <div class="col gap-8 mb-20">
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary);"><div style="width:18px;">${I.user}</div></div><span class="text-sm font-semibold">Edit Profile</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(15,23,42,0.08); display:flex; align-items:center; justify-content:center; color:var(--text);"><div style="width:18px;">${I.lock}</div></div><span class="text-sm font-semibold">Change Password</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+        </div>
+        <div class="section-title">About</div>
+        <div class="col gap-8 mb-20">
+          <div class="glass card row-between">
+            <span class="text-sm font-semibold">App Version</span>
+            <span class="text-sm text-2">1.0.0</span>
+          </div>
+          <div class="glass card row-between">
+            <span class="text-sm font-semibold">Backend URL</span>
+            <span class="text-sm text-2 font-mono">api.patafundi.co.ke</span>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent);"><div style="width:18px;">${I.info}</div></div><span class="text-sm font-semibold">Privacy Policy</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+        </div>
+        <div class="section-title" style="color:var(--error);">Danger Zone</div>
+        <div class="col gap-8">
+          <button class="btn btn-outline-red">Delete Account</button>
+          <button class="btn btn-ghost" style="color:var(--error);">${I.logout} Sign Out</button>
+        </div>
+      </div>`,
+  },
+};
+
+/* ============================================================
+   FUNDI APP SCREENS
+   ============================================================ */
+
+const fundiScreens = {
+  fundiLogin: {
+    title: 'Fundi Login',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad" style="padding-top:60px; min-height:100%; display:flex; flex-direction:column; justify-content:center;">
+        <div style="text-align:center; margin-bottom:32px;">
+          <div class="avatar avatar-grad-teal" style="width:72px; height:72px; font-size:30px; margin:0 auto 16px; box-shadow:0 12px 30px rgba(30,158,138,0.4);">F</div>
+          <h1 class="text-3xl font-extrabold grad-text-teal">PataFundi Fundi</h1>
+          <p class="text-sm text-2 mt-4">For verified service professionals</p>
+        </div>
+        <div class="glass card col gap-14">
+          <div>
+            <label class="g-label">Email</label>
+            <input class="g-input" type="email" value="james@fundi.co.ke">
+          </div>
+          <div>
+            <label class="g-label">Password</label>
+            <input class="g-input" type="password" value="password">
+          </div>
+          <button class="btn btn-teal" data-nav="dashboard">Sign In</button>
+          <div class="text-center text-sm text-2">
+            Want to join? <span class="grad-text-teal font-semibold" style="cursor:pointer;">Apply as Fundi</span>
+          </div>
+        </div>
+      </div>`,
+  },
+
+  dashboard: {
+    title: 'Dashboard',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <div class="row-between mb-16">
+          <div class="row gap-12">
+            <div class="avatar avatar-grad-teal" style="width:44px; height:44px; font-size:16px;">J</div>
+            <div class="col">
+              <div class="text-xs text-2 font-semibold" style="text-transform:uppercase; letter-spacing:0.04em;">Welcome</div>
+              <div class="text-lg font-bold">James Mwangi</div>
+            </div>
+          </div>
+          <div class="glass card" style="padding:6px 12px; display:flex; align-items:center; gap:8px;">
+            <span style="width:8px; height:8px; background:var(--success); border-radius:50%; box-shadow:0 0 8px var(--success);"></span>
+            <span class="text-xs font-bold" style="color:var(--success);">ONLINE</span>
+          </div>
+        </div>
+
+        <div class="card card-tap mb-16" data-nav="jobDetail" style="background:linear-gradient(135deg, rgba(30,158,138,0.9), rgba(14,107,92,0.95)); border:none; color:#fff; padding:18px;">
+          <div class="row-between mb-8">
+            <span class="text-xs font-bold" style="background:rgba(255,255,255,0.2); padding:4px 10px; border-radius:var(--r-pill); color:#fff;">● ACTIVE JOB</span>
+            <span class="text-xs" style="color:rgba(255,255,255,0.85);">2:42 PM</span>
+          </div>
+          <div class="text-lg font-bold" style="color:#fff;">Leaking Kitchen Sink</div>
+          <div class="text-sm mt-4" style="color:rgba(255,255,255,0.85);">Plumbing · Westlands</div>
+          <div class="row-between mt-12" style="align-items:center;">
+            <div class="text-2xl font-extrabold" style="color:#fff;">KES 2,500</div>
+            <div class="row gap-6" style="background:rgba(255,255,255,0.25); padding:8px 16px; border-radius:var(--r-pill); color:#fff; font-size:13px; font-weight:600;">
+              Go to Job ${I.chevronRight}
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">Today's Earnings</div>
+        <div class="row gap-8 mb-20">
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-xs text-2 font-semibold">TODAY</div>
+            <div class="text-lg font-extrabold grad-text mt-4">3,500</div>
+            <div class="text-xs text-2 mt-4">KES</div>
+          </div>
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-xs text-2 font-semibold">WEEK</div>
+            <div class="text-lg font-extrabold grad-text mt-4">18,000</div>
+            <div class="text-xs text-2 mt-4">KES</div>
+          </div>
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-xs text-2 font-semibold">MONTH</div>
+            <div class="text-lg font-extrabold grad-text mt-4">72,000</div>
+            <div class="text-xs text-2 mt-4">KES</div>
+          </div>
+        </div>
+
+        <div class="section-title">Performance</div>
+        <div class="row gap-8 mb-20">
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-lg font-extrabold" style="color:var(--success);">147</div>
+            <div class="text-xs text-2 mt-4">Completed</div>
+          </div>
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-lg font-extrabold" style="color:var(--warning);">4.8★</div>
+            <div class="text-xs text-2 mt-4">Rating</div>
+          </div>
+          <div class="glass card flex-1" style="text-align:center; padding:14px 8px;">
+            <div class="text-lg font-extrabold" style="color:var(--primary);">1</div>
+            <div class="text-xs text-2 mt-4">Active</div>
+          </div>
+        </div>
+
+        <div class="section-title">Quick Actions</div>
+        <div class="row gap-8">
+          <button class="btn btn-ghost flex-1" data-tab="fundiWallet" style="flex-direction:column; padding:14px; font-size:11px; gap:6px;">
+            <div style="width:22px;">${I.wallet}</div> Wallet
+          </button>
+          <button class="btn btn-ghost flex-1" data-tab="fundiJobs" style="flex-direction:column; padding:14px; font-size:11px; gap:6px;">
+            <div style="width:22px;">${I.briefcase}</div> Jobs
+          </button>
+          <button class="btn btn-ghost flex-1" data-tab="fundiProfile" style="flex-direction:column; padding:14px; font-size:11px; gap:6px;">
+            <div style="width:22px;">${I.user}</div> Profile
+          </button>
+        </div>
+      </div>
+      ${tabBar('dashboard', true)}`,
+  },
+
+  fundiJobs: {
+    title: 'Jobs',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <h2 class="text-xl font-extrabold mb-16">Jobs</h2>
+        <div class="segment">
+          <button class="active">Available (3)</button>
+          <button>My Jobs (1)</button>
+        </div>
+        <div class="col gap-12">
+          <div class="glass card">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">🔧</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Burst Pipe Repair</div>
+                  <div class="text-xs text-2">Plumbing · Parklands · 2.3 km</div>
+                </div>
+              </div>
+              <div class="text-base font-extrabold grad-text">KES 4,000</div>
+            </div>
+            <div class="row gap-8 text-xs text-2 mb-12">
+              <span>🚨 Emergency</span><span>·</span><span>Posted 5 min ago</span>
+            </div>
+            <button class="btn btn-success" data-nav="jobDetail">Accept Job</button>
+          </div>
+          <div class="glass card">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">⚡</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Install Ceiling Lights</div>
+                  <div class="text-xs text-2">Electrical · Westlands · 1.1 km</div>
+                </div>
+              </div>
+              <div class="text-base font-extrabold grad-text">KES 1,800</div>
+            </div>
+            <div class="row gap-8 text-xs text-2 mb-12">
+              <span>📅 Scheduled</span><span>·</span><span>Tomorrow 10 AM</span>
+            </div>
+            <button class="btn btn-success" data-nav="jobDetail">Accept Job</button>
+          </div>
+          <div class="glass card">
+            <div class="row-between mb-8">
+              <div class="row gap-8">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">🧹</div>
+                <div class="col">
+                  <div class="text-sm font-bold">Office Deep Clean</div>
+                  <div class="text-xs text-2">Cleaning · CBD · 3.8 km</div>
+                </div>
+              </div>
+              <div class="text-base font-extrabold grad-text">KES 6,500</div>
+            </div>
+            <div class="row gap-8 text-xs text-2 mb-12">
+              <span>⏱ Normal</span><span>·</span><span>Posted 22 min ago</span>
+            </div>
+            <button class="btn btn-success" data-nav="jobDetail">Accept Job</button>
+          </div>
+        </div>
+      </div>
+      ${tabBar('fundiJobs', true)}`,
+  },
+
+  jobDetail: {
+    title: 'Job Detail',
+    hasTabBar: false,
+    render: () => `
+      <div class="scr-pad">
+        ${navBar('Job Detail')}
+        <div class="map mb-16">
+          <div class="map-pin orange" style="top:55%; left:25%;"><div class="dot"></div></div>
+          <div class="map-pin teal" style="top:30%; left:65%;"><div class="dot"></div></div>
+          <div class="map-route" style="top:42%; left:25%; width:50%; transform:rotate(-30deg);"></div>
+        </div>
+        <div class="glass card mb-16">
+          <div class="row gap-8 mb-12">
+            <div style="width:44px; height:44px; border-radius:12px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; font-size:22px;">🔧</div>
+            <div class="flex-1">
+              <div class="text-sm font-bold">Leaking Kitchen Sink</div>
+              <div class="text-xs text-2">Plumbing · Westlands</div>
+            </div>
+            <div class="text-xl font-extrabold grad-text">KES 2,500</div>
+          </div>
+          <div class="text-sm text-2 mb-12">Kitchen sink leaking under cabinet, water pooling on floor. Need urgent fix.</div>
+          <div class="col gap-8">
+            <div class="row gap-10 text-xs">
+              <div style="width:16px; color:var(--text-2);">${I.user}</div>
+              <span class="text-2">Customer:</span><span class="font-semibold">John Doe</span>
+            </div>
+            <div class="row gap-10 text-xs">
+              <div style="width:16px; color:var(--text-2);">${I.mapPin}</div>
+              <span class="text-2">Waiyaki Way, Westlands · 1.4 km away</span>
+            </div>
+            <div class="row gap-10 text-xs">
+              <div style="width:16px; color:var(--text-2);">${I.clock}</div>
+              <span class="text-2">Started 2:42 PM · 18 min elapsed</span>
+            </div>
+          </div>
+        </div>
+        <div class="col gap-10">
+          <button class="btn btn-teal">${I.navigate} Navigate</button>
+          <button class="btn btn-primary">Check In</button>
+          <div class="btn-row">
+            <button class="btn btn-outline-teal" data-nav="chat" style="display:flex;">${I.chat} Chat</button>
+            <button class="btn btn-outline-red" style="display:flex;">${I.alert} SOS</button>
+          </div>
+        </div>
+      </div>`,
+  },
+
+  fundiWallet: {
+    title: 'Wallet',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <h2 class="text-xl font-extrabold mb-16">Wallet</h2>
+        <div class="card mb-16" style="background:linear-gradient(135deg, #F97316 0%, #C2410C 100%); border:none; color:#fff; padding:22px;">
+          <div class="row-between mb-8">
+            <div class="text-xs" style="color:rgba(255,255,255,0.85); text-transform:uppercase; letter-spacing:0.05em;">Available Balance</div>
+            <div style="width:22px; color:rgba(255,255,255,0.9);">${I.wallet}</div>
+          </div>
+          <div class="text-3xl font-extrabold" style="color:#fff;">KES 45,000</div>
+          <div class="text-sm mt-8" style="color:rgba(255,255,255,0.85);">Pending: KES 3,500</div>
+          <button class="btn mt-16" style="background:#fff; color:var(--accent-dark); font-weight:700;">Withdraw to M-Pesa</button>
+        </div>
+        <div class="section-title">This Week's Earnings</div>
+        <div class="glass card mb-16">
+          <div class="row-between mb-8">
+            <div class="text-lg font-extrabold grad-text">KES 18,000</div>
+            <div class="row gap-4 text-xs font-semibold" style="color:var(--success);">
+              <div style="width:14px;">${I.trending}</div> +12%
+            </div>
+          </div>
+          <div class="bars">
+            <div class="bar" style="height:55%;"></div>
+            <div class="bar" style="height:75%;"></div>
+            <div class="bar" style="height:40%;"></div>
+            <div class="bar" style="height:90%;"></div>
+            <div class="bar" style="height:65%;"></div>
+            <div class="bar" style="height:85%;"></div>
+            <div class="bar" style="height:70%;"></div>
+          </div>
+          <div class="row gap-8 text-xs text-2 mt-8" style="justify-content:space-between;">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
+        </div>
+        <div class="section-title">Recent Transactions</div>
+        <div class="col gap-10">
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(39,163,95,0.15); display:flex; align-items:center; justify-content:center; color:var(--success); font-size:18px;">↓</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Job Payout</div>
+              <div class="text-xs text-2">Burst Pipe Repair · Today</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--success);">+KES 4,000</div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:18px;">↑</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Withdrawal to M-Pesa</div>
+              <div class="text-xs text-2">Yesterday</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--accent);">-KES 10,000</div>
+          </div>
+          <div class="glass card row gap-12">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(39,163,95,0.15); display:flex; align-items:center; justify-content:center; color:var(--success); font-size:18px;">↓</div>
+            <div class="col flex-1">
+              <div class="text-sm font-bold">Job Payout</div>
+              <div class="text-xs text-2">Ceiling Lights · 2 days ago</div>
+            </div>
+            <div class="text-sm font-extrabold" style="color:var(--success);">+KES 1,800</div>
+          </div>
+        </div>
+      </div>
+      ${tabBar('fundiWallet', true)}`,
+  },
+
+  fundiProfile: {
+    title: 'Profile',
+    hasTabBar: true,
+    render: () => `
+      <div class="scr-pad" style="padding-top:8px;">
+        <div class="glass card mb-16" style="text-align:center; padding:24px 20px;">
+          <div style="position:relative; display:inline-block; margin-bottom:12px;">
+            <div class="avatar avatar-grad-teal" style="width:80px; height:80px; font-size:32px; box-shadow:0 10px 24px rgba(30,158,138,0.3);">J</div>
+            <div style="position:absolute; bottom:0; right:0; background:var(--success); width:26px; height:26px; border-radius:50%; border:3px solid #fff; display:flex; align-items:center; justify-content:center; color:#fff;">
+              <div style="width:14px;">${I.shieldCheck}</div>
+            </div>
+          </div>
+          <h2 class="text-xl font-extrabold">James Mwangi</h2>
+          <div class="text-xs text-2 mt-4">Verified Plumber · Nairobi</div>
+          <div class="row gap-8 mt-12" style="justify-content:center;">
+            <div class="glass-warn card" style="padding:8px 14px; display:flex; align-items:center; gap:6px;">
+              <div style="width:14px; color:var(--warning);">${I.star}</div>
+              <span class="text-sm font-bold">4.8</span>
+            </div>
+            <div class="glass card" style="padding:8px 14px;"><span class="text-sm font-bold">147 jobs</span></div>
+            <div class="glass-success card" style="padding:8px 14px;"><span class="text-sm font-bold" style="color:var(--success);">92% accept</span></div>
+          </div>
+        </div>
+        <div class="col gap-8">
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(249,115,22,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary);"><div style="width:18px;">${I.edit}</div></div><span class="text-sm font-semibold">Edit Profile</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent);"><div style="width:18px;">${I.image}</div></div><span class="text-sm font-semibold">Portfolio</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; color:var(--warning);"><div style="width:18px;">${I.clock}</div></div><span class="text-sm font-semibold">Availability</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(251,191,36,0.15); display:flex; align-items:center; justify-content:center; color:var(--warning);"><div style="width:18px;">${I.star}</div></div><span class="text-sm font-semibold">Reviews</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between" data-tab="fundiWallet">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(39,163,95,0.15); display:flex; align-items:center; justify-content:center; color:var(--success);"><div style="width:18px;">${I.trending}</div></div><span class="text-sm font-semibold">Earnings</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(30,158,138,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent);"><div style="width:18px;">${I.shieldCheck}</div></div><span class="text-sm font-semibold">Verification</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+          <div class="glass card card-tap row-between">
+            <div class="row gap-12"><div style="width:36px; height:36px; border-radius:10px; background:rgba(15,23,42,0.08); display:flex; align-items:center; justify-content:center; color:var(--text);"><div style="width:18px;">${I.settings}</div></div><span class="text-sm font-semibold">Settings</span></div>
+            <div style="width:18px; color:var(--text-2);">${I.chevronRight}</div>
+          </div>
+        </div>
+        <button class="btn btn-outline-red mt-16">${I.logout} Sign Out</button>
+      </div>
+      ${tabBar('fundiProfile', true)}`,
+  },
+};
+
+/* ============================================================
+   STATE + NAVIGATION
+   ============================================================ */
+
+const allScreens = { customer: customerScreens, fundi: fundiScreens };
+
+const screenMenu = {
+  customer: [
+    { group: 'Auth', items: ['login', 'register', 'otp'] },
+    { group: 'Main', items: ['home', 'createJob', 'jobs', 'jobTracking', 'chat', 'review'] },
+    { group: 'Account', items: ['wallet', 'profile', 'notifications', 'settings'] },
+  ],
+  fundi: [
+    { group: 'Auth', items: ['fundiLogin'] },
+    { group: 'Main', items: ['dashboard', 'fundiJobs', 'jobDetail', 'fundiWallet', 'fundiProfile'] },
+  ],
+};
+
+const state = {
+  app: 'customer',
+  screen: 'login',
+  history: [],
+};
+
+function navigate(target, opts = {}) {
+  const dir = opts.direction || 'forward';
+  if (target === state.screen) return;
+  if (dir === 'forward') {
+    state.history.push(state.screen);
+  }
+  state.screen = target;
+  render(dir);
+}
+
+function back() {
+  const prev = state.history.pop();
+  if (prev) {
+    state.screen = prev;
+    render('back');
+  }
+}
+
+function switchApp(app) {
+  state.app = app;
+  state.screen = app === 'customer' ? 'login' : 'fundiLogin';
+  state.history = [];
+  render('tab');
+  renderScreenList();
+}
+
+function render(direction) {
+  const screens = allScreens[state.app];
+  const def = screens[state.screen];
+  if (!def) return;
+
+  const content = document.getElementById('screenContent');
+  const animClass = direction === 'back' ? 'back' : direction === 'tab' ? 'tab' : '';
+  content.innerHTML = `<div class="screen ${animClass}">${def.render()}</div>`;
+  document.getElementById('screenName').textContent = def.title;
+  content.scrollTop = 0;
+  renderScreenList();
+
+  // Update app toggle
+  document.querySelectorAll('#appToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.app === state.app);
+  });
+}
+
+function renderScreenList() {
+  const list = document.getElementById('screenList');
+  const menu = screenMenu[state.app];
+  let html = '';
+  menu.forEach((g, gi) => {
+    html += `<div class="group"><h3>${g.group}</h3>`;
+    g.items.forEach((s, i) => {
+      const def = allScreens[state.app][s];
+      const num = menu.slice(0, gi).reduce((acc, gg) => acc + gg.items.length, 0) + i + 1;
+      const active = s === state.screen ? 'active' : '';
+      html += `<button class="${active}" data-jump="${s}"><span class="num">${num}</span>${def.title}</button>`;
+    });
+    html += `</div>`;
+  });
+  list.innerHTML = html;
+}
+
+/* ---------- Event delegation ---------- */
+document.addEventListener('click', (e) => {
+  // App toggle
+  const appBtn = e.target.closest('[data-app]');
+  if (appBtn) {
+    switchApp(appBtn.dataset.app);
+    return;
+  }
+  // Jump from sidebar
+  const jump = e.target.closest('[data-jump]');
+  if (jump) {
+    state.history = [];
+    state.screen = jump.dataset.jump;
+    render('tab');
+    return;
+  }
+  // Back button
+  if (e.target.closest('[data-back]')) {
+    back();
+    return;
+  }
+  // Tab bar nav (root-level, clears history)
+  const tab = e.target.closest('[data-tab]');
+  if (tab) {
+    state.history = [];
+    state.screen = tab.dataset.tab;
+    render('tab');
+    return;
+  }
+  // Forward nav
+  const nav = e.target.closest('[data-nav]');
+  if (nav) {
+    navigate(nav.dataset.nav, { direction: 'forward' });
+    return;
+  }
+});
+
+/* ---------- OTP input behavior ---------- */
+document.addEventListener('input', (e) => {
+  if (e.target.classList.contains('otp-box')) {
+    if (e.target.value) {
+      e.target.classList.add('filled');
+      const next = e.target.nextElementSibling;
+      if (next && next.classList.contains('otp-box')) next.focus();
+    } else {
+      e.target.classList.remove('filled');
+    }
+  }
+});
+
+/* ---------- Init ---------- */
+render('tab');
+</script>
+</body>
+</html>

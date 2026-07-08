@@ -193,3 +193,30 @@ export async function service(req, res) {
   };
   res.json({ success: true, service: services[req.params.slug] || null, fundis: [] });
 }
+
+export async function careerApply(req, res) {
+  const { jobId = null, fullName = '', email = '', phone = '', coverLetter = '', resumeUrl = '', linkedinUrl = '', portfolioUrl = '' } = req.body || {};
+  if (!fullName.trim() || !email.trim()) {
+    return res.status(400).json({ success: false, message: 'Full name and email are required' });
+  }
+  const result = await query(
+    `insert into career_applications (job_id, full_name, email, phone, cover_letter, resume_url, linkedin_url, portfolio_url)
+     values ($1, $2, $3, $4, $5, $6, $7, $8) returning id, status, applied_at`,
+    [jobId, fullName.trim(), email.trim().toLowerCase(), phone.trim() || null, coverLetter.trim() || null, resumeUrl.trim() || null, linkedinUrl.trim() || null, portfolioUrl.trim() || null],
+  );
+  res.status(201).json({ success: true, application: result.rows[0] });
+}
+
+export async function listCareerApplications(req, res) {
+  const status = req.query.status || 'pending';
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const result = await query(
+    `select ca.*, cj.title as job_title, cj.department
+     from career_applications ca
+     left join career_jobs cj on cj.id = ca.job_id
+     where ca.status = $1
+     order by ca.applied_at desc limit $2`,
+    [status, limit],
+  );
+  res.json({ success: true, applications: result.rows });
+}

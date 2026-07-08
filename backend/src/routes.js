@@ -457,7 +457,8 @@ router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.frau
 router.get('/blog', asyncHandler(content.genericList('posts')));
 router.get('/blog/:slug', asyncHandler(content.blogPost));
 router.get('/careers/jobs', asyncHandler(content.genericList('jobs')));
-router.post('/careers/apply', (_req, res) => res.status(201).json({ success: true }));
+router.post('/careers/apply', asyncHandler(content.careerApply));
+router.get('/admin/careers/applications', authRequired, requireRole('admin'), asyncHandler(content.listCareerApplications));
 router.get('/help', asyncHandler(content.help));
 router.get('/policies/:slug', asyncHandler(content.policy));
 router.get('/services/:slug', asyncHandler(content.service));
