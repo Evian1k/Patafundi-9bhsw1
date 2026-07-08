@@ -314,64 +314,39 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
         ) : null}
       </View>
 
-      {/* ── Price Quote Section ─────────────────────────────── */}
+      {/* ── Price Quote — Customer sees ONLY total, ETA, duration ── */}
       {priceQuote ? (
         <View style={styles.priceCard}>
           <View style={styles.priceHeader}>
             <Ionicons name="pricetag" size={20} color={colors.primary} />
-            <Text style={styles.priceTitle}>Your Price Quote</Text>
+            <Text style={styles.priceTitle}>Your Price</Text>
           </View>
 
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service cost</Text>
-            <Text style={styles.priceValue}>KES {priceQuote.serviceCost.toLocaleString()}</Text>
-          </View>
-          {priceQuote.travelFee > 0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Travel fee ({priceQuote.distanceKm} km)</Text>
-              <Text style={styles.priceValue}>KES {priceQuote.travelFee.toLocaleString()}</Text>
-            </View>
-          )}
-          {priceQuote.emergencyFee > 0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Emergency fee</Text>
-              <Text style={styles.priceValue}>KES {priceQuote.emergencyFee.toLocaleString()}</Text>
-            </View>
-          )}
-          {priceQuote.surgeMultiplier > 1.0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Surge ({Math.round((priceQuote.surgeMultiplier - 1) * 100)}%)</Text>
-              <Text style={styles.priceValue}>+{Math.round((priceQuote.surgeMultiplier - 1) * 100)}%</Text>
-            </View>
-          )}
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Platform fee</Text>
-            <Text style={styles.priceValue}>KES {priceQuote.platformFee.toLocaleString()}</Text>
-          </View>
+          {/* The only number that matters to the customer */}
+          <Text style={styles.priceHero}>KES {priceQuote.total.toLocaleString()}</Text>
 
-          <View style={styles.priceDivider} />
-
-          <View style={styles.priceTotalRow}>
-            <Text style={styles.priceTotalLabel}>Total</Text>
-            <Text style={styles.priceTotalValue}>KES {priceQuote.total.toLocaleString()}</Text>
-          </View>
-
+          {/* Simple meta — arrival + duration only */}
           <View style={styles.priceMetaRow}>
             <View style={styles.priceMetaItem}>
-              <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.priceMetaText}>~{priceQuote.estimatedDurationMinutes} min</Text>
+              <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+              <View>
+                <Text style={styles.priceMetaLabel}>Arrival</Text>
+                <Text style={styles.priceMetaValue}>{priceQuote.etaMinutes} min</Text>
+              </View>
             </View>
+            <View style={styles.priceMetaDivider} />
             <View style={styles.priceMetaItem}>
-              <Ionicons name="navigate-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.priceMetaText}>ETA {priceQuote.etaMinutes} min</Text>
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
+              <View>
+                <Text style={styles.priceMetaLabel}>Duration</Text>
+                <Text style={styles.priceMetaValue}>~{priceQuote.estimatedDurationMinutes} min</Text>
+              </View>
             </View>
           </View>
 
-          {priceQuote.factors.timeReasons.length > 0 && (
-            <Text style={styles.priceNote}>
-              Includes: {priceQuote.factors.timeReasons.join(', ')} pricing
-            </Text>
-          )}
+          <Text style={styles.priceTrust}>
+            Final price — no hidden fees, no surprises.
+          </Text>
         </View>
       ) : null}
 
@@ -388,8 +363,8 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
               <ActivityIndicator color={colors.textLight} />
             ) : (
               <>
-                <Ionicons name="calculator-outline" size={20} color={colors.textLight} />
-                <Text style={styles.btnText}>Get Price Quote</Text>
+                <Ionicons name="pricetag-outline" size={20} color={colors.textLight} />
+                <Text style={styles.btnText}>See Price</Text>
               </>
             )}
           </LinearGradient>
@@ -414,7 +389,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
               style={styles.btn}
             >
               <Ionicons name="checkmark-circle-outline" size={20} color={colors.textLight} />
-              <Text style={styles.btnText}>Accept Price</Text>
+              <Text style={styles.btnText}>Accept</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -436,7 +411,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
               ) : (
                 <>
                   <Ionicons name="send-outline" size={20} color={colors.textLight} />
-                  <Text style={styles.btnText}>Post Job</Text>
+                  <Text style={styles.btnText}>Book Now</Text>
                 </>
               )}
             </LinearGradient>
@@ -445,8 +420,8 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       )}
 
       <Text style={styles.platformNote}>
-        <Ionicons name="information-circle-outline" size={12} color={colors.textSecondary} />
-        {'  '}Prices are calculated by PataFundi based on service, distance, time, and demand. You never overpay.
+        <Ionicons name="shield-checkmark-outline" size={12} color={colors.textSecondary} />
+        {'  '}Final price includes everything. No hidden fees, no surprises.
       </Text>
     </ScrollView>
   );
@@ -509,22 +484,29 @@ const styles = StyleSheet.create({
   },
   addPhotoText: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.primary, marginTop: 2 },
   priceCard: {
-    backgroundColor: colors.card, borderRadius: borderRadius.xl, padding: spacing.lg,
+    backgroundColor: colors.card, borderRadius: borderRadius.xl, padding: spacing.xl,
     marginTop: spacing.md, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center',
   },
   priceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md },
-  priceTitle: { fontFamily: fonts.display, fontSize: fontSize.md, fontWeight: '700', color: colors.text },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  priceLabel: { fontFamily: fonts.sans, fontSize: fontSize.sm, color: colors.textSecondary },
-  priceValue: { fontFamily: fonts.sans, fontSize: fontSize.sm, fontWeight: '500', color: colors.text },
-  priceDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
-  priceTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  priceTotalLabel: { fontFamily: fonts.display, fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
-  priceTotalValue: { fontFamily: fonts.display, fontSize: fontSize.xxl, fontWeight: '800', color: colors.primary },
-  priceMetaRow: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
-  priceMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  priceMetaText: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary },
-  priceNote: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textTertiary || colors.textSecondary, marginTop: spacing.sm, fontStyle: 'italic' },
+  priceTitle: { fontFamily: fonts.display, fontSize: fontSize.md, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
+  priceHero: {
+    fontFamily: fonts.display, fontSize: 40, fontWeight: '800', color: colors.primary,
+    marginVertical: spacing.sm,
+  },
+  priceMetaRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.md, marginTop: spacing.md, paddingVertical: spacing.md,
+    borderTopWidth: 1, borderTopColor: colors.border, width: '100%',
+  },
+  priceMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  priceMetaDivider: { width: 1, height: 24, backgroundColor: colors.border },
+  priceMetaLabel: { fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary },
+  priceMetaValue: { fontFamily: fonts.sans, fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  priceTrust: {
+    fontFamily: fonts.sans, fontSize: fontSize.xs, color: colors.textSecondary,
+    marginTop: spacing.sm, textAlign: 'center',
+  },
   btn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: borderRadius.md, paddingVertical: 14, marginTop: spacing.xl,

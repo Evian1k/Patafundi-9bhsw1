@@ -95,7 +95,10 @@ export function JobsScreen({ navigation }: any): JSX.Element {
               {item.description}
             </Text>
             {item.estimatedPrice ? (
-              <Text style={styles.jobPrice}>KES {item.estimatedPrice}</Text>
+              <View style={styles.earningsWrap}>
+                <Text style={styles.earningsLabel}>You earn</Text>
+                <Text style={styles.jobPrice}>KES {Math.round(Number(item.estimatedPrice) * 0.85).toLocaleString()}</Text>
+              </View>
             ) : null}
             {!isAvailable ? (
               <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
@@ -270,10 +273,21 @@ const styles = StyleSheet.create({
   },
   jobPrice: {
     fontFamily: fonts.sans,
-    fontSize: fontSize.xs,
-    color: colors.accent,
-    fontWeight: '600',
+    fontSize: fontSize.sm,
+    color: colors.success,
+    fontWeight: '700',
     marginTop: 2,
+  },
+  earningsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  earningsLabel: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
   },
   statusBadge: {
     alignSelf: 'flex-start',

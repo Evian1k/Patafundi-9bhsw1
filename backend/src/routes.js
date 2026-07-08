@@ -717,3 +717,25 @@ router.put('/pricing/config', authRequired, requireRole('admin'), asyncHandler(p
 router.get('/pricing/recommendations', authRequired, requireRole('admin'), asyncHandler(pricing.listRecommendations));
 router.post('/pricing/recommendations/generate', authRequired, requireRole('admin'), asyncHandler(pricing.generateRecommendations));
 router.post('/pricing/recommendations/:id/review', authRequired, requireRole('admin'), asyncHandler(pricing.reviewRecommendation));
+
+// ============================================================
+// Financial Confidentiality System — CEO-only financial intelligence
+// Customers and fundis never see internal financial data.
+// Staff see only what they need. CEO sees everything.
+// ============================================================
+import * as financial from './controllers/financialController.js';
+import { requireFinancialAccess } from './services/financialConfidentialityService.js';
+
+// CEO Financial Dashboard (super_admin only)
+router.get('/financial/dashboard', authRequired, requireRole('admin'), asyncHandler(financial.ceoFinancialDashboard));
+
+// Commission Campaigns (CEO creates, approves, cancels)
+router.get('/financial/campaigns', authRequired, requireRole('admin'), asyncHandler(financial.listCampaigns));
+router.post('/financial/campaigns', authRequired, requireRole('admin'), asyncHandler(financial.createCampaign));
+router.post('/financial/campaigns/:id/approve', authRequired, requireRole('admin'), asyncHandler(financial.approveCampaign));
+router.post('/financial/campaigns/:id/cancel', authRequired, requireRole('admin'), asyncHandler(financial.cancelCampaign));
+
+// Financial Access Grants (CEO grants staff temporary access)
+router.get('/financial/access-grants', authRequired, requireRole('admin'), asyncHandler(financial.listAccessGrants));
+router.post('/financial/access-grants', authRequired, requireRole('admin'), asyncHandler(financial.grantFinancialAccess));
+router.delete('/financial/access-grants/:id', authRequired, requireRole('admin'), asyncHandler(financial.revokeFinancialAccess));
