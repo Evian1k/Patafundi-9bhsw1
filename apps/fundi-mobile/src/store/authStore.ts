@@ -16,6 +16,13 @@ interface AuthState {
 
 const FUNDI_ONLY_ERROR = 'This app is for fundis only. Please use the customer app.';
 
+// A fundi goes through two phases:
+//   1. fundi_pending — just registered, waiting for email verification + admin approval
+//   2. fundi — admin has approved their account
+// Both roles should be accepted in the fundi app. The RootNavigator will
+// route fundi_pending users to PendingApprovalScreen.
+const FUNDI_ROLES = ['fundi', 'fundi_pending'];
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoggedIn: false,
@@ -26,7 +33,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await apiClient.login(email, password);
-      if (data.user && data.user.role !== 'fundi') {
+      if (data.user && !FUNDI_ROLES.includes(data.user.role)) {
         await apiClient.logout();
         set({ loading: false, error: FUNDI_ONLY_ERROR, isLoggedIn: false, user: null });
         return;
@@ -54,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchUser: async () => {
     try {
       const data = await apiClient.getCurrentUser();
-      if (data.user && data.user.role !== 'fundi') {
+      if (data.user && !FUNDI_ROLES.includes(data.user.role)) {
         await apiClient.logout();
         set({ user: null, isLoggedIn: false, error: FUNDI_ONLY_ERROR });
         return;

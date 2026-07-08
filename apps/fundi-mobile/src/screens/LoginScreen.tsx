@@ -14,7 +14,7 @@ import { colors, fonts, fontSize, spacing, borderRadius, gradients } from '@pata
 import { useAuthStore } from '../store/authStore';
 import { Input } from '../components/ui';
 
-export function LoginScreen(): JSX.Element {
+export function LoginScreen({ navigation }: any): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const login = useAuthStore((s) => s.login);
@@ -72,6 +72,16 @@ export function LoginScreen(): JSX.Element {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.signupLink}
+          onPress={() => navigation.navigate('Register')}
+        >
+          <Text style={styles.footerText}>
+            New here?{' '}
+            <Text style={styles.signupAction}>Create a fundi account</Text>
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.footerRow}>
           <Text style={styles.footerText}>Not a fundi? Download the customer app.</Text>
@@ -136,6 +146,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  signupLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  signupAction: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   errorText: {
     color: colors.error,
