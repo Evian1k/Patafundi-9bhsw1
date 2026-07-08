@@ -1,0 +1,3518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PataFundi — Premium App Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PATAFUNDI PREMIUM PREVIEW
+   Design language: Apple HIG + Uber + Airbnb + Stripe + Linear
+   ============================================================ */
+
+:root {
+  /* Brand colors */
+  --primary: #F97316;
+  --primary-dark: #EA580C;
+  --primary-light: #FDBA74;
+  --accent: #1E9E8A;
+  --accent-dark: #0E6B5C;
+  --accent-light: #5EEAD4;
+
+  /* Neutrals (warm) */
+  --bg: #FBFAF8;
+  --text: #1C1917;
+  --text-2: #78716C;
+  --text-3: #A8A29E;
+  --border: #E7E5E4;
+
+  /* Status */
+  --success: #27A35F;
+  --warning: #F59E0B;
+  --error: #EF4444;
+
+  /* Glass */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.5);
+
+  /* Shadows (soft, layered) */
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+  --shadow-card: 0 4px 24px rgba(28, 25, 23, 0.06);
+  --shadow-card-lg: 0 12px 40px rgba(28, 25, 23, 0.10);
+  --shadow-float: 0 16px 48px rgba(28, 25, 23, 0.14);
+  --shadow-orange: 0 4px 12px rgba(249, 115, 22, 0.25);
+  --shadow-teal: 0 4px 12px rgba(30, 158, 138, 0.22);
+
+  /* Motion */
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Type */
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(at 20% 20%, rgba(249,115,22,0.08) 0%, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(30,158,138,0.08) 0%, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(249,115,22,0.04) 0%, transparent 40%),
+    #FBFAF8;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   STAGE / SIDEBAR LAYOUT
+   ============================================================ */
+.stage {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 48px 64px;
+  align-items: start;
+}
+
+/* Sidebar */
+.sidebar {
+  position: sticky;
+  top: 48px;
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.brand-mark {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  display: grid; place-items: center;
+  box-shadow: var(--shadow-orange);
+  color: white; flex-shrink: 0;
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+.brand-sub {
+  font-size: 11px; color: var(--text-2); font-weight: 500;
+}
+
+.app-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: rgba(28, 25, 23, 0.04);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 24px;
+  position: relative;
+}
+.app-toggle button {
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+  position: relative;
+  z-index: 2;
+}
+.app-toggle button.active {
+  color: var(--text);
+}
+.app-toggle-slider {
+  position: absolute;
+  top: 4px; bottom: 4px;
+  width: calc(50% - 4px);
+  background: white;
+  border-radius: 9px;
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(28,25,23,0.04);
+  transition: transform 0.28s var(--ease-out);
+  z-index: 1;
+}
+.app-toggle[data-app="fundi"] .app-toggle-slider { transform: translateX(100%); }
+
+.nav-section { margin-bottom: 16px; }
+.nav-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 4px 8px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s var(--ease);
+}
+.nav-item:hover { background: rgba(28, 25, 23, 0.04); color: var(--text); }
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(249,115,22,0.10), rgba(249,115,22,0.04));
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+.nav-item .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-item .nav-num {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: rgba(28,25,23,0.04);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* ============================================================
+   PHONE FRAME — iPhone 15 Pro
+   ============================================================ */
+.phone-wrap {
+  display: flex;
+  justify-content: center;
+  position: sticky;
+  top: 48px;
+}
+.phone {
+  width: 390px;
+  height: 844px;
+  background: #1C1917;
+  border-radius: 56px;
+  padding: 6px;
+  box-shadow:
+    0 0 0 2px #3F3F46,
+    0 0 0 4px #1C1917,
+    0 30px 80px rgba(28, 25, 23, 0.30),
+    0 60px 120px rgba(249, 115, 22, 0.08);
+  position: relative;
+}
+.phone::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 54px;
+  background: linear-gradient(135deg, #52525B 0%, #27272A 30%, #18181B 70%, #3F3F46 100%);
+  z-index: 0;
+}
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50px;
+  overflow: hidden;
+  background:
+    radial-gradient(at 20% 20%, rgba(249,115,22,0.08) 0%, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(30,158,138,0.08) 0%, transparent 50%),
+    #FBFAF8;
+  z-index: 1;
+}
+/* Dynamic Island */
+.island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 36px;
+  background: #000;
+  border-radius: 22px;
+  z-index: 100;
+}
+
+/* Status bar */
+.status-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 32px 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  z-index: 50;
+  pointer-events: none;
+}
+.status-bar svg { width: 16px; height: 12px; }
+
+/* ============================================================
+   SCREEN CONTAINER
+   ============================================================ */
+.screens {
+  position: absolute;
+  inset: 0;
+  border-radius: 50px;
+  overflow: hidden;
+}
+.screen-page {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(20px);
+  transition: opacity 0.28s var(--ease), transform 0.32s var(--ease-out);
+  display: flex;
+  flex-direction: column;
+}
+.screen-page.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.screen-page.active.reverse { animation: slideInRight 0.32s var(--ease-out); }
+@keyframes slideInRight {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 54px 0 110px;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-area::-webkit-scrollbar { display: none; }
+.scroll-area { scrollbar-width: none; }
+
+.content { padding: 0 24px; }
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+.mega-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.section-header {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.card-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.005em;
+}
+.body-text {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.caption {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--glass-border);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-primary {
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  border: none;
+  box-shadow: var(--shadow-orange);
+  transition: all 0.2s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+.btn-primary:active { transform: scale(0.97); box-shadow: 0 2px 6px rgba(249,115,22,0.2); }
+
+.btn-secondary {
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 14px;
+  background: rgba(30, 158, 138, 0.08);
+  color: var(--accent);
+  border: 1px solid rgba(30, 158, 138, 0.2);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: all 0.2s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+.btn-secondary:active { transform: scale(0.97); }
+
+.btn-danger {
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  transition: all 0.2s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+.btn-danger:active { transform: scale(0.97); }
+
+.btn-ghost {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-2);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.btn-ghost:active { transform: scale(0.97); }
+
+.btn-outline {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--glass);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.btn-outline:active { transform: scale(0.97); }
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+.input-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+.input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.input-field {
+  width: 100%;
+  height: 48px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 16px 0 44px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  transition: all 0.2s var(--ease);
+}
+.input-field::placeholder { color: var(--text-3); }
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
+}
+.textarea-field {
+  width: 100%;
+  height: 120px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  resize: none;
+  transition: all 0.2s var(--ease);
+}
+.textarea-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1);
+}
+.input-prefix {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+  pointer-events: none;
+}
+.input-field.with-prefix { padding-left: 56px; }
+
+/* ============================================================
+   TOP NAV BAR (within screens)
+   ============================================================ */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 16px;
+  gap: 8px;
+}
+.top-nav-left, .top-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-back {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  box-shadow: var(--shadow-sm);
+}
+.nav-back:active { transform: scale(0.95); }
+.nav-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.005em;
+}
+.icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  box-shadow: var(--shadow-sm);
+}
+.icon-btn:active { transform: scale(0.95); }
+.icon-btn.has-badge { position: relative; }
+.icon-btn .badge-dot {
+  position: absolute;
+  top: 9px; right: 9px;
+  width: 8px; height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+/* ============================================================
+   FLOATING GLASS BOTTOM TAB BAR
+   ============================================================ */
+.tab-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgba(28, 25, 23, 0.12), 0 2px 8px rgba(28,25,23,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  z-index: 40;
+}
+.tab {
+  flex: 1;
+  height: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #78716C;
+  transition: all 0.25s var(--ease);
+  position: relative;
+}
+.tab svg { width: 22px; height: 22px; transition: transform 0.25s var(--ease); }
+.tab .tab-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.25s var(--ease);
+  letter-spacing: -0.01em;
+}
+.tab.active {
+  color: var(--primary);
+}
+.tab.active svg { transform: scale(1.08) translateY(-1px); }
+.tab.active .tab-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================================
+   SERVICE CATEGORY GRID
+   ============================================================ */
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.service-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+.service-card:active { transform: scale(0.94); }
+.service-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-card);
+  display: grid;
+  place-items: center;
+}
+.service-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* ============================================================
+   CHIPS & PILLS
+   ============================================================ */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -24px;
+  padding: 0 24px 4px;
+  scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  white-space: nowrap;
+}
+.chip svg { width: 14px; height: 14px; }
+.chip.active {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-orange);
+}
+.chip.teal {
+  background: rgba(30, 158, 138, 0.1);
+  color: var(--accent);
+  border-color: rgba(30, 158, 138, 0.2);
+}
+.chip.red {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-body);
+}
+.pill-orange { background: rgba(249, 115, 22, 0.12); color: var(--primary-dark); }
+.pill-teal { background: rgba(30, 158, 138, 0.12); color: var(--accent-dark); }
+.pill-green { background: rgba(39, 163, 95, 0.12); color: var(--success); }
+.pill-amber { background: rgba(245, 158, 11, 0.14); color: #B45309; }
+.pill-red { background: rgba(239, 68, 68, 0.12); color: var(--error); }
+.pill-gray { background: rgba(28, 25, 23, 0.06); color: var(--text-2); }
+
+/* ============================================================
+   LOGIN SCREEN
+   ============================================================ */
+.login-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 54px 24px 40px;
+  height: 100%;
+}
+.login-logo {
+  width: 72px; height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  display: grid; place-items: center;
+  margin: 0 auto 24px;
+  box-shadow: 0 12px 32px rgba(249, 115, 22, 0.3);
+}
+.login-title {
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.login-subtitle {
+  text-align: center;
+  color: var(--text-2);
+  font-size: 15px;
+  margin-bottom: 32px;
+}
+.login-card {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: var(--shadow-card-lg);
+}
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.link-teal {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-ghost {
+  color: var(--text-2);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ============================================================
+   HOME SCREEN
+   ============================================================ */
+.greeting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 8px 0 24px;
+}
+.greeting-hi {
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.greeting-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.hero-cta {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  border-radius: 20px;
+  padding: 20px;
+  color: white;
+  box-shadow: var(--shadow-orange);
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.hero-cta:active { transform: scale(0.98); }
+.hero-cta-label {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+.hero-cta-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 24px 0 16px;
+}
+.section-link {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Job card */
+.job-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.job-card:active { transform: scale(0.98); }
+.job-icon-box {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.job-info { flex: 1; min-width: 0; }
+.job-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.job-meta {
+  font-size: 12px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.job-price {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* ============================================================
+   MAP / TRACKING
+   ============================================================ */
+.map-area {
+  position: relative;
+  width: 100%;
+  height: 462px; /* 55% of 844 */
+  background:
+    radial-gradient(at 30% 30%, rgba(30,158,138,0.10) 0%, transparent 40%),
+    radial-gradient(at 70% 70%, rgba(249,115,22,0.08) 0%, transparent 40%),
+    linear-gradient(135deg, #F5F4F0 0%, #EDEDEA 100%);
+  overflow: hidden;
+}
+.map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(28,25,23,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28,25,23,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.map-road {
+  position: absolute;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(28,25,23,0.06);
+}
+.map-road.h1 { top: 30%; left: -10%; right: -10%; height: 32px; transform: rotate(-2deg); }
+.map-road.h2 { top: 65%; left: -10%; right: -10%; height: 24px; transform: rotate(1deg); }
+.map-road.v1 { top: -10%; bottom: -10%; left: 35%; width: 28px; transform: rotate(3deg); }
+.map-road.v2 { top: -10%; bottom: -10%; right: 22%; width: 20px; transform: rotate(-1deg); }
+.map-park {
+  position: absolute;
+  top: 18%; left: 8%;
+  width: 90px; height: 70px;
+  background: rgba(39, 163, 95, 0.15);
+  border-radius: 14px;
+}
+.map-water {
+  position: absolute;
+  bottom: 18%; right: 12%;
+  width: 80px; height: 60px;
+  background: rgba(30, 158, 138, 0.18);
+  border-radius: 18px;
+}
+
+.map-pin {
+  position: absolute;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 3;
+}
+.map-pin::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.3;
+  animation: pulseRing 2s var(--ease) infinite;
+}
+@keyframes pulseRing {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.map-pin.you {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  top: 35%; left: 28%;
+}
+.map-pin.fundi {
+  background: linear-gradient(135deg, #1E9E8A, #0E6B5C);
+  top: 58%; right: 30%;
+  animation: floatFundi 3s var(--ease) infinite;
+}
+@keyframes floatFundi {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.map-route {
+  position: absolute;
+  top: 40%; left: 30%;
+  width: 40%;
+  height: 60px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bottom-sheet {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  padding: 20px;
+  box-shadow: 0 -8px 32px rgba(28,25,23,0.10), var(--shadow-card-lg);
+  z-index: 5;
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.tracking-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.tracking-status-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+.tracking-eta {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--primary);
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  position: relative;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  background: var(--border);
+}
+.timeline-progress {
+  position: absolute;
+  top: 10px;
+  left: 8%;
+  width: 33%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  z-index: 1;
+}
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+  position: relative;
+}
+.timeline-dot {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+.timeline-step.active .timeline-dot {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  border-color: var(--primary);
+}
+.timeline-step.done .timeline-dot {
+  background: var(--success);
+  border-color: var(--success);
+}
+.timeline-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.timeline-step.active .timeline-label,
+.timeline-step.done .timeline-label { color: var(--text); }
+
+/* Fundi contact card */
+.fundi-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 16px 0;
+}
+.avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1E9E8A, #0E6B5C);
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--font-display);
+  flex-shrink: 0;
+}
+.avatar.lg { width: 80px; height: 80px; font-size: 28px; }
+.avatar.md { width: 56px; height: 56px; font-size: 19px; }
+.avatar.sm { width: 36px; height: 36px; font-size: 13px; }
+.avatar.orange { background: linear-gradient(135deg, #F97316, #EA580C); }
+.fundi-info { flex: 1; }
+.fundi-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+.fundi-rating {
+  font-size: 12px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.contact-btn {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.contact-btn:active { transform: scale(0.92); }
+.contact-btn.call { background: rgba(39, 163, 95, 0.12); color: var(--success); }
+.contact-btn.chat { background: rgba(249, 115, 22, 0.12); color: var(--primary); }
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 12px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 5;
+}
+.chat-status {
+  font-size: 11px;
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+.online-dot {
+  width: 6px; height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-messages::-webkit-scrollbar { display: none; }
+.msg {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.45;
+  position: relative;
+  animation: msgIn 0.3s var(--ease-out);
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg.other {
+  align-self: flex-start;
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-bottom-left-radius: 6px;
+  color: var(--text);
+}
+.msg.me {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  color: white;
+  border-bottom-right-radius: 6px;
+  box-shadow: var(--shadow-orange);
+}
+.msg-time {
+  font-size: 10px;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+.typing-indicator {
+  align-self: flex-start;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  padding: 14px 18px;
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  display: flex;
+  gap: 4px;
+}
+.typing-dot {
+  width: 6px; height: 6px;
+  background: var(--text-3);
+  border-radius: 50%;
+  animation: typing 1.4s var(--ease) infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 24px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-top: 1px solid var(--border);
+}
+.chat-input {
+  flex: 1;
+  height: 44px;
+  background: rgba(28,25,23,0.04);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 0 18px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+}
+.chat-input:focus { outline: none; border-color: var(--primary); }
+.chat-send {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  border: none;
+  color: white;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-orange);
+  transition: all 0.2s var(--ease);
+}
+.chat-send:active { transform: scale(0.92); }
+.chat-attach {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(28,25,23,0.04);
+  border: none;
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+/* ============================================================
+   REVIEW
+   ============================================================ */
+.review-screen {
+  padding: 54px 24px 40px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.review-avatar-wrap {
+  text-align: center;
+  margin: 24px 0;
+}
+.review-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0;
+}
+.star {
+  width: 40px; height: 40px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  color: var(--border);
+}
+.star.filled {
+  color: #F59E0B;
+  transform: scale(1.05);
+}
+.star:active { transform: scale(0.9); }
+
+/* ============================================================
+   WALLET
+   ============================================================ */
+.balance-card {
+  background: linear-gradient(135deg, #F97316 0%, #EA580C 50%, #1E9E8A 130%);
+  border-radius: 24px;
+  padding: 24px;
+  color: white;
+  box-shadow: 0 12px 32px rgba(249, 115, 22, 0.25);
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.balance-card::after {
+  content: '';
+  position: absolute;
+  top: -50%; right: -20%;
+  width: 200px; height: 200px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+}
+.balance-label {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.balance-amount {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.balance-meta {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.balance-meta-item strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-display);
+  margin-top: 2px;
+}
+
+.loyalty-card {
+  background: linear-gradient(135deg, rgba(30,158,138,0.12), rgba(30,158,138,0.04));
+  border: 1px solid rgba(30,158,138,0.2);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.loyalty-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.loyalty-tier {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--accent-dark);
+}
+.loyalty-points {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--accent);
+}
+.progress-track {
+  height: 8px;
+  background: rgba(30,158,138,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+  border-radius: 4px;
+  width: 62%;
+  transition: width 1s var(--ease-out);
+}
+.progress-caption {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tx-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tx-row:last-child { border-bottom: none; }
+.tx-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.tx-info { flex: 1; }
+.tx-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.tx-date {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.tx-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+}
+.tx-amount.pos { color: var(--success); }
+.tx-amount.neg { color: var(--error); }
+
+/* ============================================================
+   PROFILE
+   ============================================================ */
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 0 24px;
+}
+.profile-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin-top: 16px;
+}
+.profile-email {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.trust-score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  height: 32px;
+  padding: 0 14px;
+  background: rgba(39, 163, 95, 0.12);
+  color: var(--success);
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid rgba(39, 163, 95, 0.2);
+}
+
+.menu-list {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 4px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 56px;
+  padding: 0 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+.menu-row:active { background: rgba(28,25,23,0.04); }
+.menu-icon-box {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.menu-label {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+}
+.menu-chevron {
+  color: var(--text-3);
+}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+.notif-row {
+  display: flex;
+  gap: 12px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 8px;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+.notif-row.unread { background: rgba(249, 115, 22, 0.05); border-color: rgba(249,115,22,0.15); }
+.notif-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.notif-body { flex: 1; min-width: 0; }
+.notif-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.notif-msg {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.notif-time {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.unread-dot {
+  position: absolute;
+  top: 16px; right: 14px;
+  width: 8px; height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+.settings-section { margin-bottom: 16px; }
+.settings-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 8px 8px;
+}
+.settings-value {
+  font-size: 13px;
+  color: var(--text-3);
+  font-family: 'SF Mono', monospace;
+}
+
+/* ============================================================
+   FUNDI DASHBOARD
+   ============================================================ */
+.online-toggle-card {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.toggle-switch {
+  width: 52px; height: 32px;
+  background: var(--border);
+  border-radius: 16px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+}
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 26px; height: 26px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: all 0.25s var(--ease);
+}
+.toggle-switch.on { background: var(--success); }
+.toggle-switch.on::after { transform: translateX(20px); }
+
+.active-job-card {
+  background: linear-gradient(135deg, rgba(30,158,138,0.12), rgba(30,158,138,0.04));
+  border: 1px solid rgba(30,158,138,0.2);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.stat-label {
+  font-size: 10px;
+  color: var(--text-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+/* Segmented control */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: rgba(28, 25, 23, 0.05);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+  position: relative;
+}
+.segmented button {
+  border: none;
+  background: transparent;
+  padding: 10px;
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  transition: color 0.2s var(--ease);
+}
+.segmented button.active {
+  color: var(--text);
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Photo thumbnail */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.photo-thumb {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #F5F4F0, #E7E5E4);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
+}
+.photo-thumb.add {
+  border: 2px dashed var(--border);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+/* Bar chart */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  height: 80px;
+  padding: 8px 0;
+}
+.bar {
+  flex: 1;
+  background: linear-gradient(180deg, #F97316, #EA580C);
+  border-radius: 4px 4px 0 0;
+  min-height: 6px;
+  transition: all 0.3s var(--ease);
+  opacity: 0.85;
+}
+.bar:hover { opacity: 1; }
+.bar-label {
+  font-size: 9px;
+  color: var(--text-3);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Toggle pills */
+.toggle-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.toggle-pill {
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.toggle-pill.active.teal {
+  background: rgba(30, 158, 138, 0.12);
+  color: var(--accent);
+  border-color: rgba(30, 158, 138, 0.3);
+}
+.toggle-pill.active.red {
+  background: rgba(239, 68, 68, 0.10);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes shimmer {
+  0% { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f0eeec 25%, #fafaf9 50%, #f0eeec 75%);
+  background-size: 936px 100%;
+  animation: shimmer 1.6s infinite linear;
+  border-radius: 8px;
+}
+
+.fade-in {
+  animation: fadeIn 0.4s var(--ease-out);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Verified badge */
+.verified-badge {
+  width: 20px; height: 20px;
+  background: var(--success);
+  border-radius: 50%;
+  border: 2px solid white;
+  display: inline-grid;
+  place-items: center;
+  color: white;
+}
+
+/* Sticky bottom button */
+.sticky-bottom {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 30;
+}
+
+/* Fundi action button row */
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+.action-btn {
+  height: 48px;
+  border-radius: 14px;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.action-btn:active { transform: scale(0.97); }
+.action-btn.navigate {
+  background: linear-gradient(135deg, #1E9E8A, #0E6B5C);
+  color: white;
+  box-shadow: var(--shadow-teal);
+}
+.action-btn.checkin {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  color: white;
+  box-shadow: var(--shadow-orange);
+}
+.action-btn.chat {
+  background: var(--glass);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.action-btn.sos {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: 280px 1fr; gap: 24px; padding: 24px; }
+}
+@media (max-width: 900px) {
+  .stage { grid-template-columns: 1fr; padding: 16px; }
+  .sidebar { position: relative; top: 0; max-height: none; }
+  .phone-wrap { position: relative; top: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- SVG Icon definitions (reusable) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <!-- General -->
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></symbol>
+  <symbol id="i-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+  <symbol id="i-star-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-navigate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-credit-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+  <symbol id="i-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/></symbol>
+
+  <!-- Service category icons -->
+  <symbol id="i-plumbing" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M8 14c1.5-1.5 4-1.5 5.5 0"/></symbol>
+  <symbol id="i-electrical" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+  <symbol id="i-carpentry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-cleaning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/><path d="M5 16l.6 1.8L7.5 18.5l-1.9.7L5 21l-.6-1.8L2.5 18.5l1.9-.7z"/></symbol>
+  <symbol id="i-painting" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="12" height="6" rx="1"/><rect x="6" y="9" width="6" height="3"/><path d="M9 12v3a2 2 0 0 0 2 2h2v4"/></symbol>
+  <symbol id="i-hvac" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/></symbol>
+  <symbol id="i-roofing" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21v-6h6v6"/></symbol>
+  <symbol id="i-welding" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+  <symbol id="i-appliance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><circle cx="6" cy="18" r="1"/></symbol>
+  <symbol id="i-pest" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2"/><path d="M5 7l3 2"/><path d="M19 13h-3"/><path d="M5 13h3"/><path d="M19 17l-3-2"/><path d="M5 17l3-2"/><path d="M12 6V4"/><path d="M8 4h8"/></symbol>
+  <symbol id="i-masonry" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="6" height="5" rx="1"/><rect x="10" y="4" width="6" height="5" rx="1"/><rect x="18" y="4" width="4" height="5" rx="1"/><rect x="2" y="11" width="4" height="5" rx="1"/><rect x="8" y="11" width="6" height="5" rx="1"/><rect x="16" y="11" width="6" height="5" rx="1"/><rect x="2" y="18" width="6" height="3" rx="1"/><rect x="10" y="18" width="6" height="3" rx="1"/><rect x="18" y="18" width="4" height="3" rx="1"/></symbol>
+  <symbol id="i-gardening" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19.2 2.96c1.4 9.3-3.6 17.04-8.2 17.04z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></symbol>
+  <symbol id="i-moving" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></symbol>
+  <symbol id="i-vehicle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></symbol>
+</defs>
+</svg>
+
+<div class="stage">
+
+  <!-- ============================ SIDEBAR ============================ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">PataFundi</div>
+        <div class="brand-sub">Premium App Preview</div>
+      </div>
+    </div>
+
+    <div class="app-toggle" data-app="customer" id="appToggle">
+      <div class="app-toggle-slider"></div>
+      <button class="active" data-app="customer">Customer</button>
+      <button data-app="fundi">Fundi</button>
+    </div>
+
+    <div class="nav-section" id="navCustomer">
+      <div class="nav-section-title">Customer App</div>
+      <button class="nav-item active" data-screen="cust-login"><svg class="nav-icon"><use href="#i-lock"/></svg>Login<span class="nav-num">01</span></button>
+      <button class="nav-item" data-screen="cust-home"><svg class="nav-icon"><use href="#i-home"/></svg>Home<span class="nav-num">02</span></button>
+      <button class="nav-item" data-screen="cust-create"><svg class="nav-icon"><use href="#i-plus"/></svg>Create Job<span class="nav-num">03</span></button>
+      <button class="nav-item" data-screen="cust-jobs"><svg class="nav-icon"><use href="#i-briefcase"/></svg>Jobs List<span class="nav-num">04</span></button>
+      <button class="nav-item" data-screen="cust-track"><svg class="nav-icon"><use href="#i-map-pin"/></svg>Tracking<span class="nav-num">05</span></button>
+      <button class="nav-item" data-screen="cust-chat"><svg class="nav-icon"><use href="#i-message"/></svg>Chat<span class="nav-num">06</span></button>
+      <button class="nav-item" data-screen="cust-review"><svg class="nav-icon"><use href="#i-star-outline"/></svg>Review<span class="nav-num">07</span></button>
+      <button class="nav-item" data-screen="cust-wallet"><svg class="nav-icon"><use href="#i-wallet"/></svg>Wallet<span class="nav-num">08</span></button>
+      <button class="nav-item" data-screen="cust-profile"><svg class="nav-icon"><use href="#i-user"/></svg>Profile<span class="nav-num">09</span></button>
+      <button class="nav-item" data-screen="cust-notif"><svg class="nav-icon"><use href="#i-bell"/></svg>Notifications<span class="nav-num">10</span></button>
+      <button class="nav-item" data-screen="cust-settings"><svg class="nav-icon"><use href="#i-settings"/></svg>Settings<span class="nav-num">11</span></button>
+    </div>
+
+    <div class="nav-section" id="navFundi" style="display:none">
+      <div class="nav-section-title">Fundi App</div>
+      <button class="nav-item" data-screen="fundi-login"><svg class="nav-icon"><use href="#i-lock"/></svg>Login<span class="nav-num">12</span></button>
+      <button class="nav-item" data-screen="fundi-dashboard"><svg class="nav-icon"><use href="#i-grid"/></svg>Dashboard<span class="nav-num">13</span></button>
+      <button class="nav-item" data-screen="fundi-jobs"><svg class="nav-icon"><use href="#i-briefcase"/></svg>Jobs<span class="nav-num">14</span></button>
+      <button class="nav-item" data-screen="fundi-detail"><svg class="nav-icon"><use href="#i-map-pin"/></svg>Job Detail<span class="nav-num">15</span></button>
+      <button class="nav-item" data-screen="fundi-wallet"><svg class="nav-icon"><use href="#i-wallet"/></svg>Wallet<span class="nav-num">16</span></button>
+      <button class="nav-item" data-screen="fundi-profile"><svg class="nav-icon"><use href="#i-user"/></svg>Profile<span class="nav-num">17</span></button>
+    </div>
+  </aside>
+
+  <!-- ============================ PHONE ============================ -->
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screen">
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span>9:41</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="18" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
+            <svg width="16" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none"><rect x="1" y="1" width="20" height="10" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="3" y="3" width="15" height="6" rx="1" fill="currentColor"/><rect x="22" y="4" width="1.5" height="4" rx="0.75" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <div class="screens" id="screens">
+
+<!-- ====================== 01. CUSTOMER LOGIN ====================== -->
+<div class="screen-page active" id="screen-cust-login">
+  <div class="login-screen">
+    <div class="login-logo">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    </div>
+    <h1 class="login-title gradient-text">PataFundi</h1>
+    <p class="login-subtitle">Get it fixed in minutes</p>
+
+    <div class="login-card">
+      <div class="input-wrap">
+        <span class="input-icon"><svg width="18" height="18"><use href="#i-mail"/></svg></span>
+        <input type="email" class="input-field" placeholder="Email address" value="john.doe@gmail.com">
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><svg width="18" height="18"><use href="#i-lock"/></svg></span>
+        <input type="password" class="input-field" placeholder="Password" value="••••••••">
+      </div>
+      <button class="btn-primary" onclick="go('cust-home')">
+        Sign In
+        <svg width="16" height="16"><use href="#i-arrow-right"/></svg>
+      </button>
+      <div class="login-links">
+        <span class="link-teal">Create account</span>
+        <span class="link-ghost">Forgot password?</span>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:32px;font-size:12px;color:var(--text-3);line-height:1.6;">
+      By continuing, you agree to PataFundi's<br>Terms of Service & Privacy Policy
+    </div>
+  </div>
+</div>
+
+<!-- ====================== 02. CUSTOMER HOME ====================== -->
+<div class="screen-page" id="screen-cust-home">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="greeting-row">
+        <div>
+          <div class="greeting-hi">Good morning,</div>
+          <div class="greeting-name">John Doe</div>
+        </div>
+        <button class="icon-btn has-badge" onclick="go('cust-notif')">
+          <svg width="20" height="20"><use href="#i-bell"/></svg>
+          <span class="badge-dot"></span>
+        </button>
+      </div>
+
+      <div class="hero-cta" onclick="go('cust-create')">
+        <div class="hero-cta-label">What needs fixing?</div>
+        <div class="hero-cta-title">
+          Post a job in 30 seconds
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </div>
+      </div>
+
+      <div class="section-row">
+        <h2 class="section-header">Popular services</h2>
+        <span class="section-link" onclick="go('cust-create')">See all</span>
+      </div>
+
+      <div class="service-grid">
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#0EA5E9;"><svg width="28" height="28"><use href="#i-plumbing"/></svg></div>
+          <div class="service-label">Plumbing</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#F59E0B;"><svg width="28" height="28"><use href="#i-electrical"/></svg></div>
+          <div class="service-label">Electrical</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#A855F7;"><svg width="28" height="28"><use href="#i-carpentry"/></svg></div>
+          <div class="service-label">Carpentry</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#1E9E8A;"><svg width="28" height="28"><use href="#i-cleaning"/></svg></div>
+          <div class="service-label">Cleaning</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#EC4899;"><svg width="28" height="28"><use href="#i-painting"/></svg></div>
+          <div class="service-label">Painting</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#0284C7;"><svg width="28" height="28"><use href="#i-hvac"/></svg></div>
+          <div class="service-label">HVAC</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#84CC16;"><svg width="28" height="28"><use href="#i-gardening"/></svg></div>
+          <div class="service-label">Gardening</div>
+        </div>
+        <div class="service-card" onclick="go('cust-create')">
+          <div class="service-icon-box" style="color:#78716C;"><svg width="28" height="28"><use href="#i-moving"/></svg></div>
+          <div class="service-label">Moving</div>
+        </div>
+      </div>
+
+      <div class="section-row">
+        <h2 class="section-header">Active jobs</h2>
+        <span class="section-link" onclick="go('cust-jobs')">View all</span>
+      </div>
+
+      <div class="job-card" onclick="go('cust-track')">
+        <div class="job-icon-box" style="background:rgba(14,165,233,0.12);color:#0EA5E9;">
+          <svg width="24" height="24"><use href="#i-plumbing"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">Kitchen sink repair</div>
+          <div class="job-meta">
+            <span class="pill pill-teal">In Progress</span>
+            <span>• Westlands</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price">KES 2,500</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="customer" data-active="home">
+    <button class="tab active" onclick="go('cust-home')"><svg><use href="#i-home"/></svg><span class="tab-label">Home</span></button>
+    <button class="tab" onclick="go('cust-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('cust-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('cust-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 03. CREATE JOB ====================== -->
+<div class="screen-page" id="screen-cust-create">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <button class="nav-back" onclick="go('cust-home')"><svg width="20" height="20"><use href="#i-back"/></svg></button>
+        <div class="nav-title">New Job</div>
+        <div style="width:40px;"></div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Category</div>
+        <div class="chip-row" id="categoryChips">
+          <button class="chip active"><svg><use href="#i-plumbing"/></svg>Plumbing</button>
+          <button class="chip"><svg><use href="#i-electrical"/></svg>Electrical</button>
+          <button class="chip"><svg><use href="#i-carpentry"/></svg>Carpentry</button>
+          <button class="chip"><svg><use href="#i-cleaning"/></svg>Cleaning</button>
+          <button class="chip"><svg><use href="#i-painting"/></svg>Painting</button>
+          <button class="chip"><svg><use href="#i-hvac"/></svg>HVAC</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Description</div>
+        <textarea class="textarea-field" placeholder="Describe what needs fixing...">Kitchen sink is leaking underneath, needs new seal and pipe tightening. Available mornings.</textarea>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Budget</div>
+        <div class="input-wrap" style="margin-bottom:0;">
+          <span class="input-prefix">KES</span>
+          <input type="text" class="input-field with-prefix" value="2,500" placeholder="0">
+        </div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Urgency</div>
+        <div class="toggle-pills">
+          <button class="toggle-pill active teal" onclick="selectTogglePill(this,'teal')">
+            <svg width="16" height="16"><use href="#i-clock"/></svg>
+            Normal
+          </button>
+          <button class="toggle-pill red" onclick="selectTogglePill(this,'red')">
+            <svg width="16" height="16"><use href="#i-zap"/></svg>
+            Emergency
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Location</div>
+        <div class="card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(249,115,22,0.12);color:var(--primary);display:grid;place-items:center;">
+            <svg width="18" height="18"><use href="#i-pin"/></svg>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">Westlands, Nairobi</div>
+            <div style="font-size:11px;color:var(--text-2);">Tap to change location</div>
+          </div>
+          <svg width="16" height="16" style="color:var(--text-3);"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <div style="margin-bottom:96px;">
+        <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Photos</div>
+        <div class="photo-grid">
+          <div class="photo-thumb" style="background:linear-gradient(135deg,#E0F2FE,#BAE6FD);"></div>
+          <div class="photo-thumb" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);"></div>
+          <div class="photo-thumb" style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);"></div>
+          <div class="photo-thumb add">
+            <svg width="20" height="20"><use href="#i-camera"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sticky-bottom">
+    <button class="btn-primary" onclick="go('cust-track')">
+      Post Job
+      <svg width="16" height="16"><use href="#i-arrow-right"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ====================== 04. JOBS LIST ====================== -->
+<div class="screen-page" id="screen-cust-jobs">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Your Jobs</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-search"/></svg></button>
+      </div>
+
+      <div class="chip-row" style="margin-bottom:16px;">
+        <button class="chip active">All</button>
+        <button class="chip">Active</button>
+        <button class="chip">Completed</button>
+        <button class="chip">Cancelled</button>
+      </div>
+
+      <div class="job-card" onclick="go('cust-track')">
+        <div class="job-icon-box" style="background:rgba(14,165,233,0.12);color:#0EA5E9;">
+          <svg width="24" height="24"><use href="#i-plumbing"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">Kitchen sink repair</div>
+          <div class="job-meta">
+            <span class="pill pill-teal">In Progress</span>
+            <span>• Mar 14</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price">KES 2,500</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <div class="job-card" onclick="go('cust-review')">
+        <div class="job-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B;">
+          <svg width="24" height="24"><use href="#i-electrical"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">Light fixture install</div>
+          <div class="job-meta">
+            <span class="pill pill-amber">Pending Review</span>
+            <span>• Mar 10</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price">KES 4,200</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <div class="job-card">
+        <div class="job-icon-box" style="background:rgba(168,85,247,0.12);color:#A855F7;">
+          <svg width="24" height="24"><use href="#i-carpentry"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">Door hinge replacement</div>
+          <div class="job-meta">
+            <span class="pill pill-green">Completed</span>
+            <span>• Mar 4</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price">KES 1,800</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <div class="job-card">
+        <div class="job-icon-box" style="background:rgba(30,158,138,0.12);color:#1E9E8A;">
+          <svg width="24" height="24"><use href="#i-cleaning"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">Deep clean apartment</div>
+          <div class="job-meta">
+            <span class="pill pill-green">Completed</span>
+            <span>• Feb 28</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price">KES 3,500</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <div class="job-card">
+        <div class="job-icon-box" style="background:rgba(239,68,68,0.12);color:#EF4444;">
+          <svg width="24" height="24"><use href="#i-hvac"/></svg>
+        </div>
+        <div class="job-info">
+          <div class="job-title">AC unit servicing</div>
+          <div class="job-meta">
+            <span class="pill pill-red">Cancelled</span>
+            <span>• Feb 22</span>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="job-price" style="color:var(--text-3);text-decoration:line-through;">KES 5,000</div>
+          <svg width="16" height="16" style="color:var(--text-3);margin-top:4px;"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="customer" data-active="jobs">
+    <button class="tab" onclick="go('cust-home')"><svg><use href="#i-home"/></svg><span class="tab-label">Home</span></button>
+    <button class="tab active" onclick="go('cust-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('cust-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('cust-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 05. JOB TRACKING ====================== -->
+<div class="screen-page" id="screen-cust-track">
+  <div class="map-area">
+    <div class="map-grid"></div>
+    <div class="map-park"></div>
+    <div class="map-water"></div>
+    <div class="map-road h1"></div>
+    <div class="map-road h2"></div>
+    <div class="map-road v1"></div>
+    <div class="map-road v2"></div>
+
+    <svg class="map-route" viewBox="0 0 100 60" preserveAspectRatio="none">
+      <path d="M 0 60 Q 30 40 50 30 T 100 0" fill="none" stroke="#F97316" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="round"/>
+    </svg>
+
+    <div class="map-pin you" style="color:#F97316;">J</div>
+    <div class="map-pin fundi" style="color:#1E9E8A;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    </div>
+
+    <button class="nav-back" style="position:absolute;top:64px;left:16px;z-index:10;" onclick="go('cust-jobs')">
+      <svg width="20" height="20"><use href="#i-back"/></svg>
+    </button>
+  </div>
+
+  <div class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="tracking-status">
+      <div>
+        <div class="tracking-status-label">Fundi On The Way</div>
+        <div class="caption" style="margin-top:2px;">James is heading to your location</div>
+      </div>
+      <div class="tracking-eta">8 min</div>
+    </div>
+
+    <div class="fundi-contact">
+      <div class="avatar">J</div>
+      <div class="fundi-info">
+        <div class="fundi-name">James Mwangi</div>
+        <div class="fundi-rating">
+          <svg width="12" height="12" style="color:#F59E0B;"><use href="#i-star"/></svg>
+          4.8 • Plumber
+        </div>
+      </div>
+      <button class="contact-btn call"><svg width="18" height="18"><use href="#i-phone"/></svg></button>
+      <button class="contact-btn chat" onclick="go('cust-chat')"><svg width="18" height="18"><use href="#i-message"/></svg></button>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-progress"></div>
+      <div class="timeline-step done">
+        <div class="timeline-dot"><svg width="10" height="10" style="color:white;"><use href="#i-check"/></svg></div>
+        <div class="timeline-label">Finding</div>
+      </div>
+      <div class="timeline-step active">
+        <div class="timeline-dot"></div>
+        <div class="timeline-label">On Way</div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-label">In Progress</div>
+      </div>
+      <div class="timeline-step">
+        <div class="timeline-dot"></div>
+        <div class="timeline-label">Done</div>
+      </div>
+    </div>
+
+    <button class="btn-ghost" style="margin-top:16px;color:var(--error);">
+      Cancel Job
+    </button>
+  </div>
+</div>
+
+<!-- ====================== 06. CHAT ====================== -->
+<div class="screen-page" id="screen-cust-chat">
+  <div class="chat-header">
+    <button class="nav-back" onclick="go('cust-track')"><svg width="20" height="20"><use href="#i-back"/></svg></button>
+    <div class="avatar sm">J</div>
+    <div style="flex:1;">
+      <div class="fundi-name">James Mwangi</div>
+      <div class="chat-status"><span class="online-dot"></span> online</div>
+    </div>
+    <button class="contact-btn call"><svg width="18" height="18"><use href="#i-phone"/></svg></button>
+  </div>
+
+  <div class="chat-messages">
+    <div class="msg other">
+      Hi, I'm on my way. ETA 15 minutes.
+      <div class="msg-time">9:24 AM</div>
+    </div>
+    <div class="msg me">
+      Great, I'll be home.
+      <div class="msg-time">9:25 AM</div>
+    </div>
+    <div class="msg other">
+      Perfect. Do you have the new seal ring ready, or should I bring one?
+      <div class="msg-time">9:25 AM</div>
+    </div>
+    <div class="msg me">
+      Please bring one, I haven't bought it yet 🙏
+      <div class="msg-time">9:26 AM</div>
+    </div>
+    <div class="msg other">
+      Almost there!
+      <div class="msg-time">9:38 AM</div>
+    </div>
+    <div class="typing-indicator">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+    </div>
+  </div>
+
+  <div class="chat-input-bar">
+    <button class="chat-attach"><svg width="20" height="20"><use href="#i-paperclip"/></svg></button>
+    <input type="text" class="chat-input" placeholder="Message...">
+    <button class="chat-send"><svg width="18" height="18"><use href="#i-send"/></svg></button>
+  </div>
+</div>
+
+<!-- ====================== 07. REVIEW ====================== -->
+<div class="screen-page" id="screen-cust-review">
+  <div class="review-screen">
+    <div class="top-nav">
+      <button class="nav-back" onclick="go('cust-jobs')"><svg width="20" height="20"><use href="#i-back"/></svg></button>
+      <div class="nav-title">Rate your experience</div>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="review-avatar-wrap">
+      <div class="avatar lg" style="margin:0 auto;">J</div>
+      <div class="card-title" style="margin-top:16px;">James Mwangi</div>
+      <div class="caption" style="margin-top:4px;">Plumbing • KES 2,500</div>
+    </div>
+
+    <div class="review-stars" id="reviewStars">
+      <svg class="star filled" onclick="setStars(1)"><use href="#i-star"/></svg>
+      <svg class="star filled" onclick="setStars(2)"><use href="#i-star"/></svg>
+      <svg class="star filled" onclick="setStars(3)"><use href="#i-star"/></svg>
+      <svg class="star filled" onclick="setStars(4)"><use href="#i-star"/></svg>
+      <svg class="star filled" onclick="setStars(5)"><use href="#i-star"/></svg>
+    </div>
+
+    <div style="text-align:center;font-size:13px;color:var(--text-2);margin-bottom:20px;font-weight:600;" id="ratingLabel">Excellent service!</div>
+
+    <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">How was James?</div>
+    <textarea class="textarea-field" placeholder="Share details of your experience..." style="height:100px;">James was punctual, professional, and fixed the sink quickly. Highly recommended!</textarea>
+
+    <div style="flex:1;"></div>
+
+    <button class="btn-primary" onclick="go('cust-home')" style="margin-top:24px;">
+      Submit Review
+      <svg width="16" height="16"><use href="#i-check"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ====================== 08. WALLET ====================== -->
+<div class="screen-page" id="screen-cust-wallet">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Wallet</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-arrow-up"/></svg></button>
+      </div>
+
+      <div class="balance-card">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-amount">KES 12,500</div>
+        <div class="balance-meta">
+          <div class="balance-meta-item">
+            Pending
+            <strong>KES 2,500</strong>
+          </div>
+          <div class="balance-meta-item">
+            This month
+            <strong>KES 32K</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="loyalty-card">
+        <div class="loyalty-top">
+          <div>
+            <div class="loyalty-tier">Gold Tier</div>
+            <div class="caption" style="margin-top:2px;">1,250 loyalty points</div>
+          </div>
+          <div class="loyalty-points">1,250</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill"></div>
+        </div>
+        <div class="progress-caption">
+          <span>Gold</span>
+          <span>750 pts to Platinum</span>
+          <span>Platinum</span>
+        </div>
+      </div>
+
+      <div class="section-row">
+        <h2 class="section-header" style="font-size:17px;">Transaction history</h2>
+        <span class="section-link">See all</span>
+      </div>
+
+      <div class="card">
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(39,163,95,0.12);color:var(--success);">
+            <svg width="18" height="18"><use href="#i-arrow-down"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Payment received</div>
+            <div class="tx-date">James Mwangi • Mar 14</div>
+          </div>
+          <div class="tx-amount pos">+KES 2,500</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(239,68,68,0.12);color:var(--error);">
+            <svg width="18" height="18"><use href="#i-arrow-up"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Job payment</div>
+            <div class="tx-date">Light fixture • Mar 10</div>
+          </div>
+          <div class="tx-amount neg">-KES 4,200</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(249,115,22,0.12);color:var(--primary);">
+            <svg width="18" height="18"><use href="#i-gift"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Loyalty bonus</div>
+            <div class="tx-date">Gold tier reward • Mar 1</div>
+          </div>
+          <div class="tx-amount pos">+KES 500</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(39,163,95,0.12);color:var(--success);">
+            <svg width="18" height="18"><use href="#i-arrow-down"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Top up via M-Pesa</div>
+            <div class="tx-date">Feb 28</div>
+          </div>
+          <div class="tx-amount pos">+KES 5,000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="customer" data-active="wallet">
+    <button class="tab" onclick="go('cust-home')"><svg><use href="#i-home"/></svg><span class="tab-label">Home</span></button>
+    <button class="tab" onclick="go('cust-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab active" onclick="go('cust-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('cust-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 09. PROFILE ====================== -->
+<div class="screen-page" id="screen-cust-profile">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Profile</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-edit"/></svg></button>
+      </div>
+
+      <div class="profile-header">
+        <div class="avatar lg orange">J</div>
+        <div class="profile-name">John Doe</div>
+        <div class="profile-email">john.doe@gmail.com • +254 712 345 678</div>
+        <div class="trust-score-pill">
+          <svg width="14" height="14"><use href="#i-shield"/></svg>
+          100 Trust Score
+        </div>
+      </div>
+
+      <div class="menu-list">
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(249,115,22,0.12);color:var(--primary);"><svg width="16" height="16"><use href="#i-user"/></svg></div>
+          <div class="menu-label">Edit Profile</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(14,165,233,0.12);color:#0EA5E9;"><svg width="16" height="16"><use href="#i-pin"/></svg></div>
+          <div class="menu-label">Saved Places</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(168,85,247,0.12);color:#A855F7;"><svg width="16" height="16"><use href="#i-briefcase"/></svg></div>
+          <div class="menu-label">Job History</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(239,68,68,0.12);color:var(--error);"><svg width="16" height="16"><use href="#i-warning"/></svg></div>
+          <div class="menu-label">Disputes</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row" onclick="go('cust-notif')">
+          <div class="menu-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B;"><svg width="16" height="16"><use href="#i-bell"/></svg></div>
+          <div class="menu-label">Notifications</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(30,158,138,0.12);color:var(--accent);"><svg width="16" height="16"><use href="#i-help"/></svg></div>
+          <div class="menu-label">Support</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row" onclick="go('cust-settings')">
+          <div class="menu-icon-box" style="background:rgba(28,25,23,0.06);color:var(--text-2);"><svg width="16" height="16"><use href="#i-settings"/></svg></div>
+          <div class="menu-label">Settings</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <button class="btn-danger" style="margin-bottom:24px;">
+        <svg width="16" height="16"><use href="#i-logout"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="customer" data-active="profile">
+    <button class="tab" onclick="go('cust-home')"><svg><use href="#i-home"/></svg><span class="tab-label">Home</span></button>
+    <button class="tab" onclick="go('cust-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('cust-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab active" onclick="go('cust-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 10. NOTIFICATIONS ====================== -->
+<div class="screen-page" id="screen-cust-notif">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <button class="nav-back" onclick="go('cust-home')"><svg width="20" height="20"><use href="#i-back"/></svg></button>
+        <div class="nav-title">Notifications</div>
+        <button class="btn-ghost" style="height:40px;width:auto;padding:0 12px;color:var(--accent);font-size:12px;">Mark all read</button>
+      </div>
+
+      <div class="notif-row unread" onclick="go('cust-track')">
+        <div class="notif-icon" style="background:rgba(249,115,22,0.12);color:var(--primary);"><svg width="18" height="18"><use href="#i-map-pin"/></svg></div>
+        <div class="notif-body">
+          <div class="notif-title">Fundi on the way</div>
+          <div class="notif-msg">James Mwangi is heading to your location. ETA 8 minutes.</div>
+          <div class="notif-time">2 min ago</div>
+        </div>
+        <span class="unread-dot"></span>
+      </div>
+
+      <div class="notif-row unread" onclick="go('cust-review')">
+        <div class="notif-icon" style="background:rgba(39,163,95,0.12);color:var(--success);"><svg width="18" height="18"><use href="#i-check-circle"/></svg></div>
+        <div class="notif-body">
+          <div class="notif-title">Job completed</div>
+          <div class="notif-msg">Your light fixture installation is done. Please rate your experience.</div>
+          <div class="notif-time">1 hour ago</div>
+        </div>
+        <span class="unread-dot"></span>
+      </div>
+
+      <div class="notif-row">
+        <div class="notif-icon" style="background:rgba(30,158,138,0.12);color:var(--accent);"><svg width="18" height="18"><use href="#i-gift"/></svg></div>
+        <div class="notif-body">
+          <div class="notif-title">Loyalty reward unlocked</div>
+          <div class="notif-msg">You've reached Gold tier! Enjoy KES 500 bonus on your next job.</div>
+          <div class="notif-time">Yesterday</div>
+        </div>
+      </div>
+
+      <div class="notif-row">
+        <div class="notif-icon" style="background:rgba(245,158,11,0.12);color:#F59E0B;"><svg width="18" height="18"><use href="#i-clock"/></svg></div>
+        <div class="notif-body">
+          <div class="notif-title">Job reminder</div>
+          <div class="notif-msg">You have a plumbing job scheduled for tomorrow at 10:00 AM.</div>
+          <div class="notif-time">2 days ago</div>
+        </div>
+      </div>
+
+      <div class="notif-row">
+        <div class="notif-icon" style="background:rgba(168,85,247,0.12);color:#A855F7;"><svg width="18" height="18"><use href="#i-info"/></svg></div>
+        <div class="notif-body">
+          <div class="notif-title">App update available</div>
+          <div class="notif-msg">Version 2.4.0 is here with improved job tracking and faster matching.</div>
+          <div class="notif-time">3 days ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== 11. SETTINGS ====================== -->
+<div class="screen-page" id="screen-cust-settings">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <button class="nav-back" onclick="go('cust-profile')"><svg width="20" height="20"><use href="#i-back"/></svg></button>
+        <div class="nav-title">Settings</div>
+        <div style="width:40px;"></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Account</div>
+        <div class="menu-list">
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(249,115,22,0.12);color:var(--primary);"><svg width="16" height="16"><use href="#i-user"/></svg></div>
+            <div class="menu-label">Edit Profile</div>
+            <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+          </div>
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B;"><svg width="16" height="16"><use href="#i-key"/></svg></div>
+            <div class="menu-label">Change Password</div>
+            <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+          </div>
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(30,158,138,0.12);color:var(--accent);"><svg width="16" height="16"><use href="#i-credit-card"/></svg></div>
+            <div class="menu-label">Payment Methods</div>
+            <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">About</div>
+        <div class="menu-list">
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(28,25,23,0.06);color:var(--text-2);"><svg width="16" height="16"><use href="#i-info"/></svg></div>
+            <div class="menu-label">Version</div>
+            <div class="settings-value">1.0.0</div>
+          </div>
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(28,25,23,0.06);color:var(--text-2);"><svg width="16" height="16"><use href="#i-grid"/></svg></div>
+            <div class="menu-label">Backend URL</div>
+            <div class="settings-value">api.patafundi.co.ke</div>
+          </div>
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(28,25,23,0.06);color:var(--text-2);"><svg width="16" height="16"><use href="#i-help"/></svg></div>
+            <div class="menu-label">Help Center</div>
+            <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title" style="color:var(--error);">Danger Zone</div>
+        <div class="menu-list">
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(239,68,68,0.12);color:var(--error);"><svg width="16" height="16"><use href="#i-logout"/></svg></div>
+            <div class="menu-label" style="color:var(--error);">Sign Out</div>
+          </div>
+          <div class="menu-row">
+            <div class="menu-icon-box" style="background:rgba(239,68,68,0.12);color:var(--error);"><svg width="16" height="16"><use href="#i-warning"/></svg></div>
+            <div class="menu-label" style="color:var(--error);">Delete Account</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== 12. FUNDI LOGIN ====================== -->
+<div class="screen-page" id="screen-fundi-login">
+  <div class="login-screen">
+    <div class="login-logo" style="background:linear-gradient(135deg, #1E9E8A, #0E6B5C);box-shadow:0 12px 32px rgba(30,158,138,0.3);">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+    </div>
+    <h1 class="login-title gradient-text">PataFundi</h1>
+    <p class="login-subtitle">For verified professionals</p>
+
+    <div class="login-card">
+      <div class="input-wrap">
+        <span class="input-icon"><svg width="18" height="18"><use href="#i-mail"/></svg></span>
+        <input type="email" class="input-field" placeholder="Email address" value="james.mwangi@gmail.com">
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><svg width="18" height="18"><use href="#i-lock"/></svg></span>
+        <input type="password" class="input-field" placeholder="Password" value="••••••••">
+      </div>
+      <button class="btn-primary" onclick="go('fundi-dashboard')" style="background:linear-gradient(135deg, #1E9E8A, #0E6B5C);box-shadow:var(--shadow-teal);">
+        Sign In to Dashboard
+        <svg width="16" height="16"><use href="#i-arrow-right"/></svg>
+      </button>
+      <div class="login-links">
+        <span class="link-teal">Apply to join</span>
+        <span class="link-ghost">Forgot password?</span>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:32px;font-size:12px;color:var(--text-3);line-height:1.6;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <svg width="14" height="14" style="color:var(--success);"><use href="#i-shield"/></svg>
+      Verified professionals only
+    </div>
+  </div>
+</div>
+
+<!-- ====================== 13. FUNDI DASHBOARD ====================== -->
+<div class="screen-page" id="screen-fundi-dashboard">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="greeting-row">
+        <div>
+          <div class="greeting-hi">Welcome back,</div>
+          <div class="greeting-name">James Mwangi</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(39,163,95,0.12);border-radius:14px;">
+          <span class="online-dot" style="width:8px;height:8px;"></span>
+          <span style="font-size:12px;font-weight:700;color:var(--success);">Online</span>
+        </div>
+      </div>
+
+      <div class="online-toggle-card">
+        <div>
+          <div class="card-title">You're Online</div>
+          <div class="caption" style="margin-top:4px;">Receiving new job requests</div>
+        </div>
+        <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+      </div>
+
+      <div class="active-job-card" onclick="go('fundi-detail')">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span class="pill pill-teal">Active Job</span>
+          <span class="caption">In progress</span>
+        </div>
+        <div class="card-title" style="margin-bottom:4px;">Kitchen sink repair</div>
+        <div class="caption" style="margin-bottom:12px;">Westlands, Nairobi • 8 min away</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--accent-dark);">KES 2,500</div>
+          <button class="btn-secondary" style="width:auto;height:40px;padding:0 16px;font-size:13px;">
+            Go to Job
+            <svg width="14" height="14"><use href="#i-arrow-right"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="caption" style="margin:24px 4px 8px;font-weight:700;color:var(--text);font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">Earnings</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Today</div>
+          <div class="stat-value">3.5K</div>
+          <div class="caption" style="font-size:10px;color:var(--success);margin-top:2px;">+12%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Week</div>
+          <div class="stat-value">18K</div>
+          <div class="caption" style="font-size:10px;color:var(--success);margin-top:2px;">+8%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Month</div>
+          <div class="stat-value">72K</div>
+          <div class="caption" style="font-size:10px;color:var(--success);margin-top:2px;">+24%</div>
+        </div>
+      </div>
+
+      <div class="caption" style="margin:16px 4px 8px;font-weight:700;color:var(--text);font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">Performance</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Jobs</div>
+          <div class="stat-value">147</div>
+          <div class="caption" style="font-size:10px;color:var(--text-3);margin-top:2px;">all time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Rating</div>
+          <div class="stat-value" style="color:#F59E0B;">4.8★</div>
+          <div class="caption" style="font-size:10px;color:var(--text-3);margin-top:2px;">132 reviews</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Accept</div>
+          <div class="stat-value">92%</div>
+          <div class="caption" style="font-size:10px;color:var(--text-3);margin-top:2px;">rate</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div class="card-title" style="font-size:15px;">Weekly Earnings</div>
+            <span class="pill pill-green">+18%</span>
+          </div>
+          <div class="bar-chart">
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:40%;"></div>
+              <div class="bar-label">M</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:65%;"></div>
+              <div class="bar-label">T</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:50%;"></div>
+              <div class="bar-label">W</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:80%;"></div>
+              <div class="bar-label">T</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:95%;"></div>
+              <div class="bar-label">F</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:70%;"></div>
+              <div class="bar-label">S</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;">
+              <div class="bar" style="height:30%;opacity:0.5;"></div>
+              <div class="bar-label">S</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="fundi" data-active="dashboard">
+    <button class="tab active" onclick="go('fundi-dashboard')"><svg><use href="#i-grid"/></svg><span class="tab-label">Dashboard</span></button>
+    <button class="tab" onclick="go('fundi-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('fundi-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('fundi-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 14. FUNDI JOBS ====================== -->
+<div class="screen-page" id="screen-fundi-jobs">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Jobs</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-settings"/></svg></button>
+      </div>
+
+      <div class="segmented" id="fundiSegmented">
+        <button class="active" data-seg="available">Available</button>
+        <button data-seg="mine">My Jobs</button>
+      </div>
+
+      <div id="segAvailable">
+        <div class="job-card" style="align-items:flex-start;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;width:100%;">
+            <div class="job-icon-box" style="background:rgba(14,165,233,0.12);color:#0EA5E9;">
+              <svg width="24" height="24"><use href="#i-plumbing"/></svg>
+            </div>
+            <div class="job-info">
+              <div class="job-title">Bathroom pipe leak</div>
+              <div class="job-meta">
+                <svg width="11" height="11"><use href="#i-pin"/></svg>
+                Kilimani • 2.4 km
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="job-price">KES 3,200</div>
+              <div class="caption" style="font-size:11px;">Emergency</div>
+            </div>
+          </div>
+          <button class="btn-secondary" style="height:40px;font-size:13px;">
+            <svg width="14" height="14"><use href="#i-check"/></svg>
+            Accept Job
+          </button>
+        </div>
+
+        <div class="job-card" style="align-items:flex-start;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;width:100%;">
+            <div class="job-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B;">
+              <svg width="24" height="24"><use href="#i-electrical"/></svg>
+            </div>
+            <div class="job-info">
+              <div class="job-title">Ceiling fan installation</div>
+              <div class="job-meta">
+                <svg width="11" height="11"><use href="#i-pin"/></svg>
+                Lavington • 1.8 km
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="job-price">KES 2,800</div>
+              <div class="caption" style="font-size:11px;">Normal</div>
+            </div>
+          </div>
+          <button class="btn-secondary" style="height:40px;font-size:13px;">
+            <svg width="14" height="14"><use href="#i-check"/></svg>
+            Accept Job
+          </button>
+        </div>
+
+        <div class="job-card" style="align-items:flex-start;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;width:100%;">
+            <div class="job-icon-box" style="background:rgba(168,85,247,0.12);color:#A855F7;">
+              <svg width="24" height="24"><use href="#i-carpentry"/></svg>
+            </div>
+            <div class="job-info">
+              <div class="job-title">Wardrobe door fix</div>
+              <div class="job-meta">
+                <svg width="11" height="11"><use href="#i-pin"/></svg>
+                Westlands • 0.9 km
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="job-price">KES 1,500</div>
+              <div class="caption" style="font-size:11px;">Normal</div>
+            </div>
+          </div>
+          <button class="btn-secondary" style="height:40px;font-size:13px;">
+            <svg width="14" height="14"><use href="#i-check"/></svg>
+            Accept Job
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="fundi" data-active="jobs">
+    <button class="tab" onclick="go('fundi-dashboard')"><svg><use href="#i-grid"/></svg><span class="tab-label">Dashboard</span></button>
+    <button class="tab active" onclick="go('fundi-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('fundi-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('fundi-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 15. FUNDI JOB DETAIL ====================== -->
+<div class="screen-page" id="screen-fundi-detail">
+  <div class="map-area" style="height:380px;">
+    <div class="map-grid"></div>
+    <div class="map-park"></div>
+    <div class="map-water"></div>
+    <div class="map-road h1"></div>
+    <div class="map-road h2"></div>
+    <div class="map-road v1"></div>
+    <div class="map-road v2"></div>
+    <div class="map-pin you" style="background:linear-gradient(135deg, #1E9E8A, #0E6B5C);color:#1E9E8A;">J</div>
+    <div class="map-pin fundi" style="background:linear-gradient(135deg, #F97316, #EA580C);color:#F97316;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    </div>
+    <button class="nav-back" style="position:absolute;top:64px;left:16px;z-index:10;" onclick="go('fundi-jobs')">
+      <svg width="20" height="20"><use href="#i-back"/></svg>
+    </button>
+  </div>
+
+  <div class="bottom-sheet" style="bottom:auto;top:380px;left:0;right:0;border-radius:28px 28px 50px 50px;padding:20px 24px 110px;">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <span class="pill pill-teal" style="margin-bottom:8px;">Active Job</span>
+        <div class="card-title" style="margin-top:8px;font-size:18px;">Kitchen sink repair</div>
+        <div class="caption" style="margin-top:4px;">Westlands, Nairobi • 8 min away</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--accent-dark);">KES 2,500</div>
+        <div class="caption" style="font-size:11px;">Emergency</div>
+      </div>
+    </div>
+
+    <div class="fundi-contact" style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:0 0 16px;">
+      <div class="avatar orange">J</div>
+      <div class="fundi-info">
+        <div class="fundi-name">John Doe</div>
+        <div class="fundi-rating">
+          <svg width="12" height="12" style="color:var(--success);"><use href="#i-shield"/></svg>
+          Verified customer
+        </div>
+      </div>
+      <button class="contact-btn call"><svg width="18" height="18"><use href="#i-phone"/></svg></button>
+      <button class="contact-btn chat"><svg width="18" height="18"><use href="#i-message"/></svg></button>
+    </div>
+
+    <div class="caption" style="margin-bottom:8px;font-weight:600;color:var(--text);">Description</div>
+    <div class="body-text" style="margin-bottom:16px;font-size:13px;line-height:1.5;">Kitchen sink is leaking underneath, needs new seal and pipe tightening. Available mornings.</div>
+
+    <div class="action-row" style="grid-template-columns:1fr 1fr;">
+      <button class="action-btn navigate">
+        <svg width="16" height="16"><use href="#i-navigate"/></svg>
+        Navigate
+      </button>
+      <button class="action-btn checkin">
+        <svg width="16" height="16"><use href="#i-map-pin"/></svg>
+        Check In
+      </button>
+      <button class="action-btn chat">
+        <svg width="16" height="16"><use href="#i-message"/></svg>
+        Chat
+      </button>
+      <button class="action-btn sos">
+        <svg width="16" height="16"><use href="#i-warning"/></svg>
+        SOS
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== 16. FUNDI WALLET ====================== -->
+<div class="screen-page" id="screen-fundi-wallet">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Wallet</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-info"/></svg></button>
+      </div>
+
+      <div class="balance-card" style="background:linear-gradient(135deg, #F97316 0%, #EA580C 60%, #C2410C 130%);">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-amount">KES 45,000</div>
+        <div class="balance-meta">
+          <div class="balance-meta-item">
+            Pending
+            <strong>KES 3,500</strong>
+          </div>
+          <div class="balance-meta-item">
+            Withdrawn
+            <strong>KES 128K</strong>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-secondary" style="margin-bottom:24px;background:linear-gradient(135deg, #1E9E8A, #0E6B5C);color:white;border:none;box-shadow:var(--shadow-teal);">
+        <svg width="16" height="16"><use href="#i-arrow-up"/></svg>
+        Withdraw to M-Pesa
+      </button>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="card-title" style="font-size:15px;">This week</div>
+          <span class="pill pill-green">+18%</span>
+        </div>
+        <div class="bar-chart">
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:40%;"></div>
+            <div class="bar-label">M</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:65%;"></div>
+            <div class="bar-label">T</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:50%;"></div>
+            <div class="bar-label">W</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:80%;"></div>
+            <div class="bar-label">T</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:95%;"></div>
+            <div class="bar-label">F</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:70%;"></div>
+            <div class="bar-label">S</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;">
+            <div class="bar" style="height:30%;opacity:0.5;"></div>
+            <div class="bar-label">S</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-row">
+        <h2 class="section-header" style="font-size:17px;">Transactions</h2>
+        <span class="section-link">See all</span>
+      </div>
+
+      <div class="card">
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(39,163,95,0.12);color:var(--success);">
+            <svg width="18" height="18"><use href="#i-arrow-down"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Job payment</div>
+            <div class="tx-date">John Doe • Today</div>
+          </div>
+          <div class="tx-amount pos">+KES 2,500</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(239,68,68,0.12);color:var(--error);">
+            <svg width="18" height="18"><use href="#i-arrow-up"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Withdrawal</div>
+            <div class="tx-date">M-Pesa • Yesterday</div>
+          </div>
+          <div class="tx-amount neg">-KES 10,000</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(39,163,95,0.12);color:var(--success);">
+            <svg width="18" height="18"><use href="#i-arrow-down"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Job payment</div>
+            <div class="tx-date">Sarah Wanjiru • 2 days ago</div>
+          </div>
+          <div class="tx-amount pos">+KES 1,800</div>
+        </div>
+        <div class="tx-row">
+          <div class="tx-icon" style="background:rgba(249,115,22,0.12);color:var(--primary);">
+            <svg width="18" height="18"><use href="#i-gift"/></svg>
+          </div>
+          <div class="tx-info">
+            <div class="tx-title">Performance bonus</div>
+            <div class="tx-date">Top fundi reward • 3 days ago</div>
+          </div>
+          <div class="tx-amount pos">+KES 1,000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="fundi" data-active="wallet">
+    <button class="tab" onclick="go('fundi-dashboard')"><svg><use href="#i-grid"/></svg><span class="tab-label">Dashboard</span></button>
+    <button class="tab" onclick="go('fundi-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab active" onclick="go('fundi-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab" onclick="go('fundi-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+<!-- ====================== 17. FUNDI PROFILE ====================== -->
+<div class="screen-page" id="screen-fundi-profile">
+  <div class="scroll-area">
+    <div class="content">
+      <div class="top-nav">
+        <div class="nav-title" style="font-size:22px;font-family:var(--font-display);font-weight:800;">Profile</div>
+        <button class="icon-btn"><svg width="20" height="20"><use href="#i-edit"/></svg></button>
+      </div>
+
+      <div class="profile-header">
+        <div style="position:relative;">
+          <div class="avatar lg" style="background:linear-gradient(135deg, #1E9E8A, #0E6B5C);">J</div>
+          <div class="verified-badge" style="position:absolute;bottom:0;right:0;">
+            <svg width="12" height="12"><use href="#i-check"/></svg>
+          </div>
+        </div>
+        <div class="profile-name" style="display:flex;align-items:center;gap:6px;justify-content:center;">
+          James Mwangi
+          <svg width="16" height="16" style="color:var(--success);"><use href="#i-shield"/></svg>
+        </div>
+        <div class="profile-email">Verified Plumber • ID #PF-00472</div>
+      </div>
+
+      <div class="stats-row" style="margin-bottom:24px;">
+        <div class="stat-card">
+          <div class="stat-label">Jobs</div>
+          <div class="stat-value">147</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Rating</div>
+          <div class="stat-value" style="color:#F59E0B;">4.8★</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Years</div>
+          <div class="stat-value">6</div>
+        </div>
+      </div>
+
+      <div class="menu-list">
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(249,115,22,0.12);color:var(--primary);"><svg width="16" height="16"><use href="#i-user"/></svg></div>
+          <div class="menu-label">Edit Profile</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(168,85,247,0.12);color:#A855F7;"><svg width="16" height="16"><use href="#i-camera"/></svg></div>
+          <div class="menu-label">Portfolio</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(14,165,233,0.12);color:#0EA5E9;"><svg width="16" height="16"><use href="#i-clock"/></svg></div>
+          <div class="menu-label">Availability</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(245,158,11,0.12);color:#F59E0B;"><svg width="16" height="16"><use href="#i-star"/></svg></div>
+          <div class="menu-label">Reviews</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row" onclick="go('fundi-wallet')">
+          <div class="menu-icon-box" style="background:rgba(30,158,138,0.12);color:var(--accent);"><svg width="16" height="16"><use href="#i-trending-up"/></svg></div>
+          <div class="menu-label">Earnings</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(39,163,95,0.12);color:var(--success);"><svg width="16" height="16"><use href="#i-shield"/></svg></div>
+          <div class="menu-label">Verification</div>
+          <span class="pill pill-green" style="margin-right:8px;">Verified</span>
+        </div>
+        <div class="menu-row">
+          <div class="menu-icon-box" style="background:rgba(28,25,23,0.06);color:var(--text-2);"><svg width="16" height="16"><use href="#i-settings"/></svg></div>
+          <div class="menu-label">Settings</div>
+          <svg width="16" height="16" class="menu-chevron"><use href="#i-chevron-right"/></svg>
+        </div>
+      </div>
+
+      <button class="btn-danger" style="margin-bottom:24px;">
+        <svg width="16" height="16"><use href="#i-logout"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </div>
+  <div class="tab-bar" data-tabs="fundi" data-active="profile">
+    <button class="tab" onclick="go('fundi-dashboard')"><svg><use href="#i-grid"/></svg><span class="tab-label">Dashboard</span></button>
+    <button class="tab" onclick="go('fundi-jobs')"><svg><use href="#i-briefcase"/></svg><span class="tab-label">Jobs</span></button>
+    <button class="tab" onclick="go('fundi-wallet')"><svg><use href="#i-wallet"/></svg><span class="tab-label">Wallet</span></button>
+    <button class="tab active" onclick="go('fundi-profile')"><svg><use href="#i-user"/></svg><span class="tab-label">Profile</span></button>
+  </div>
+</div>
+
+        </div><!-- /screens -->
+      </div><!-- /screen -->
+    </div><!-- /phone -->
+  </div><!-- /phone-wrap -->
+
+</div><!-- /stage -->
+
+<script>
+// ============================================================
+// NAVIGATION SYSTEM
+// ============================================================
+const screens = document.querySelectorAll('.screen-page');
+const navItems = document.querySelectorAll('.nav-item');
+const appToggle = document.getElementById('appToggle');
+const navCustomer = document.getElementById('navCustomer');
+const navFundi = document.getElementById('navFundi');
+let currentApp = 'customer';
+let currentScreen = 'cust-login';
+
+function go(screenId) {
+  const target = document.getElementById('screen-' + screenId);
+  if (!target) return;
+
+  // Determine if reverse navigation (back)
+  const order = Array.from(screens).map(s => s.id.replace('screen-',''));
+  const currentIdx = order.indexOf(currentScreen);
+  const targetIdx = order.indexOf(screenId);
+  const isReverse = targetIdx < currentIdx;
+
+  screens.forEach(s => {
+    s.classList.remove('active', 'reverse');
+  });
+  target.classList.add('active');
+  if (isReverse) target.classList.add('reverse');
+
+  // Update sidebar nav
+  navItems.forEach(n => n.classList.remove('active'));
+  const matchingNav = document.querySelector(`.nav-item[data-screen="${screenId}"]`);
+  if (matchingNav) matchingNav.classList.add('active');
+
+  // Auto-switch app context if needed
+  if (screenId.startsWith('cust') && currentApp !== 'customer') {
+    switchApp('customer');
+  } else if (screenId.startsWith('fundi') && currentApp !== 'fundi') {
+    switchApp('fundi');
+  }
+
+  currentScreen = screenId;
+
+  // Scroll to top
+  const scrollArea = target.querySelector('.scroll-area');
+  if (scrollArea) scrollArea.scrollTop = 0;
+}
+
+// Sidebar navigation
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    go(item.dataset.screen);
+  });
+});
+
+// App toggle
+function switchApp(app) {
+  currentApp = app;
+  appToggle.dataset.app = app;
+  appToggle.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.app === app);
+  });
+  if (app === 'customer') {
+    navCustomer.style.display = '';
+    navFundi.style.display = 'none';
+    go('cust-home');
+  } else {
+    navCustomer.style.display = 'none';
+    navFundi.style.display = '';
+    go('fundi-dashboard');
+  }
+}
+
+appToggle.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchApp(btn.dataset.app);
+  });
+});
+
+// ============================================================
+// CATEGORY CHIPS (Create Job)
+// ============================================================
+document.querySelectorAll('#categoryChips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#categoryChips .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+// Generic chip-row selection
+document.querySelectorAll('.chip-row').forEach(row => {
+  if (row.id === 'categoryChips') return;
+  row.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      row.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+});
+
+// ============================================================
+// TOGGLE PILLS (Urgency)
+// ============================================================
+function selectTogglePill(el, color) {
+  const parent = el.parentElement;
+  parent.querySelectorAll('.toggle-pill').forEach(p => {
+    p.classList.remove('active', 'teal', 'red');
+  });
+  el.classList.add('active', color);
+}
+
+// ============================================================
+// REVIEW STARS
+// ============================================================
+const ratingLabels = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent service!'];
+function setStars(n) {
+  const stars = document.querySelectorAll('#reviewStars .star');
+  stars.forEach((s, i) => {
+    s.classList.toggle('filled', i < n);
+  });
+  document.getElementById('ratingLabel').textContent = ratingLabels[n];
+}
+
+// ============================================================
+// FUNDI SEGMENTED CONTROL
+// ============================================================
+document.querySelectorAll('#fundiSegmented button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#fundiSegmented button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ============================================================
+// TOAST FEEDBACK (for buttons without destinations)
+// ============================================================
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = `
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(28,25,23,0.92); color: white; padding: 12px 20px;
+    border-radius: 12px; font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif;
+    z-index: 200; backdrop-filter: blur(20px); box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    animation: fadeIn 0.2s ease;
+  `;
+  document.querySelector('.phone').appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.3s';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 1600);
+}
+
+// Wire up buttons without onclick handlers to show toast
+document.querySelectorAll('.btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .btn-outline, .action-btn, .contact-btn, .icon-btn, .toggle-switch').forEach(btn => {
+  if (!btn.hasAttribute('onclick') && !btn.onclick) {
+    btn.addEventListener('click', () => {
+      const label = btn.textContent.trim().slice(0, 30) || 'Action';
+      showToast(label);
+    });
+  }
+});
+
+// ============================================================
+// KEYBOARD: Arrow keys to navigate
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  const items = Array.from(document.querySelectorAll(`#nav${currentApp === 'customer' ? 'Customer' : 'Fundi'} .nav-item`));
+  const currentIdx = items.findIndex(i => i.classList.contains('active'));
+  if (e.key === 'ArrowDown' && currentIdx < items.length - 1) {
+    go(items[currentIdx + 1].dataset.screen);
+  } else if (e.key === 'ArrowUp' && currentIdx > 0) {
+    go(items[currentIdx - 1].dataset.screen);
+  }
+});
+
+console.log('%cPataFundi Premium Preview','color:#F97316;font-weight:800;font-size:18px;font-family:Plus Jakarta Sans,sans-serif;');
+console.log('%c17 screens loaded. Use sidebar or arrow keys to navigate.','color:#78716C;font-size:12px;');
+</script>
+
+</body>
+</html>
