@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true, "jsx": "react-jsx", "esModuleInterop": true, "skipLibCheck": true,
+    "moduleResolution": "node", "allowSyntheticDefaultImports": true,
+    "baseUrl": ".", "paths": { "@patafundi/shared": ["../../packages/shared/src"] }
+  },
+  "extends": "expo/tsconfig.base"
+}
