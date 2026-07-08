@@ -9,19 +9,15 @@
  */
 
 import { query } from '../db.js';
-import { requireFinancialAccess, sanitizeJobForCustomer, sanitizeJobForFundi, getActiveCampaign, recordRevenueEntry } from '../services/financialConfidentialityService.js';
+import { hasFinancialAccess, sanitizeJobForCustomer, sanitizeJobForFundi, getActiveCampaign, recordRevenueEntry } from '../services/financialConfidentialityService.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 
 // ── CEO Financial Dashboard ───────────────────────────────────
 export async function ceoFinancialDashboard(req, res) {
-  // Double-check access (middleware already does this, but defense in depth)
-  const hasAccess = await requireFinancialAccess('view_financial_reports').then(fn => new Promise((resolve) => {
-    const mockRes = { status: () => ({ json: () => resolve(false) }) };
-    const mockNext = () => resolve(true);
-    fn(req, mockRes, mockNext);
-  }));
-  if (!hasAccess) {
+  // Defense in depth: route middleware already checks role, but verify here too
+  const allowed = await hasFinancialAccess(req.user.id, 'view_financial_reports');
+  if (!allowed) {
     return res.status(403).json({ success: false, message: 'CEO access required' });
   }
 
