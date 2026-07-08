@@ -20,6 +20,20 @@ import { useAuthStore } from '../store/authStore';
 
 const APP_VERSION = '1.0.0';
 
+interface LegalLink {
+  label: string;
+  slug: string;
+}
+
+const LEGAL_LINKS: LegalLink[] = [
+  { label: 'Terms of Service', slug: 'terms-of-service' },
+  { label: 'Privacy Policy', slug: 'privacy-policy' },
+  { label: 'Cookie Policy', slug: 'cookie-policy' },
+  { label: 'Refund Policy', slug: 'refund-policy' },
+  { label: 'Safety Guidelines', slug: 'safety-guidelines' },
+  { label: 'Community Guidelines', slug: 'community-guidelines' },
+];
+
 export function SettingsScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -98,6 +112,27 @@ export function SettingsScreen({ navigation }: any): JSX.Element {
         <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
+      <Text style={styles.sectionLabel}>Legal</Text>
+      <View style={styles.legalCard}>
+        {LEGAL_LINKS.map((link, idx) => (
+          <TouchableOpacity
+            key={link.slug}
+            style={[
+              styles.legalRow,
+              idx < LEGAL_LINKS.length - 1 ? styles.legalRowBorder : null,
+            ]}
+            onPress={() => navigation.navigate('LegalPage', { slug: link.slug, title: link.label })}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              <Text style={styles.menuLabel}>{link.label}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <TouchableOpacity
         style={[styles.outlineBtn, { borderColor: colors.error }]}
         onPress={handleDeleteAccount}
@@ -169,6 +204,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  sectionLabel: {
+    fontFamily: fonts.display,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  legalCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  legalRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   menuLeft: {
     flexDirection: 'row',

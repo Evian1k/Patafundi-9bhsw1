@@ -28,10 +28,15 @@ interface MenuItem {
 const MENU: MenuItem[] = [
   { label: 'Edit Profile', icon: 'create-outline', route: 'EditProfile' },
   { label: 'Saved Places', icon: 'location-outline', route: 'SavedPlaces' },
+  { label: 'Favorites', icon: 'heart-outline', route: 'Favorites' },
+  { label: 'Refer & Earn', icon: 'gift-outline', route: 'ReferEarn' },
   { label: 'My Jobs', icon: 'briefcase-outline', route: 'Jobs' },
   { label: 'Disputes', icon: 'alert-circle-outline', route: 'Disputes' },
   { label: 'Notifications', icon: 'notifications-outline', route: 'Notifications' },
-  { label: 'Support', icon: 'help-circle-outline', route: 'Support' },
+  { label: 'Help Center', icon: 'help-circle-outline', route: 'HelpCenter' },
+  { label: 'Support', icon: 'chatbubble-ellipses-outline', route: 'Support' },
+  { label: 'Security', icon: 'shield-outline', route: 'SecurityCenter' },
+  { label: 'About', icon: 'information-circle-outline', route: 'About' },
   { label: 'Settings', icon: 'settings-outline', route: 'Settings' },
 ];
 

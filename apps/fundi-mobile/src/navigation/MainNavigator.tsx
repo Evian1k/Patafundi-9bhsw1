@@ -17,6 +17,9 @@ import { ReviewsScreen } from '../screens/ReviewsScreen';
 import { EarningsScreen } from '../screens/EarningsScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { FundiHelpCenterScreen } from '../screens/FundiHelpCenterScreen';
+import { FundiAboutScreen } from '../screens/FundiAboutScreen';
+import { LegalPageScreen } from '../screens/LegalPageScreen';
 
 export type DashboardStackParamList = {
   Dashboard: undefined;
@@ -44,6 +47,9 @@ export type ProfileStackParamList = {
   Earnings: undefined;
   Verification: undefined;
   Settings: undefined;
+  HelpCenter: undefined;
+  About: undefined;
+  LegalPage: { slug: string; title: string };
 };
 
 export type MainTabParamList = {
@@ -99,6 +105,13 @@ function ProfileStackScreen(): JSX.Element {
       <ProfileStack.Screen name="Earnings" component={EarningsScreen} options={{ title: 'Earnings' }} />
       <ProfileStack.Screen name="Verification" component={VerificationScreen} options={{ title: 'Verification' }} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <ProfileStack.Screen name="HelpCenter" component={FundiHelpCenterScreen} options={{ title: 'Help Center' }} />
+      <ProfileStack.Screen name="About" component={FundiAboutScreen} options={{ title: 'About' }} />
+      <ProfileStack.Screen
+        name="LegalPage"
+        component={LegalPageScreen}
+        options={({ route }) => ({ title: (route.params as { title?: string } | undefined)?.title ?? 'Legal' })}
+      />
     </ProfileStack.Navigator>
   );
 }

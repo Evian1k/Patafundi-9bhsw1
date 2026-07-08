@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
 import { apiClient, colors } from '@patafundi/shared';
 import { useAuthStore } from './store/authStore';
 import { RootNavigator } from './navigation/RootNavigator';
+import { OnboardingScreen } from './screens/OnboardingScreen';
 import { linking } from './linking';
+
+const ONBOARDING_KEY = 'onboarding_complete';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -19,7 +23,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 export default function App(): JSX.Element {
   const checkAuth = useAuthStore((s) => s.checkAuth);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [ready, setReady] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -35,6 +41,12 @@ export default function App(): JSX.Element {
         await withTimeout(apiClient.ensureTokensLoaded(), 4000);
         await withTimeout(checkAuth(), 4000);
         await withTimeout(Location.requestForegroundPermissionsAsync(), 4000);
+        try {
+          const flag = await AsyncStorage.getItem(ONBOARDING_KEY);
+          if (mounted && !flag) setNeedsOnboarding(true);
+        } catch {
+          // ignore storage errors — proceed without onboarding
+        }
       } catch {
         // continue regardless of failures
       } finally {
@@ -57,6 +69,14 @@ export default function App(): JSX.Element {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
+    );
+  }
+
+  if (needsOnboarding && !isLoggedIn) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onComplete={() => setNeedsOnboarding(false)} />
+      </SafeAreaProvider>
     );
   }
 

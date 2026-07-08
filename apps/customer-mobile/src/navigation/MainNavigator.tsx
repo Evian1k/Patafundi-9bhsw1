@@ -18,6 +18,12 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { DisputesScreen } from '../screens/DisputesScreen';
 import { SupportScreen } from '../screens/SupportScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { LegalPageScreen } from '../screens/LegalPageScreen';
+import { HelpCenterScreen } from '../screens/HelpCenterScreen';
+import { FavoritesScreen } from '../screens/FavoritesScreen';
+import { ReferEarnScreen } from '../screens/ReferEarnScreen';
+import { AboutScreen } from '../screens/AboutScreen';
+import { SecurityCenterScreen } from '../screens/SecurityCenterScreen';
 
 export type HomeStackParamList = {
   Home: undefined;
@@ -51,6 +57,12 @@ export type ProfileStackParamList = {
   Review: { jobId: string };
   Support: undefined;
   Settings: undefined;
+  LegalPage: { slug: string; title: string };
+  HelpCenter: undefined;
+  Favorites: undefined;
+  ReferEarn: undefined;
+  About: undefined;
+  SecurityCenter: undefined;
 };
 
 export type MainTabParamList = {
@@ -112,6 +124,16 @@ function ProfileStackScreen(): JSX.Element {
       <ProfileStack.Screen name="Review" component={ReviewScreen} options={{ title: 'Review' }} />
       <ProfileStack.Screen name="Support" component={SupportScreen} options={{ title: 'Support' }} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <ProfileStack.Screen
+        name="LegalPage"
+        component={LegalPageScreen}
+        options={({ route }) => ({ title: (route.params as { title?: string } | undefined)?.title ?? 'Legal' })}
+      />
+      <ProfileStack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: 'Help Center' }} />
+      <ProfileStack.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Favorites' }} />
+      <ProfileStack.Screen name="ReferEarn" component={ReferEarnScreen} options={{ title: 'Refer & Earn' }} />
+      <ProfileStack.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
+      <ProfileStack.Screen name="SecurityCenter" component={SecurityCenterScreen} options={{ title: 'Security' }} />
     </ProfileStack.Navigator>
   );
 }

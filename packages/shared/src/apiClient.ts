@@ -212,6 +212,18 @@ class ApiClient {
   // Support
   createSupportTicket(data: { subject: string; message: string; category?: string; jobId?: string }): Promise<{ ticket: any }> { return this.request('/support/ticket', { method: 'POST', body: JSON.stringify(data) }); }
 
+  // ── Content: Policies, Help, Blog, Services ───────────────
+  getPolicy(slug: string): Promise<{ policy: any }> { return this.request(`/policies/${slug}`); }
+  getHelp(): Promise<{ help: any }> { return this.request('/help'); }
+  listBlogPosts(): Promise<{ posts: any[] }> { return this.request('/blog'); }
+  getBlogPost(slug: string): Promise<{ post: any }> { return this.request(`/blog/${slug}`); }
+  getServiceDetails(slug: string): Promise<{ service: any; fundis: any[] }> { return this.request(`/services/${slug}`); }
+
+  // ── Favorites ──────────────────────────────────────────────
+  listFavoriteFundis(): Promise<{ favorites: FundiPublic[] }> { return this.request('/favorites/fundis'); }
+  addFavoriteFundi(fundiId: string): Promise<{ success: boolean }> { return this.request('/favorites/fundis', { method: 'POST', body: JSON.stringify({ fundiId }) }); }
+  removeFavoriteFundi(fundiId: string): Promise<{ success: boolean }> { return this.request(`/favorites/fundis/${fundiId}`, { method: 'DELETE' }); }
+
   // GDPR
   requestDataExport(): Promise<{ success: boolean; requestId: string }> { return this.request('/gdpr/export', { method: 'POST' }); }
   requestDataDeletion(): Promise<{ success: boolean; requestId: string }> { return this.request('/gdpr/deletion', { method: 'POST' }); }
