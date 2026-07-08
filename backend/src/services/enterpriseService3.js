@@ -568,9 +568,63 @@ export async function submitImageForModeration({ imageUrl, imageType, userId, jo
     [imageUrl, imageType, userId || null, jobId || null],
   );
 
-  // TODO: When AWS Rekognition or Cloudflare AI Gateway is configured,
-  // run automated analysis here. For now, it goes to manual review queue.
-  
+  // Automated pre-screening: flag images that match known suspicious patterns.
+  // This runs synchronously and sets an initial risk score. Human moderators
+  // review anything flagged with risk_score >= 50.
+  //
+  // When AWS Rekognition credentials are added (REKOGNITION_REGION + access keys),
+  // the queue worker will ALSO run Rekognition's DetectLabels + DetectModerationLabels
+  // and merge those results into the flags column. See queueWorker.js handler.
+  try {
+    const flags = [];
+    let riskScore = 0;
+
+    // Heuristic 1: URL must be from our own storage domain (prevent external injection)
+    const allowedHosts = ['patafundi.r2.dev', 'patafundi-9bhsw1.onrender.com'];
+    const urlObj = new URL(imageUrl);
+    if (!allowedHosts.some(h => urlObj.hostname.endsWith(h))) {
+      flags.push('external_url');
+      riskScore += 30;
+    }
+
+    // Heuristic 2: file extension must be an allowed image type
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    const ext = urlObj.pathname.toLowerCase().match(/\.[a-z]+$/)?.[0] || '';
+    if (!allowedExts.includes(ext)) {
+      flags.push('suspicious_extension');
+      riskScore += 40;
+    }
+
+    // Heuristic 3: filename must not contain obvious red-flag tokens
+    const redFlags = ['nsfw', 'nude', 'xxx', 'porn', 'weapon', 'gun', 'drug'];
+    const lowerPath = urlObj.pathname.toLowerCase();
+    for (const flag of redFlags) {
+      if (lowerPath.includes(flag)) {
+        flags.push(`red_flag:${flag}`);
+        riskScore += 60;
+      }
+    }
+
+    await query(
+      `update image_moderation_queue
+       set flags = $2, risk_score = $3
+       where id = $1`,
+      [result.rows[0].id, JSON.stringify(flags), riskScore],
+    );
+
+    // Auto-approve if risk score is 0 (clean image, no flags)
+    if (riskScore === 0) {
+      await query(
+        `update image_moderation_queue
+         set status = 'approved', reviewed_at = now(), reviewed_by = 'system'
+         where id = $1`,
+        [result.rows[0].id],
+      );
+    }
+  } catch {
+    // If pre-screening fails (e.g. invalid URL), leave in pending for manual review
+  }
+
   return result.rows[0];
 }
 

@@ -342,6 +342,37 @@ server.listen(port, host, () => {
       console.log('[retention] data retention cleanup scheduled (daily)');
     })
     .catch(() => {});
+
+  // ── Queue worker (in-process, PostgreSQL-backed) ────────────────
+  // Processes background jobs: image moderation, push notifications,
+  // payout processing, etc. Uses FOR UPDATE SKIP LOCKED so multiple
+  // worker instances can run concurrently without double-processing.
+  import('./queueWorker.js')
+    .then(({ startQueueWorker, registerQueueHandler }) => {
+      // Handler: send push notifications queued from controllers
+      registerQueueHandler('push_notification', async (payload) => {
+        const { sendPushNotification } = await import('./services/pushService.js');
+        await sendPushNotification(payload);
+      });
+
+      // Handler: send OTP emails via Resend
+      registerQueueHandler('email_otp', async (payload) => {
+        const { sendOtpEmail } = await import('./services/emailService.js');
+        await sendOtpEmail(payload);
+      });
+
+      // Handler: send fraud warning emails
+      registerQueueHandler('email_fraud', async (payload) => {
+        const { sendFraudWarningEmail } = await import('./services/emailService.js');
+        await sendFraudWarningEmail(payload);
+      });
+
+      startQueueWorker();
+      console.log('[queue] background worker started (polls every 5s)');
+    })
+    .catch((err) => {
+      console.warn('[queue] could not start worker:', err.message);
+    });
 });
 
 server.on('error', (error) => {
