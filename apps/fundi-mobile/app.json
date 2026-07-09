@@ -8,7 +8,11 @@
     "scheme": "patafundi-fundi",
     "userInterfaceStyle": "automatic",
     "splash": { "image": "./assets/splash.png", "resizeMode": "contain", "backgroundColor": "#0F172A" },
-    "updates": { "enabled": false },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
