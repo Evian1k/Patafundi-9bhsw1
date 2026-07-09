@@ -23,7 +23,8 @@ import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
 } from '@patafundi/shared';
-import type { Job } from '@patafundi/shared';
+import type { Job, Payment } from '@patafundi/shared';
+import { useAuthStore } from '../store/authStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -34,7 +35,10 @@ interface FundiLocation {
 
 export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   const jobId: string = route?.params?.jobId;
+  const user = useAuthStore((s) => s.user);
   const [job, setJob] = useState<Job | null>(null);
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [fundiLoc, setFundiLoc] = useState<FundiLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -53,6 +57,13 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
         } catch {
           // location may not be available
         }
+      }
+      // Fetch payment status in parallel — best-effort, do not block job render
+      try {
+        const payResp = await apiClient.getPaymentForJob(jobId);
+        setPayment(payResp?.payment ?? null);
+      } catch {
+        setPayment(null);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load job';
@@ -129,6 +140,29 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
     ]);
   };
 
+  const handlePayNow = async (phone: string): Promise<void> => {
+    if (!phone) {
+      Alert.alert('Phone required', 'Please add a phone number to your profile to pay via M-Pesa.');
+      return;
+    }
+    setPaymentLoading(true);
+    try {
+      await apiClient.stkPush(jobId, phone);
+      Alert.alert('STK Push sent', 'Check your phone for the M-Pesa prompt to authorize payment.');
+      try {
+        const payResp = await apiClient.getPaymentForJob(jobId);
+        setPayment(payResp?.payment ?? null);
+      } catch {
+        // ignore refresh error
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to initiate payment';
+      Alert.alert('Payment failed', msg);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -162,6 +196,13 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   const showConfirm = job.status === 'completed' && !job.customer_completion_confirmed;
   const showReview = job.status === 'completed' && !job.hasReview;
   const showCancel = job.status === 'matching';
+  const paymentPaid = payment?.status === 'completed';
+  const showPayNow =
+    job.status === 'completed' &&
+    !!payment &&
+    (payment!.status === 'pending' || payment!.status === 'failed') &&
+    !paymentLoading;
+  const userPhone = user?.phone ?? '';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -184,6 +225,12 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
           {job.urgency === 'emergency' ? (
             <View style={[styles.statusBadge, { backgroundColor: colors.error }]}>
               <Text style={styles.statusText}>Emergency</Text>
+            </View>
+          ) : null}
+          {paymentPaid ? (
+            <View style={[styles.statusBadge, { backgroundColor: colors.success }]}>
+              <Ionicons name="checkmark" size={12} color={colors.successForeground} />
+              <Text style={styles.statusText}>Paid</Text>
             </View>
           ) : null}
         </View>
@@ -271,6 +318,30 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
             <Text style={[styles.outlineBtnText, { color: colors.error }]}>Cancel Job</Text>
           </TouchableOpacity>
         ) : null}
+
+        {showPayNow ? (
+          <TouchableOpacity
+            onPress={() => void handlePayNow(userPhone)}
+            disabled={paymentLoading}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={[gradients.accent.start, gradients.accent.end]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gradientBtn}
+            >
+              {paymentLoading ? (
+                <ActivityIndicator color={colors.accentForeground} />
+              ) : (
+                <>
+                  <Ionicons name="card-outline" size={18} color={colors.accentForeground} style={{ marginRight: 6 }} />
+                  <Text style={styles.btnText}>Pay Now</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -333,6 +404,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
@@ -416,9 +490,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   gradientBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: borderRadius.md,
     paddingVertical: 14,
-    alignItems: 'center',
   },
   btnText: {
     color: colors.primaryForeground,

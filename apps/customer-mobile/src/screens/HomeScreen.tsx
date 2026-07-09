@@ -25,20 +25,58 @@ import {
 import type { Job, Referral } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
+interface ServicePrice {
+  serviceCategory: string;
+  basePrice: number | null;
+  minimumPrice: number | null;
+  maximumPrice: number | null;
+}
+
+function normalizeServicePrice(raw: Record<string, unknown>): ServicePrice | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const category = raw.service_category ?? raw.serviceCategory;
+  if (typeof category !== 'string') return null;
+  const base = raw.base_price ?? raw.basePrice;
+  const min = raw.minimum_price ?? raw.minimumPrice;
+  const max = raw.maximum_price ?? raw.maximumPrice;
+  return {
+    serviceCategory: category,
+    basePrice: typeof base === 'number' ? base : null,
+    minimumPrice: typeof min === 'number' ? min : null,
+    maximumPrice: typeof max === 'number' ? max : null,
+  };
+}
+
+function formatKes(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '';
+  return `from KES ${Math.round(value).toLocaleString('en-KE')}`;
+}
+
 export function HomeScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [referral, setReferral] = useState<Referral | null>(null);
+  const [priceMap, setPriceMap] = useState<Record<string, ServicePrice>>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async (): Promise<void> => {
     try {
-      const [jobsResp, refResp] = await Promise.allSettled([
+      const [jobsResp, refResp, pricesResp] = await Promise.allSettled([
         apiClient.listJobs({ limit: 5 }),
         apiClient.getReferralDashboard(),
+        apiClient.listServicePrices(),
       ]);
       if (jobsResp.status === 'fulfilled') setJobs(jobsResp.value.jobs || []);
       if (refResp.status === 'fulfilled') setReferral(refResp.value);
+      if (pricesResp.status === 'fulfilled') {
+        const services = pricesResp.value?.services ?? [];
+        const nextMap: Record<string, ServicePrice> = {};
+        for (const raw of services) {
+          const normalized = normalizeServicePrice(raw as Record<string, unknown>);
+          if (normalized) nextMap[normalized.serviceCategory] = normalized;
+        }
+        setPriceMap(nextMap);
+      }
     } catch {
       // ignore
     } finally {
@@ -91,16 +129,25 @@ export function HomeScreen({ navigation }: any): JSX.Element {
 
       <Text style={styles.sectionTitle}>Services</Text>
       <View style={styles.grid}>
-        {SERVICE_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.slug}
-            style={styles.categoryCard}
-            onPress={() => navigation.navigate('CreateJob', { category: cat.slug })}
-          >
-            <Text style={styles.categoryIcon}>{cat.icon}</Text>
-            <Text style={styles.categoryLabel}>{cat.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {SERVICE_CATEGORIES.map((cat) => {
+          const price = priceMap[cat.slug];
+          const fromLabel = price
+            ? formatKes(price.minimumPrice ?? price.basePrice)
+            : '';
+          return (
+            <TouchableOpacity
+              key={cat.slug}
+              style={styles.categoryCard}
+              onPress={() => navigation.navigate('CreateJob', { category: cat.slug })}
+            >
+              <Text style={styles.categoryIcon}>{cat.icon}</Text>
+              <Text style={styles.categoryLabel}>{cat.label}</Text>
+              {fromLabel ? (
+                <Text style={styles.categoryPrice} numberOfLines={1}>{fromLabel}</Text>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {referral ? (
@@ -243,6 +290,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans,
     fontSize: fontSize.xs,
     color: colors.text,
+    textAlign: 'center',
+  },
+  categoryPrice: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '600',
+    marginTop: 2,
     textAlign: 'center',
   },
   referralCard: {

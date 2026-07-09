@@ -7,7 +7,7 @@ export interface Job { id: string; customerId: string; fundiId: string | null; s
 export interface JobLocation { jobId: string; latitude: number; longitude: number; accuracy?: number; recordedAt: string; }
 export interface Message { id: string; jobId: string; senderId: string; senderName?: string; text: string; type: 'text' | 'image' | 'system'; readAt?: string | null; createdAt: string; }
 export interface SavedPlace { id: string; label: string; address: string; latitude: number; longitude: number; }
-export interface Notification { id: string; userId: string; title: string; message: string; body?: string; type: string; isRead: boolean; createdAt: string; }
+export interface Notification { id: string; userId: string; title: string; message: string; body?: string; type: string; isRead: boolean; createdAt: string; jobId?: string | null; data?: Record<string, unknown> | null; }
 export interface Payment { id: string; jobId: string; amount: number; status: 'pending' | 'processing' | 'completed' | 'failed'; method: 'mpesa' | 'card' | 'wallet'; phoneNumber?: string; mpesaRef?: string; createdAt: string; }
 export interface WalletBalance { available: number; pending: number; currency: string; }
 export interface WalletTransaction { id: string; type: 'credit' | 'debit' | 'payout' | 'commission' | 'refund'; amount: number; description: string; status: 'pending' | 'completed' | 'failed'; createdAt: string; }

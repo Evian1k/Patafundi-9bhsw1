@@ -54,6 +54,11 @@ export function FavoritesScreen({ navigation }: any): JSX.Element {
     }
   }, []);
 
+  const onRefresh = useCallback((): void => {
+    setRefreshing(true);
+    void load();
+  }, [load]);
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -180,7 +185,7 @@ export function FavoritesScreen({ navigation }: any): JSX.Element {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           <View style={styles.emptyCard}>
             <View style={styles.emptyCircle}>

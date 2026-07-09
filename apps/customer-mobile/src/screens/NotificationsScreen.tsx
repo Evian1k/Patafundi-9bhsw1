@@ -20,11 +20,12 @@ import {
 } from '@patafundi/shared';
 import type { Notification } from '@patafundi/shared';
 
-export function NotificationsScreen(): JSX.Element {
+export function NotificationsScreen({ navigation }: any): JSX.Element {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [tappingId, setTappingId] = useState<string | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -60,8 +61,33 @@ export function NotificationsScreen(): JSX.Element {
     }
   };
 
+  const handleTap = async (item: Notification): Promise<void> => {
+    const targetJobId = item.jobId ?? null;
+    if (!item.isRead) {
+      setTappingId(item.id);
+      try {
+        await apiClient.markNotificationRead(item.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)),
+        );
+      } catch {
+        // ignore — still allow navigation
+      } finally {
+        setTappingId(null);
+      }
+    }
+    if (targetJobId) {
+      navigation?.navigate?.('JobTracking', { jobId: targetJobId });
+    }
+  };
+
   const renderItem = ({ item }: { item: Notification }): JSX.Element => (
-    <View style={[styles.card, item.isRead ? styles.cardRead : null]}>
+    <TouchableOpacity
+      style={[styles.card, item.isRead ? styles.cardRead : null]}
+      onPress={() => void handleTap(item)}
+      disabled={tappingId === item.id}
+      activeOpacity={0.7}
+    >
       <View style={[styles.iconWrap, item.isRead ? null : styles.iconWrapUnread]}>
         <Ionicons name="notifications" size={18} color={item.isRead ? colors.textSecondary : colors.primary} />
       </View>
@@ -70,7 +96,8 @@ export function NotificationsScreen(): JSX.Element {
         <Text style={styles.body}>{item.message}</Text>
         <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
       </View>
-    </View>
+      {!item.isRead ? <View style={styles.unreadDot} /> : null}
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -164,6 +191,13 @@ const styles = StyleSheet.create({
   },
   cardRead: {
     opacity: 0.7,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.primary,
+    marginLeft: 8,
   },
   iconWrap: {
     width: 38,
