@@ -5,29 +5,22 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "patafundi",
     "userInterfaceStyle": "automatic",
-    "splash": { "image": "./assets/splash.png", "resizeMode": "contain", "backgroundColor": "#0F172A" },
-    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.patafundi.customer",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "PataFundi needs your location to find nearby fundis and track your service.",
-        "NSCameraUsageDescription": "PataFundi needs camera access to take job photos.",
-        "NSPhotoLibraryUsageDescription": "PataFundi needs photo library access to upload job photos."
-      },
-      "associatedDomains": ["applinks:patafundi-9bhsw1.vercel.app"]
+      "bundleIdentifier": "com.patafundi.customer"
     },
     "android": {
-      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#0F172A" },
-      "package": "com.patafundi.customer",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "CAMERA"]
+      "package": "com.patafundi.customer"
     },
     "extra": {
-      "API_URL": "https://patafundi-9bhsw1.onrender.com",
-      "SOCKET_URL": "https://patafundi-9bhsw1.onrender.com"
+      "API_URL": "https://patafundi-9bhsw1.onrender.com"
     },
-    "plugins": ["expo-location", "expo-font"]
+    "plugins": ["expo-location"]
   }
 }
