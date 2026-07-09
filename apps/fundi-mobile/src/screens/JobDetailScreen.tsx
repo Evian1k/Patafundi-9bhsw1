@@ -162,10 +162,24 @@ export function JobDetailScreen({ navigation, route }: any): JSX.Element {
     }
     setActionLoading(true);
     try {
-      await apiClient.completeJob(job.id, photos);
-      Alert.alert('Completed', 'Job has been marked complete.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      const response = await apiClient.completeJob(job.id, photos);
+      // The backend returns a completion OTP that the fundi must give to the
+      // customer. The customer enters this code to confirm completion + release payment.
+      const otp = (response as any)?.completionOtp;
+      if (otp) {
+        Alert.alert(
+          'Job Completed! 🎉',
+          `Give this code to the customer:\n\n  ${otp}\n\nThey'll enter it to confirm completion and release your payment.`,
+          [
+            { text: 'Copy Code', onPress: () => { /* could use Clipboard */ } },
+            { text: 'Done', onPress: () => navigation.goBack() },
+          ],
+        );
+      } else {
+        Alert.alert('Completed', 'Job has been marked complete. Ask the customer to confirm completion.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to complete job';
       Alert.alert('Failed', msg);
