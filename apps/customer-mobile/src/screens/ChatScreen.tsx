@@ -24,7 +24,7 @@ import {
 import type { Message } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function ChatScreen({ route }: any): JSX.Element {
+export function ChatScreen({ route, navigation }: any): JSX.Element {
   const jobId: string = route?.params?.jobId;
   const user = useAuthStore((s) => s.user);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -123,6 +123,14 @@ export function ChatScreen({ route }: any): JSX.Element {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Chat'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -169,6 +177,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
   },
   systemWrap: {
     alignItems: 'center',

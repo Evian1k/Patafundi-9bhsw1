@@ -1,4 +1,13 @@
 import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  colors,
+  fonts,
+  fontSize,
+  spacing,
+  borderRadius,
+} from '@patafundi/shared';
 import { InfoPageScreen, InfoSection } from '../components/InfoPageScreen';
 
 const SECTIONS: InfoSection[] = [
@@ -58,14 +67,59 @@ const SECTIONS: InfoSection[] = [
   },
 ];
 
-export function SafetyPromiseScreen(): JSX.Element {
+export function SafetyPromiseScreen({ navigation }: any): JSX.Element {
   return (
-    <InfoPageScreen
-      heroIcon="shield-checkmark"
-      heroTitle="Our Safety Promise"
-      heroSubtitle="Nine layers of protection on every PataFundi job."
-      heroGradient="primary"
-      sections={SECTIONS}
-    />
+    <View style={styles.outer}>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Safety Promise'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <InfoPageScreen
+        heroIcon="shield-checkmark"
+        heroTitle="Our Safety Promise"
+        heroSubtitle="Nine layers of protection on every PataFundi job."
+        heroGradient="primary"
+        sections={SECTIONS}
+      />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+});

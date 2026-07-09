@@ -49,7 +49,16 @@ export function AccountSuspendedScreen({ route, navigation }: any): JSX.Element 
       end={{ x: 1, y: 1 }}
       style={[styles.container, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]}
     >
-      <View style={styles.card}>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Account Under Review'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <View style={styles.contentWrap}>
+        <View style={styles.card}>
         <View style={styles.iconWrap}>
           <LinearGradient
             colors={[gradients.primary.start, gradients.primary.end]}
@@ -109,9 +118,10 @@ export function AccountSuspendedScreen({ route, navigation }: any): JSX.Element 
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.footer}>
-        Account reviews are conducted by our Trust &amp; Safety team. We appreciate your patience.
-      </Text>
+        <Text style={styles.footer}>
+          Account reviews are conducted by our Trust &amp; Safety team. We appreciate your patience.
+        </Text>
+      </View>
     </LinearGradient>
   );
 }
@@ -119,9 +129,41 @@ export function AccountSuspendedScreen({ route, navigation }: any): JSX.Element 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: spacing.lg,
+  },
+  contentWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.lg,
+    width: '100%',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
   },
   card: {
     width: '100%',

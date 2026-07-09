@@ -104,13 +104,22 @@ export function EmergencySosScreen({ navigation }: any): JSX.Element {
   };
 
   return (
-    <InfoPageScreen
-      heroIcon="warning"
-      heroTitle="Emergency SOS"
-      heroSubtitle="One tap connects you to support when safety is at risk."
-      heroGradient="danger"
-      sections={SOS_STEPS}
-    >
+    <View style={styles.outer}>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Emergency SOS'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <InfoPageScreen
+        heroIcon="warning"
+        heroTitle="Emergency SOS"
+        heroSubtitle="One tap connects you to support when safety is at risk."
+        heroGradient="danger"
+        sections={SOS_STEPS}
+      >
       <LinearGradient
         colors={[gradients.danger.start, gradients.danger.end]}
         start={{ x: 0, y: 0 }}
@@ -174,11 +183,44 @@ export function EmergencySosScreen({ navigation }: any): JSX.Element {
         <Ionicons name="headset" size={18} color={colors.primaryForeground} />
         <Text style={styles.supportBtnText}>Contact Support Now</Text>
       </TouchableOpacity>
-    </InfoPageScreen>
+      </InfoPageScreen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
   warningCallout: {
     flexDirection: 'row',
     alignItems: 'center',

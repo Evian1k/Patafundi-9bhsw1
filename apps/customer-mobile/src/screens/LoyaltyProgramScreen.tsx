@@ -5,6 +5,7 @@ import {
   View,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,7 +65,7 @@ const EARN_POINTS_SECTION: InfoSection = {
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; loyalty: Loyalty };
 
-export function LoyaltyProgramScreen(): JSX.Element {
+export function LoyaltyProgramScreen({ navigation }: any): JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
   const load = useCallback(async (): Promise<void> => {
@@ -117,6 +118,14 @@ export function LoyaltyProgramScreen(): JSX.Element {
       style={styles.container}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
     >
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Loyalty Program'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <LinearGradient
         colors={[tierInfo.color, tierInfo.color + 'CC']}
         start={{ x: 0, y: 0 }}
@@ -242,6 +251,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
   },
   center: {
     flex: 1,

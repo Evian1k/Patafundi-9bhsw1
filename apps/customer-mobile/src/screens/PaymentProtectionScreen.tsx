@@ -3,6 +3,7 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,15 +71,24 @@ const STATIC_SECTIONS: InfoSection[] = [
   },
 ];
 
-export function PaymentProtectionScreen(): JSX.Element {
+export function PaymentProtectionScreen({ navigation }: any): JSX.Element {
   return (
-    <InfoPageScreen
-      heroIcon="wallet"
-      heroTitle="Payment Protection"
-      heroSubtitle="Your money is safe from the moment you pay until the job is done."
-      heroGradient="success"
-      sections={STATIC_SECTIONS}
-    >
+    <View style={styles.outer}>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{'Payment Protection'}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <InfoPageScreen
+        heroIcon="wallet"
+        heroTitle="Payment Protection"
+        heroSubtitle="Your money is safe from the moment you pay until the job is done."
+        heroGradient="success"
+        sections={STATIC_SECTIONS}
+      >
       <View style={styles.flowCard}>
         <View style={styles.flowHeader}>
           <Ionicons name="git-branch" size={20} color={colors.success} />
@@ -115,10 +125,43 @@ export function PaymentProtectionScreen(): JSX.Element {
         </LinearGradient>
       </View>
     </InfoPageScreen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
   flowCard: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.xl,

@@ -65,7 +65,7 @@ function formatDate(post: ReleasePost): string {
   }
 }
 
-export function ReleaseNotesScreen(): JSX.Element {
+export function ReleaseNotesScreen({ navigation }: any): JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -156,6 +156,14 @@ export function ReleaseNotesScreen(): JSX.Element {
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{"What's New"}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       {state.posts.map((post) => {
         const id = post.id ?? `${post.title ?? ''}-${post.createdAt ?? ''}`;
         const isOpen = !!expanded[id];
@@ -210,6 +218,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
   },
   center: {
     alignItems: 'center',
