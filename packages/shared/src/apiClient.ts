@@ -5,12 +5,18 @@ import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notific
 
 function resolveBaseUrl(): string {
   const FALLBACK = 'https://patafundi-9bhsw1.onrender.com';
-  try { // @ts-ignore
-    if (typeof process !== 'undefined' && process.env?.API_URL) { // @ts-ignore
-      return process.env.API_URL as string; }
+  try {
+    // @ts-ignore — process.env may not exist on RN
+    if (typeof process !== 'undefined' && process.env?.API_URL) {
+      // @ts-ignore
+      return process.env.API_URL as string;
+    }
   } catch {}
-  try { const Constants = require('expo-constants');
-    const fromExtra = Constants?.default?.expoConfig?.extra?.API_URL || Constants?.expoConfig?.extra?.API_URL;
+  try {
+    // Use Expo Constants to read API_URL from app.json extra
+    const Constants = require('expo-constants');
+    const fromExtra = Constants?.default?.expoConfig?.extra?.API_URL
+                   || Constants?.expoConfig?.extra?.API_URL;
     if (fromExtra) return fromExtra as string;
   } catch {}
   return FALLBACK;
