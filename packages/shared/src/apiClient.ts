@@ -124,7 +124,7 @@ class ApiClient {
   cancelJob(id: string, reason?: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }); }
   checkIn(id: string, lat: number, lng: number): Promise<{ job: Job }> { return this.request(`/jobs/${id}/check-in`, { method: 'POST', body: JSON.stringify({ latitude: lat, longitude: lng }) }); }
   completeJob(id: string, photos?: { uri: string; type?: string; name?: string }[]): Promise<{ job: Job }> { if (photos && photos.length) { const fd = new FormData(); photos.forEach(p => fd.append('photos', { uri: p.uri, type: p.type || 'image/jpeg', name: p.name || `photo-${Date.now()}.jpg` } as any)); return this.upload(`/jobs/${id}/complete`, fd); } return this.request(`/jobs/${id}/complete`, { method: 'POST' }); }
-  confirmCompletion(id: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}/confirm-completion`, { method: 'POST' }); }
+  confirmCompletion(id: string, otp?: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}/confirm-completion`, { method: 'POST', body: JSON.stringify({ otp }) }); }
   submitReview(jobId: string, rating: number, comment: string): Promise<{ review: Review }> { return this.request(`/jobs/${jobId}/review`, { method: 'POST', body: JSON.stringify({ rating, comment }) }); }
 
   // Chat

@@ -84,8 +84,18 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
           setFundiLoc({ latitude: p.latitude, longitude: p.longitude });
         }
       },
-      onCompleted: () => {
+      onCompleted: (payload: any) => {
         loadJob();
+        // The backend sends the completion OTP via socket + notification.
+        // Show it to the customer so they can enter it to confirm.
+        if (payload?.completionOtp) {
+          Alert.alert(
+            'Job Completed!',
+            `Your fundi has completed the job. Use code ${payload.completionOtp} to confirm completion and release payment.`,
+          );
+        } else {
+          Alert.alert('Job Completed', 'Your fundi has completed the job. Enter the code they gave you to confirm.');
+        }
       },
       onCancelled: () => {
         loadJob();
@@ -103,18 +113,33 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   }, [jobId, loadJob]);
 
   const handleConfirmCompletion = async (): Promise<void> => {
-    setActionLoading(true);
-    try {
-      await apiClient.confirmCompletion(jobId);
-      Alert.alert('Confirmed', 'You have confirmed completion. Please rate your fundi.');
-      loadJob();
-      navigation.navigate('Review', { jobId });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to confirm';
-      Alert.alert('Failed', msg);
-    } finally {
-      setActionLoading(false);
-    }
+    // The fundi gives the customer a 6-digit OTP when they complete the job.
+    // The customer enters it to confirm completion + release payment.
+    Alert.prompt(
+      'Confirm Completion',
+      'Enter the 6-digit code your fundi gave you:',
+      async (code) => {
+        if (!code || code.length < 6) {
+          Alert.alert('Invalid Code', 'Please enter the 6-digit code from your fundi.');
+          return;
+        }
+        setActionLoading(true);
+        try {
+          await apiClient.confirmCompletion(jobId, code);
+          Alert.alert('Confirmed', 'You have confirmed completion. Payment has been released to your fundi.');
+          loadJob();
+          navigation.navigate('Review', { jobId });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Failed to confirm';
+          Alert.alert('Failed', msg);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+      'plain-text',
+      '',
+      'number-pad',
+    );
   };
 
   const handleCancel = async (): Promise<void> => {

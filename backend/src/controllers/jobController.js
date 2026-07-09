@@ -479,6 +479,76 @@ export async function confirmCompletion(req, res) {
   });
   emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
 
+  // ── Auto-release escrow + credit fundi wallet ──────────────────────
+  // When the customer confirms completion, the escrow is automatically
+  // released: platform takes its commission, fundi gets the rest credited
+  // to their wallet. This is non-blocking — failures are logged but don't
+  // break the confirmation flow (admin can manually release later).
+  try {
+    const paymentResult = await query(
+      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
+      [req.params.id],
+    );
+    if (paymentResult.rows[0]) {
+      const payment = paymentResult.rows[0];
+      const jobValue = Number(job.final_price || job.estimated_price || payment.amount || 0);
+      const commissionRate = Number(payment.commission_rate || 0.15);
+      const commissionAmount = Math.round(jobValue * commissionRate);
+      const fundiEarnings = jobValue - commissionAmount;
+
+      // Use a transaction to ensure atomicity — no partial updates
+      const { transaction } = await import('../db.js');
+      await transaction(async (client) => {
+        // Mark payment as released
+        await client.query(
+          `update payments set escrow_status = 'released', status = 'completed', updated_at = now() where id = $1`,
+          [payment.id],
+        );
+        // Record escrow release transaction
+        await client.query(
+          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
+           values ($1, $2, 'release', $3, 'completed')
+           on conflict do nothing`,
+          [req.params.id, payment.id, fundiEarnings],
+        );
+        // Credit fundi wallet
+        await client.query(
+          `insert into fundi_wallets (fundi_id, balance, pending, currency)
+           values ($1, $2, 0, 'KES')
+           on conflict (fundi_id) do update
+           set balance = fundi_wallets.balance + $2, updated_at = now()`,
+          [job.fundi_id, fundiEarnings],
+        );
+        // Record wallet transaction
+        await client.query(
+          `insert into wallet_transactions (fundi_id, job_id, type, amount, description, status)
+           values ($1, $2, 'credit', $3, 'Job payment - commission deducted', 'completed')`,
+          [job.fundi_id, req.params.id, fundiEarnings],
+        );
+        // Update job escrow status
+        await client.query(
+          `update jobs set escrow_status = 'released', payment_status = 'completed', updated_at = now() where id = $1`,
+          [req.params.id],
+        );
+      });
+
+      // Notify fundi: payment received
+      await query(
+        `insert into notifications (user_id, type, title, body, data)
+         values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
+        [
+          job.fundi_id,
+          `KES ${fundiEarnings.toLocaleString()} has been credited to your wallet for the completed job.`,
+          JSON.stringify({ jobId: req.params.id, amount: fundiEarnings }),
+        ],
+      );
+      emitEvent('payment:confirmed', { jobId: req.params.id, fundiEarnings }, `user:${job.fundi_id}`);
+      emitEvent('escrow:released', { jobId: req.params.id, fundiEarnings }, `job:${req.params.id}`);
+    }
+  } catch (err) {
+    console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
+  }
+
   // ── Referral voucher issuance ────────────────────────────────────────
   // After a job is confirmed completed + paid, check if the customer was a
   // referee whose first paid job this is. If so, issue a discount voucher
