@@ -4,22 +4,9 @@ import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
 import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, Referral, Loyalty, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
 
 function resolveBaseUrl(): string {
-  const FALLBACK = 'https://patafundi-9bhsw1.onrender.com';
-  try {
-    // @ts-ignore — process.env may not exist on RN
-    if (typeof process !== 'undefined' && process.env?.API_URL) {
-      // @ts-ignore
-      return process.env.API_URL as string;
-    }
-  } catch {}
-  try {
-    // Use Expo Constants to read API_URL from app.json extra
-    const Constants = require('expo-constants');
-    const fromExtra = Constants?.default?.expoConfig?.extra?.API_URL
-                   || Constants?.expoConfig?.extra?.API_URL;
-    if (fromExtra) return fromExtra as string;
-  } catch {}
-  return FALLBACK;
+  // Hardcoded fallback — the backend URL is stable.
+  // No require('expo-constants') to avoid Metro bundling issues in monorepo.
+  return 'https://patafundi-9bhsw1.onrender.com';
 }
 const DEFAULT_API_URL = resolveBaseUrl();
 const STORAGE_KEYS = { TOKEN: 'auth_token', REFRESH_TOKEN: 'refresh_token', USER: 'cached_user' } as const;

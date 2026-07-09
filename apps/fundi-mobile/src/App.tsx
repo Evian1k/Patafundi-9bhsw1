@@ -13,10 +13,10 @@ const ONBOARDING_KEY = 'fundi_onboarding_complete';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
   ]);
 }
 
@@ -37,9 +37,9 @@ export default function App(): JSX.Element {
 
     (async () => {
       try {
-        await withTimeout(apiClient.ensureTokensLoaded(), 4000);
-        await withTimeout(checkAuth(), 4000);
-        await withTimeout(Location.requestForegroundPermissionsAsync(), 4000);
+        await withTimeout(apiClient.ensureTokensLoaded(), 4000, undefined as any);
+        await withTimeout(checkAuth(), 4000, undefined as any);
+        await withTimeout(Location.requestForegroundPermissionsAsync(), 4000, { status: 'undetermined' } as any);
         try {
           const flag = await AsyncStorage.getItem(ONBOARDING_KEY);
           if (mounted && !flag) setNeedsOnboarding(true);
