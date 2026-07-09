@@ -644,30 +644,25 @@ const renderers = {
   `,
 
   profile: () => `
-    <div class="screen-content">
-      <div class="header-bar"><h2>Profile</h2></div>
-      <div style="text-align:center; margin-bottom:10px;">
-        <div style="width:48px; height:48px; border-radius:24px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); margin:0 auto 6px; display:flex; align-items:center; justify-content:center; color:white; font-size:20px; font-weight:700;">J</div>
-        <h3 style="font-size:15px;">John Doe</h3>
-        <p style="font-size:11px; color:var(--text-2);">john@example.com</p>
-      </div>
-      <div class="glass-card" style="background:rgba(39,163,95,0.08); margin-bottom:10px; padding:8px 14px;">
-        <div style="display:flex; align-items:center; gap:8px;">
+    <div class="screen-content" style="padding:12px 20px 160px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="width:44px; height:44px; border-radius:22px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); display:flex; align-items:center; justify-content:center; color:white; font-size:18px; font-weight:700; flex-shrink:0;">J</div>
+        <div style="flex:1;"><h3 style="font-size:15px;">John Doe</h3><p style="font-size:11px; color:var(--text-2);">john@example.com</p></div>
+        <div style="background:rgba(39,163,95,0.1); border-radius:999px; padding:4px 10px; display:flex; align-items:center; gap:4px;">
           ${ICONS.shield.replace('currentColor','var(--success)')}
-          <span style="font-size:12px; color:var(--text-2); flex:1;">Trust Score</span>
-          <span style="font-size:15px; font-weight:700; color:var(--success);">100</span>
+          <span style="font-size:12px; font-weight:600; color:var(--success);">100</span>
         </div>
       </div>
       <div class="glass-card" style="padding:0; overflow:hidden;">
-        ${[['Edit Profile','person'],['Saved Places & Favorites','heart'],['Job History','briefcase'],['Disputes','warning'],['Notifications','bell'],['Refer & Earn','gift'],['Trust & Safety','shield'],['Security','lock'],['Support & Help','phone'],['Settings & About','settings']].map(([label,icon]) => `
-          <div style="display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
-            <div style="width:28px; height:28px; border-radius:7px; background:rgba(249,115,22,0.1); display:flex; align-items:center; justify-content:center; color:var(--primary); flex-shrink:0;">${ICONS[icon]}</div>
+        ${[['Edit Profile','person'],['Saved Places','heart'],['Job History','briefcase'],['Disputes','warning'],['Notifications','bell'],['Refer & Earn','gift'],['Trust & Safety','shield'],['Support','phone'],['Settings','settings']].map(([label,icon]) => `
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
+            <div style="width:26px; height:26px; border-radius:7px; background:rgba(249,115,22,0.08); display:flex; align-items:center; justify-content:center; color:var(--primary); flex-shrink:0;">${ICONS[icon]}</div>
             <span style="flex:1; font-size:13px;">${label}</span>
             ${ICONS.chevronRight}
           </div>
         `).join('')}
       </div>
-      <button class="btn-danger" style="margin-top:10px; height:38px; font-size:13px;">Sign Out</button>
+      <button class="btn-danger" style="margin-top:10px; height:36px; font-size:13px;">Sign Out</button>
     </div>
     ${tabBar('profile')}
   `,
