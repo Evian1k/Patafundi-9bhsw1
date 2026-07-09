@@ -81,6 +81,7 @@ router.get('/payments/escrow/:jobId', authRequired, asyncHandler(payments.escrow
 router.get('/payments/wallet/balance', authRequired, asyncHandler(payments.walletBalance));
 
 router.post('/payouts/request', authRequired, requireApprovedFundi, asyncHandler(payouts.requestPayout));
+router.post('/admin/refunds', authRequired, requireRole('admin'), asyncHandler(payouts.processRefund));
 router.post('/fundi/wallet/withdraw-request', authRequired, requireApprovedFundi, asyncHandler(payouts.requestPayout));
 
 router.post('/disputes', authRequired, asyncHandler(disputes.createDispute));

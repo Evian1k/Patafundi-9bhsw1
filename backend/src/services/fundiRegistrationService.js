@@ -118,8 +118,9 @@ export async function createFundiRegistration({ body, files, existingUserId = nu
     }
 
     const fundi = await client.query(
-      `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude, id_number, bio)
-       values ($1, $2, $3, $4, 'pending', $5, $6, $7, $8)
+      `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude, id_number, bio,
+        kra_pin, business_permit_url, terms_accepted, terms_version, terms_accepted_at, terms_accepted_ip, terms_accepted_device)
+       values ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, true, $12, now(), $13, $14)
        on conflict (user_id) do update set
          skills = excluded.skills,
          experience = excluded.experience,
@@ -127,6 +128,13 @@ export async function createFundiRegistration({ body, files, existingUserId = nu
          id_number = coalesce(excluded.id_number, fundis.id_number),
          latitude = coalesce(excluded.latitude, fundis.latitude),
          longitude = coalesce(excluded.longitude, fundis.longitude),
+         kra_pin = coalesce(excluded.kra_pin, fundis.kra_pin),
+         business_permit_url = coalesce(excluded.business_permit_url, fundis.business_permit_url),
+         terms_accepted = true,
+         terms_version = excluded.terms_version,
+         terms_accepted_at = now(),
+         terms_accepted_ip = excluded.terms_accepted_ip,
+         terms_accepted_device = excluded.terms_accepted_device,
          approval_status = 'pending',
          updated_at = now()
        returning *`,
@@ -139,6 +147,11 @@ export async function createFundiRegistration({ body, files, existingUserId = nu
         body.longitude || null,
         body.idNumber || body.id_number || null,
         [county, town].filter(Boolean).join(', ') || null,
+        body.kraPin || body.kra_pin || null,
+        body.businessPermitUrl || body.business_permit_url || null,
+        body.termsVersion || '1.0',
+        body.ipAddress || null,
+        body.userAgent || body.device || null,
       ],
     );
 

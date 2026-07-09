@@ -566,6 +566,22 @@ export async function confirmCompletion(req, res) {
           `update jobs set escrow_status = 'released', payment_status = 'completed', updated_at = now() where id = $1`,
           [req.params.id],
         );
+        // Record revenue ledger entries (CEO-only financial intelligence)
+        await client.query(
+          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
+            customer_paid, commission_amount, platform_fee_amount,
+            fundi_payout, net_revenue, payment_method, user_id, fundi_id, notes)
+           values ($1, 'commission_earned', $2, 'KES', $3, $2, $4, $5, $2, $6, $7, $8, 'Auto-released on customer confirmation')`,
+          [req.params.id, commissionAmount, jobValue,
+           Number(payment.platform_fee || 0), fundiEarnings,
+           payment.provider || 'mpesa', job.customer_id, job.fundi_id],
+        );
+        await client.query(
+          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
+            fundi_payout, user_id, fundi_id, notes)
+           values ($1, 'escrow_released', $2, 'KES', $2, $3, $4, 'Escrow released to fundi wallet')`,
+          [req.params.id, fundiEarnings, job.customer_id, job.fundi_id],
+        );
       });
 
       // Notify fundi: payment received
