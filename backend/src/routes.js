@@ -739,3 +739,29 @@ router.post('/financial/campaigns/:id/cancel', authRequired, requireRole('admin'
 router.get('/financial/access-grants', authRequired, requireRole('admin'), asyncHandler(financial.listAccessGrants));
 router.post('/financial/access-grants', authRequired, requireRole('admin'), asyncHandler(financial.grantFinancialAccess));
 router.delete('/financial/access-grants/:id', authRequired, requireRole('admin'), asyncHandler(financial.revokeFinancialAccess));
+
+// ============================================================
+// Global Multi-Country System — 100+ country support
+// ============================================================
+import * as globalCtrl from './controllers/globalController.js';
+
+// Public: list countries, languages
+router.get('/global/countries', asyncHandler(globalCtrl.listCountries));
+router.get('/global/countries/:code', asyncHandler(globalCtrl.getCountry));
+router.get('/global/languages', asyncHandler(globalCtrl.listLanguages));
+router.get('/global/translations/:lang', asyncHandler(globalCtrl.getTranslationsForLang));
+router.get('/global/payments/:countryCode', asyncHandler(globalCtrl.getPaymentMethods));
+router.get('/global/verification/:countryCode', asyncHandler(globalCtrl.getVerificationReqs));
+router.get('/global/emergency/:countryCode', asyncHandler(globalCtrl.getEmergencyContacts));
+router.get('/global/pricing/:countryCode', asyncHandler(globalCtrl.getPricingConfig));
+router.get('/global/services/:countryCode', asyncHandler(globalCtrl.getCountryServices));
+router.get('/global/exchange-rates', asyncHandler(globalCtrl.getRates));
+router.get('/global/convert', asyncHandler(globalCtrl.convertAmount));
+router.get('/global/detect-country', asyncHandler(globalCtrl.detectCountry));
+
+// Admin: manage countries, exchange rates
+router.post('/global/countries', authRequired, requireRole('admin'), asyncHandler(globalCtrl.createCountry));
+router.put('/global/countries/:code', authRequired, requireRole('admin'), asyncHandler(globalCtrl.updateCountry));
+router.post('/global/exchange-rates', authRequired, requireRole('admin'), asyncHandler(globalCtrl.updateRates));
+router.get('/global/analytics', authRequired, requireRole('admin'), asyncHandler(globalCtrl.getAnalytics));
+router.get('/global/dashboard', authRequired, requireRole('admin'), asyncHandler(globalCtrl.getGlobalDashboard));
