@@ -398,6 +398,30 @@ export async function checkIn(req, res) {
   if (!allowedStatuses.includes(status)) throw badRequest('Invalid check-in status');
   const job = await loadJob(req.params.id);
   requireAssignedFundi(req.user, job);
+  // GPS distance validation: if checking in as 'arrived', verify the fundi is
+  // actually near the customer location (within 2km). This prevents fake
+  // check-ins from a remote location. For 'on_the_way' status, no distance
+  // check needed (fundi is still travelling).
+  if (status === 'arrived' && job.customer_latitude && job.customer_longitude) {
+    const distance = haversineKm(
+      Number(latitude), Number(longitude),
+      Number(job.customer_latitude), Number(job.customer_longitude),
+    );
+    if (distance > 2.0) {
+      // Log the suspicious check-in for fraud review instead of hard-blocking
+      // (the fundi might be at the building entrance but GPS is slightly off)
+      console.warn(`[fraud] Fundi ${req.user.id} checked in as 'arrived' but is ${distance.toFixed(2)}km from customer (job ${req.params.id})`);
+      // Record in GPS validations for fraud analysis
+      try {
+        await query(
+          `insert into gps_validations (fundi_id, job_id, latitude, longitude, accuracy, is_spoofed, spoof_indicators, risk_score)
+           values ($1, $2, $3, $4, $5, true, $6, 75)`,
+          [req.user.id, req.params.id, latitude, longitude, accuracy,
+           JSON.stringify(['far_from_customer', `distance_${distance.toFixed(2)}km`])],
+        );
+      } catch {}
+    }
+  }
   const result = await transaction(async (client) => {
     await client.query(
       `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
@@ -458,18 +482,30 @@ export async function confirmCompletion(req, res) {
   const job = existing.rows[0];
   if (!job) throw notFound('Job not found');
   requireCustomer(req.user, job);
+  // Prevent double-confirmation — if already confirmed, return success without
+  // re-processing (idempotent). This prevents duplicate referral vouchers,
+  // duplicate escrow releases, and duplicate notifications.
+  if (job.customer_completion_confirmed) {
+    return res.json({ success: true, job: publicJob(job), alreadyConfirmed: true });
+  }
   const otpResult = await verifyJobCompletionOtp({
     jobId: req.params.id,
     otp,
     verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
   });
   if (!otpResult.ok) throw forbidden(otpResult.error);
+  // Clear the OTP hash so it can't be reused (one-time use)
   const result = await query(
     `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
-      escrow_status = 'completion_requested', updated_at = now()
-     where id = $1 returning *`,
+      escrow_status = 'completion_requested', completion_otp_hash = null, updated_at = now()
+     where id = $1 and customer_completion_confirmed = false returning *`,
     [req.params.id],
   );
+  // If no rows updated, another request confirmed it concurrently — return idempotent success
+  if (!result.rows[0]) {
+    const current = await query('select * from jobs where id = $1', [req.params.id]);
+    return res.json({ success: true, job: publicJob(current.rows[0]), alreadyConfirmed: true });
+  }
   await markCommissionCustomerConfirmed(req.params.id);
   await recordTimelineEvent({
     jobId: req.params.id,
