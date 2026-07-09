@@ -60,7 +60,7 @@ h1,h2,h3,h4 { font-family: 'Plus Jakarta Sans', sans-serif; }
 /* Screen content */
 .screen { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; }
 .screen.hidden { display: none; }
-.screen-content { padding: 16px 20px 120px; min-height: 100%; }
+.screen-content { padding: 16px 20px 140px; min-height: 100%; }
 .screen-content.no-tab { padding-bottom: 40px; }
 
 /* Glass card */
@@ -89,7 +89,7 @@ h1,h2,h3,h4 { font-family: 'Plus Jakarta Sans', sans-serif; }
 .tab-item.active span { color: var(--primary); font-weight: 600; }
 
 /* Header bar */
-.header-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 16px; }
+.header-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 12px; }
 .header-bar h2 { font-size: 22px; font-weight: 700; }
 .back-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.6); border-radius: var(--radius-md); cursor: pointer; border: 1px solid var(--border-light); }
 .back-btn svg { width: 20px; height: 20px; }
@@ -646,28 +646,28 @@ const renderers = {
   profile: () => `
     <div class="screen-content">
       <div class="header-bar"><h2>Profile</h2></div>
-      <div style="text-align:center; margin-bottom:12px;">
-        <div style="width:56px; height:56px; border-radius:28px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); margin:0 auto 8px; display:flex; align-items:center; justify-content:center; color:white; font-size:22px; font-weight:700;">J</div>
-        <h3 style="font-size:16px;">John Doe</h3>
-        <p style="font-size:12px; color:var(--text-2);">john@example.com</p>
+      <div style="text-align:center; margin-bottom:10px;">
+        <div style="width:48px; height:48px; border-radius:24px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); margin:0 auto 6px; display:flex; align-items:center; justify-content:center; color:white; font-size:20px; font-weight:700;">J</div>
+        <h3 style="font-size:15px;">John Doe</h3>
+        <p style="font-size:11px; color:var(--text-2);">john@example.com</p>
       </div>
-      <div class="glass-card" style="background:rgba(39,163,95,0.08); margin-bottom:12px; padding:10px 14px;">
+      <div class="glass-card" style="background:rgba(39,163,95,0.08); margin-bottom:10px; padding:8px 14px;">
         <div style="display:flex; align-items:center; gap:8px;">
           ${ICONS.shield.replace('currentColor','var(--success)')}
-          <span style="font-size:13px; color:var(--text-2); flex:1;">Trust Score</span>
-          <span style="font-size:16px; font-weight:700; color:var(--success);">100</span>
+          <span style="font-size:12px; color:var(--text-2); flex:1;">Trust Score</span>
+          <span style="font-size:15px; font-weight:700; color:var(--success);">100</span>
         </div>
       </div>
       <div class="glass-card" style="padding:0; overflow:hidden;">
-        ${[['Edit Profile','person'],['Saved Places','heart'],['Favorites','heart'],['Job History','briefcase'],['Disputes','warning'],['Notifications','bell'],['Refer & Earn','gift'],['Help Center','helpCircle'],['Trust & Safety','shield'],['Security','lock'],['Support','phone'],['Settings','settings'],['About','info']].map(([label,icon]) => `
-          <div style="display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
+        ${[['Edit Profile','person'],['Saved Places & Favorites','heart'],['Job History','briefcase'],['Disputes','warning'],['Notifications','bell'],['Refer & Earn','gift'],['Trust & Safety','shield'],['Security','lock'],['Support & Help','phone'],['Settings & About','settings']].map(([label,icon]) => `
+          <div style="display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
             <div style="width:28px; height:28px; border-radius:7px; background:rgba(249,115,22,0.1); display:flex; align-items:center; justify-content:center; color:var(--primary); flex-shrink:0;">${ICONS[icon]}</div>
             <span style="flex:1; font-size:13px;">${label}</span>
             ${ICONS.chevronRight}
           </div>
         `).join('')}
       </div>
-      <button class="btn-danger" style="margin-top:12px; height:40px; font-size:14px;">Sign Out</button>
+      <button class="btn-danger" style="margin-top:10px; height:38px; font-size:13px;">Sign Out</button>
     </div>
     ${tabBar('profile')}
   `,
