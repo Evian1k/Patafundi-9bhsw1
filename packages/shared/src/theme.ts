@@ -168,17 +168,17 @@ export const shadows = {
 // ── Component Tokens (Apple HIG + Uber inspired) ──────────────
 export const components = {
   button: {
-    height: { sm: 36, md: 44, lg: 50 },
+    height: { sm: 36, md: 44, lg: 48 },
     paddingX: { sm: 16, md: 20, lg: 28 },
     fontSize: { sm: fontSize.sm, md: fontSize.md, lg: fontSize.lg },
     fontWeight: fontWeight.semibold,
     radius: borderRadius.lg,
-    iconSize: { sm: 16, md: 20, lg: 24 },
+    iconSize: { sm: 16, md: 18, lg: 22 },
   },
   input: {
-    height: 48,
+    height: 46,
     paddingX: 16,
-    paddingY: 14,
+    paddingY: 12,
     fontSize: fontSize.md,
     radius: borderRadius.lg,
     borderWidth: 1,
