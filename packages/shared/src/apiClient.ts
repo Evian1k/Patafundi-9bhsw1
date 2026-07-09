@@ -60,9 +60,16 @@ class ApiClient {
     }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: response.statusText }));
-      const err = new Error(error.message || 'Request failed') as any;
+      let userMessage = error.message || 'We couldn\'t complete your request right now. Please try again.';
+      // Replace technical errors with user-friendly messages
+      if (response.status === 403) { userMessage = 'You don\'t have permission to do this.'; }
+      else if (response.status === 404) { userMessage = 'We couldn\'t find what you\'re looking for.'; }
+      else if (response.status === 429) { userMessage = 'Too many requests. Please wait a moment and try again.'; }
+      else if (response.status >= 500) { userMessage = 'Something went wrong on our end. Please try again in a moment.'; }
+      else if (response.status === 503) { userMessage = 'Service temporarily unavailable. Please try again in 30 seconds.'; }
+      const err = new Error(userMessage) as any;
       err.status = response.status; err.maintenanceMode = error.maintenanceMode; err.code = error.code; err.payload = error;
-      if (response.status === 503) { err.message = 'Service temporarily unavailable. The platform is warming up — please try again in 30 seconds.'; err.code = 'SERVICE_UNAVAILABLE'; }
+      if (response.status === 503) { err.code = 'SERVICE_UNAVAILABLE'; }
       throw err;
     }
     if (response.status === 204) return undefined as T;
