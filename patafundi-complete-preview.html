@@ -60,7 +60,7 @@ h1,h2,h3,h4 { font-family: 'Plus Jakarta Sans', sans-serif; }
 /* Screen content */
 .screen { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; }
 .screen.hidden { display: none; }
-.screen-content { padding: 16px 20px 100px; min-height: 100%; }
+.screen-content { padding: 16px 20px 120px; min-height: 100%; }
 .screen-content.no-tab { padding-bottom: 40px; }
 
 /* Glass card */
@@ -646,28 +646,28 @@ const renderers = {
   profile: () => `
     <div class="screen-content">
       <div class="header-bar"><h2>Profile</h2></div>
-      <div style="text-align:center; margin-bottom:16px;">
-        <div style="width:72px; height:72px; border-radius:40px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); margin:0 auto 12px; display:flex; align-items:center; justify-content:center; color:white; font-size:26px; font-weight:700;">J</div>
-        <h3 style="font-size:18px;">John Doe</h3>
-        <p style="font-size:13px; color:var(--text-2);">john@example.com</p>
+      <div style="text-align:center; margin-bottom:12px;">
+        <div style="width:56px; height:56px; border-radius:28px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); margin:0 auto 8px; display:flex; align-items:center; justify-content:center; color:white; font-size:22px; font-weight:700;">J</div>
+        <h3 style="font-size:16px;">John Doe</h3>
+        <p style="font-size:12px; color:var(--text-2);">john@example.com</p>
       </div>
-      <div class="glass-card" style="background:rgba(39,163,95,0.08); margin-bottom:16px;">
+      <div class="glass-card" style="background:rgba(39,163,95,0.08); margin-bottom:12px; padding:10px 14px;">
         <div style="display:flex; align-items:center; gap:8px;">
           ${ICONS.shield.replace('currentColor','var(--success)')}
-          <span style="font-size:14px; color:var(--text-2); flex:1;">Trust Score</span>
-          <span style="font-size:18px; font-weight:700; color:var(--success);">100</span>
+          <span style="font-size:13px; color:var(--text-2); flex:1;">Trust Score</span>
+          <span style="font-size:16px; font-weight:700; color:var(--success);">100</span>
         </div>
       </div>
       <div class="glass-card" style="padding:0; overflow:hidden;">
         ${[['Edit Profile','person'],['Saved Places','heart'],['Favorites','heart'],['Job History','briefcase'],['Disputes','warning'],['Notifications','bell'],['Refer & Earn','gift'],['Help Center','helpCircle'],['Trust & Safety','shield'],['Security','lock'],['Support','phone'],['Settings','settings'],['About','info']].map(([label,icon]) => `
-          <div style="display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
-            <div style="width:32px; height:32px; border-radius:8px; background:rgba(249,115,22,0.1); display:flex; align-items:center; justify-content:center; color:var(--primary);">${ICONS[icon]}</div>
-            <span style="flex:1; font-size:14px;">${label}</span>
+          <div style="display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="nav('${label.toLowerCase().replace(/[^a-z]/g,'')}')">
+            <div style="width:28px; height:28px; border-radius:7px; background:rgba(249,115,22,0.1); display:flex; align-items:center; justify-content:center; color:var(--primary); flex-shrink:0;">${ICONS[icon]}</div>
+            <span style="flex:1; font-size:13px;">${label}</span>
             ${ICONS.chevronRight}
           </div>
         `).join('')}
       </div>
-      <button class="btn-danger" style="margin-top:16px;">Sign Out</button>
+      <button class="btn-danger" style="margin-top:12px; height:40px; font-size:14px;">Sign Out</button>
     </div>
     ${tabBar('profile')}
   `,
