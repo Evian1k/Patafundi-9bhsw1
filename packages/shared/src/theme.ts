@@ -101,6 +101,10 @@ export const fonts = {
   sans: 'Inter',
   display: 'PlusJakartaSans',
   mono: 'SF Mono',
+  // Fallback fonts for web
+  sansFallback: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  displayFallback: 'PlusJakartaSans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  monoFallback: 'SF Mono, "SF Mono", "Courier New", monospace',
 } as const;
 
 export const fontSize = {
