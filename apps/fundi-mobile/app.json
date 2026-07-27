@@ -3,6 +3,7 @@
     "name": "PataFundi Fundi",
     "slug": "patafundi-fundi",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,16 +12,42 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.patafundi.fundi"
+      "bundleIdentifier": "com.patafundi.fundi",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow PataFundi to access your camera for profile photos and job documentation",
+        "NSLocationWhenInUseUsageDescription": "Allow PataFundi to access your location to receive job requests and provide accurate service",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow PataFundi to access your location even when the app is in background to receive job requests",
+        "NSPhotoLibraryUsageDescription": "Allow PataFundi to access your photo library for profile photos and job documentation"
+      }
     },
     "android": {
-      "package": "com.patafundi.fundi"
+      "package": "com.patafundi.fundi",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "extra": {
       "API_URL": "https://patafundi-9bhsw1.onrender.com"
     },
-    "plugins": ["expo-location"]
+    "scheme": "patafundi-fundi",
+    "plugins": [
+      "expo-location"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

@@ -16,6 +16,18 @@ export function isEmbeddedDb() {
   return Boolean(pglite);
 }
 
+function isRecoverableDiskError(error) {
+  const msg = String(error?.message || error || '');
+  return /aborted|wasm|corrupt|invalid|eacces|eperm|spawn/i.test(msg);
+}
+
+async function createPgliteInstance(dataDir) {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const instance = new PGlite(dataDir);
+  await instance.waitReady;
+  return instance;
+}
+
 /**
  * PGlite (embedded Postgres) is used as a dev-mode fallback when no real
  * DATABASE_URL is configured. On some platforms — notably Windows with
@@ -24,33 +36,42 @@ export function isEmbeddedDb() {
  *
  * Strategy:
  *   1. Try disk-backed PGlite (persists across restarts).
- *   2. If that fails, try in-memory PGlite (no disk = no WASM abort, but
- *      data is lost on restart — fine for dev/testing).
- *   3. If both fail, throw a clear error telling the developer to use
- *      Docker Postgres or a cloud Postgres (Neon, Supabase, etc.).
+ *   2. If that fails with a recoverable error, clear the stale data directory
+ *      and retry once so the app can recover from a broken local state.
+ *   3. If that still fails, fall back to in-memory PGlite (data is lost on
+ *      restart, but the app keeps working in dev).
  */
 export async function getEmbeddedDb() {
   if (pglite) return pglite;
   if (initError) throw initError;
   if (!initPromise) {
     initPromise = (async () => {
-      // Attempt 1: disk-backed PGlite (preferred — data persists).
+      // Attempt 1: disk-backed PGlite (preferred — data persists across restarts).
       try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
-        const { PGlite } = await import('@electric-sql/pglite');
-        pglite = new PGlite(DATA_DIR);
-        await pglite.waitReady;
+        pglite = await createPgliteInstance(DATA_DIR);
         console.log(`[PataFundi] Using embedded PostgreSQL (PGlite) at ${DATA_DIR}`);
         return pglite;
       } catch (diskErr) {
-        console.warn(`[PataFundi] PGlite disk mode failed (${diskErr?.message || diskErr}); trying in-memory...`);
+        if (isRecoverableDiskError(diskErr) && fs.existsSync(DATA_DIR)) {
+          console.warn(`[PataFundi] PGlite disk mode failed (${diskErr?.message || diskErr}); clearing stale data directory and retrying...`);
+          try {
+            fs.rmSync(DATA_DIR, { recursive: true, force: true });
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+            pglite = await createPgliteInstance(DATA_DIR);
+            console.log(`[PataFundi] Using embedded PostgreSQL (PGlite) at ${DATA_DIR}`);
+            return pglite;
+          } catch (recoveryErr) {
+            console.warn(`[PataFundi] PGlite recovery attempt failed (${recoveryErr?.message || recoveryErr}); trying in-memory...`);
+          }
+        } else {
+          console.warn(`[PataFundi] PGlite disk mode failed (${diskErr?.message || diskErr}); trying in-memory...`);
+        }
       }
 
-      // Attempt 2: in-memory PGlite (no disk I/O = avoids WASM abort on Windows).
+      // Attempt 2: in-memory PGlite (no disk I/O = avoids certain WASM aborts on Windows).
       try {
-        const { PGlite } = await import('@electric-sql/pglite');
-        pglite = new PGlite(); // no path = in-memory mode
-        await pglite.waitReady;
+        pglite = await createPgliteInstance(':memory:');
         console.log('[PataFundi] Using embedded PostgreSQL (PGlite) in-memory mode');
         console.log('[PataFundi] ⚠️  Data will be lost on restart. For persistent data, set DATABASE_URL (see .env.example).');
         return pglite;

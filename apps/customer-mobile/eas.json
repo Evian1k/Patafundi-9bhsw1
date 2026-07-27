@@ -1,8 +1,47 @@
 {
   "cli": { "version": ">= 5.9.0", "appVersionSource": "remote" },
   "build": {
-    "development": { "developmentClient": true, "distribution": "internal", "channel": "development" },
-    "preview": { "distribution": "internal", "channel": "preview" },
-    "production": { "channel": "production", "autoIncrement": true }
+    "development": { 
+      "developmentClient": true, 
+      "distribution": "internal", 
+      "channel": "development",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": { 
+      "distribution": "internal", 
+      "channel": "preview",
+      "ios": {
+        "bundleIdentifier": "com.patafundi.customer"
+      },
+      "android": {
+        "package": "com.patafundi.customer"
+      }
+    },
+    "production": { 
+      "channel": "production", 
+      "autoIncrement": true,
+      "ios": {
+        "bundleIdentifier": "com.patafundi.customer",
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "package": "com.patafundi.customer",
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json"
+      }
+    }
   }
 }

@@ -36,38 +36,77 @@ CREATE INDEX IF NOT EXISTS idx_campaign_active ON commission_campaigns(status, s
 
 -- ── 2. Revenue Ledger ─────────────────────────────────────────
 -- Every monetary transaction is recorded here. CEO-only access.
-CREATE TABLE IF NOT EXISTS revenue_ledger (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  job_id uuid REFERENCES jobs(id) ON DELETE SET NULL,
-  transaction_type text NOT NULL CHECK (transaction_type IN (
-    'customer_payment',    -- money in from customer
-    'escrow_held',         -- held in escrow
-    'escrow_released',     -- released to fundi
-    'commission_earned',   -- platform's cut
-    'platform_fee',        -- flat fee
-    'payout',              -- money out to fundi
-    'refund',              -- money returned to customer
-    'chargeback',          -- reversed payment
-    'gateway_fee',         -- payment processor fee (M-Pesa)
-    'adjustment'           -- manual CEO adjustment
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'revenue_ledger'
+  ) THEN
+    CREATE TABLE revenue_ledger (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      job_id uuid REFERENCES jobs(id) ON DELETE SET NULL,
+      transaction_type text NOT NULL CHECK (transaction_type IN (
+        'customer_payment',    -- money in from customer
+        'escrow_held',         -- held in escrow
+        'escrow_released',     -- released to fundi
+        'commission_earned',   -- platform's cut
+        'platform_fee',        -- flat fee
+        'payout',              -- money out to fundi
+        'refund',              -- money returned to customer
+        'chargeback',          -- reversed payment
+        'gateway_fee',         -- payment processor fee (M-Pesa)
+        'adjustment'           -- manual CEO adjustment
+      )),
+      amount numeric(12,2) NOT NULL,  -- positive = credit, negative = debit
+      currency text NOT NULL DEFAULT 'KES',
+      -- Breakdown (CEO-only, never exposed to fundi/customer)
+      customer_paid numeric(12,2),
+      commission_amount numeric(12,2),
+      platform_fee_amount numeric(12,2),
+      fundi_payout numeric(12,2),
+      gateway_fee_amount numeric(12,2),
+      net_revenue numeric(12,2),  -- platform profit after gateway fees
+      -- Metadata
+      payment_method text,  -- 'mpesa', 'card', 'wallet'
+      gateway_reference text,
+      user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      fundi_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      notes text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  END IF;
+END $$;
+
+ALTER TABLE revenue_ledger
+  ADD COLUMN IF NOT EXISTS job_id uuid REFERENCES jobs(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS transaction_type text NOT NULL DEFAULT 'adjustment' CHECK (transaction_type IN (
+    'customer_payment',
+    'escrow_held',
+    'escrow_released',
+    'commission_earned',
+    'platform_fee',
+    'payout',
+    'refund',
+    'chargeback',
+    'gateway_fee',
+    'adjustment'
   )),
-  amount numeric(12,2) NOT NULL,  -- positive = credit, negative = debit
-  currency text NOT NULL DEFAULT 'KES',
-  -- Breakdown (CEO-only, never exposed to fundi/customer)
-  customer_paid numeric(12,2),
-  commission_amount numeric(12,2),
-  platform_fee_amount numeric(12,2),
-  fundi_payout numeric(12,2),
-  gateway_fee_amount numeric(12,2),
-  net_revenue numeric(12,2),  -- platform profit after gateway fees
-  -- Metadata
-  payment_method text,  -- 'mpesa', 'card', 'wallet'
-  gateway_reference text,
-  user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  fundi_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  notes text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+  ADD COLUMN IF NOT EXISTS amount numeric(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'KES',
+  ADD COLUMN IF NOT EXISTS customer_paid numeric(12,2),
+  ADD COLUMN IF NOT EXISTS commission_amount numeric(12,2),
+  ADD COLUMN IF NOT EXISTS platform_fee_amount numeric(12,2),
+  ADD COLUMN IF NOT EXISTS fundi_payout numeric(12,2),
+  ADD COLUMN IF NOT EXISTS gateway_fee_amount numeric(12,2),
+  ADD COLUMN IF NOT EXISTS net_revenue numeric(12,2),
+  ADD COLUMN IF NOT EXISTS payment_method text,
+  ADD COLUMN IF NOT EXISTS gateway_reference text,
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS fundi_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS notes text,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_revenue_ledger_type ON revenue_ledger(transaction_type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_revenue_ledger_job ON revenue_ledger(job_id);

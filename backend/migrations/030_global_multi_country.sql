@@ -161,11 +161,11 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
   rate numeric(12,6) NOT NULL,            -- 1 from_currency = rate to_currency
   source text NOT NULL DEFAULT 'manual',  -- 'manual', 'fixer', 'ecb', 'openexchangerates'
   fetched_at timestamptz NOT NULL DEFAULT now(),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(from_currency, to_currency, fetched_at::date)
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair ON exchange_rates(from_currency, to_currency, fetched_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_exchange_rates_pair
+  ON exchange_rates(from_currency, to_currency, fetched_at);
 
 -- Seed some default rates (KES as base)
 INSERT INTO exchange_rates (from_currency, to_currency, rate, source) VALUES

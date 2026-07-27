@@ -5,7 +5,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+
+let sharp;
+try {
+  ({ default: sharp } = await import('sharp'));
+} catch (error) {
+  sharp = null;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, '../public');
@@ -22,6 +28,10 @@ function findSource() {
 
 /** Remove light gray/white checkerboard background → transparent PNG */
 async function transparentLogo(input) {
+  if (!sharp) {
+    throw new Error('sharp is not available');
+  }
+
   const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const px = data;
   for (let i = 0; i < px.length; i += 4) {
@@ -70,8 +80,13 @@ async function extractIcon(base, width, height) {
 async function main() {
   const source = findSource();
   if (!source) {
-    console.error('Save your logo as public/logo-source.png');
-    process.exit(1);
+    console.warn('No logo source image found; skipping logo generation.');
+    return;
+  }
+
+  if (!sharp) {
+    console.warn('sharp is unavailable; skipping logo generation.');
+    return;
   }
 
   console.log(`Processing ${path.basename(source)}…`);

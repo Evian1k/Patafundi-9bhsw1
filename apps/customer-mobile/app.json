@@ -3,6 +3,7 @@
     "name": "PataFundi",
     "slug": "patafundi-customer",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,16 +12,39 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.patafundi.customer"
+      "bundleIdentifier": "com.patafundi.customer",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow PataFundi to access your camera for profile photos and job documentation",
+        "NSLocationWhenInUseUsageDescription": "Allow PataFundi to access your location to find nearby fundis and provide accurate service",
+        "NSPhotoLibraryUsageDescription": "Allow PataFundi to access your photo library for profile photos and job documentation"
+      }
     },
     "android": {
-      "package": "com.patafundi.customer"
+      "package": "com.patafundi.customer",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "extra": {
       "API_URL": "https://patafundi-9bhsw1.onrender.com"
     },
-    "plugins": ["expo-location"]
+    "scheme": "patafundi-customer",
+    "plugins": [
+      "expo-location"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
