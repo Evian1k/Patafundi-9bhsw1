@@ -16,6 +16,8 @@
     "prebuild": "node scripts/process-brand-logo.mjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "test": "node --test backend/src",
+    "test:coverage": "node --test --experimental-test-coverage backend/src",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",

@@ -25,6 +25,20 @@ jobs:
           REFRESH_TOKEN_SECRET: ci-test-refresh-secret-32-chars
           PATAFUNDI_EMBEDDED_DB: '1'
 
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+        env:
+          JWT_SECRET: ci-test-secret-at-least-32-chars-long
+          REFRESH_TOKEN_SECRET: ci-test-refresh-secret-32-chars
+
   security-audit:
     runs-on: ubuntu-latest
     steps:
