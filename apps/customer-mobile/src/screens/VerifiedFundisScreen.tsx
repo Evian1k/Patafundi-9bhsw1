@@ -16,8 +16,9 @@ import {
   borderRadius,
   gradients,
   shadows,
+  InfoPageScreen,
+  InfoSection,
 } from '@patafundi/shared';
-import { InfoPageScreen, InfoSection } from '../components/InfoPageScreen';
 
 interface VerificationStep {
   icon: keyof typeof Ionicons.glyphMap;

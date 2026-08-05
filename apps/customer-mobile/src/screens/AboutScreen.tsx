@@ -18,6 +18,7 @@ import {
   spacing,
   borderRadius,
   gradients,
+  ScreenHeader,
 } from '@patafundi/shared';
 
 const APP_VERSION = '1.0.0';
@@ -80,13 +81,7 @@ export function AboutScreen({ navigation }: any): JSX.Element {
       style={styles.container}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, alignItems: 'center' }}
     >
-      <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{'About'}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title="About" onBack={() => navigation.goBack()} />
 
       <LinearGradient
         colors={[gradients.primary.start, gradients.primary.end]}
@@ -146,34 +141,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.md,
-    width: '100%',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
   },
   logo: {
     width: 100,

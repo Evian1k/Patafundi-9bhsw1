@@ -8,13 +8,31 @@
     "@react-native-async-storage/async-storage": ">=1.23.0",
     "react": ">=18.0.0",
     "react-native": ">=0.70.0",
-    "socket.io-client": ">=4.0.0"
+    "socket.io-client": ">=4.0.0",
+    "expo-linear-gradient": ">=13.0.0",
+    "@expo/vector-icons": ">=14.0.0"
   },
   "peerDependenciesMeta": {
-    "@react-native-async-storage/async-storage": { "optional": false },
-    "react": { "optional": false },
-    "react-native": { "optional": false },
-    "socket.io-client": { "optional": false }
+    "@react-native-async-storage/async-storage": {
+      "optional": false
+    },
+    "react": {
+      "optional": false
+    },
+    "react-native": {
+      "optional": false
+    },
+    "socket.io-client": {
+      "optional": false
+    },
+    "expo-linear-gradient": {
+      "optional": false
+    },
+    "@expo/vector-icons": {
+      "optional": false
+    }
   },
-  "devDependencies": { "typescript": "~5.3.3" }
+  "devDependencies": {
+    "typescript": "~5.3.3"
+  }
 }

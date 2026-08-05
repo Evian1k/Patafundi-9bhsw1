@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, Text, View, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   colors,
@@ -15,12 +9,11 @@ import {
   borderRadius,
   shadows,
   SERVICE_CATEGORIES,
-} from '@patafundi/shared';
-import {
+  ScreenHeader,
   InfoHero,
   InfoSectionCard,
   InfoSection,
-} from '../components/InfoPageScreen';
+} from '@patafundi/shared';
 
 interface PricingFactor {
   icon: keyof typeof Ionicons.glyphMap;
@@ -80,13 +73,7 @@ export function PricingExplainedScreen({ navigation }: any): JSX.Element {
       style={styles.container}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
     >
-      <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{'How Pricing Works'}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title="How Pricing Works" onBack={() => navigation.goBack()} />
 
       <InfoHero
         heroIcon="calculator"
@@ -147,34 +134,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.md,
-    width: '100%',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
   },
   factorsCard: {
     backgroundColor: colors.card,

@@ -10,9 +10,16 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, fonts, fontSize, spacing, borderRadius, gradients } from '@patafundi/shared';
+import {
+  colors,
+  fonts,
+  fontSize,
+  spacing,
+  borderRadius,
+  gradients,
+  Input,
+} from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
-import { Input } from '../components/ui';
 
 export function LoginScreen({ navigation }: any): JSX.Element {
   const [email, setEmail] = useState('');
