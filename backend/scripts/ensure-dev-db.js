@@ -194,6 +194,14 @@ async function ensureCustomersTable(db) {
 async function seedIfEmpty(db) {
   if (!(await tableExists(db, 'users'))) return;
 
+  // Demo accounts use passwords that are published in this repository, and
+  // include staff roles up to super_admin. Never create them on a production
+  // database — an explicit opt-in is required for demo/staging deployments.
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_USERS !== 'true') {
+    console.log('[seed] demo accounts skipped in production (set SEED_DEMO_USERS=true to override)');
+    return;
+  }
+
   for (const user of demoUsers) {
     const existing = await db.query('select id from users where lower(email) = lower($1)', [user.email]);
     if (existing.rows[0]) continue;

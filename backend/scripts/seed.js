@@ -30,6 +30,12 @@ async function query(db, sql, params = []) {
 }
 
 async function main() {
+  // These credentials are published in this repository — refuse to create them
+  // on a production database unless explicitly opted in.
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_USERS !== 'true') {
+    console.error('[seed] refusing to seed demo accounts in production (set SEED_DEMO_USERS=true to override)');
+    return;
+  }
   const db = await getDb();
   const isPool = Boolean(db.end);
   try {

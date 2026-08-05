@@ -152,7 +152,7 @@ router.put('/admin/settings', authRequired, requireRole('admin'), asyncHandler(a
 // ============================================================
 // Enterprise RBAC — permission-scoped staff endpoints
 // ============================================================
-import { requirePermission, requireAnyPermission } from './middleware/rbac.js';
+import { requirePermission, requireAnyPermission, requireStaff } from './middleware/rbac.js';
 import * as rbac from './controllers/rbacController.js';
 
 // Any staff member can list their own permissions (for frontend UI gating).
@@ -268,9 +268,9 @@ router.get('/loyalty/me', authRequired, asyncHandler(enterprise.getMyLoyalty));
 router.post('/admin/loyalty/:userId/recalculate', authRequired, requireRole('admin'), asyncHandler(enterprise.recalculateLoyalty));
 
 // Escalations (Phase 6)
-router.post('/staff/escalations', authRequired, asyncHandler(enterprise.createEscalationReq));
-router.post('/staff/escalations/:id/resolve', authRequired, asyncHandler(enterprise.resolveEscalationReq));
-router.get('/staff/escalations', authRequired, asyncHandler(enterprise.listEscalationsReq));
+router.post('/staff/escalations', authRequired, requireStaff(), asyncHandler(enterprise.createEscalationReq));
+router.post('/staff/escalations/:id/resolve', authRequired, requireStaff(), asyncHandler(enterprise.resolveEscalationReq));
+router.get('/staff/escalations', authRequired, requireStaff(), asyncHandler(enterprise.listEscalationsReq));
 
 // SLA (Phase 6)
 router.get('/staff/sla/breaches', authRequired, requirePerm('can_view_logs'), asyncHandler(enterprise.getSlaBreachesReq));
