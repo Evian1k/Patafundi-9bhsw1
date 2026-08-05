@@ -12,6 +12,7 @@
  *   - Rate limit errors → super_admin + devops_engineer
  */
 import { query } from '../db.js';
+import { logNonFatal, swallow } from '../utils/logError.js';
 
 const ERROR_STAFF_ROLES = {
   system: ['super_admin', 'devops_engineer'],
@@ -70,7 +71,7 @@ export async function logErrorAndNotifyStaff({
         `insert into error_logs (error_type, status_code, message, stack_trace, path, method, user_id, ip_address, user_agent, created_at)
          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())`,
         [type, statusCode, message?.slice(0, 1000), stack?.slice(0, 5000) || null, path || null, method || null, userId, ip, userAgent?.slice(0, 500) || null],
-      ).catch(() => {});
+      ).catch(swallow('errorNotify.insertRetry'));
     }
 
     // 2. Only notify staff for significant errors (not every 404 or 401)
@@ -105,8 +106,8 @@ export async function logErrorAndNotifyStaff({
             JSON.stringify({ type, statusCode, path, method, timestamp: new Date().toISOString() }),
           ],
         );
-      } catch {
-        // notifications table might have different schema — ignore
+      } catch (error) {
+        logNonFatal('errorNotify.notifyStaff', error, { staffId: staff.id });
       }
     }
 
@@ -117,7 +118,9 @@ export async function logErrorAndNotifyStaff({
          values ($1, 'system.error', 'error', null, $2::jsonb, now())`,
         [userId, JSON.stringify({ type, statusCode, message: message?.slice(0, 500), path, method, ip })],
       );
-    } catch { /* ignore */ }
+    } catch (error) {
+      logNonFatal('errorNotify.auditLog', error, { type, statusCode });
+    }
 
   } catch (err) {
     // Never let error logging crash the request

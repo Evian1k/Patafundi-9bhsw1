@@ -2,6 +2,7 @@ import { query } from '../db.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { detectBypass, recordFraudAlert } from '../services/fraudService.js';
 import { auditLog } from '../services/auditService.js';
+import { logNonFatal } from '../utils/logError.js';
 
 export async function supportTicket(req, res) {
   const { name = null, email = null, subject = null, message = '' } = req.body || {};
@@ -160,7 +161,9 @@ export async function policy(req, res) {
       res.json({ success: true, policy: result.rows[0] });
       return;
     }
-  } catch { /* table might not exist */ }
+  } catch (error) {
+    logNonFatal('content.policyLookup', error, { slug: req.params.slug });
+  }
   // Fallback to hardcoded
   const policies = {
     privacy: { slug: 'privacy', title: 'Privacy Policy', body: 'PataFundi stores account, job, payment, and safety data needed to operate the platform.' },
@@ -185,7 +188,9 @@ export async function service(req, res) {
       res.json({ success: true, service: result.rows[0], fundis: fundis.rows });
       return;
     }
-  } catch { /* table might not exist */ }
+  } catch (error) {
+    logNonFatal('content.serviceLookup', error, { slug: req.params.slug });
+  }
   const services = {
     plumbing: { slug: 'plumbing', title: 'Plumbing', description: 'Leaks, fixtures, drainage, and urgent plumbing repairs.' },
     electrical: { slug: 'electrical', title: 'Electrical', description: 'Fault diagnosis, wiring, lighting, and appliance electrical work.' },

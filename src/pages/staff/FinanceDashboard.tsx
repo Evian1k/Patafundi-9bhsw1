@@ -3,8 +3,9 @@
  * Top cards: Revenue Today, Escrow Balance, Pending Payouts, Refund Requests
  * Charts: Daily Revenue, Monthly Revenue, Commission Revenue, Payout Trends
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
+import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { DollarSign, Wallet, Clock, RotateCcw, TrendingUp } from "lucide-react";
 
 interface FinanceData {
@@ -21,32 +22,38 @@ interface FinanceData {
 export default function FinanceDashboard() {
   const [data, setData] = useState<FinanceData>({ revenueToday: 0, revenueMonth: 0, escrowBalance: 0, pendingPayouts: 0, refundRequests: 0, commissionRevenue: 0, dailyRevenue: [], payoutTrends: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      apiClient.getAdminDashboard(),
-      apiClient.request("/staff/revenue").catch(() => null),
-    ])
-      .then(([dash, rev]: any) => {
-        const stats = dash?.stats || {};
-        const revenue = rev?.totals || {};
-        setData({
-          revenueToday: Number(revenue.dailyRevenue || 0),
-          revenueMonth: Number(revenue.monthlyRevenue || stats.revenue || 0),
-          escrowBalance: Number(stats.revenueBreakdown?.totals?.escrowBalance || 0),
-          pendingPayouts: 0,
-          refundRequests: 0,
-          commissionRevenue: Number(revenue.commissionRevenue || 0),
-          dailyRevenue: [],
-          payoutTrends: [],
-        });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [dash, rev]: any = await Promise.all([
+        apiClient.getAdminDashboard(),
+        apiClient.request("/staff/revenue"),
+      ]);
+      const stats = dash?.stats || {};
+      const revenue = rev?.totals || {};
+      setData({
+        revenueToday: Number(revenue.dailyRevenue || 0),
+        revenueMonth: Number(revenue.monthlyRevenue || stats.revenue || 0),
+        escrowBalance: Number(stats.revenueBreakdown?.totals?.escrowBalance || 0),
+        pendingPayouts: 0,
+        refundRequests: 0,
+        commissionRevenue: Number(revenue.commissionRevenue || 0),
+        dailyRevenue: [],
+        payoutTrends: [],
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { void load(); }, [load]);
+
   if (loading) return <div className="p-8 text-slate-400">Loading finance dashboard…</div>;
-  // data is always defined (initialized with empty defaults)
 
   const fmt = (n: number) => `KES ${Number(n).toLocaleString()}`;
 
@@ -54,6 +61,8 @@ export default function FinanceDashboard() {
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Finance Dashboard</h1>
       <p className="text-slate-500 text-sm mb-6">Revenue, escrow, payouts, and refunds overview</p>
+
+      {error && <DashboardLoadError message={error} onRetry={() => void load()} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card icon={DollarSign} label="Revenue Today" value={fmt(data.revenueToday)} color="text-green-600" />

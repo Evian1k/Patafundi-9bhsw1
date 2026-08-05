@@ -1,15 +1,16 @@
 import { query } from '../db.js';
 import { forbidden } from '../utils/http.js';
 import { logAccessDecision } from './accessDebug.js';
+import { swallow } from '../utils/logError.js';
 
 /** Any fundi lifecycle role (pending review or approved). */
 export function requireFundiAccount(req, res, next) {
   const allowed = new Set(['fundi', 'fundi_pending', 'admin']);
   if (!req.user || !allowed.has(req.user.role)) {
-    logAccessDecision(req, 'requireFundiAccount:denied', { allowedRoles: [...allowed] }).catch(() => {});
+    logAccessDecision(req, 'requireFundiAccount:denied', { allowedRoles: [...allowed] }).catch(swallow('fundiAccess.accessLog'));
     return next(forbidden('Fundi account required'));
   }
-  logAccessDecision(req, 'requireFundiAccount:allowed').catch(() => {});
+  logAccessDecision(req, 'requireFundiAccount:allowed').catch(swallow('fundiAccess.accessLog'));
   return next();
 }
 

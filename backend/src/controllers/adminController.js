@@ -1,6 +1,7 @@
 import { query, transaction } from '../db.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
+import { logNonFatal } from '../utils/logError.js';
 import { getSignedAccessUrl, getObjectBuffer, uploadProfilePhoto } from '../services/storageService.js';
 
 const tableOrderBy = {
@@ -694,7 +695,9 @@ export async function getSettings(_req, res) {
   try {
     const flag = await query(`select is_enabled from feature_flags where key = 'maintenance_mode'`);
     settings.maintenanceMode = flag.rows[0]?.is_enabled === true;
-  } catch { /* feature_flags table may not exist in very old installs */ }
+  } catch (error) {
+    logNonFatal('admin.maintenanceFlagSync', error);
+  }
   res.json({ success: true, settings });
 }
 

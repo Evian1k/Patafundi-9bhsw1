@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -101,9 +102,10 @@ const STATIC_SECTIONS: InfoSection[] = [
 export function EmergencySosScreen({ navigation }: any): JSX.Element {
   const callNumber = (number: string): void => {
     const url = `tel:${number}`;
-    Linking.canOpenURL(url).then((ok) => {
-      if (ok) Linking.openURL(url).catch(() => {});
-    }).catch(() => {});
+    // An emergency call that silently does nothing is worse than no button.
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Could not start the call', `Please dial ${number} manually.`);
+    });
   };
 
   return (

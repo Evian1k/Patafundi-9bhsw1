@@ -104,13 +104,14 @@ export default function StaffLayout() {
         // redirect them to the customer auth page (not staff login)
         const staffRoles = ["super_admin", "admin", "ops_manager", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];
         if (!staffRoles.includes(data.role)) {
-          await apiClient.logout().catch(() => {});
+          await apiClient.logout().catch((err) => console.warn("[staff] logout failed:", err));
           navigate("/auth", { replace: true });
           return;
         }
         setRole(data.role);
         setPermissions(new Set(data.permissions || []));
-      } catch {
+      } catch (err) {
+        console.warn("[staff] permission check failed:", err);
         navigate("/staff/login");
       } finally {
         setLoading(false);
@@ -122,7 +123,7 @@ export default function StaffLayout() {
     // Security: actually log out (revoke refresh token + clear cookies)
     // before redirecting. This prevents the back button from re-entering
     // the staff dashboard with a still-valid session.
-    await apiClient.logout().catch(() => {});
+    await apiClient.logout().catch((err) => console.warn("[staff] logout failed:", err));
     navigate("/staff/login", { replace: true });
   };
 

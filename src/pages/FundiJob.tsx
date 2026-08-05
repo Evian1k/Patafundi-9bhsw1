@@ -52,7 +52,7 @@ export default function FundiJob() {
     apiClient.getCurrentUser().then((res) => {
       const u = res?.user as { id?: string } | undefined;
       if (u?.id) setCurrentUserId(u.id);
-    }).catch(() => {});
+    }).catch((err) => console.warn('[job] could not load current user:', err));
   }, []);
 
   useEffect(() => {

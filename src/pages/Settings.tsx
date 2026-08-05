@@ -55,6 +55,18 @@ export default function Settings() {
   const workPlace = useMemo(() => savedPlaces.find((p) => p.type === "work") || null, [savedPlaces]);
   const otherPlaces = useMemo(() => savedPlaces.filter((p) => p.type === "other"), [savedPlaces]);
 
+  const toggleSetting = async (key: keyof typeof settings) => {
+    const previous = settings[key];
+    const next = !previous;
+    setSettings((s) => ({ ...s, [key]: next }));
+    try {
+      await apiClient.updateUserSettings({ [key]: next });
+    } catch (err) {
+      setSettings((s) => ({ ...s, [key]: previous }));
+      toast.error(err instanceof Error ? err.message : "Could not save your setting");
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) { navigate("/auth"); return; }
@@ -312,11 +324,7 @@ export default function Settings() {
                         <p className="text-xs text-muted-foreground">{desc}</p>
                       </div>
                       <button
-                        onClick={async () => {
-                          const val = !settings[key as keyof typeof settings];
-                          setSettings((s) => ({ ...s, [key]: val }));
-                          await apiClient.updateUserSettings({ [key]: val }).catch(() => {});
-                        }}
+                        onClick={() => void toggleSetting(key as keyof typeof settings)}
                         className={`w-10 h-6 rounded-full transition-colors relative ${settings[key as keyof typeof settings] ? "bg-primary" : "bg-muted"}`}
                       >
                         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings[key as keyof typeof settings] ? "translate-x-5" : "translate-x-0.5"}`} />
@@ -338,11 +346,7 @@ export default function Settings() {
                         <p className="text-xs text-muted-foreground">{desc}</p>
                       </div>
                       <button
-                        onClick={async () => {
-                          const val = !settings[key as keyof typeof settings];
-                          setSettings((s) => ({ ...s, [key]: val }));
-                          await apiClient.updateUserSettings({ [key]: val }).catch(() => {});
-                        }}
+                        onClick={() => void toggleSetting(key as keyof typeof settings)}
                         className={`w-10 h-6 rounded-full transition-colors relative ${settings[key as keyof typeof settings] ? "bg-primary" : "bg-muted"}`}
                       >
                         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings[key as keyof typeof settings] ? "translate-x-5" : "translate-x-0.5"}`} />
