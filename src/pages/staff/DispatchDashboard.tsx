@@ -9,7 +9,7 @@ import { Package, UserCheck, UserX, Clock, Map } from "lucide-react";
 import DashboardLoadError from "@/components/staff/DashboardLoadError";
 
 export default function DispatchDashboard() {
-  const [data, setData] = useState<any>({});
+  const [data, setData] = useState<any>({ activeJobs: "—", availableFundis: "—", busyFundis: "—", avgResponseTime: "—" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +47,7 @@ export default function DispatchDashboard() {
         <Card icon={Package} label="Active Jobs" value={data.activeJobs} color="text-blue-600" />
         <Card icon={UserCheck} label="Available Fundis" value={data.availableFundis} color="text-green-600" />
         <Card icon={UserX} label="Busy Fundis" value={data.busyFundis} color="text-amber-600" />
-        <Card icon={Clock} label="Avg Response Time" value={`${data.avgResponseTime}m`} color="text-purple-600" />
+        <Card icon={Clock} label="Avg Response Time" value={typeof data.avgResponseTime === "number" ? `${data.avgResponseTime}m` : data.avgResponseTime} color="text-purple-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border border-slate-100">

@@ -8,7 +8,7 @@ import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { Ticket, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
 export default function SupportDashboard() {
-  const [data, setData] = useState<any>({});
+  const [data, setData] = useState<any>({ open: "—", resolved: "—", escalated: "—", slaBreaches: "—", tickets: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

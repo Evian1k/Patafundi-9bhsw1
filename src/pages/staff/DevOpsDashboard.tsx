@@ -9,7 +9,10 @@ import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { Cpu, MemoryStick, Database, Zap, Activity, AlertTriangle } from "lucide-react";
 
 export default function DevOpsDashboard() {
-  const [data, setData] = useState<any>({});
+  const [data, setData] = useState<any>({
+    cpu: 0, ram: 0, dbStatus: "—", dbMode: "—", apiLatency: 0, uptime: 0,
+    storage: "—", email: "—", mpesa: "—",
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
