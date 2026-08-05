@@ -2,6 +2,7 @@ import pg from 'pg';
 import { config, requireConfig } from './config.js';
 import { getEmbeddedDb, isEmbeddedDb } from './pglite-instance.js';
 import { getPgPoolConfig, isLocalDatabaseUrl } from './pg-config.js';
+import { logNonFatal, swallow } from './utils/logError.js';
 
 const { Pool } = pg;
 
@@ -45,7 +46,7 @@ async function initDriver() {
       console.log('[PataFundi API] PostgreSQL database ready');
     } catch (error) {
       lastConnectionError = error instanceof Error ? error : new Error(String(error));
-      await pool?.end().catch(() => {});
+      await pool?.end().catch(swallow('db.poolEnd'));
       pool = null;
       consecutiveFailures++;
       console.error(`[PataFundi API] PostgreSQL connection failed (attempt ${consecutiveFailures}):`, lastConnectionError.message);
@@ -66,8 +67,9 @@ async function initDriver() {
       await testPool.query('select 1');
       pool = testPool;
       return;
-    } catch {
-      await testPool.end().catch(() => {});
+    } catch (error) {
+      logNonFatal('db.probe', error, { fallback: 'embedded' });
+      await testPool.end().catch(swallow('db.poolEnd'));
     }
   }
 
@@ -100,7 +102,7 @@ async function ensureInit() {
  */
 async function destroyPool() {
   if (pool) {
-    await pool.end().catch(() => {});
+    await pool.end().catch(swallow('db.poolEnd'));
     pool = null;
   }
   initPromise = null;

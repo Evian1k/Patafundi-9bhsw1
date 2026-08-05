@@ -74,19 +74,21 @@ const HOW_IT_WORKS_SECTION: InfoSection[] = [
 ];
 
 export function ReferralProgramScreen({ navigation }: any): JSX.Element {
+  const openShareUrl = (url: string, appName: string): void => {
+    Linking.openURL(url).catch(() => {
+      Alert.alert(`Could not open ${appName}`, 'Copy your referral code and share it manually instead.');
+    });
+  };
+
   const handleInvite = (option: InviteOption): void => {
     if (option.icon === 'logo-whatsapp') {
       const url = `https://wa.me/?text=${encodeURIComponent('Join me on PataFundi! Use my referral code to get KES 100 off your first job.')}`;
-      Linking.canOpenURL(url).then((ok) => {
-        if (ok) Linking.openURL(url).catch(() => {});
-      }).catch(() => {});
+      openShareUrl(url, 'WhatsApp');
       return;
     }
     if (option.icon === 'chatbubble') {
       const url = `sms:?body=${encodeURIComponent('Join me on PataFundi! Use my referral code to get KES 100 off your first job.')}`;
-      Linking.canOpenURL(url).then((ok) => {
-        if (ok) Linking.openURL(url).catch(() => {});
-      }).catch(() => {});
+      openShareUrl(url, 'Messages');
       return;
     }
     if (option.icon === 'qr-code') {
@@ -96,7 +98,9 @@ export function ReferralProgramScreen({ navigation }: any): JSX.Element {
     void Share.share({
       message: 'Join me on PataFundi! Use my referral code to get KES 100 off your first job.',
       title: 'PataFundi referral',
-    }).catch(() => {});
+    }).catch(() => {
+      Alert.alert('Could not open the share sheet', 'Copy your referral code and share it manually instead.');
+    });
   };
 
   return (

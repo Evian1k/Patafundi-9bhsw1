@@ -2,8 +2,9 @@
  * Growth Dashboard — Super Admin only
  * Shows: user growth, job growth, revenue growth, retention, conversion
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
+import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { TrendingUp, Users, Package, DollarSign, Activity } from "lucide-react";
 
 interface GrowthData {
@@ -23,10 +24,14 @@ interface GrowthData {
 export default function GrowthDashboard() {
   const [data, setData] = useState<GrowthData>({ overview: { total_users: 0, new_users_30d: 0, total_jobs: 0, new_jobs_30d: 0, total_revenue: 0, revenue_30d: 0, customer_retention: 0, fundi_retention: 0 }, chartData: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient.getAdminReportsAnalytics(30)
-      .then((d: any) => setData({
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d: any = await apiClient.getAdminReportsAnalytics(30);
+      setData({
         overview: {
           total_users: d?.summary?.total_users || 0,
           new_users_30d: d?.summary?.new_users || 0,
@@ -38,13 +43,17 @@ export default function GrowthDashboard() {
           fundi_retention: 0,
         },
         chartData: d?.chartData || [],
-      }))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { void load(); }, [load]);
+
   if (loading) return <div className="p-8 text-slate-400">Loading growth analytics…</div>;
-  // data is always defined (initialized with empty defaults)
 
   const o = data.overview;
   const fmt = (n: number) => Number(n).toLocaleString();
@@ -53,6 +62,8 @@ export default function GrowthDashboard() {
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Growth Dashboard</h1>
       <p className="text-slate-500 text-sm mb-6">User acquisition, job growth, and revenue trends</p>
+
+      {error && <DashboardLoadError message={error} onRetry={() => void load()} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card icon={Users} label="Total Users" value={fmt(o.total_users)} sub={`${o.new_users_30d} new (30d)`} />

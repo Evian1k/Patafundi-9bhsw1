@@ -135,7 +135,7 @@ export default function FundiTracker({
         bootstrapAuthSessionFromUser(u);
         setCurrentUser({ id: u.id });
       }
-    }).catch(() => {});
+    }).catch((err) => console.warn("[tracker] could not load current user:", err));
   }, []);
 
   useEffect(() => {

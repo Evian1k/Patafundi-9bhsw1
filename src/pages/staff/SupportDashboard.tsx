@@ -2,37 +2,46 @@
  * Support Dashboard — Super Admin + Support Agent + Ops Manager
  * Top cards: Open Tickets, Resolved Tickets, Escalated Tickets, SLA Breaches
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
+import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { Ticket, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
 export default function SupportDashboard() {
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient.request("/staff/support/tickets?limit=100").catch(() => ({ tickets: [] }))
-      .then((d: any) => {
-        const tickets = d?.tickets || [];
-        setData({
-          open: tickets.filter((t: any) => t.status === "open").length,
-          resolved: tickets.filter((t: any) => t.status === "resolved" || t.status === "closed").length,
-          escalated: tickets.filter((t: any) => t.priority === "high" || t.priority === "urgent").length,
-          slaBreaches: 0,
-          tickets,
-        });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d: any = await apiClient.request("/staff/support/tickets?limit=100");
+      const tickets = d?.tickets || [];
+      setData({
+        open: tickets.filter((t: any) => t.status === "open").length,
+        resolved: tickets.filter((t: any) => t.status === "resolved" || t.status === "closed").length,
+        escalated: tickets.filter((t: any) => t.priority === "high" || t.priority === "urgent").length,
+        slaBreaches: 0,
+        tickets,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { void load(); }, [load]);
+
   if (loading) return <div className="p-8 text-slate-400">Loading support dashboard…</div>;
-  // data is always defined (initialized with empty defaults)
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Support Dashboard</h1>
       <p className="text-slate-500 text-sm mb-6">Customer service tickets and SLA monitoring</p>
+
+      {error && <DashboardLoadError message={error} onRetry={() => void load()} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card icon={Ticket} label="Open Tickets" value={data.open} color="text-blue-600" bg="bg-blue-50" />

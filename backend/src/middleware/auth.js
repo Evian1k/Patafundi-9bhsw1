@@ -4,6 +4,7 @@ import { config, requireConfig } from '../config.js';
 import { query } from '../db.js';
 import { forbidden } from '../utils/http.js';
 import { logAccessDecision } from './accessDebug.js';
+import { logNonFatal, swallow } from '../utils/logError.js';
 
 export function signAccessToken(user) {
   requireConfig(config.jwtSecret, 'JWT_SECRET');
@@ -76,7 +77,12 @@ export async function optionalAuth(req, _res, next) {
     );
     if (result.rows[0]?.status === 'active') req.user = result.rows[0];
     next();
-  } catch {
+  } catch (error) {
+    // A malformed/expired token simply means "anonymous request". Anything
+    // else (database down, missing JWT_SECRET) would otherwise be invisible.
+    if (!(error instanceof jwt.JsonWebTokenError)) {
+      logNonFatal('auth.optionalAuth', error, { path: req.originalUrl || req.path });
+    }
     next();
   }
 }
@@ -117,10 +123,10 @@ export function requireRole(...roles) {
       if (roles.includes('admin') && req.user?.role === 'super_admin') {
         return next();
       }
-      logAccessDecision(req, 'requireRole:denied', { requiredRoles: roles }).catch(() => {});
+      logAccessDecision(req, 'requireRole:denied', { requiredRoles: roles }).catch(swallow('auth.accessLog'));
       return next(forbidden());
     }
-    logAccessDecision(req, 'requireRole:allowed', { requiredRoles: roles }).catch(() => {});
+    logAccessDecision(req, 'requireRole:allowed', { requiredRoles: roles }).catch(swallow('auth.accessLog'));
     return next();
   };
 }

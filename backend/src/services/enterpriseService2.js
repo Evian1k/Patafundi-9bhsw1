@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { auditLog } from './auditService.js';
+import { logNonFatal } from '../utils/logError.js';
 
 const execAsync = promisify(exec);
 
@@ -85,28 +86,45 @@ export async function requestDataExport(userId) {
     'favorite_fundis', 'saved_places', 'support_tickets', 'disputes'];
 
   const userData = {};
+  /** Tables that could not be read — a GDPR export must disclose its own gaps. */
+  const skippedTables = [];
   for (const table of tables) {
     try {
       const result = await query(`select * from ${table} where user_id = $1 or customer_id = $1 or referrer_id = $1 or referee_id = $1 or sender_id = $1 limit 1000`, [userId]);
       if (result.rows.length > 0) userData[table] = result.rows;
-    } catch { /* table might not have user_id column */ }
+    } catch (error) {
+      // Not every table has a user-owned column; only a real failure matters.
+      logNonFatal('gdpr.dataExport.table', error, { table, userId });
+      skippedTables.push({ table, reason: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   // Also get fundi-specific data
   try {
     const fundiData = await query('select * from fundis where user_id = $1', [userId]);
     if (fundiData.rows[0]) userData.fundis = fundiData.rows;
-  } catch {}
+  } catch (error) {
+    logNonFatal('gdpr.dataExport.fundis', error, { userId });
+    skippedTables.push({ table: 'fundis', reason: error instanceof Error ? error.message : String(error) });
+  }
 
   const result = await query(
     `insert into gdpr_requests (user_id, request_type, status, details, processed_by, processed_at, expires_at)
      values ($1, 'data_export', 'completed', $2::jsonb, $1, now(), now() + interval '30 days')
      returning id`,
-    [userId, JSON.stringify({ tableCount: Object.keys(userData).length, exportedAt: new Date().toISOString() })],
+    [
+      userId,
+      JSON.stringify({
+        tableCount: Object.keys(userData).length,
+        exportedAt: new Date().toISOString(),
+        complete: skippedTables.length === 0,
+        skippedTables,
+      }),
+    ],
   );
 
-  await auditLog({ userId, action: 'gdpr.data_export', entityType: 'user', entityId: userId });
-  return { requestId: result.rows[0].id, data: userData };
+  await auditLog({ userId, action: 'gdpr.data_export', entityType: 'user', entityId: userId, metadata: { skippedTables } });
+  return { requestId: result.rows[0].id, data: userData, complete: skippedTables.length === 0, skippedTables };
 }
 
 export async function requestDataDeletion(userId, reason) {

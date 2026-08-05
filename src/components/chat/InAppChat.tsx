@@ -67,7 +67,7 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
     try {
       const res = await apiClient.getJobMessages(jobId) as { messages?: ChatMessage[] };
       setMessages((res.messages || []).map((m) => normalizeMessage(m, currentUserId)));
-      await apiClient.markJobMessagesRead(jobId).catch(() => {});
+      await apiClient.markJobMessagesRead(jobId).catch((err) => console.warn('[chat] Failed to mark messages read:', err));
     } catch (error) {
       console.warn('[chat] Failed to load messages:', error);
     } finally {

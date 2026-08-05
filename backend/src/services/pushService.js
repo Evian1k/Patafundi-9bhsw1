@@ -12,6 +12,7 @@
  *   await sendPushNotification({ userId, title: 'New Job', body: 'Plumbing job nearby', data: { jobId: '...' } });
  */
 import { query } from '../db.js';
+import { logNonFatal } from '../utils/logError.js';
 
 let fcmConfigured = null;
 
@@ -50,8 +51,9 @@ export async function sendPushNotification({ userId, title, body, data = {} }) {
     try {
       await sendViaFcm(device.token, title, body, data);
       sentCount++;
-    } catch {
+    } catch (error) {
       // Token might be invalid — deactivate it
+      logNonFatal('push.sendFailed', error, { userId, platform: device.platform });
       await query('update user_device_tokens set is_active = false where token = $1', [device.token]);
       failedCount++;
     }

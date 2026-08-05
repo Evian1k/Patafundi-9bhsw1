@@ -3,35 +3,42 @@
  * Top cards: CPU, RAM, Database, API Latency
  * Charts: Error Rates, Response Times, Uptime
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
+import DashboardLoadError from "@/components/staff/DashboardLoadError";
 import { Cpu, MemoryStick, Database, Zap, Activity, AlertTriangle } from "lucide-react";
 
 export default function DevOpsDashboard() {
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiClient.request("/health").catch(() => null)
-      .then((d: any) => {
-        setData({
-          cpu: 0, // Not available without server metrics endpoint
-          ram: 0,
-          dbStatus: d?.subsystems?.database?.ok ? "Healthy" : "Unknown",
-          dbMode: d?.subsystems?.database?.mode || "unknown",
-          apiLatency: 0,
-          uptime: d?.uptimeSeconds || 0,
-          storage: d?.subsystems?.storage?.provider || "unknown",
-          email: d?.subsystems?.email?.configured ? "Configured" : "Not configured",
-          mpesa: d?.subsystems?.mpesa?.configured ? "Configured" : "Not configured",
-        });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d: any = await apiClient.request("/health");
+      setData({
+        cpu: 0, // Not available without server metrics endpoint
+        ram: 0,
+        dbStatus: d?.subsystems?.database?.ok ? "Healthy" : "Unknown",
+        dbMode: d?.subsystems?.database?.mode || "unknown",
+        apiLatency: 0,
+        uptime: d?.uptimeSeconds || 0,
+        storage: d?.subsystems?.storage?.provider || "unknown",
+        email: d?.subsystems?.email?.configured ? "Configured" : "Not configured",
+        mpesa: d?.subsystems?.mpesa?.configured ? "Configured" : "Not configured",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { void load(); }, [load]);
+
   if (loading) return <div className="p-8 text-slate-400">Loading devops dashboard…</div>;
-  // data is always defined (initialized with empty defaults)
 
   const fmtUptime = (s: number) => {
     if (s < 60) return `${Math.floor(s)}s`;
@@ -43,6 +50,8 @@ export default function DevOpsDashboard() {
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">DevOps Dashboard</h1>
       <p className="text-slate-500 text-sm mb-6">Infrastructure health and system metrics</p>
+
+      {error && <DashboardLoadError message={error} onRetry={() => void load()} />}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Card icon={Cpu} label="CPU Usage" value={`${data.cpu}%`} color="text-blue-600" />

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+import { logNonFatal } from '../utils/logError.js';
 import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
 import {
   createExpectedCommission,
@@ -419,7 +420,9 @@ export async function checkIn(req, res) {
           [req.user.id, req.params.id, latitude, longitude, accuracy,
            JSON.stringify(['far_from_customer', `distance_${distance.toFixed(2)}km`])],
         );
-      } catch {}
+      } catch (error) {
+        logNonFatal('job.gpsValidationInsert', error, { jobId: req.params.id, fundiId: req.user.id });
+      }
     }
   }
   const result = await transaction(async (client) => {

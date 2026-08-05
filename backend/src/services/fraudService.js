@@ -3,6 +3,7 @@ import { query, transaction } from '../db.js';
 import { auditLog } from './auditService.js';
 import { calculateCommission, getPaymentSettings } from './financeService.js';
 import { sendFraudWarningEmail } from './emailService.js';
+import { swallow } from '../utils/logError.js';
 
 const BYPASS_PATTERNS = [
   ['phone_number', /(?:\+?254|0)?[17]\d{8}\b|(?:\+?254|0)?\d{9,12}/i, 15, 'high'],
@@ -284,7 +285,7 @@ async function flagSuspiciousCommission(row) {
         to: user.rows[0].email,
         subject: 'Commission protection alert — PataFundi',
         body: 'A job was marked complete without platform payment. Outstanding commission may be deducted from your next payout.',
-      }).catch(() => {});
+      }).catch(swallow('fraud.commissionWarningEmail', { fundiId: row.fundi_id, jobId: row.job_id }));
     }
   });
 }

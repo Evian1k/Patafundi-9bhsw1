@@ -15,6 +15,7 @@ import { csrfProtection } from './middleware/auth.js';
 import { authRateLimit, otpRateLimit, paymentWebhookRateLimit, mapsRateLimit } from './middleware/rateLimit.js';
 import { corsOriginCallback } from './cors.js';
 import { isLocalDatabaseUrl } from './pg-config.js';
+import { logNonFatal, swallow } from './utils/logError.js';
 import { checkCommissionProtection, runPatternDetection } from './services/fraudService.js';
 
 const app = express();
@@ -131,7 +132,9 @@ app.get('/health', async (_req, res) => {
   try {
     const { storageStatus } = await import('./services/storageService.js');
     storage = storageStatus();
-  } catch { /* storageService not yet loaded — leave default */ }
+  } catch (error) {
+    logNonFatal('health.storageStatus', error);
+  }
 
   // Email (Resend) — API key present?
   const email = {
@@ -224,7 +227,7 @@ app.use((error, _req, res, _next) => {
   // Non-blocking — never let this crash the request.
   import('./services/errorNotificationService.js')
     .then(({ logErrorAndNotifyStaff }) => {
-      logErrorAndNotifyStaff({
+      return logErrorAndNotifyStaff({
         type: errorType,
         statusCode: status,
         message,
@@ -236,7 +239,7 @@ app.use((error, _req, res, _next) => {
         userAgent: _req.get('User-Agent'),
       });
     })
-    .catch(() => { /* ignore — never crash the request */ });
+    .catch(swallow('errorHandler.notifyStaff', { path: _req.path, status }));
 
   res.status(status).json({ success: false, message });
 });
@@ -341,7 +344,9 @@ server.listen(port, host, () => {
       setInterval(runDataRetentionCleanup, 24 * 60 * 60 * 1000);
       console.log('[retention] data retention cleanup scheduled (daily)');
     })
-    .catch(() => {});
+    .catch((err) => {
+      console.warn('[retention] could not schedule data retention cleanup:', err.message);
+    });
 
   // ── Queue worker (in-process, PostgreSQL-backed) ────────────────
   // Processes background jobs: image moderation, push notifications,

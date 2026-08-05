@@ -3,12 +3,13 @@
  * Adapts to the user's role: shows different stat cards and quick links
  * based on what permissions they have.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Wrench, Package, DollarSign, AlertTriangle, Users, Activity } from "lucide-react";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { apiClient } from "@/lib/api";
+import DashboardLoadError from "@/components/staff/DashboardLoadError";
 
 interface Stats {
   fundis?: number;
@@ -33,54 +34,63 @@ export default function StaffOverview() {
   const [role, setRole] = useState("");
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        // Use apiClient (configured with VITE_API_URL) — works on Vercel + dev
-        const permData = await apiClient.getStaffPermissions().catch(() => ({ role: "", permissions: [] })) as { role: string; permissions: string[] };
-        setRole(permData.role || "");
-        setPermissions(new Set(permData.permissions || []));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const failures: string[] = [];
+    try {
+      // Use apiClient (configured with VITE_API_URL) — works on Vercel + dev
+      const permData = await apiClient.getStaffPermissions() as { role: string; permissions: string[] };
+      setRole(permData.role || "");
+      setPermissions(new Set(permData.permissions || []));
 
-        const promises: Promise<void>[] = [];
-        if (permData.role === "super_admin" || permData.permissions?.includes("can_view_metrics")) {
-          promises.push(
-            apiClient.getAdminDashboard()
-              .then((d: any) => {
-                const s = d?.stats || {};
-                setStats(prev => ({
-                  ...prev,
-                  fundis: s.fundis,
-                  pendingFundis: s.pendingFundis,
-                  jobs: s.jobs,
-                  revenue: s.revenue,
-                  platformRevenue: s.platformRevenue,
-                  netProfit: s.netProfit,
-                  users: s.users,
-                  openDisputes: s.openDisputes,
-                }));
-              })
-              .catch(() => {})
-          );
-        }
-        if (permData.permissions?.includes("can_view_fraud_dashboard")) {
-          promises.push(
-            apiClient.getFraudDashboard()
-              .then((d: any) => {
-                const open = d?.dashboard?.fraudAlerts?.open ?? d?.fraudAlerts?.open ?? 0;
-                setStats(prev => ({ ...prev, fraudAlerts: open }));
-              })
-              .catch(() => {})
-          );
-        }
-        await Promise.all(promises);
-      } catch {
-        // ignore — dashboard shows "—" placeholders
-      } finally {
-        setLoading(false);
+      const promises: Promise<void>[] = [];
+      if (permData.role === "super_admin" || permData.permissions?.includes("can_view_metrics")) {
+        promises.push(
+          apiClient.getAdminDashboard()
+            .then((d: any) => {
+              const s = d?.stats || {};
+              setStats(prev => ({
+                ...prev,
+                fundis: s.fundis,
+                pendingFundis: s.pendingFundis,
+                jobs: s.jobs,
+                revenue: s.revenue,
+                platformRevenue: s.platformRevenue,
+                netProfit: s.netProfit,
+                users: s.users,
+                openDisputes: s.openDisputes,
+              }));
+            })
+            .catch((err: unknown) => {
+              failures.push(`platform metrics (${err instanceof Error ? err.message : "unknown error"})`);
+            })
+        );
       }
-    })();
+      if (permData.permissions?.includes("can_view_fraud_dashboard")) {
+        promises.push(
+          apiClient.getFraudDashboard()
+            .then((d: any) => {
+              const open = d?.dashboard?.fraudAlerts?.open ?? d?.fraudAlerts?.open ?? 0;
+              setStats(prev => ({ ...prev, fraudAlerts: open }));
+            })
+            .catch((err: unknown) => {
+              failures.push(`fraud alerts (${err instanceof Error ? err.message : "unknown error"})`);
+            })
+        );
+      }
+      await Promise.all(promises);
+      if (failures.length) setError(`Failed to load ${failures.join(", ")}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (loading) {
     return <div className="p-8 text-slate-400">Loading…</div>;
@@ -109,6 +119,8 @@ export default function StaffOverview() {
         <motion.p variants={itemVariants} className="text-slate-500 mb-8 capitalize">
           Welcome back. You are signed in as <strong>{role.replace("_", " ")}</strong>.
         </motion.p>
+
+        {error && <DashboardLoadError message={error} onRetry={() => void load()} />}
 
         <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {cards.map((card) => {
