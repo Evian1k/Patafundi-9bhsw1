@@ -28,8 +28,16 @@ const PRODUCTION_ORIGINS = [
 ];
 
 export function getAllowedOrigins() {
+  const isProduction = config.nodeEnv === 'production';
   return new Set(
-    [config.frontendOrigin, ...PRODUCTION_ORIGINS, ...LOCAL_ORIGINS, ...config.corsOrigins].filter(Boolean),
+    [
+      config.frontendOrigin,
+      ...PRODUCTION_ORIGINS,
+      // Loopback origins are development-only: a credentialed request from a
+      // page served on the developer's machine must not reach production.
+      ...(isProduction ? [] : LOCAL_ORIGINS),
+      ...config.corsOrigins,
+    ].filter(Boolean),
   );
 }
 

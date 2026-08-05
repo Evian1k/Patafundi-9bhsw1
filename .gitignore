@@ -31,8 +31,12 @@ dist-ssr
 # Local file storage fallback (dev only — production uses Cloudflare R2)
 backend/uploads/
 
-# PGlite dev database
+# PGlite dev database (may contain seeded users and password hashes)
 .pgdata/
+.pgdata-*/
+
+# Local debug scripts (often contain credentials)
+.debug-*.mjs
 
 # Local E2E audit artifacts
 E2E_AUDIT_RESULTS.json
