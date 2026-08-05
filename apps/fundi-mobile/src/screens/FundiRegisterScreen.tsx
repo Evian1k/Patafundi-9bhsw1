@@ -40,7 +40,6 @@ import {
   spacing,
   fontSize,
   borderRadius,
-  shadows,
   SERVICE_CATEGORIES,
 } from '@patafundi/shared';
 

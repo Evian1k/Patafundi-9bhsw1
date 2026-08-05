@@ -16,7 +16,7 @@ import {
   borderRadius,
   gradients,
   shadows,
-} from '@patafundi/shared';
+} from '../theme';
 
 export interface InfoSection {
   icon: keyof typeof Ionicons.glyphMap;

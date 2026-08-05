@@ -20,9 +20,9 @@ import {
   borderRadius,
   gradients,
   SERVICE_CATEGORIES,
+  Input,
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
-import { Input } from '../components/ui';
 
 export function EditProfileScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);

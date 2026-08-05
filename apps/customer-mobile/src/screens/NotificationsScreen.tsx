@@ -17,6 +17,7 @@ import {
   fontSize,
   spacing,
   borderRadius,
+  ScreenHeader,
 } from '@patafundi/shared';
 import type { Notification } from '@patafundi/shared';
 
@@ -110,13 +111,7 @@ export function NotificationsScreen({ navigation }: any): JSX.Element {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{'Notifications'}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title="Notifications" onBack={() => navigation.goBack()} />
       <View style={styles.header}>
         <TouchableOpacity
           onPress={handleMarkAll}
@@ -151,34 +146,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.md,
-    width: '100%',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
   },
   center: {
     flex: 1,

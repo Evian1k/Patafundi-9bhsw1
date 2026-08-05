@@ -12,7 +12,7 @@ import {
   TextStyle as RNTextStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, fonts, fontSize, borderRadius, spacing } from '@patafundi/shared';
+import { colors, fonts, fontSize, borderRadius, spacing } from '../theme';
 
 interface PrimaryButtonProps {
   label: string;
@@ -45,17 +45,18 @@ interface OutlineButtonProps {
   label: string;
   onPress: () => void;
   loading?: boolean;
+  disabled?: boolean;
   color?: string;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
 
-export function OutlineButton({ label, onPress, loading, color, style, textStyle }: OutlineButtonProps): JSX.Element {
+export function OutlineButton({ label, onPress, loading, disabled, color, style, textStyle }: OutlineButtonProps): JSX.Element {
   const borderColor = color || colors.accent;
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={loading}
+      disabled={disabled || loading}
       activeOpacity={0.85}
       style={[styles.outlineBtn, { borderColor }, style]}
     >

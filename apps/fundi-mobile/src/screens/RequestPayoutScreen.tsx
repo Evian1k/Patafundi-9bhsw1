@@ -21,8 +21,8 @@ import {
   borderRadius,
   gradients,
   type WalletBalance,
+  Input,
 } from '@patafundi/shared';
-import { Input } from '../components/ui';
 
 type PayoutMethod = 'mpesa' | 'bank';
 

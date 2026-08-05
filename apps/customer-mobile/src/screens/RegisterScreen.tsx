@@ -10,10 +10,17 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, fontSize, spacing, borderRadius, gradients } from '@patafundi/shared';
+import {
+  colors,
+  fonts,
+  fontSize,
+  spacing,
+  borderRadius,
+  gradients,
+  ScreenHeader,
+  Input,
+} from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
-import { Input } from '../components/ui';
 
 export function RegisterScreen({ navigation }: any): JSX.Element {
   const [fullName, setFullName] = useState('');
@@ -45,13 +52,7 @@ export function RegisterScreen({ navigation }: any): JSX.Element {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{'Create Account'}</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <ScreenHeader title="Create Account" onBack={() => navigation.goBack()} />
 
         <Text style={styles.title}>Create account</Text>
         <Text style={styles.subtitle}>Join PataFundi to hire trusted fundis.</Text>
@@ -109,34 +110,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     flexGrow: 1,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.md,
-    width: '100%',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
   },
   title: {
     fontFamily: fonts.display,

@@ -18,8 +18,10 @@ import {
   borderRadius,
   gradients,
   shadows,
+  ScreenHeader,
+  InfoPageScreen,
+  InfoSection,
 } from '@patafundi/shared';
-import { InfoPageScreen, InfoSection } from '../components/InfoPageScreen';
 
 interface InviteOption {
   icon: keyof typeof Ionicons.glyphMap;
@@ -101,13 +103,7 @@ export function ReferralProgramScreen({ navigation }: any): JSX.Element {
 
   return (
     <View style={styles.outer}>
-      <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{'Referral Program'}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title="Referral Program" onBack={() => navigation.goBack()} />
 
       <InfoPageScreen
         heroIcon="gift"
@@ -166,34 +162,6 @@ const styles = StyleSheet.create({
   outer: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.md,
-    width: '100%',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
   },
   inviteCard: {
     backgroundColor: colors.card,
