@@ -39,7 +39,7 @@ services:
       # reads DATABASE_URL. No secrets belong in this file — override via .env.
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-patafundi}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
-      REFRESH_SECRET: ${REFRESH_SECRET:-${JWT_SECRET}}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-${JWT_SECRET}}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       FRONTEND_ORIGIN: http://localhost:8080
       CORS_ORIGINS: http://localhost:8080

@@ -6,6 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GoogleMapsProvider } from "@/components/maps/GoogleMapsProvider";
 import NetworkReconnectBanner from "@/components/system/NetworkReconnectBanner";
+import RouteErrorBoundary from "@/components/system/RouteErrorBoundary";
 import { AppRoutes } from "@/routes";
 
 const App = () => {
@@ -26,7 +27,11 @@ const App = () => {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <GoogleMapsProvider>
             <NetworkReconnectBanner />
-            <AppRoutes />
+            {/* Global crash boundary: users never see raw errors; crashes are
+                reported to /api/client-errors and routed to DevOps staff. */}
+            <RouteErrorBoundary>
+              <AppRoutes />
+            </RouteErrorBoundary>
           </GoogleMapsProvider>
         </BrowserRouter>
       </TooltipProvider>

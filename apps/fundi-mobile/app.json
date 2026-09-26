@@ -39,9 +39,6 @@
         "POST_NOTIFICATIONS"
       ]
     },
-    "extra": {
-      "API_URL": "https://patafundi-9bhsw1.onrender.com"
-    },
     "scheme": "patafundi-fundi",
     "plugins": [
       "expo-location"

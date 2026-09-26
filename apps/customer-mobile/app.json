@@ -36,9 +36,6 @@
         "WRITE_EXTERNAL_STORAGE"
       ]
     },
-    "extra": {
-      "API_URL": "https://patafundi-9bhsw1.onrender.com"
-    },
     "scheme": "patafundi-customer",
     "plugins": [
       "expo-location"

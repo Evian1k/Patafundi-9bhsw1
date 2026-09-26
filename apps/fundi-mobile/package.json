@@ -4,9 +4,9 @@
   "main": "src/App.tsx",
   "private": true,
   "scripts": {
-    "start": "cross-env EXPO_PUBLIC_HOST=192.168.0.106 expo start --host lan --port 8082",
-    "android": "cross-env EXPO_PUBLIC_HOST=192.168.0.106 expo start --android --host lan --port 8082",
-    "ios": "cross-env EXPO_PUBLIC_HOST=192.168.0.106 expo start --ios --host lan --port 8082",
+    "start": "expo start --host lan --port 8082",
+    "android": "expo start --android --host lan --port 8082",
+    "ios": "expo start --ios --host lan --port 8082",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
