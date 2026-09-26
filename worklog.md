@@ -195,3 +195,29 @@ Work Log:
 Stage Summary:
 - Stack restored to aa6141a, supervisor-maintained, all demo accounts + CORS verified live
 - BLOCKED: image-driven UI work — waiting for user to re-upload the screenshot
+
+---
+Task ID: 9 (FUNDIHUB production completion)
+Agent: Super Z (main agent)
+Task: User replaced the spec with "FUNDIHUB — ULTIMATE PRODUCTION COMPLETION PROMPT" (42 sections): rebrand + close every functional gap, no fake data/buttons, preserve working code.
+
+Work Log:
+- Two deep Explore audits produced gap matrices vs the 42 sections; verified every claimed blocker in code before acting (one hallucinated blocker — "queue table named n" — was disproven by inspection)
+- Migration 036_fundihub_upgrade.sql: provider_type += 'platform_match', match_metadata jsonb, fundis.verification_level, refund_requests, reviews.provider_reply/hidden, ai_events, subscriptions.subscriber_type
+- Real bug found & fixed en route: queueWorker set status='processing' but job_queue CHECK only allows 'running' → every queued job (push/email) silently failed forever
+- Three-way booking (§2/§13): createJob accepts providerType platform_match + preferredFundiId (validated); direct bookings visible ONLY to chosen fundi (metadata guard in SQL, race-safe); smart match wired to geoMatchingService (new cancellation-rate factor, weights rebalanced to 1.00); top-rated fallback when no geo candidates; acceptance of another fundi's direct booking now forbidden in the UPDATE guard
+- Privacy (§24): providerJobView — unassigned providers get area-level names + ~1km coarse coords everywhere (socket broadcast, open pool, direct offers); exact address revealed only after acceptance
+- Real AI (§31/§32): llmService wraps z-ai-web-dev-sdk server-side; POST /ai/analyze-job (customer, LLM w/ JSON coercion + labelled heuristic fallback), /ai/dispute-summary (admin, authorized server-fetched dossier), /ai/profile-improve, /ai/status; all calls logged to ai_events; advisory-only guardrails; aiRateLimit 25/10min
+- Notifications (§27): notificationService (in-app + realtime + queued email/SMS/push channels, env-gated); handlers email_notification + sms_notification registered; customer now notified on job acceptance
+- Refunds (§8/§23): refund_requests workflow — customer requests via FundiTracker UI, admin approves/rejects in new UI; approval executes extracted refundReversalService (shared with legacy /admin/refunds endpoint): wallet debit, settlement void, revenue ledger, audit
+- Admin (§20): endpoints /admin/payouts|subscriptions|reviews(+hide)|refund-requests|fundis/:id/verification-level; 4 new admin pages w/ real data + honest empty states; nav updated
+- Reviews (§29): POST /reviews/:id/reply (RBAC: reviewed fundi or company owner/admin/manager) + fundi reply composer; review moderation hidden flag
+- Security: patchJob TOCTOU closed (conditional UPDATE + 409); CSRF timingSafeEqual; dispute super_admin recognition; direct-booking accept guard
+- Owner (§3): emmanuelevian@gmail.com super_admin seeded in dev (FundiHubOwner@2026) + scripts/bootstrap-owner.js for production (OWNER_PASSWORD, idempotent, role-healing, refuses localhost in prod)
+- Rebrand (§1/§37): original SVG brand mark (hub-and-spokes) + wordmark component, SVG favicon, index.html, theme-color, 29 frontend files, email/SMS strings, seeds (@fundihub.com + @fundihub.test sets; legacy kept working), 20 mobile files, login pages, DEMO_ACCOUNTS.md rewritten; Render origin preserved (documented ops task)
+- Subscriptions (§7): activation extended to company_admin (subscriber_type column)
+- QA: package.json test glob extended; new fundihub-additions.test.js; 110/110 unit, 41/41 E2E, 16/16 security probe, 19/19 security battery (probe+battery credentials rebranded); browser-verified: login → 5-step wizard → LIVE LLM analysis ("Use this description") → 3-way provider choice → location autocomplete → submit → tracking page; all 4 new admin pages 200
+
+Stage Summary:
+- Commit ef31fc6 pushed to origin/main (96 files)
+- Honest open items: M-Pesa reversal API call remains a documented manual step (money ledger is real); Stripe not integrated; Render service rename + DNS is an ops task; PostGIS geo indexes deferred (bounding-box + haversine adequate at current scale); refresh-token-in-localStorage redesign deferred (documented tradeoff)
