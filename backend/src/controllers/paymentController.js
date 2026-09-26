@@ -9,6 +9,7 @@ import {
 } from '../services/mpesaService.js';
 import { auditLog } from '../services/auditService.js';
 import { calculateCommission, getPaymentSettings } from '../services/financeService.js';
+import { config } from '../config.js';
 import { emitEvent } from '../realtime.js';
 import { recordTimelineEvent } from '../services/timelineService.js';
 import {
@@ -79,6 +80,51 @@ export async function stkPush(req, res) {
     );
     return inserted.rows[0];
   });
+
+  // ── Development payment provider (honest, clearly-labelled simulator) ──
+  // When M-Pesa/Daraja credentials are absent OUTSIDE production, the payment
+  // is processed by the built-in dev provider: escrow hold is applied exactly
+  // like the real webhook would. Real money never moves; production requires
+  // MPESA_CONSUMER_KEY/SECRET (CREDENTIAL REQUIRED).
+  const mpesaConfigured = Boolean(
+    config.mpesa?.consumerKey && config.mpesa?.consumerSecret,
+  );
+  if (!mpesaConfigured && config.nodeEnv !== 'production') {
+    await transaction(async (client) => {
+      const locked = await client.query('select * from payments where id = $1 for update', [payment.id]);
+      if (locked.rows[0].status === 'pending') {
+        await client.query(
+          `update payments set status = 'completed', escrow_status = 'held', mpesa_receipt_number = $2,
+            provider_response = $3, paid_at = now(), updated_at = now() where id = $1`,
+          [payment.id, `DEV-${payment.id.slice(0, 8).toUpperCase()}`, JSON.stringify({ provider: 'dev-simulator', simulated: true })],
+        );
+        await client.query(
+          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
+           select $1, $2, 'hold', $3, 'held'
+           where not exists (select 1 from escrow_transactions where payment_id = $2 and type = 'hold')`,
+          [jobId, payment.id, payment.amount],
+        );
+        await client.query(
+          `insert into escrow_accounts (job_id, customer_id, fundi_id, balance, status)
+           select j.id, j.customer_id, j.fundi_id, $2, 'escrow_held' from jobs j where j.id = $1
+           on conflict (job_id) do update set balance = excluded.balance, status = 'escrow_held', updated_at = now()`,
+          [jobId, payment.amount],
+        );
+        await client.query(
+          `update jobs set payment_status = 'escrow_held', escrow_status = 'held', updated_at = now() where id = $1`,
+          [jobId],
+        );
+      }
+    });
+    await auditLog({ userId: req.user.id, action: 'payment.dev_simulated', entityType: 'payment', entityId: payment.id, metadata: { jobId } });
+    emitEvent('payment:confirmed', { jobId, paymentId: payment.id, devSimulated: true }, `job:${jobId}`);
+    return res.status(200).json({
+      success: true,
+      paymentId: payment.id,
+      devSimulated: true,
+      message: 'Development payment provider: escrow held (no real M-Pesa credentials configured).',
+    });
+  }
 
   const daraja = await initiateStkPush({
     phone: mpesaNumber,

@@ -7,7 +7,8 @@ export default defineConfig(() => ({
   envPrefix: ["VITE_", "REACT_APP_"],
   server: {
     host: "0.0.0.0",
-    port: 8080,
+    port: Number(process.env.VITE_PORT) || 3000,
+    strictPort: true,
     proxy: {
       "/api": {
         target: "http://127.0.0.1:4000",
@@ -25,7 +26,7 @@ export default defineConfig(() => ({
       // the server binds to IPv6 (::). Explicitly set host + clientPort so
       // the HMR WebSocket connects to the right address.
       host: "localhost",
-      clientPort: 8080,
+      clientPort: 3000,
     },
   },
   plugins: [react()],

@@ -125,64 +125,34 @@ export async function requestPayout(req, res) {
 }
 
 export async function releaseEscrow(req, res) {
-  const result = await transaction(async (client) => {
-    const job = await client.query('select * from jobs where id = $1 for update', [req.params.jobId]);
-    const row = job.rows[0];
-    if (!row) throw badRequest('Job not found');
-    if (!row.fundi_id) throw badRequest('Job has no assigned fundi');
-    if (row.status !== 'completed' || !row.customer_completion_confirmed) {
-      throw badRequest('Escrow can only be released after customer-confirmed completion');
-    }
-    const dispute = await client.query(
-      `select id from disputes where job_id = $1 and status in ('open', 'under_review') limit 1`,
-      [req.params.jobId],
-    );
-    if (dispute.rows[0]) throw badRequest('Escrow cannot be released while a dispute is open');
-    const payment = await client.query(
-      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
-      [req.params.jobId],
-    );
-    if (!payment.rows[0]) throw badRequest('No held escrow found');
-    await client.query(
-      `insert into escrow_transactions (job_id, payment_id, type, amount, status)
-       select $1, $2, 'release', $3, 'released'
-       where not exists (
-         select 1 from escrow_transactions where payment_id = $2 and type = 'release'
-       )`,
-      [req.params.jobId, payment.rows[0].id, payment.rows[0].fundi_amount || payment.rows[0].amount],
-    );
-    await client.query(`update payments set escrow_status = 'released', updated_at = now() where id = $1`, [payment.rows[0].id]);
-    await client.query(
-      `update escrow_accounts set balance = 0, status = 'payout_processing', updated_at = now() where job_id = $1`,
-      [req.params.jobId],
-    );
-    await client.query(`update jobs set escrow_status = 'released', payment_status = 'payout_processing' where id = $1`, [req.params.jobId]);
-    return client.query(
-      `insert into payouts (job_id, fundi_id, amount, status, net_amount, protection_snapshot)
-       select $1, $2, $3, 'processing', $4, $5::jsonb
-       where not exists (
-         select 1 from payouts where job_id = $1 and status in ('requested', 'processing', 'completed')
-       )
-       returning *`,
-      [
-        req.params.jobId,
-        row.fundi_id,
-        payment.rows[0].fundi_amount || payment.rows[0].amount,
-        payment.rows[0].fundi_amount || payment.rows[0].amount,
-        JSON.stringify({ source: 'escrow_release', platformCommission: payment.rows[0].platform_commission || 0 }),
-      ],
-    );
+  // Delegated to the shared settlement service — one authoritative path for
+  // escrow release, fundi wallet credits, company settlements and ledger writes.
+  const { releaseJobEscrow } = await import('../services/settlementService.js');
+  const result = await releaseJobEscrow({
+    jobId: req.params.jobId,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    source: 'admin_release',
   });
+  if (!result.released) throw badRequest(result.reason === 'no_held_escrow' ? 'No held escrow found for this job' : 'Escrow cannot be released');
   await recordTimelineEvent({
     jobId: req.params.jobId,
     eventType: 'escrow_released',
     actorId: req.user.id,
     actorRole: req.user.role,
   });
-  await auditLog({ userId: req.user.id, action: 'escrow.release', entityType: 'job', entityId: req.params.jobId });
-  emitEvent('escrow:released', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
-  emitEvent('payout:processing', { jobId: req.params.jobId, payout: result.rows[0] || null }, `job:${req.params.jobId}`);
-  res.json({ success: true, payout: result.rows[0] });
+  emitEvent('escrow:released', { jobId: req.params.jobId, amount: result.providerAmount }, `job:${req.params.jobId}`);
+  res.json({
+    success: true,
+    released: {
+      jobId: req.params.jobId,
+      jobValue: result.jobValue,
+      commission: result.commissionAmount,
+      providerAmount: result.providerAmount,
+      settlement: result.settlement,
+      payout: result.payout,
+    },
+  });
 }
 
 export async function freezeEscrow(req, res) {
@@ -244,24 +214,32 @@ export async function processRefund(req, res) {
 
     const refundAmount = customAmount ? Number(customAmount) : Number(payment.rows[0].amount);
 
-    // Check if fundi was already paid — if so, debit their wallet
+    // Check if fundi was already credited — if so, debit their wallet
     const walletTx = await client.query(
-      `select * from wallet_transactions where job_id = $1 and type = 'credit' and status = 'completed'`,
+      `select * from wallet_transactions where job_id = $1 and type = 'credit' limit 1`,
       [jobId],
     );
     if (walletTx.rows[0]) {
       const fundiId = walletTx.rows[0].fundi_id;
       const creditedAmount = Number(walletTx.rows[0].amount);
       await client.query(
-        `update fundi_wallets set balance = greatest(0, balance - $2), updated_at = now() where fundi_id = $1`,
+        `update fundi_wallets set available_balance = greatest(0, available_balance - $2), total_withdrawn = total_withdrawn, updated_at = now() where fundi_id = $1`,
         [fundiId, creditedAmount],
       );
+      const bal = await client.query(`select available_balance from fundi_wallets where fundi_id = $1`, [fundiId]);
       await client.query(
-        `insert into wallet_transactions (fundi_id, job_id, type, amount, description, status)
-         values ($1, $2, 'debit', $3, 'Refund - job cancelled/disputed', 'completed')`,
-        [fundiId, jobId, creditedAmount],
+        `insert into wallet_transactions (fundi_id, job_id, type, amount, balance_after, reason)
+         values ($1, $2, 'debit', $3, $4, 'Refund — job cancelled/disputed')`,
+        [fundiId, jobId, creditedAmount, bal.rows[0]?.available_balance ?? 0],
       );
     }
+
+    // Void any pending company settlement for this job
+    await client.query(
+      `update company_settlements set status = 'cancelled', updated_at = now()
+       where job_id = $1 and status in ('pending','processing')`,
+      [jobId],
+    );
 
     // Mark payment as refunded
     await client.query(

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev -- --port 3000 --strictPort",
     "dev:backend": "node backend/src/server.js",
     "dev:full": "npm run dev",
     "prestart": "node backend/scripts/bootstrap-production-db.js",
@@ -25,7 +25,9 @@
     "preview": "npm --prefix frontend run preview",
     "verify:live": "node backend/scripts/live-verification.js",
     "audit:e2e": "node backend/scripts/e2e-production-audit.js",
-    "setup:logo": "node scripts/process-brand-logo.mjs"
+    "setup:logo": "node scripts/process-brand-logo.mjs",
+    "db:push": "node backend/scripts/ensure-dev-db.js && node backend/scripts/seed-takeover.js",
+    "db:seed:takeover": "node backend/scripts/seed-takeover.js"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.750.0",

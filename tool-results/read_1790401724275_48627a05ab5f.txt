@@ -1,0 +1,694 @@
+     1→import crypto from 'node:crypto';
+     2→import bcrypt from 'bcryptjs';
+     3→import { query, transaction } from '../db.js';
+     4→import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
+     5→import { emitEvent } from '../realtime.js';
+     6→import { logNonFatal } from '../utils/logError.js';
+     7→import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
+     8→import {
+     9→  createExpectedCommission,
+    10→  markCommissionCustomerConfirmed,
+    11→  rewardTrust,
+    12→  scanContent,
+    13→  verifyJobCompletionOtp,
+    14→} from '../services/fraudService.js';
+    15→
+    16→function haversineKm(lat1, lon1, lat2, lon2) {
+    17→  const toRad = (v) => (v * Math.PI) / 180;
+    18→  const dLat = toRad(lat2 - lat1);
+    19→  const dLon = toRad(lon2 - lon1);
+    20→  const a = Math.sin(dLat / 2) ** 2
+    21→    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    22→  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    23→}
+    24→
+    25→async function findNearestFundis(latitude, longitude, skill, limit = 5) {
+    26→  // SECURITY: same visibility filters as searchFundis — enforced server-side.
+    27→  //   u.role = 'fundi' + u.status = 'active' + f.approval_status = 'approved' + f.online = true
+    28→  // A disabled/banned/pending fundi can NEVER receive a job match.
+    29→  const baseWhere = `u.role = 'fundi' and u.status = 'active' and f.approval_status = 'approved' and f.online = true`;
+    30→
+    31→  if (latitude == null || longitude == null) {
+    32→    const fallback = await query(
+    33→      `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score
+    34→       from fundis f join users u on u.id = f.user_id
+    35→       where ${baseWhere}
+    36→       order by f.rating desc nulls last, f.trust_score desc nulls last limit $1`,
+    37→      [limit],
+    38→    );
+    39→    return fallback.rows.map((row) => ({ ...row, distanceKm: null }));
+    40→  }
+    41→  const result = await query(
+    42→    `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
+    43→            f.latitude, f.longitude
+    44→     from fundis f join users u on u.id = f.user_id
+    45→     where ${baseWhere}
+    46→       and f.latitude is not null and f.longitude is not null`,
+    47→  );
+    48→  return result.rows
+    49→    .map((row) => ({
+    50→      ...row,
+    51→      distanceKm: haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude)),
+    52→    }))
+    53→    .filter((row) => {
+    54→      if (!skill) return true;
+    55→      const needle = String(skill).toLowerCase();
+    56→      return (row.skills || []).some((s) => String(s).toLowerCase() === needle);
+    57→    })
+    58→    .sort((a, b) => {
+    59→      // Distance first, then rating, then trust score.
+    60→      if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+    61→      if (Number(b.rating || 0) !== Number(a.rating || 0)) return Number(b.rating || 0) - Number(a.rating || 0);
+    62→      return Number(b.trust_score || 0) - Number(a.trust_score || 0);
+    63→    })
+    64→    .slice(0, limit);
+    65→}
+    66→
+    67→function canAccessJob(user, job) {
+    68→  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+    69→}
+    70→
+    71→function requireJobAccess(user, job) {
+    72→  if (!canAccessJob(user, job)) throw forbidden('Not allowed to access this job');
+    73→}
+    74→
+    75→function requireAssignedFundi(user, job) {
+    76→  if (user.role === 'admin') return;
+    77→  if (job.fundi_id !== user.id) throw forbidden('Only the assigned fundi can update this job');
+    78→}
+    79→
+    80→function requireCustomer(user, job) {
+    81→  if (user.role === 'admin') return;
+    82→  if (job.customer_id !== user.id) throw forbidden('Only the customer can perform this action');
+    83→}
+    84→
+    85→async function loadJob(jobId) {
+    86→  const id = parseUuid(jobId, 'job id');
+    87→  const result = await query('select * from jobs where id = $1', [id]);
+    88→  if (!result.rows[0]) throw notFound('Job not found');
+    89→  return result.rows[0];
+    90→}
+    91→
+    92→function publicJob(job) {
+    93→  if (!job) return null;
+    94→  return {
+    95→    id: job.id,
+    96→    jobId: job.id,
+    97→    customerId: job.customer_id,
+    98→    fundiId: job.fundi_id,
+    99→    serviceCategory: job.service_category,
+   100→    service_category: job.service_category,
+   101→    description: job.description,
+   102→    locationName: job.location_name,
+   103→    location_name: job.location_name,
+   104→    location: job.location_name,
+   105→    customerLatitude: job.customer_latitude == null ? undefined : Number(job.customer_latitude),
+   106→    customerLongitude: job.customer_longitude == null ? undefined : Number(job.customer_longitude),
+   107→    customer_latitude: job.customer_latitude == null ? undefined : Number(job.customer_latitude),
+   108→    customer_longitude: job.customer_longitude == null ? undefined : Number(job.customer_longitude),
+   109→    fundiLatitude: job.fundi_latitude == null ? undefined : Number(job.fundi_latitude),
+   110→    fundiLongitude: job.fundi_longitude == null ? undefined : Number(job.fundi_longitude),
+   111→    fundi_latitude: job.fundi_latitude == null ? undefined : Number(job.fundi_latitude),
+   112→    fundi_longitude: job.fundi_longitude == null ? undefined : Number(job.fundi_longitude),
+   113→    latitude: job.customer_latitude == null ? undefined : Number(job.customer_latitude),
+   114→    longitude: job.customer_longitude == null ? undefined : Number(job.customer_longitude),
+   115→    status: job.status,
+   116→    urgency: job.urgency,
+   117→    paymentStatus: job.payment_status,
+   118→    escrowStatus: job.escrow_status,
+   119→    customerCompletionConfirmed: Boolean(job.customer_completion_confirmed),
+   120→    customer_completion_confirmed: Boolean(job.customer_completion_confirmed),
+   121→    estimatedPrice: job.estimated_price == null ? undefined : Number(job.estimated_price),
+   122→    estimated_price: job.estimated_price == null ? undefined : Number(job.estimated_price),
+   123→    finalPrice: job.final_price == null ? undefined : Number(job.final_price),
+   124→    final_price: job.final_price == null ? undefined : Number(job.final_price),
+   125→    title: job.title || `${job.service_category || 'Service'} job`,
+   126→    category: job.service_category,
+   127→    createdAt: job.created_at,
+   128→    updatedAt: job.updated_at,
+   129→    updated_at: job.updated_at,
+   130→  };
+   131→}
+   132→
+   133→export async function createJob(req, res) {
+   134→  const body = req.body || {};
+   135→  const serviceCategory = body.serviceCategory || body.service_category || body.category;
+   136→  const description = body.description || body.details;
+   137→  if (!serviceCategory || !description) throw badRequest('Service category and description are required');
+   138→  const latitude = body.latitude || body.customer_latitude || null;
+   139→  const longitude = body.longitude || body.customer_longitude || null;
+   140→  const scheduledAt = body.scheduledDate || body.scheduled_at || null;
+   141→
+   142→  // ── Referral voucher application ────────────────────────────────────
+   143→  // If the customer requests to use a voucher AND has an active voucher,
+   144→  // apply the discount to the job's estimated_price.
+   145→  // Single-use, non-stackable, validated server-side.
+   146→  let voucherApplied = null;
+   147→  let finalPrice = body.estimatedPrice || body.estimated_price || null;
+   148→  if (body.useReferralVoucher === true && finalPrice && Number(finalPrice) > 0) {
+   149→    try {
+   150→      const { applyVoucherToJob, confirmVoucherRedemption } = await import('../services/referralService.js');
+   151→      const result = await applyVoucherToJob(req.user.id, Number(finalPrice), 0);
+   152→      if (result.applied) {
+   153→        finalPrice = Math.max(0, Number(finalPrice) - Number(result.discount));
+   154→        voucherApplied = {
+   155→          voucherId: result.voucherId,
+   156→          voucherCode: result.voucherCode,
+   157→          discountKes: result.discount,
+   158→          discountPercentage: result.discountPercentage,
+   159→        };
+   160→      }
+   161→    } catch (err) {
+   162→      console.warn('[referral] voucher application failed (non-blocking):', err.message);
+   163→    }
+   164→  }
+   165→
+   166→  const result = await query(
+   167→    `insert into jobs (customer_id, service_category, description, location_name, customer_latitude,
+   168→      customer_longitude, status, urgency, estimated_price, scheduled_at)
+   169→     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+   170→    [
+   171→      req.user.id,
+   172→      serviceCategory,
+   173→      description,
+   174→      body.formattedAddress || body.formatted_address
+   175→      || body.locationName || body.location_name || body.location || body.address || '',
+   176→      latitude,
+   177→      longitude,
+   178→      scheduledAt ? 'scheduled' : 'matching',
+   179→      body.urgency || 'normal',
+   180→      finalPrice,
+   181→      scheduledAt,
+   182→    ],
+   183→  );
+   184→  const job = result.rows[0];
+   185→  await query(
+   186→    `insert into job_status_updates (job_id, status, actor_id, note) values ($1, 'matching', $2, 'Job created')`,
+   187→    [job.id, req.user.id],
+   188→  );
+   189→  await recordTimelineEvent({
+   190→    jobId: job.id,
+   191→    eventType: 'job_created',
+   192→    actorId: req.user.id,
+   193→    actorRole: req.user.role,
+   194→    metadata: { serviceCategory, urgency: body.urgency || 'normal', voucherApplied },
+   195→  });
+   196→  await recordTimelineEvent({
+   197→    jobId: job.id,
+   198→    eventType: 'job_posted',
+   199→    actorId: req.user.id,
+   200→    actorRole: req.user.role,
+   201→  });
+   202→
+   203→  // ── Confirm voucher redemption (after job is created) ──────────────
+   204→  if (voucherApplied) {
+   205→    try {
+   206→      const { confirmVoucherRedemption } = await import('../services/referralService.js');
+   207→      await confirmVoucherRedemption({
+   208→        voucherId: voucherApplied.voucherId,
+   209→        jobId: job.id,
+   210→        userId: req.user.id,
+   211→        originalPrice: Number(body.estimatedPrice || body.estimated_price || 0),
+   212→        discountApplied: voucherApplied.discountKes,
+   213→        ipAddress: req.ip,
+   214→      });
+   215→    } catch (err) {
+   216→      console.warn('[referral] voucher redemption confirmation failed (non-blocking):', err.message);
+   217→    }
+   218→  }
+   219→  if (body.description) {
+   220→    const scan = await scanContent({
+   221→      content: body.description,
+   222→      userId: req.user.id,
+   223→      userRole: req.user.role,
+   224→      jobId: job.id,
+   225→      source: 'job_notes',
+   226→    });
+   227→    if (scan.blocked) throw forbidden('Job description contains off-platform contact or payment information');
+   228→  }
+   229→  emitEvent('job:created', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
+   230→  const candidates = await findNearestFundis(latitude, longitude, serviceCategory);
+   231→  if (!candidates.length) {
+   232→    emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
+   233→    return res.status(201).json({ success: true, job: publicJob(job), matching: { candidates: [], failed: true } });
+   234→  }
+   235→  const publishedJob = publicJob(job);
+   236→  for (const candidate of candidates) {
+   237→    emitEvent(
+   238→      'job:created',
+   239→      { jobId: job.id, job: publishedJob, distanceKm: candidate.distanceKm, status: 'matching' },
+   240→      `user:${candidate.user_id}`,
+   241→    );
+   242→  }
+   243→  emitEvent('job:created', { jobId: job.id, job: publishedJob, candidates, status: 'matching' }, `job:${job.id}`);
+   244→  res.status(201).json({ success: true, job: publishedJob, matching: { candidates, failed: false } });
+   245→}
+   246→
+   247→export async function uploadJobPhotos(req, res) {
+   248→  const job = await loadJob(req.params.id);
+   249→  requireJobAccess(req.user, job);
+   250→  const { uploadPrivateFile, getSignedAccessUrl, getSignedThumbUrl } = await import('../services/storageService.js');
+   251→  const { mapMulterFiles } = await import('../middleware/upload.js');
+   252→  const files = mapMulterFiles(req.files);
+   253→  if (!files.length) throw badRequest('At least one photo is required');
+   254→
+   255→  const photos = [];
+   256→  let sortOrder = 0;
+   257→  for (const file of files) {
+   258→    const uploaded = await uploadPrivateFile({
+   259→      folder: `jobs/${job.id}`,
+   260→      file,
+   261→    });
+   262→    const row = await query(
+   263→      `insert into job_photos (job_id, uploaded_by, r2_key, thumb_r2_key, mime_type, file_size, original_name, width, height, sort_order, status)
+   264→       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active') returning *`,
+   265→      [
+   266→        job.id,
+   267→        req.user.id,
+   268→        uploaded.r2Key,
+   269→        uploaded.thumbR2Key,
+   270→        uploaded.mimeType,
+   271→        uploaded.fileSize,
+   272→        file.originalname,
+   273→        uploaded.width,
+   274→        uploaded.height,
+   275→        sortOrder++,
+   276→      ],
+   277→    );
+   278→    photos.push({
+   279→      id: row.rows[0].id,
+   280→      signedUrl: await getSignedAccessUrl(uploaded.r2Key),
+   281→      thumbSignedUrl: await getSignedThumbUrl(uploaded.thumbR2Key, uploaded.r2Key),
+   282→      originalName: file.originalname,
+   283→      mimeType: uploaded.mimeType,
+   284→      size: uploaded.fileSize,
+   285→      expiresIn: 900,
+   286→    });
+   287→  }
+   288→  res.status(201).json({ success: true, photos });
+   289→}
+   290→
+   291→export async function listJobs(req, res) {
+   292→  const column = req.user.role === 'fundi' ? 'fundi_id' : 'customer_id';
+   293→  const result = await query(`select * from jobs where ${column} = $1 order by created_at desc`, [req.user.id]);
+   294→  res.json({ success: true, jobs: result.rows.map(publicJob) });
+   295→}
+   296→
+   297→export async function getJob(req, res) {
+   298→  const job = await loadJob(req.params.id);
+   299→  requireJobAccess(req.user, job);
+   300→  res.json({ success: true, job: publicJob(job) });
+   301→}
+   302→
+   303→export async function getJobStatus(req, res) {
+   304→  const job = await loadJob(req.params.id);
+   305→  requireJobAccess(req.user, job);
+   306→  res.json({ success: true, status: job.status, updatedAt: job.updated_at, job: publicJob(job) });
+   307→}
+   308→
+   309→export async function patchJob(req, res) {
+   310→  const { status } = req.body || {};
+   311→  if (!status) throw badRequest('Status is required');
+   312→  const allowedStatuses = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled', 'failed'];
+   313→  if (!allowedStatuses.includes(status)) throw badRequest('Invalid job status');
+   314→  const job = await loadJob(req.params.id);
+   315→  requireJobAccess(req.user, job);
+   316→  if (req.user.role !== 'admin') {
+   317→    if (['on_the_way', 'arrived', 'in_progress', 'completed'].includes(status)) requireAssignedFundi(req.user, job);
+   318→    if (['cancelled'].includes(status)) requireCustomer(req.user, job);
+   319→  }
+   320→  const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
+   321→  await recordJobStatusTimeline(result.rows[0], status, req.user.id, req.user.role);
+   322→  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+   323→  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+   324→  if (status === 'cancelled') emitEvent('job:cancelled', { jobId: req.params.id, status }, `job:${req.params.id}`);
+   325→  res.json({ success: true, job: publicJob(result.rows[0]) });
+   326→}
+   327→
+   328→export async function updateStatus(req, res) {
+   329→  req.params.id = req.params.id || req.params.jobId;
+   330→  return patchJob(req, res);
+   331→}
+   332→
+   333→export async function acceptJob(req, res) {
+   334→  const { logAccessDecision } = await import('../middleware/accessDebug.js');
+   335→  const fundi = await query(
+   336→    `select approval_status from fundis where user_id = $1`,
+   337→    [req.user.id],
+   338→  );
+   339→  await logAccessDecision(req, 'jobs.acceptJob:precheck', {
+   340→    approvalStatus: fundi.rows[0]?.approval_status ?? null,
+   341→  });
+   342→  if (req.user.role !== 'admin' && fundi.rows[0]?.approval_status !== 'approved') {
+   343→    throw forbidden('Only approved fundis can accept jobs');
+   344→  }
+   345→  const result = await query(
+   346→    `update jobs set fundi_id = $2, status = 'accepted', estimated_price = coalesce($3, estimated_price), updated_at = now()
+   347→     where id = $1 and status in ('pending', 'matching') returning *`,
+   348→    [req.params.id, req.user.id, req.body?.estimatedPrice || null],
+   349→  );
+   350→  if (!result.rows[0]) throw badRequest('Job cannot be accepted');
+   351→  const job = result.rows[0];
+   352→  const amount = Number(job.final_price || job.estimated_price || 0);
+   353→  if (amount > 0) {
+   354→    await createExpectedCommission({
+   355→      jobId: job.id,
+   356→      fundiId: req.user.id,
+   357→      customerId: job.customer_id,
+   358→      amount,
+   359→    });
+   360→  }
+   361→  await recordTimelineEvent({
+   362→    jobId: job.id,
+   363→    eventType: 'fundi_matched',
+   364→    actorId: req.user.id,
+   365→    actorRole: req.user.role,
+   366→  });
+   367→  await recordTimelineEvent({
+   368→    jobId: job.id,
+   369→    eventType: 'fundi_accepted',
+   370→    actorId: req.user.id,
+   371→    actorRole: req.user.role,
+   372→    metadata: { estimatedPrice: job.estimated_price },
+   373→  });
+   374→  emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted', job: publicJob(job) }, `job:${req.params.id}`);
+   375→  emitEvent('fundi:response:ok', { accepted: true, jobId: req.params.id }, `user:${req.user.id}`);
+   376→  res.json({ success: true, job: publicJob(result.rows[0]) });
+   377→}
+   378→
+   379→export async function cancelJob(req, res) {
+   380→  const job = await loadJob(req.params.id);
+   381→  requireJobAccess(req.user, job);
+   382→  if (req.user.role !== 'admin' && !['pending', 'matching', 'accepted'].includes(job.status)) {
+   383→    throw badRequest('Job can no longer be cancelled');
+   384→  }
+   385→  const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 returning *', [
+   386→    req.params.id,
+   387→    'cancelled',
+   388→    req.body?.reason || null,
+   389→  ]);
+   390→  emitEvent('job:request:declined', { jobId: req.params.id, reason: req.body?.reason || null }, `job:${req.params.id}`);
+   391→  emitEvent('job:cancelled', { jobId: req.params.id, status: 'cancelled', reason: req.body?.reason || null }, `job:${req.params.id}`);
+   392→  res.json({ success: true, job: publicJob(result.rows[0]) });
+   393→}
+   394→
+   395→export async function checkIn(req, res) {
+   396→  const { latitude, longitude, status = 'on_the_way', accuracy = null } = req.body || {};
+   397→  if (!latitude || !longitude) throw badRequest('Latitude and longitude are required');
+   398→  const allowedStatuses = ['on_the_way', 'arrived', 'in_progress'];
+   399→  if (!allowedStatuses.includes(status)) throw badRequest('Invalid check-in status');
+   400→  const job = await loadJob(req.params.id);
+   401→  requireAssignedFundi(req.user, job);
+   402→  // GPS distance validation: if checking in as 'arrived', verify the fundi is
+   403→  // actually near the customer location (within 2km). This prevents fake
+   404→  // check-ins from a remote location. For 'on_the_way' status, no distance
+   405→  // check needed (fundi is still travelling).
+   406→  if (status === 'arrived' && job.customer_latitude && job.customer_longitude) {
+   407→    const distance = haversineKm(
+   408→      Number(latitude), Number(longitude),
+   409→      Number(job.customer_latitude), Number(job.customer_longitude),
+   410→    );
+   411→    if (distance > 2.0) {
+   412→      // Log the suspicious check-in for fraud review instead of hard-blocking
+   413→      // (the fundi might be at the building entrance but GPS is slightly off)
+   414→      console.warn(`[fraud] Fundi ${req.user.id} checked in as 'arrived' but is ${distance.toFixed(2)}km from customer (job ${req.params.id})`);
+   415→      // Record in GPS validations for fraud analysis
+   416→      try {
+   417→        await query(
+   418→          `insert into gps_validations (fundi_id, job_id, latitude, longitude, accuracy, is_spoofed, spoof_indicators, risk_score)
+   419→           values ($1, $2, $3, $4, $5, true, $6, 75)`,
+   420→          [req.user.id, req.params.id, latitude, longitude, accuracy,
+   421→           JSON.stringify(['far_from_customer', `distance_${distance.toFixed(2)}km`])],
+   422→        );
+   423→      } catch (error) {
+   424→        logNonFatal('job.gpsValidationInsert', error, { jobId: req.params.id, fundiId: req.user.id });
+   425→      }
+   426→    }
+   427→  }
+   428→  const result = await transaction(async (client) => {
+   429→    await client.query(
+   430→      `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
+   431→       values ($1, $2, $3, $4, $5)`,
+   432→      [req.params.id, req.user.id, latitude, longitude, accuracy],
+   433→    );
+   434→    return client.query(
+   435→      `update jobs set status = $2, fundi_latitude = $3, fundi_longitude = $4, updated_at = now()
+   436→       where id = $1 returning *`,
+   437→      [req.params.id, status, latitude, longitude],
+   438→    );
+   439→  });
+   440→  emitEvent('fundi:location:update', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
+   441→  emitEvent('job:checkin', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
+   442→  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+   443→  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+   444→  res.json({ success: true, job: publicJob(result.rows[0]) });
+   445→}
+   446→
+   447→export async function completeJob(req, res) {
+   448→  const job = await loadJob(req.params.id);
+   449→  requireAssignedFundi(req.user, job);
+   450→  if (!['in_progress', 'arrived'].includes(job.status)) throw badRequest('Job must be in progress before completion');
+   451→  const otp = String(crypto.randomInt(100000, 999999));
+   452→  const otpHash = await bcrypt.hash(otp, 10);
+   453→  const result = await query(
+   454→    `update jobs set status = 'completed', completion_otp_hash = $2,
+   455→      final_price = coalesce($3, final_price, estimated_price), updated_at = now()
+   456→     where id = $1 returning *`,
+   457→    [req.params.id, otpHash, req.body?.finalPrice || null],
+   458→  );
+   459→  await recordTimelineEvent({
+   460→    jobId: req.params.id,
+   461→    eventType: 'work_completed',
+   462→    actorId: req.user.id,
+   463→    actorRole: req.user.role,
+   464→  });
+   465→  // Deliver the OTP to the customer via socket + notification so they can confirm completion.
+   466→  await query(
+   467→    `insert into notifications (user_id, type, title, body, data)
+   468→     values ($1, 'job_completion_otp', 'Job Complete — Confirm with Code', $2, $3::jsonb)`,
+   469→    [
+   470→      job.customer_id,
+   471→      `Your fundi has completed the job. Use code ${otp} to confirm completion.`,
+   472→      JSON.stringify({ jobId: job.id, otp }),
+   473→    ],
+   474→  );
+   475→  emitEvent('job:completed', { jobId: req.params.id, completionOtp: otp }, `job:${req.params.id}`);
+   476→  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]), completionOtp: otp }, `job:${req.params.id}`);
+   477→  emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
+   478→  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true, completionOtp: otp });
+   479→}
+   480→
+   481→export async function confirmCompletion(req, res) {
+   482→  const { otp } = req.body || {};
+   483→  if (!otp) throw badRequest('OTP is required');
+   484→  const existing = await query('select * from jobs where id = $1', [req.params.id]);
+   485→  const job = existing.rows[0];
+   486→  if (!job) throw notFound('Job not found');
+   487→  requireCustomer(req.user, job);
+   488→  // Prevent double-confirmation — if already confirmed, return success without
+   489→  // re-processing (idempotent). This prevents duplicate referral vouchers,
+   490→  // duplicate escrow releases, and duplicate notifications.
+   491→  if (job.customer_completion_confirmed) {
+   492→    return res.json({ success: true, job: publicJob(job), alreadyConfirmed: true });
+   493→  }
+   494→  const otpResult = await verifyJobCompletionOtp({
+   495→    jobId: req.params.id,
+   496→    otp,
+   497→    verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
+   498→  });
+   499→  if (!otpResult.ok) throw forbidden(otpResult.error);
+   500→  // Clear the OTP hash so it can't be reused (one-time use)
+   501→  const result = await query(
+   502→    `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
+   503→      escrow_status = 'completion_requested', completion_otp_hash = null, updated_at = now()
+   504→     where id = $1 and customer_completion_confirmed = false returning *`,
+   505→    [req.params.id],
+   506→  );
+   507→  // If no rows updated, another request confirmed it concurrently — return idempotent success
+   508→  if (!result.rows[0]) {
+   509→    const current = await query('select * from jobs where id = $1', [req.params.id]);
+   510→    return res.json({ success: true, job: publicJob(current.rows[0]), alreadyConfirmed: true });
+   511→  }
+   512→  await markCommissionCustomerConfirmed(req.params.id);
+   513→  await recordTimelineEvent({
+   514→    jobId: req.params.id,
+   515→    eventType: 'customer_confirmed',
+   516→    actorId: req.user.id,
+   517→    actorRole: req.user.role,
+   518→  });
+   519→  emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+   520→
+   521→  // ── Auto-release escrow + credit fundi wallet ──────────────────────
+   522→  // When the customer confirms completion, the escrow is automatically
+   523→  // released: platform takes its commission, fundi gets the rest credited
+   524→  // to their wallet. This is non-blocking — failures are logged but don't
+   525→  // break the confirmation flow (admin can manually release later).
+   526→  try {
+   527→    const paymentResult = await query(
+   528→      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
+   529→      [req.params.id],
+   530→    );
+   531→    if (paymentResult.rows[0]) {
+   532→      const payment = paymentResult.rows[0];
+   533→      const jobValue = Number(job.final_price || job.estimated_price || payment.amount || 0);
+   534→      const commissionRate = Number(payment.commission_rate || 0.15);
+   535→      const commissionAmount = Math.round(jobValue * commissionRate);
+   536→      const fundiEarnings = jobValue - commissionAmount;
+   537→
+   538→      // Use a transaction to ensure atomicity — no partial updates
+   539→      const { transaction } = await import('../db.js');
+   540→      await transaction(async (client) => {
+   541→        // Mark payment as released
+   542→        await client.query(
+   543→          `update payments set escrow_status = 'released', status = 'completed', updated_at = now() where id = $1`,
+   544→          [payment.id],
+   545→        );
+   546→        // Record escrow release transaction
+   547→        await client.query(
+   548→          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
+   549→           values ($1, $2, 'release', $3, 'completed')
+   550→           on conflict do nothing`,
+   551→          [req.params.id, payment.id, fundiEarnings],
+   552→        );
+   553→        // Credit fundi wallet
+   554→        await client.query(
+   555→          `insert into fundi_wallets (fundi_id, balance, pending, currency)
+   556→           values ($1, $2, 0, 'KES')
+   557→           on conflict (fundi_id) do update
+   558→           set balance = fundi_wallets.balance + $2, updated_at = now()`,
+   559→          [job.fundi_id, fundiEarnings],
+   560→        );
+   561→        // Record wallet transaction
+   562→        await client.query(
+   563→          `insert into wallet_transactions (fundi_id, job_id, type, amount, description, status)
+   564→           values ($1, $2, 'credit', $3, 'Job payment - commission deducted', 'completed')`,
+   565→          [job.fundi_id, req.params.id, fundiEarnings],
+   566→        );
+   567→        // Update job escrow status
+   568→        await client.query(
+   569→          `update jobs set escrow_status = 'released', payment_status = 'completed', updated_at = now() where id = $1`,
+   570→          [req.params.id],
+   571→        );
+   572→        // Record revenue ledger entries (CEO-only financial intelligence)
+   573→        await client.query(
+   574→          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
+   575→            customer_paid, commission_amount, platform_fee_amount,
+   576→            fundi_payout, net_revenue, payment_method, user_id, fundi_id, notes)
+   577→           values ($1, 'commission_earned', $2, 'KES', $3, $2, $4, $5, $2, $6, $7, $8, 'Auto-released on customer confirmation')`,
+   578→          [req.params.id, commissionAmount, jobValue,
+   579→           Number(payment.platform_fee || 0), fundiEarnings,
+   580→           payment.provider || 'mpesa', job.customer_id, job.fundi_id],
+   581→        );
+   582→        await client.query(
+   583→          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
+   584→            fundi_payout, user_id, fundi_id, notes)
+   585→           values ($1, 'escrow_released', $2, 'KES', $2, $3, $4, 'Escrow released to fundi wallet')`,
+   586→          [req.params.id, fundiEarnings, job.customer_id, job.fundi_id],
+   587→        );
+   588→      });
+   589→
+   590→      // Notify fundi: payment received
+   591→      await query(
+   592→        `insert into notifications (user_id, type, title, body, data)
+   593→         values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
+   594→        [
+   595→          job.fundi_id,
+   596→          `KES ${fundiEarnings.toLocaleString()} has been credited to your wallet for the completed job.`,
+   597→          JSON.stringify({ jobId: req.params.id, amount: fundiEarnings }),
+   598→        ],
+   599→      );
+   600→      emitEvent('payment:confirmed', { jobId: req.params.id, fundiEarnings }, `user:${job.fundi_id}`);
+   601→      emitEvent('escrow:released', { jobId: req.params.id, fundiEarnings }, `job:${req.params.id}`);
+   602→    }
+   603→  } catch (err) {
+   604→    console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
+   605→  }
+   606→
+   607→  // ── Referral voucher issuance ────────────────────────────────────────
+   608→  // After a job is confirmed completed + paid, check if the customer was a
+   609→  // referee whose first paid job this is. If so, issue a discount voucher
+   610→  // to the referrer (subject to fraud checks).
+   611→  // Non-blocking — failures here must not break the job completion flow.
+   612→  try {
+   613→    const { processJobCompletionForReferral } = await import('../services/referralService.js');
+   614→    const jobValue = Number(job.final_price || job.estimated_price || 0);
+   615→    await processJobCompletionForReferral(req.params.id, req.user.id, jobValue);
+   616→  } catch (err) {
+   617→    console.warn('[referral] voucher issuance failed (non-blocking):', err.message);
+   618→  }
+   619→
+   620→  res.json({ success: true, job: publicJob(result.rows[0]) });
+   621→}
+   622→
+   623→export async function activeFundiJob(req, res) {
+   624→  const { logAccessDecision } = await import('../middleware/accessDebug.js');
+   625→  await logAccessDecision(req, 'jobs.activeFundiJob:enter');
+   626→  const assigned = await query(
+   627→    `select * from jobs where fundi_id = $1 and status not in ('completed', 'cancelled') order by updated_at desc limit 1`,
+   628→    [req.user.id],
+   629→  );
+   630→  if (assigned.rows[0]) return res.json({ success: true, job: publicJob(assigned.rows[0]) });
+   631→
+   632→  const fundi = await query('select skills, latitude, longitude, online from fundis where user_id = $1 and approval_status = $2', [req.user.id, 'approved']);
+   633→  if (!fundi.rows[0]?.online) return res.json({ success: true, job: null });
+   634→  const available = await query(
+   635→    `select j.*, u.full_name as customer_name
+   636→     from jobs j join users u on u.id = j.customer_id
+   637→     where j.fundi_id is null and j.status = 'matching'
+   638→     order by j.created_at asc limit 25`,
+   639→  );
+   640→  const skills = (fundi.rows[0].skills || []).map((skill) => String(skill).toLowerCase());
+   641→  const lat = Number(fundi.rows[0].latitude);
+   642→  const lon = Number(fundi.rows[0].longitude);
+   643→  const matches = available.rows
+   644→    .filter((job) => !skills.length || skills.includes(String(job.service_category || '').toLowerCase()))
+   645→    .map((job) => ({
+   646→      ...job,
+   647→      distanceKm: Number.isFinite(lat) && Number.isFinite(lon) && job.customer_latitude != null && job.customer_longitude != null
+   648→        ? haversineKm(lat, lon, Number(job.customer_latitude), Number(job.customer_longitude))
+   649→        : null,
+   650→    }))
+   651→    .sort((a, b) => (a.distanceKm ?? 999999) - (b.distanceKm ?? 999999));
+   652→  const next = matches[0];
+   653→  if (!next) return res.json({ success: true, job: null });
+   654→  res.json({
+   655→    success: true,
+   656→    job: {
+   657→      ...publicJob(next),
+   658→      customer_name: next.customer_name,
+   659→      distanceKm: next.distanceKm,
+   660→    },
+   661→  });
+   662→}
+   663→
+   664→export async function submitReview(req, res) {
+   665→  const { jobId = req.params.id, rating, comment = '' } = req.body || {};
+   666→  if (!jobId || !rating) throw badRequest('Job and rating are required');
+   667→  const job = await loadJob(jobId);
+   668→  requireCustomer(req.user, job);
+   669→  if (job.status !== 'completed' || !job.customer_completion_confirmed) {
+   670→    throw badRequest('Only completed jobs can be reviewed');
+   671→  }
+   672→  if (comment) {
+   673→    const scan = await scanContent({
+   674→      content: comment,
+   675→      userId: req.user.id,
+   676→      userRole: req.user.role,
+   677→      jobId,
+   678→      source: 'review',
+   679→    });
+   680→    if (scan.blocked) throw forbidden('Review contains off-platform contact or payment information');
+   681→  }
+   682→  const result = await query(
+   683→    `insert into reviews (job_id, reviewer_id, rating, comment)
+   684→     values ($1, $2, $3, $4) returning *`,
+   685→    [jobId, req.user.id, rating, comment],
+   686→  );
+   687→  if (Number(rating) >= 4 && job.fundi_id) {
+   688→    await rewardTrust({ userId: job.fundi_id, reason: 'Positive review', bonusKey: 'positive_review' });
+   689→  }
+   690→  emitEvent('review:submitted', { jobId, reviewId: result.rows[0].id }, `job:${jobId}`);
+   691→  emitEvent('trust:updated', { userId: job.fundi_id, jobId }, `user:${job.fundi_id}`);
+   692→  res.status(201).json({ success: true, review: result.rows[0] });
+   693→}
+   694→

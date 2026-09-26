@@ -64,12 +64,21 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
     .slice(0, limit);
 }
 
-function canAccessJob(user, job) {
-  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+async function canAccessJob(user, job) {
+  if (!user) return false;
+  if (user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id) return true;
+  // Company workflow: assigned technician + members of the owning company
+  if (job.technician_user_id && job.technician_user_id === user.id) return true;
+  if (job.company_id) {
+    const { getMembership } = await import('../middleware/companyAccess.js');
+    const membership = await getMembership(job.company_id, user.id);
+    return Boolean(membership && membership.status === 'active');
+  }
+  return false;
 }
 
-function requireJobAccess(user, job) {
-  if (!canAccessJob(user, job)) throw forbidden('Not allowed to access this job');
+async function requireJobAccess(user, job) {
+  if (!(await canAccessJob(user, job))) throw forbidden('Not allowed to access this job');
 }
 
 function requireAssignedFundi(user, job) {
@@ -124,6 +133,16 @@ function publicJob(job) {
     final_price: job.final_price == null ? undefined : Number(job.final_price),
     title: job.title || `${job.service_category || 'Service'} job`,
     category: job.service_category,
+    providerType: job.provider_type || 'fundi',
+    provider_type: job.provider_type || 'fundi',
+    companyId: job.company_id,
+    company_id: job.company_id,
+    technicianUserId: job.technician_user_id,
+    technician_user_id: job.technician_user_id,
+    scheduledAt: job.scheduled_at,
+    scheduled_at: job.scheduled_at,
+    propertyId: job.property_id,
+    property_id: job.property_id,
     createdAt: job.created_at,
     updatedAt: job.updated_at,
     updated_at: job.updated_at,
@@ -138,6 +157,23 @@ export async function createJob(req, res) {
   const latitude = body.latitude || body.customer_latitude || null;
   const longitude = body.longitude || body.customer_longitude || null;
   const scheduledAt = body.scheduledDate || body.scheduled_at || null;
+  const propertyId = body.propertyId || body.property_id || null;
+  let providerType = body.providerType === 'company' || body.provider_type === 'company' ? 'company' : 'fundi';
+
+  // ── Direct company booking (spec §5): customer books a specific company ──
+  let companyId = body.companyId || body.company_id || null;
+  if (companyId) {
+    const companyRes = await query(
+      `select id, company_name, status from company_profiles where id = $1`,
+      [companyId],
+    );
+    if (!companyRes.rows[0] || companyRes.rows[0].status !== 'approved') {
+      throw badRequest('Company is not available for booking');
+    }
+    providerType = 'company';
+  } else if (providerType === 'company') {
+    companyId = null; // open pool — any eligible company can claim
+  }
 
   // ── Referral voucher application ────────────────────────────────────
   // If the customer requests to use a voucher AND has an active voucher,
@@ -163,10 +199,13 @@ export async function createJob(req, res) {
     }
   }
 
+  // Company jobs wait for company acceptance (or dispatcher assignment);
+  // individual jobs enter geo matching. Scheduled jobs (either kind) park as scheduled.
+  const initialStatus = companyId ? 'pending' : (providerType === 'company' ? 'matching' : (scheduledAt ? 'scheduled' : 'matching'));
   const result = await query(
     `insert into jobs (customer_id, service_category, description, location_name, customer_latitude,
-      customer_longitude, status, urgency, estimated_price, scheduled_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+      customer_longitude, status, urgency, estimated_price, scheduled_at, company_id, provider_type, property_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
     [
       req.user.id,
       serviceCategory,
@@ -175,10 +214,13 @@ export async function createJob(req, res) {
       || body.locationName || body.location_name || body.location || body.address || '',
       latitude,
       longitude,
-      scheduledAt ? 'scheduled' : 'matching',
+      initialStatus,
       body.urgency || 'normal',
       finalPrice,
       scheduledAt,
+      companyId,
+      providerType,
+      propertyId,
     ],
   );
   const job = result.rows[0];
@@ -226,7 +268,33 @@ export async function createJob(req, res) {
     });
     if (scan.blocked) throw forbidden('Job description contains off-platform contact or payment information');
   }
-  emitEvent('job:created', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
+  emitEvent('job:created', { jobId: job.id, status: initialStatus }, `job:${job.id}`);
+
+  // Company-flow jobs skip individual fundi matching entirely.
+  if (providerType === 'company') {
+    // Notify the targeted company (if any) that a job is waiting
+    if (companyId) {
+      const ownerRes = await query(
+        `select owner_user_id from company_profiles where id = $1`,
+        [companyId],
+      );
+      if (ownerRes.rows[0]) {
+        await query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'company_incoming_job', 'New Incoming Job', $2, $3::jsonb)`,
+          [ownerRes.rows[0].owner_user_id,
+           `New ${body.urgency === 'emergency' ? 'EMERGENCY ' : ''}${serviceCategory} request received. Open your dispatch board to respond.`,
+           JSON.stringify({ jobId: job.id })],
+        );
+      }
+    }
+    return res.status(201).json({
+      success: true,
+      job: publicJob(job),
+      matching: { providerType: 'company', companyId, candidates: [], failed: false },
+    });
+  }
+
   const candidates = await findNearestFundis(latitude, longitude, serviceCategory);
   if (!candidates.length) {
     emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
@@ -246,7 +314,7 @@ export async function createJob(req, res) {
 
 export async function uploadJobPhotos(req, res) {
   const job = await loadJob(req.params.id);
-  requireJobAccess(req.user, job);
+  await requireJobAccess(req.user, job);
   const { uploadPrivateFile, getSignedAccessUrl, getSignedThumbUrl } = await import('../services/storageService.js');
   const { mapMulterFiles } = await import('../middleware/upload.js');
   const files = mapMulterFiles(req.files);
@@ -296,23 +364,43 @@ export async function listJobs(req, res) {
 
 export async function getJob(req, res) {
   const job = await loadJob(req.params.id);
-  requireJobAccess(req.user, job);
+  await requireJobAccess(req.user, job);
   res.json({ success: true, job: publicJob(job) });
 }
 
 export async function getJobStatus(req, res) {
   const job = await loadJob(req.params.id);
-  requireJobAccess(req.user, job);
+  await requireJobAccess(req.user, job);
   res.json({ success: true, status: job.status, updatedAt: job.updated_at, job: publicJob(job) });
 }
+
+// ── Job lifecycle state machine (spec §21) — no arbitrary status jumps ──
+const JOB_TRANSITIONS = {
+  pending: ['matching', 'accepted', 'assigned', 'scheduled', 'offered', 'cancelled'],
+  matching: ['pending', 'accepted', 'assigned', 'scheduled', 'offered', 'cancelled'],
+  offered: ['accepted', 'matching', 'cancelled'],
+  scheduled: ['accepted', 'assigned', 'on_the_way', 'cancelled'],
+  accepted: ['assigned', 'on_the_way', 'cancelled'],
+  assigned: ['on_the_way', 'arrived', 'accepted', 'cancelled'],
+  on_the_way: ['arrived', 'cancelled'],
+  arrived: ['in_progress', 'on_the_way', 'cancelled'],
+  in_progress: ['completed', 'completion_requested', 'cancelled'],
+  completion_requested: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  failed: [],
+};
 
 export async function patchJob(req, res) {
   const { status } = req.body || {};
   if (!status) throw badRequest('Status is required');
-  const allowedStatuses = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled', 'failed'];
+  const allowedStatuses = Object.keys(JOB_TRANSITIONS);
   if (!allowedStatuses.includes(status)) throw badRequest('Invalid job status');
   const job = await loadJob(req.params.id);
-  requireJobAccess(req.user, job);
+  await requireJobAccess(req.user, job);
+  if (!JOB_TRANSITIONS[job.status]?.includes(status)) {
+    throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
+  }
   if (req.user.role !== 'admin') {
     if (['on_the_way', 'arrived', 'in_progress', 'completed'].includes(status)) requireAssignedFundi(req.user, job);
     if (['cancelled'].includes(status)) requireCustomer(req.user, job);
@@ -349,6 +437,32 @@ export async function acceptJob(req, res) {
   );
   if (!result.rows[0]) throw badRequest('Job cannot be accepted');
   const job = result.rows[0];
+
+  // ── Quote revision (spec §4/§22): if the fundi's quote differs materially
+  // from the customer's request, park the job as 'offered' until the customer
+  // approves the revised price. Server stores the quote — client cannot bypass.
+  const quoted = Number(req.body?.estimatedPrice);
+  if (
+    result.rows[0].status === 'accepted' &&
+    Number.isFinite(quoted) &&
+    job.estimated_price != null &&
+    Math.abs(quoted - Number(job.estimated_price)) > Math.max(50, Number(job.estimated_price) * 0.25)
+  ) {
+    const revised = await query(
+      `update jobs set estimated_price = $2, status = 'offered', updated_at = now() where id = $1 returning *`,
+      [req.params.id, quoted],
+    );
+    await query(
+      `insert into notifications (user_id, type, title, body, data)
+       values ($1, 'job_quote', 'Price Quote Update', $2, $3::jsonb)`,
+      [job.customer_id,
+       `The fundi quoted KES ${quoted.toLocaleString()} for your ${job.service_category} job (original estimate KES ${Number(job.estimated_price).toLocaleString()}). Approve the quote to start work.`,
+       JSON.stringify({ jobId: job.id, quoted })],
+    );
+    emitEvent('job:quote', { jobId: job.id, amount: quoted }, `job:${job.id}`);
+    return res.json({ success: true, job: publicJob(revised.rows[0]), quotePending: true });
+  }
+
   const amount = Number(job.final_price || job.estimated_price || 0);
   if (amount > 0) {
     await createExpectedCommission({
@@ -378,7 +492,7 @@ export async function acceptJob(req, res) {
 
 export async function cancelJob(req, res) {
   const job = await loadJob(req.params.id);
-  requireJobAccess(req.user, job);
+  await requireJobAccess(req.user, job);
   if (req.user.role !== 'admin' && !['pending', 'matching', 'accepted'].includes(job.status)) {
     throw badRequest('Job can no longer be cancelled');
   }
@@ -450,11 +564,22 @@ export async function completeJob(req, res) {
   if (!['in_progress', 'arrived'].includes(job.status)) throw badRequest('Job must be in progress before completion');
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = await bcrypt.hash(otp, 10);
+  // ── Server-authoritative final price (spec §17): the provider-suggested
+  // final price is clamped to ±25% of the approved estimate. Anything beyond
+  // that would require a fresh quote the customer has not approved.
+  const estimated = job.estimated_price != null ? Number(job.estimated_price) : null;
+  let finalPrice = req.body?.finalPrice != null ? Number(req.body.finalPrice) : null;
+  if (finalPrice != null && estimated != null && estimated > 0) {
+    const maxAllowed = Math.round(estimated * 1.25);
+    const minAllowed = Math.max(0, Math.round(estimated * 0.5));
+    if (finalPrice > maxAllowed) finalPrice = maxAllowed;
+    if (finalPrice < minAllowed) finalPrice = minAllowed;
+  }
   const result = await query(
     `update jobs set status = 'completed', completion_otp_hash = $2,
       final_price = coalesce($3, final_price, estimated_price), updated_at = now()
      where id = $1 returning *`,
-    [req.params.id, otpHash, req.body?.finalPrice || null],
+    [req.params.id, otpHash, finalPrice],
   );
   await recordTimelineEvent({
     jobId: req.params.id,
@@ -518,88 +643,12 @@ export async function confirmCompletion(req, res) {
   });
   emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
 
-  // ── Auto-release escrow + credit fundi wallet ──────────────────────
-  // When the customer confirms completion, the escrow is automatically
-  // released: platform takes its commission, fundi gets the rest credited
-  // to their wallet. This is non-blocking — failures are logged but don't
-  // break the confirmation flow (admin can manually release later).
+  // ── Auto-release escrow via the shared settlement service ─────────
+  // Server-authoritative split, fundi wallet credit OR company settlement,
+  // revenue ledger, notifications and audit are all handled atomically.
   try {
-    const paymentResult = await query(
-      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
-      [req.params.id],
-    );
-    if (paymentResult.rows[0]) {
-      const payment = paymentResult.rows[0];
-      const jobValue = Number(job.final_price || job.estimated_price || payment.amount || 0);
-      const commissionRate = Number(payment.commission_rate || 0.15);
-      const commissionAmount = Math.round(jobValue * commissionRate);
-      const fundiEarnings = jobValue - commissionAmount;
-
-      // Use a transaction to ensure atomicity — no partial updates
-      const { transaction } = await import('../db.js');
-      await transaction(async (client) => {
-        // Mark payment as released
-        await client.query(
-          `update payments set escrow_status = 'released', status = 'completed', updated_at = now() where id = $1`,
-          [payment.id],
-        );
-        // Record escrow release transaction
-        await client.query(
-          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
-           values ($1, $2, 'release', $3, 'completed')
-           on conflict do nothing`,
-          [req.params.id, payment.id, fundiEarnings],
-        );
-        // Credit fundi wallet
-        await client.query(
-          `insert into fundi_wallets (fundi_id, balance, pending, currency)
-           values ($1, $2, 0, 'KES')
-           on conflict (fundi_id) do update
-           set balance = fundi_wallets.balance + $2, updated_at = now()`,
-          [job.fundi_id, fundiEarnings],
-        );
-        // Record wallet transaction
-        await client.query(
-          `insert into wallet_transactions (fundi_id, job_id, type, amount, description, status)
-           values ($1, $2, 'credit', $3, 'Job payment - commission deducted', 'completed')`,
-          [job.fundi_id, req.params.id, fundiEarnings],
-        );
-        // Update job escrow status
-        await client.query(
-          `update jobs set escrow_status = 'released', payment_status = 'completed', updated_at = now() where id = $1`,
-          [req.params.id],
-        );
-        // Record revenue ledger entries (CEO-only financial intelligence)
-        await client.query(
-          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
-            customer_paid, commission_amount, platform_fee_amount,
-            fundi_payout, net_revenue, payment_method, user_id, fundi_id, notes)
-           values ($1, 'commission_earned', $2, 'KES', $3, $2, $4, $5, $2, $6, $7, $8, 'Auto-released on customer confirmation')`,
-          [req.params.id, commissionAmount, jobValue,
-           Number(payment.platform_fee || 0), fundiEarnings,
-           payment.provider || 'mpesa', job.customer_id, job.fundi_id],
-        );
-        await client.query(
-          `insert into revenue_ledger (job_id, transaction_type, amount, currency,
-            fundi_payout, user_id, fundi_id, notes)
-           values ($1, 'escrow_released', $2, 'KES', $2, $3, $4, 'Escrow released to fundi wallet')`,
-          [req.params.id, fundiEarnings, job.customer_id, job.fundi_id],
-        );
-      });
-
-      // Notify fundi: payment received
-      await query(
-        `insert into notifications (user_id, type, title, body, data)
-         values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
-        [
-          job.fundi_id,
-          `KES ${fundiEarnings.toLocaleString()} has been credited to your wallet for the completed job.`,
-          JSON.stringify({ jobId: req.params.id, amount: fundiEarnings }),
-        ],
-      );
-      emitEvent('payment:confirmed', { jobId: req.params.id, fundiEarnings }, `user:${job.fundi_id}`);
-      emitEvent('escrow:released', { jobId: req.params.id, fundiEarnings }, `job:${req.params.id}`);
-    }
+    const { releaseJobEscrow } = await import('../services/settlementService.js');
+    await releaseJobEscrow({ jobId: req.params.id, actorId: req.user.id, actorRole: req.user.role, source: 'customer_confirmation' });
   } catch (err) {
     console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
   }
@@ -690,4 +739,115 @@ export async function submitReview(req, res) {
   emitEvent('review:submitted', { jobId, reviewId: result.rows[0].id }, `job:${jobId}`);
   emitEvent('trust:updated', { userId: job.fundi_id, jobId }, `user:${job.fundi_id}`);
   res.status(201).json({ success: true, review: result.rows[0] });
+}
+
+// ── Customer quote decision (spec §22): approve or reject a revised quote ──
+// Only the job's customer can decide. Approve resumes the normal workflow;
+// reject releases the provider and re-opens matching.
+export async function decideQuote(req, res) {
+  const { decision } = req.body || {};
+  if (!['approve', 'reject'].includes(decision)) throw badRequest('decision must be approve or reject');
+  const job = await loadJob(req.params.id);
+  requireCustomer(req.user, job);
+  if (job.status !== 'offered') throw badRequest('This job has no pending quote to decide');
+  if (decision === 'approve') {
+    const result = await query(
+      `update jobs set status = case when company_id is null then 'accepted' else 'accepted' end,
+        updated_at = now() where id = $1 returning *`,
+      [req.params.id],
+    );
+    const updated = result.rows[0];
+    await recordTimelineEvent({
+      jobId: req.params.id, eventType: 'quote_approved', actorId: req.user.id, actorRole: req.user.role,
+      metadata: { amount: updated.estimated_price },
+    });
+    // Notify whoever sent the quote
+    if (updated.company_id) {
+      const ownerRes = await query('select owner_user_id from company_profiles where id = $1', [updated.company_id]);
+      if (ownerRes.rows[0]) {
+        await query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'quote_approved', 'Quote Approved', $2, $3::jsonb)`,
+          [ownerRes.rows[0].owner_user_id, 'The customer approved your quote. Assign a technician to proceed.',
+           JSON.stringify({ jobId: updated.id })],
+        );
+      }
+    } else if (updated.fundi_id) {
+      await query(
+        `insert into notifications (user_id, type, title, body, data)
+         values ($1, 'quote_approved', 'Quote Approved', $2, $3::jsonb)`,
+        [updated.fundi_id, 'The customer approved your quote. You can now proceed with the job.',
+         JSON.stringify({ jobId: updated.id })],
+      );
+    }
+    emitEvent('job:status', { jobId: updated.id, status: 'accepted' }, `job:${updated.id}`);
+    return res.json({ success: true, job: publicJob(updated) });
+  }
+  const result = await query(
+    `update jobs set status = case when company_id is null then 'matching' else 'matching' end,
+      fundi_id = case when company_id is null then null else fundi_id end,
+      technician_user_id = null, updated_at = now() where id = $1 returning *`,
+    [req.params.id],
+  );
+  await recordTimelineEvent({
+    jobId: req.params.id, eventType: 'quote_rejected', actorId: req.user.id, actorRole: req.user.role,
+  });
+  emitEvent('job:status', { jobId: req.params.id, status: 'matching' }, `job:${req.params.id}`);
+  res.json({ success: true, job: publicJob(result.rows[0]) });
+}
+
+// ── Multi-property (spec §25): customer property book CRUD ──
+export async function listProperties(req, res) {
+  const result = await query(
+    `select * from customer_properties where customer_id = $1 order by is_default desc, created_at desc`,
+    [req.user.id],
+  );
+  res.json({ success: true, properties: result.rows });
+}
+
+export async function createProperty(req, res) {
+  const b = req.body || {};
+  if (!b.label) throw badRequest('label is required');
+  if (b.isDefault) {
+    await query(`update customer_properties set is_default = false where customer_id = $1`, [req.user.id]);
+  }
+  const result = await query(
+    `insert into customer_properties (customer_id, label, property_type, address_line, location_name, latitude, longitude, access_notes, is_default)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, coalesce($9, false)) returning *`,
+    [req.user.id, b.label, b.propertyType || 'home', b.addressLine || null, b.locationName || null,
+     b.latitude || null, b.longitude || null, b.accessNotes || null, b.isDefault ?? false],
+  );
+  res.status(201).json({ success: true, property: result.rows[0] });
+}
+
+export async function updateProperty(req, res) {
+  const own = await query(
+    `select id from customer_properties where id = $1 and customer_id = $2`,
+    [req.params.id, req.user.id],
+  );
+  if (!own.rows[0]) throw notFound('Property not found');
+  const b = req.body || {};
+  if (b.isDefault) {
+    await query(`update customer_properties set is_default = false where customer_id = $1`, [req.user.id]);
+  }
+  const result = await query(
+    `update customer_properties set label = coalesce($2, label), property_type = coalesce($3, property_type),
+       address_line = coalesce($4, address_line), location_name = coalesce($5, location_name),
+       latitude = coalesce($6, latitude), longitude = coalesce($7, longitude),
+       access_notes = coalesce($8, access_notes), is_default = coalesce($9, is_default), updated_at = now()
+     where id = $1 returning *`,
+    [req.params.id, b.label ?? null, b.propertyType ?? null, b.addressLine ?? null, b.locationName ?? null,
+     b.latitude ?? null, b.longitude ?? null, b.accessNotes ?? null,
+     typeof b.isDefault === 'boolean' ? b.isDefault : null],
+  );
+  res.json({ success: true, property: result.rows[0] });
+}
+
+export async function deleteProperty(req, res) {
+  const result = await query(
+    `delete from customer_properties where id = $1 and customer_id = $2 returning id`,
+    [req.params.id, req.user.id],
+  );
+  if (!result.rows[0]) throw notFound('Property not found');
+  res.json({ success: true });
 }

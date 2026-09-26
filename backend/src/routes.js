@@ -1,6 +1,7 @@
 import express from 'express';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
 import { requireFundiAccount, requireApprovedFundi } from './middleware/fundiAccess.js';
+import { requireApprovedWorker } from './middleware/workerAccess.js';
 import { imageUpload } from './middleware/upload.js';
 import * as auth from './controllers/authController.js';
 import * as users from './controllers/userController.js';
@@ -56,16 +57,54 @@ router.delete('/users/saved-places/:id', authRequired, asyncHandler(users.delete
 router.post('/users/change-password', authRequired, asyncHandler(users.changePassword));
 router.post('/users/delete-account', authRequired, asyncHandler(users.deleteAccount));
 
+// ── Public company directory (customer-safe, no auth needed to browse) ──
+router.get('/companies', asyncHandler(company.publicCompanyDirectory));
+router.get('/companies/:id', asyncHandler(company.publicCompanyProfileById));
+
+// ── Company partner applications ──
 router.post('/company/applications', authRequired, asyncHandler(company.createPartnerApplication));
-router.get('/company/applications/me', authRequired, asyncHandler(async (req, res) => {
-  const result = await query('select * from company_partner_applications where user_id = $1 order by created_at desc', [req.user.id]);
-  res.json({ success: true, applications: result.rows });
-}));
+router.get('/company/applications/me', authRequired, asyncHandler(company.listMyApplications));
+router.post('/company/applications/:id/submit', authRequired, asyncHandler(company.reviewPartnerApplication));
+router.post('/company/applications/:id/review', authRequired, requireRole('admin'), asyncHandler(company.reviewPartnerApplication));
 router.post('/company/applications/:id/approve', authRequired, requireRole('admin'), asyncHandler(company.approvePartnerApplication));
+router.get('/admin/company-applications', authRequired, requireRole('admin'), asyncHandler(company.adminListApplications));
+router.get('/admin/companies', authRequired, requireRole('admin'), asyncHandler(company.adminListCompanies));
+router.post('/admin/companies/:id/action', authRequired, requireRole('admin'), asyncHandler(company.adminCompanyAction));
+
+// ── Company portal (organization isolation enforced by requireCompanyMember) ──
+router.get('/company/portal/overview', authRequired, company.portalAccess, asyncHandler(company.portalOverview));
+router.get('/company/portal/profile', authRequired, company.portalAccess, asyncHandler(company.portalProfile));
+router.put('/company/portal/profile', authRequired, company.portalAccess, asyncHandler(company.portalProfile));
+router.get('/company/portal/services', authRequired, company.portalAccess, asyncHandler(company.portalServices));
+router.post('/company/portal/services', authRequired, company.portalAccess, asyncHandler(company.portalCreateService));
+router.patch('/company/portal/services/:serviceId', authRequired, company.portalAccess, asyncHandler(company.portalUpdateService));
+router.delete('/company/portal/services/:serviceId', authRequired, company.portalAccess, asyncHandler(company.portalDeleteService));
+router.get('/company/portal/team', authRequired, company.portalAccess, asyncHandler(company.portalTeam));
+router.post('/company/portal/team', authRequired, company.portalAccess, asyncHandler(company.portalAddMember));
+router.patch('/company/portal/team/:memberId', authRequired, company.portalAccess, asyncHandler(company.portalUpdateMember));
+router.delete('/company/portal/team/:memberId', authRequired, company.portalAccess, asyncHandler(company.portalRemoveMember));
+router.get('/company/portal/jobs', authRequired, company.portalAccess, asyncHandler(company.portalJobs));
+router.get('/company/portal/open-pool', authRequired, company.portalAccess, asyncHandler(company.portalOpenPool));
+router.post('/company/jobs/:jobId/claim', authRequired, company.portalAccess, asyncHandler(company.claimPoolJob));
+router.post('/company/jobs/:jobId/accept', authRequired, company.portalAccess, asyncHandler(company.acceptCompanyJob));
+router.post('/company/jobs/:jobId/reject', authRequired, company.portalAccess, asyncHandler(company.rejectCompanyJob));
+router.post('/company/jobs/:jobId/quote', authRequired, company.portalAccess, asyncHandler(company.quoteCompanyJob));
+router.post('/company/jobs/:jobId/assign-technician', authRequired, company.portalAccess, asyncHandler(company.assignTechnician));
+router.post('/company/jobs/:jobId/unassign-technician', authRequired, company.portalAccess, asyncHandler(company.unassignTechnician));
+router.get('/company/portal/schedule', authRequired, company.portalAccess, asyncHandler(company.portalSchedule));
+router.get('/company/portal/reviews', authRequired, company.portalAccess, asyncHandler(company.portalReviews));
+router.get('/company/portal/finance', authRequired, company.portalAccess, asyncHandler(company.portalFinance));
+router.get('/company/technician/assignments', authRequired, asyncHandler(company.technicianAssignments));
+
+// Legacy secured overview (kept for compatibility)
 router.get('/company/:companyId/overview', authRequired, asyncHandler(company.getCompanyPortalOverview));
-router.post('/jobs/:id/assign-technician', authRequired, asyncHandler(company.assignTechnicianToJob));
 
 router.post('/jobs', authRequired, asyncHandler(jobs.createJob));
+router.post('/jobs/:id/quote/decision', authRequired, asyncHandler(jobs.decideQuote));
+router.get('/properties', authRequired, asyncHandler(jobs.listProperties));
+router.post('/properties', authRequired, asyncHandler(jobs.createProperty));
+router.patch('/properties/:id', authRequired, asyncHandler(jobs.updateProperty));
+router.delete('/properties/:id', authRequired, asyncHandler(jobs.deleteProperty));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));
 router.get('/jobs/fundi/active', authRequired, requireApprovedFundi, asyncHandler(jobs.activeFundiJob));
 router.get('/jobs/:id', authRequired, asyncHandler(jobs.getJob));
@@ -76,8 +115,8 @@ router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJobStatus));
 router.get('/jobs/:id/location', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/accept', authRequired, requireApprovedFundi, asyncHandler(jobs.acceptJob));
 router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
-router.post('/jobs/:id/check-in', authRequired, requireApprovedFundi, asyncHandler(jobs.checkIn));
-router.post('/jobs/:id/complete', authRequired, requireApprovedFundi, imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
+router.post('/jobs/:id/check-in', authRequired, requireApprovedWorker, asyncHandler(jobs.checkIn));
+router.post('/jobs/:id/complete', authRequired, requireApprovedWorker, imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
 router.post('/jobs/:id/confirm-completion', authRequired, asyncHandler(jobs.confirmCompletion));
 router.post('/jobs/:id/review', authRequired, asyncHandler(jobs.submitReview));
 router.post('/reviews', authRequired, asyncHandler(jobs.submitReview));
