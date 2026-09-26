@@ -13,8 +13,10 @@ const Header = () => {
 
   const navLinks = [
     { name: "How it Works", href: "/how-it-works" },
+    { name: "Customers", href: "/customers" },
+    { name: "Fundis", href: "/fundis" },
+    { name: "Companies", href: "/companies" },
     { name: "Services", href: "/#services" },
-    { name: "For Professionals", href: "/register/fundi" },
   ];
 
   // Mobile menu animation variants — collapse to instant when reduced motion is on.

@@ -146,7 +146,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gradient-hero">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10">
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-muted rounded-lg transition-colors flex items-center gap-1 text-primary text-sm">
             <ArrowLeft className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function Settings() {
           ))}
         </div>
 
-        <div className="bg-card rounded-2xl border border-border/50 p-6">
+        <div className="bg-card rounded-2xl border border-border/50 p-6 lg:p-8">
           {activeTab === "personal" && (
             <div className="space-y-4">
               <h2 className="font-semibold text-lg">Personal Information</h2>

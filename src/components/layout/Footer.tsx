@@ -61,9 +61,9 @@ const Footer = () => {
       { name: "API Documentation", href: "/api-documentation" },
     ],
     forPros: [
-      { name: "Become a Fundi", href: "/fundi/register" },
-      { name: "Fundi Resources", href: "/fundi/resources" },
-      { name: "Fundi App", href: "/fundi/app" },
+      { name: "Become a Fundi", href: "/register/fundi" },
+      { name: "For Fundis", href: "/fundis" },
+      { name: "Fundi Dashboard", href: "/auth" },
     ],
   };
 

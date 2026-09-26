@@ -153,7 +153,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BrandLogo size="xs" iconOnly linkTo={false} />
             {DEMO_MODE && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Demo</span>}
@@ -174,17 +174,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10 space-y-5">
         {/* Welcome */}
         <div>
-          <h1 className="text-2xl font-display font-bold">
+          <h1 className="text-2xl md:text-4xl font-display font-bold">
             Hello, {String(user?.fullName ?? '').split(" ")[0] || "there"}!
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">What needs fixing today?</p>
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate("/create-job")}

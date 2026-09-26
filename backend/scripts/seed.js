@@ -9,8 +9,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 const demoUsers = [
   { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },
-  { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000002' },
-  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Demo Admin', role: 'admin', phone: '254712000003' },
+  { email: 'company@patafundi.com', password: 'Company@2024!', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712000002' },
+  { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000003' },
+  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Demo Admin', role: 'admin', phone: '254712000004' },
 ];
 
 async function getDb() {

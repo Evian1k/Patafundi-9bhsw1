@@ -96,7 +96,7 @@ export default function DisputeCenter() {
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-muted rounded-xl transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -110,7 +110,7 @@ export default function DisputeCenter() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10 space-y-5">
         {/* Info banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
           <Scale className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />

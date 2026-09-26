@@ -185,7 +185,7 @@ const CreateJob = () => {
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
           <button onClick={() => step > 1 ? setStep(step - 1) : navigate(-1)} className="p-2 hover:bg-muted rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -201,14 +201,14 @@ const CreateJob = () => {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10">
         <AnimatePresence mode="wait">
           {/* Step 1: Service Selection */}
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">What service do you need?</h2>
               <p className="text-muted-foreground text-sm mb-6">Select the category that best matches your needs.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {services.map((service) => (
                   <button
                     key={service.id}

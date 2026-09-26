@@ -73,6 +73,7 @@ function resolveJwtSecret() {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   if (isProduction) return '';
   const generated = crypto.randomBytes(32).toString('hex');
+  process.env.JWT_SECRET = generated;
   console.warn('[PataFundi] JWT_SECRET not set — auto-generated for dev. Set it in .env for persistence.');
   return generated;
 }
@@ -81,6 +82,7 @@ function resolveRefreshSecret() {
   if (process.env.REFRESH_TOKEN_SECRET) return process.env.REFRESH_TOKEN_SECRET;
   if (isProduction) return '';
   const generated = crypto.randomBytes(32).toString('hex');
+  process.env.REFRESH_TOKEN_SECRET = generated;
   console.warn('[PataFundi] REFRESH_TOKEN_SECRET not set — auto-generated for dev. Set it in .env for persistence.');
   return generated;
 }

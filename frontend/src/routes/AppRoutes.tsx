@@ -16,6 +16,7 @@ import Settings from "@/pages/Settings";
 import JobTracking from "@/pages/JobTracking";
 import NotFound from "@/pages/NotFound";
 import ServicePage from "@/pages/ServicePage";
+import CompanyPage from "@/pages/CompanyPage";
 import About from "@/pages/About";
 import Careers from "@/pages/Careers";
 import Blog from "@/pages/Blog";
@@ -77,6 +78,8 @@ export default function AppRoutes() {
           </Suspense>
         ) : <NotFound />
       } />
+      <Route path="/demo/company" element={<CompanyPage />} />
+      <Route path="/companies" element={<CompanyPage />} />
       <Route path="/register/customer" element={<Auth />} />
       <Route path="/register/fundi" element={<FundiRegister />} />
 
@@ -90,6 +93,7 @@ export default function AppRoutes() {
       <Route path="/disputes" element={<DisputeCenter />} />
 
       <Route path="/services/:slug" element={<ServicePage />} />
+      <Route path="/companies" element={<CompanyPage />} />
 
       <Route path="/about" element={<About />} />
       <Route path="/careers" element={<Careers />} />

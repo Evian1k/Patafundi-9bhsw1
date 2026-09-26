@@ -17,6 +17,7 @@ import * as fraud from './controllers/fraudController.js';
 import * as storage from './controllers/storageController.js';
 import * as verification from './controllers/verificationController.js';
 import * as referral from './controllers/referralController.js';
+import * as company from './controllers/companyController.js';
 import {
   requireAdminDocumentAccess,
   requireJobPhotoAccess,
@@ -54,6 +55,15 @@ router.put('/users/saved-places/:id', authRequired, asyncHandler(users.updateSav
 router.delete('/users/saved-places/:id', authRequired, asyncHandler(users.deleteSavedPlace));
 router.post('/users/change-password', authRequired, asyncHandler(users.changePassword));
 router.post('/users/delete-account', authRequired, asyncHandler(users.deleteAccount));
+
+router.post('/company/applications', authRequired, asyncHandler(company.createPartnerApplication));
+router.get('/company/applications/me', authRequired, asyncHandler(async (req, res) => {
+  const result = await query('select * from company_partner_applications where user_id = $1 order by created_at desc', [req.user.id]);
+  res.json({ success: true, applications: result.rows });
+}));
+router.post('/company/applications/:id/approve', authRequired, requireRole('admin'), asyncHandler(company.approvePartnerApplication));
+router.get('/company/:companyId/overview', authRequired, asyncHandler(company.getCompanyPortalOverview));
+router.post('/jobs/:id/assign-technician', authRequired, asyncHandler(company.assignTechnicianToJob));
 
 router.post('/jobs', authRequired, asyncHandler(jobs.createJob));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));

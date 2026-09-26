@@ -1,7 +1,22 @@
--- Extend user roles for fundi onboarding flow
+-- Extend user roles for fundi onboarding flow and internal staff RBAC.
+-- Some dev runs may already contain staff roles from later migrations, so we
+-- normalize any stray/legacy values before adding the constraint.
+update users
+set role = 'customer'
+where role is null
+   or role not in (
+     'customer', 'fundi', 'fundi_pending', 'admin', 'super_admin',
+     'ops_manager', 'support_agent', 'fraud_analyst', 'finance_team',
+     'dispatch_team', 'devops_engineer', 'auditor'
+   );
+
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check
-  check (role in ('customer', 'fundi', 'fundi_pending', 'admin'));
+  check (role in (
+    'customer', 'fundi', 'fundi_pending', 'admin', 'super_admin',
+    'ops_manager', 'support_agent', 'fraud_analyst', 'finance_team',
+    'dispatch_team', 'devops_engineer', 'auditor'
+  ));
 
 alter table users alter column trust_score set default 100;
 alter table trust_scores alter column score set default 100;

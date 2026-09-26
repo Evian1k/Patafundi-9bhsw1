@@ -34,6 +34,9 @@ import Socials from "@/pages/Socials";
 import PolicyPage from "@/pages/PolicyPage";
 import FundiResources from "@/pages/FundiResources";
 import FundiApp from "@/pages/FundiApp";
+import CustomerPage from "@/pages/CustomerPage";
+import FundiPage from "@/pages/FundiPage";
+import CompanyPage from "@/pages/CompanyPage";
 
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -92,6 +95,7 @@ export default function AppRoutes() {
           </Suspense>
         ) : <NotFound />
       } />
+      <Route path="/demo/company" element={<CompanyPage />} />
       <Route path="/register/customer" element={<Auth />} />
       <Route path="/register/fundi" element={<FundiRegister />} />
 
@@ -105,6 +109,9 @@ export default function AppRoutes() {
       <Route path="/disputes" element={<ProtectedCustomerRoute element={<DisputeCenter />} />} />
 
       <Route path="/services/:slug" element={<ServicePage />} />
+      <Route path="/customers" element={<CustomerPage />} />
+      <Route path="/fundis" element={<FundiPage />} />
+      <Route path="/companies" element={<CompanyPage />} />
 
       <Route path="/about" element={<About />} />
       <Route path="/careers" element={<Careers />} />

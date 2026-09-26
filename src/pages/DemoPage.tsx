@@ -1,21 +1,22 @@
 /**
  * Demo Accounts Page — /demo
  *
- * Shows all 10 demo accounts with copy-to-clipboard buttons and one-click
+ * Shows all 11 demo accounts with copy-to-clipboard buttons and one-click
  * login (dev only). Hidden in production by default — guarded by a
  * VITE_DEV_DEMO flag and NODE_ENV check.
  *
  * Demo accounts:
- *   demo@patafundi.com / Demo@2024!       → customer
- *   fundi@patafundi.com / Fundi@2024!     → fundi (approved)
- *   admin@patafundi.com / Admin@2024!     → super_admin
- *   ops@patafundi.com / Ops@2024!         → admin (ops manager)
- *   support@patafundi.com / Support@2024! → support_agent
- *   fraud@patafundi.com / Fraud@2024!     → fraud_analyst
- *   finance@patafundi.com / Finance@2024! → finance_team
+ *   demo@patafundi.com / Demo@2024!         → customer
+ *   company@patafundi.com / Company@2024!   → company_admin
+ *   fundi@patafundi.com / Fundi@2024!       → fundi (approved)
+ *   admin@patafundi.com / Admin@2024!       → super_admin
+ *   ops@patafundi.com / Ops@2024!           → admin (ops manager)
+ *   support@patafundi.com / Support@2024!   → support_agent
+ *   fraud@patafundi.com / Fraud@2024!       → fraud_analyst
+ *   finance@patafundi.com / Finance@2024!   → finance_team
  *   dispatch@patafundi.com / Dispatch@2024! → dispatch_team
- *   devops@patafundi.com / Devops@2024!   → devops_engineer
- *   auditor@patafundi.com / Auditor@2024! → auditor
+ *   devops@patafundi.com / Devops@2024!     → devops_engineer
+ *   auditor@patafundi.com / Auditor@2024!   → auditor
  */
 
 import { useState } from "react";
@@ -24,6 +25,7 @@ import { motion } from "framer-motion";
 import {
   Copy, Check, LogIn, Users, Wrench, Shield, Headphones,
   AlertTriangle, DollarSign, Package, Activity, ScrollText,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
@@ -49,6 +51,15 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     description: "Create jobs, hire fundis, pay, review",
     icon: Users,
     color: "#2595FF",
+  },
+  {
+    email: "company@patafundi.com",
+    password: "Company@2024!",
+    role: "company_admin",
+    label: "Company Admin",
+    description: "Manage branches, assign work, view company ops",
+    icon: BriefcaseBusiness,
+    color: "#7C3AED",
   },
   {
     email: "fundi@patafundi.com",
@@ -176,6 +187,7 @@ export default function DemoPage() {
       // Route based on role
       const role = data.user?.role;
       if (role === "customer") navigate("/dashboard");
+      else if (role === "company_admin") navigate("/demo/company");
       else if (role === "fundi") navigate("/fundi");
       else if (role === "fundi_pending") navigate("/fundi/pending");
       else if (["super_admin", "admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"].includes(role)) {
@@ -200,7 +212,7 @@ export default function DemoPage() {
           <motion.div variants={itemVariants} className="text-center mb-10">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Demo Accounts</h1>
             <p className="text-slate-600">
-              PataFundi has 10 demo accounts — one for each role. Click any card to log in instantly,
+              PataFundi has 11 demo accounts — one for each role, including a company partnership admin. Click any card to log in instantly,
               or copy the credentials to use on the login page.
             </p>
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">

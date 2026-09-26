@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:frontend": "vite",
+    "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "node backend/src/server.js",
     "dev:full": "npm run dev",
     "prestart": "node backend/scripts/bootstrap-production-db.js",
@@ -14,13 +14,15 @@
     "db:seed": "node backend/scripts/seed.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "prebuild": "node scripts/process-brand-logo.mjs",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "test": "node --test backend/src",
-    "test:coverage": "node --test --experimental-test-coverage backend/src",
+    "build": "npm --prefix frontend run build",
+    "build:dev": "npm --prefix frontend run build:dev",
+    "test": "node --test ./backend/src/**/*.test.js",
+    "test:unit": "node --test ./backend/src/**/*.test.js",
+    "test:e2e": "node --test ./backend/src/**/*.e2e.test.js",
+    "test:coverage": "node --test --experimental-test-coverage ./backend/src/**/*.test.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview",
+    "preview": "npm --prefix frontend run preview",
     "verify:live": "node backend/scripts/live-verification.js",
     "audit:e2e": "node backend/scripts/e2e-production-audit.js",
     "setup:logo": "node scripts/process-brand-logo.mjs"
@@ -143,9 +145,5 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^7.3.5"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+  }
 }

@@ -3,6 +3,6 @@
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (
   role IN ('customer', 'fundi', 'fundi_pending', 'admin', 'super_admin',
-           'ops_manager', 'support_agent', 'fraud_analyst', 'finance_team',
-           'dispatch_team', 'devops_engineer', 'auditor')
+           'company_admin', 'ops_manager', 'support_agent', 'fraud_analyst',
+           'finance_team', 'dispatch_team', 'devops_engineer', 'auditor')
 );

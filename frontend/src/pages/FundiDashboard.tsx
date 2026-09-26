@@ -193,7 +193,7 @@ export function FundiDashboard() {
 
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BrandLogo size="xs" iconOnly linkTo={false} />
             <span className="font-display font-bold">Fundi <span className="text-primary">Hub</span></span>
@@ -209,7 +209,7 @@ export function FundiDashboard() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10 space-y-4">
         {/* Status Card */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-5 border border-border/50">
           <div className="flex items-center justify-between mb-4">
