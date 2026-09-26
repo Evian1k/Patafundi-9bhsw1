@@ -52,3 +52,12 @@ apps/*/package-lock.json
 packages/*/node_modules/
 .expo/
 *.tsbuildinfo
+
+# Container/workspace artifacts (not part of the product repo)
+tool-results/
+skills/
+.agents/
+download/
+upload/
+dev.log
+.test-summary.txt

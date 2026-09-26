@@ -2,30 +2,45 @@
 
 A production-grade on-demand home services marketplace connecting customers with verified individual fundis and professional service companies across Kenya. **One project. One codebase. One ecosystem.**
 
-## Project Structure (single unified app)
+## Project Structure (one monorepo)
 
 ```
 patafundi/
-├── backend/            Express API + PostgreSQL (PGlite embedded for dev)
-│   ├── src/server.js   API entry — port 4000
-│   ├── src/routes.js   All /api/* routes
-│   ├── src/controllers/  Auth, jobs, payments, companies, staff, admin…
-│   ├── src/services/     Money, matching, fraud, errors, notifications…
-│   └── migrations/       33 SQL migrations (001–033)
-├── frontend/           React 18 + Vite + shadcn/ui + Tailwind — THE web app
+├── backend/                  Express API + PostgreSQL (PGlite embedded for dev)
+│   ├── src/server.js         API entry — port 4000
+│   ├── src/routes.js         All /api/* routes
+│   ├── src/controllers/      Auth, jobs, payments, companies, staff, admin…
+│   ├── src/services/         Money, matching, fraud, errors, notifications…
+│   └── migrations/           33 SQL migrations (001–033)
+├── frontend/                 React 18 + Vite + shadcn/ui + Tailwind — THE web app
 │   └── src/
-│       ├── pages/        Customer, Fundi, Company portal, Technician, Staff
-│       ├── routes/       Single role-aware router (guards by role)
-│       ├── components/   UI kit + shared design system
-│       └── lib/api.ts    Single API client for every role
-├── docs/               Runbooks + archived historical audits
-├── scripts/            Brand/logo tooling
-└── package.json        One entry point: npm run dev (backend + frontend)
+│       ├── pages/            Customer, Fundi, Company portal, Technician, Staff
+│       ├── routes/           Single role-aware router (guards by role)
+│       ├── components/       UI kit + shared design system
+│       └── lib/api.ts        Single API client for every role
+├── apps/customer-mobile/     Expo (React Native) customer app
+├── apps/fundi-mobile/        Expo (React Native) fundi app
+├── packages/shared/          @patafundi/shared — API client, auth store, theme shared by both mobile apps
+├── docs/                     Runbooks + archived historical audits (docs/archive/)
+├── scripts/                  Brand/logo tooling
+└── package.json              One entry point: npm run dev (backend + frontend)
 ```
 
-> Historical mobile-app clones, duplicate frontends and static previews were
-> consolidated — this repo is one web platform. See `docs/archive/` for the
-> historical audit trail.
+> Duplicate/superseded frontends and static previews were consolidated into
+> `frontend/`. The Expo mobile apps live in `apps/` and share code through
+> `packages/shared`. Historical audit trail: `docs/archive/`.
+
+## Mobile apps (Expo)
+
+```bash
+cd apps/customer-mobile && npm install && npm start   # port 8081
+cd apps/fundi-mobile     && npm install && npm start   # port 8082
+```
+
+Both apps read their backend host from `EXPO_PUBLIC_HOST` (no hardcoded
+localhost — set it to your LAN IP for devices, or the Render URL for
+production) and share one codebase via `@patafundi/shared`. The customer app
+rejects fundi accounts and vice-versa (wrong-app guard).
 
 ## Run it
 
