@@ -96,9 +96,9 @@ export async function createPartnerApplication(req, res) {
   // notify staff (ops) for review
   await query(
     `insert into notifications (user_id, type, title, body, data)
-     select id, 'company_application', 'New Company Application', $2, $3::jsonb
+     select id, 'company_application', 'New Company Application', $1, $2::jsonb
      from users where role in ('admin','super_admin') and status = 'active'`,
-    [result.rows[0].id, `${body.companyName} submitted a partner application.`,
+    [`${body.companyName} submitted a partner application.`,
      JSON.stringify({ applicationId: result.rows[0].id })],
   );
   res.status(201).json({ success: true, application: toPartnerApplicationSummary(result.rows[0]) });

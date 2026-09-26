@@ -46,6 +46,25 @@ import ReportsAnalytics from "@/pages/admin/ReportsAnalytics";
 import AdminSettings from "@/pages/admin/SettingsPage";
 import AuditLogs from "@/pages/admin/AuditLogs";
 import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
+import CompanyApplications from "@/pages/admin/CompanyApplications";
+
+// Company ecosystem (takeover) — public directory + partner program + portal
+import CompanyDirectory from "@/pages/company/CompanyDirectory";
+import CompanyProfile from "@/pages/company/CompanyProfile";
+import PartnerProgram from "@/pages/company/PartnerProgram";
+import CompanyPortalLayout from "@/pages/company/CompanyPortalLayout";
+import PortalDashboard from "@/pages/company/PortalDashboard";
+import PortalJobs from "@/pages/company/PortalJobs";
+import PortalTeam from "@/pages/company/PortalTeam";
+import PortalServices from "@/pages/company/PortalServices";
+import PortalSchedule from "@/pages/company/PortalSchedule";
+import PortalQuality from "@/pages/company/PortalQuality";
+import PortalFinance from "@/pages/company/PortalFinance";
+import PortalSettings from "@/pages/company/PortalSettings";
+import TechnicianApp from "@/pages/company/TechnicianApp";
+
+// Staff role-specific dashboards (takeover)
+import StaffRoleHome from "@/pages/staff/StaffRoleHome";
 
 // Staff dashboards (enterprise RBAC)
 import StaffLayout from "@/components/staff/StaffLayout";
@@ -78,8 +97,10 @@ export default function AppRoutes() {
           </Suspense>
         ) : <NotFound />
       } />
-      <Route path="/demo/company" element={<CompanyPage />} />
-      <Route path="/companies" element={<CompanyPage />} />
+      <Route path="/demo/company" element={<Navigate to="/companies" replace />} />
+      <Route path="/companies" element={<CompanyDirectory />} />
+      <Route path="/companies/:id" element={<CompanyProfile />} />
+      <Route path="/partner-program" element={<PartnerProgram />} />
       <Route path="/register/customer" element={<Auth />} />
       <Route path="/register/fundi" element={<FundiRegister />} />
 
@@ -93,7 +114,19 @@ export default function AppRoutes() {
       <Route path="/disputes" element={<DisputeCenter />} />
 
       <Route path="/services/:slug" element={<ServicePage />} />
-      <Route path="/companies" element={<CompanyPage />} />
+
+      {/* ── Company portal (organization-scoped; server-side RBAC) ── */}
+      <Route path="/company" element={<CompanyPortalLayout />}>
+        <Route index element={<PortalDashboard />} />
+        <Route path="jobs" element={<PortalJobs />} />
+        <Route path="team" element={<PortalTeam />} />
+        <Route path="services" element={<PortalServices />} />
+        <Route path="schedule" element={<PortalSchedule />} />
+        <Route path="quality" element={<PortalQuality />} />
+        <Route path="finance" element={<PortalFinance />} />
+        <Route path="settings" element={<PortalSettings />} />
+      </Route>
+      <Route path="/technician" element={<TechnicianApp />} />
 
       <Route path="/about" element={<About />} />
       <Route path="/careers" element={<Careers />} />
@@ -141,6 +174,7 @@ export default function AppRoutes() {
       <Route path="/admin/settings" element={<ProtectedAdminRoute element={<AdminSettings />} />} />
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
+      <Route path="/admin/companies" element={<ProtectedAdminRoute element={<CompanyApplications />} />} />
 
       {/* Staff login portal — rejects customer/fundi accounts */}
       <Route path="/staff/login" element={<StaffLogin />} />
@@ -155,40 +189,15 @@ export default function AppRoutes() {
         <Route path="staff-mgmt" element={<StaffManagement />} />
         <Route path="commission" element={<CommissionControl />} />
         <Route path="operations" element={<LiveOperations />} />
-        <Route path="dispatch" element={<LiveOperations />} />
-        <Route path="support" element={<StaffOverview />} />
-        <Route path="fraud" element={
-          <StaffDataTable resource="fraud-alerts" title="Fraud Alerts"
-            columns={[
-              { key: "alert_type", label: "Type" },
-              { key: "severity", label: "Severity" },
-              { key: "status", label: "Status" },
-              { key: "created_at", label: "Detected", render: (r) => new Date(r.created_at).toLocaleString() },
-            ]}
-          />
-        } />
-        <Route path="finance" element={
-          <StaffDataTable resource="payments" title="Payments"
-            columns={[
-              { key: "amount", label: "Amount (KES)" },
-              { key: "status", label: "Status" },
-              { key: "escrow_status", label: "Escrow" },
-              { key: "created_at", label: "Date", render: (r) => new Date(r.created_at).toLocaleDateString() },
-            ]}
-          />
-        } />
-        <Route path="dispatch" element={<StaffOverview />} />
-        <Route path="devops" element={<StaffOverview />} />
-        <Route path="audit" element={
-          <StaffDataTable resource="audit-logs" title="Audit Logs"
-            columns={[
-              { key: "action", label: "Action" },
-              { key: "entity_type", label: "Entity" },
-              { key: "created_at", label: "Time", render: (r) => new Date(r.created_at).toLocaleString() },
-            ]}
-          />
-        } />
-        <Route path="admin" element={<StaffOverview />} />
+        {/* Role-specific dashboards (takeover: real data per role) */}
+        <Route path="dispatch" element={<StaffRoleHome role="dispatch_team" />} />
+        <Route path="finance" element={<StaffRoleHome role="finance_team" />} />
+        <Route path="finance/revenue" element={<StaffRoleHome role="finance_team" />} />
+        <Route path="fraud" element={<StaffRoleHome role="fraud_analyst" />} />
+        <Route path="audit" element={<StaffRoleHome role="auditor" />} />
+        <Route path="devops" element={<StaffRoleHome role="devops_engineer" />} />
+        <Route path="support" element={<StaffRoleHome role="support_agent" />} />
+        <Route path="admin" element={<StaffRoleHome role="admin" />} />
         <Route path="admin/fundis" element={
           <StaffDataTable resource="fundis" title="Fundi Management"
             columns={[
@@ -221,28 +230,6 @@ export default function AppRoutes() {
             ]}
           />
         } />
-        <Route path="finance" element={
-          <StaffDataTable resource="payments" title="Payments"
-            columns={[
-              { key: "amount", label: "Amount (KES)" },
-              { key: "status", label: "Status" },
-              { key: "escrow_status", label: "Escrow" },
-              { key: "mpesa_receipt_number", label: "Receipt" },
-              { key: "created_at", label: "Date", render: (r) => new Date(r.created_at).toLocaleDateString() },
-            ]}
-          />
-        } />
-        <Route path="finance/revenue" element={<StaffOverview />} />
-        <Route path="fraud" element={
-          <StaffDataTable resource="fraud-alerts" title="Fraud Alerts"
-            columns={[
-              { key: "alert_type", label: "Type" },
-              { key: "severity", label: "Severity" },
-              { key: "status", label: "Status" },
-              { key: "created_at", label: "Detected", render: (r) => new Date(r.created_at).toLocaleString() },
-            ]}
-          />
-        } />
         <Route path="support/disputes" element={
           <StaffDataTable resource="disputes" title="Disputes"
             columns={[
@@ -252,17 +239,6 @@ export default function AppRoutes() {
             ]}
           />
         } />
-        <Route path="audit" element={
-          <StaffDataTable resource="audit-logs" title="Audit Logs"
-            columns={[
-              { key: "action", label: "Action" },
-              { key: "entity_type", label: "Entity" },
-              { key: "user_id", label: "User ID", render: (r) => String(r.user_id || "—").slice(0, 8) },
-              { key: "created_at", label: "Time", render: (r) => new Date(r.created_at).toLocaleString() },
-            ]}
-          />
-        } />
-        <Route path="devops" element={<StaffOverview />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

@@ -70,8 +70,19 @@ const Auth = () => {
         return navigate("/register/fundi");
       }
     }
+    // Company ecosystem routing (takeover): company admins → portal;
+    // dispatchers/technicians detect membership server-side.
+    if (me.role === "company_admin") return navigate("/company");
+    try {
+      const portal = await apiClient.request("/company/portal/overview") as { myRole?: string };
+      const next = searchParams.get("next");
+      if (portal?.myRole === "technician") return navigate(next || "/technician");
+      return navigate(next || "/company");
+    } catch {
+      // not a company member — fall through to customer app
+    }
     return navigate("/dashboard");
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");

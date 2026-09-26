@@ -1,56 +1,85 @@
-# PataFundi Feature Matrix
+# PataFundi — Feature Matrix (post-takeover)
 
-## Status legend
+Legend: ✅ IMPLEMENTED+TESTED · 🟡 PARTIAL · ⏸ CREDENTIAL REQUIRED · ❌ NOT IMPLEMENTED
 
-- COMPLETE: backed by verified evidence
-- PASS WITH LIMITATIONS: tested in backend or build, but not full browser proof
-- PARTIAL: present in code but not fully validated
-- BLOCKED: major gap remains
-- NOT IMPLEMENTED: no evidence of real functionality
+## Public website
+| Feature | Status | Notes |
+|---|---|---|
+| Landing, services, how-it-works, trust, blog, careers, policies | ✅ | pre-existing, verified |
+| Company directory (real data, filters, search) | ✅ | NEW — replaced static marketing page |
+| Company public profile (customer-safe) + direct booking | ✅ | NEW |
+| Partner With PataFundi application (4-step) | ✅ | NEW |
+| Dead `/partner-program` link fixed | ✅ | FIXED |
 
-## Matrix
+## Customer experience
+| Feature | Status |
+|---|---|
+| Signup/login/OTP/refresh, session persistence | ✅ |
+| Job wizard: category, description, photos, urgency, schedule | ✅ |
+| **Book a company directly** | ✅ NEW |
+| Post to open company pool | ✅ NEW |
+| Multi-property book (home/office/rental…) | ✅ NEW |
+| Quote approve/reject flow | ✅ NEW |
+| Live tracking + polling fallback | ✅ |
+| Chat (socket.io) | ✅ |
+| Payment (dev provider in sandbox; M-Pesa adapter ready) | ✅ / ⏸ |
+| OTP completion confirm + escrow auto-release | ✅ FIXED (never worked before) |
+| Receipts, payment status, refund status | ✅ |
+| Reviews | ✅ |
+| Service history & rebook | 🟡 (history ✅; one-tap rebook = reuse wizard) |
+| Emergency flow (urgency + priority matching) | ✅ |
 
-| Feature | UI | Backend | DB | Auth | E2E | Status | Evidence |
-|---|---|---|---|---|---|---|---|
-| Customer auth/login | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Backend session/JWT tests passed |
-| Fundi registration | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Code exists; not browser-validated |
-| Company partner application | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Company workflow tests passed |
-| Company portal | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Real backend flow exists; portal UX not validated |
-| Company isolation | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Direct DB+logic test passed |
-| Job creation | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | DB-backed test passed |
-| Job matching | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Matching test passed |
-| Notifications | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Scope tests passed |
-| Payout/financial calculations | PARTIAL | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Backend math tests passed |
-| Routing guards | COMPLETE | COMPLETE | N/A | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | Logic and build validated |
-| Public website pages | COMPLETE | N/A | N/A | N/A | PARTIAL | PASS WITH LIMITATIONS | Build passes, route inventory exists |
-| Staff portal | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Code exists, not full role-by-role UI evidence |
-| Super admin portal | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Code exists, not full live-admin proof |
-| Business/B2B customer flow | NOT IMPLEMENTED | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | No direct business-customer E2E proof |
-| Multi-property flow | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Code suggests feature, not proven |
-| Recurring services | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not evidenced end-to-end |
-| Emergency service flow | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| Inspection/quote flow | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| Messaging/chat | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Present in code but not proven |
-| Realtime updates | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not proven live |
-| Location/GPS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not proven in live browser |
-| File uploads | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not validated end-to-end |
-| Search/filter/sort | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not proven across screens |
-| Security hardening | COMPLETE | COMPLETE | COMPLETE | COMPLETE | PARTIAL | PASS WITH LIMITATIONS | RBAC and JWT tests pass |
-| Production build | COMPLETE | N/A | N/A | N/A | N/A | COMPLETE | Build passed |
-| Full customer journey | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated in browser |
-| Full fundi journey | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| Full company journey | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| Full staff journey | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| Full admin journey | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Not fully validated |
-| AI features | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT IMPLEMENTED | PARTIAL | Code presence only |
+## Fundi app
+| Feature | Status |
+|---|---|
+| Registration + document upload + admin verification | ✅ |
+| Online toggle, GPS streaming, job offers | ✅ |
+| Accept → check-in → complete (+evidence) | ✅ |
+| Wallet (escrow releases, balance, withdrawals) | ✅ FIXED (tables were missing) |
+| Earnings visibility (available/pending/withdrawn) | ✅ |
 
-## Bottom line
+## Company ecosystem
+| Feature | Status |
+|---|---|
+| Partner application → review → approval → provisioning | ✅ REBUILT |
+| Company portal (dashboard, jobs, dispatch, team, services, schedule, quality, finance, settings) | ✅ NEW |
+| Team/technician CRUD with temp-password provisioning | ✅ NEW |
+| Dispatch: accept/claim/reject/quote/assign/unassign | ✅ FIXED+NEW (assign used to crash) |
+| Technician experience app | ✅ NEW |
+| Company settlements (server-computed) | ✅ NEW |
+| Company isolation (403 cross-company) | ✅ FIXED+TESTED |
+| Suspension / reactivation | ✅ NEW |
+| Open job pool (competitive claim) | ✅ NEW |
+| Guarantees/warranties on profile | ✅ NEW |
 
-The repository has strong backend proof but not complete frontend/product E2E evidence. Product completion is not claimed at this stage.
+## Staff & Super Admin
+| Feature | Status |
+|---|---|
+| Role-specific staff dashboards (ops/support/dispatch/finance/fraud/devops/auditor) | ✅ REDESIGNED (were generic fallbacks) |
+| Company applications review + companies management | ✅ NEW |
+| Fundi verification, customers, jobs, payments, disputes | ✅ (pre-existing) |
+| Escrow release/freeze, payouts, refunds (admin) | ✅ FIXED (release/refund paths were broken) |
+| Fraud center, security center, 2FA, feature flags | ✅ (pre-existing) |
+| Audit logs + system health | ✅ |
+| Revenue/commission control | ✅ |
 
-## Supporting evidence
+## Platform core
+| Feature | Status |
+|---|---|
+| Job lifecycle state machine | ✅ NEW (arbitrary jumps were allowed) |
+| Escrow + double-entry ledger + revenue ledger | ✅ FIXED |
+| Notifications (scoped per user) + realtime events | ✅ |
+| Audit logging on sensitive actions | ✅ EXPANDED |
+| Rate limiting, helmet/CSP, CSRF, lockout, replay protection | ✅ (pre-existing) |
+| Files: public photos + private documents with access checks | ✅ |
+| AI assistant (advisory) | 🟡 (endpoints exist; advisory-only enforced) |
+| Responsive UI 360→1920px + mobile bottom nav | ✅ NEW for company/technician surfaces |
 
-- `node --test "backend/src/**/*.test.js"` -> 104 pass, 0 fail
-- `npm run typecheck` -> pass
-- `npm run build` -> pass
-- `npm run lint` -> 0 errors, warnings only
+## M-Pesa / Stripe / SMS / Email / Push / Maps
+| Integration | Status |
+|---|---|
+| M-Pesa Daraja STK + webhook (signature/replay) | ⏸ CREDENTIAL REQUIRED (code complete; dev provider covers sandbox) |
+| Stripe | ❌ NOT IMPLEMENTED (adapter interface available) |
+| Email / SMS (OTP delivery) | ⏸ CREDENTIAL REQUIRED (OTP surfaces in dev) |
+| Push (Expo tokens) | ⏸ CREDENTIAL REQUIRED |
+| Maps | ✅ OSM/Leaflet (Google optional via key) |

@@ -285,7 +285,7 @@ export async function sendMessage(senderId, { channelId, recipientId, message, i
     const staff = await query(`select id from users where role in ('super_admin','admin','ops_manager','support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor') and status = 'active'`);
     for (const s of staff.rows) {
       await query(
-        `insert into notifications (user_id, type, title, message, data)
+        `insert into notifications (user_id, type, title, body, data)
          values ($1, 'emergency_alert', 'EMERGENCY ALERT', $2, $3::jsonb)`,
         [s.id, message.substring(0, 500), JSON.stringify({ senderId, messageId: result.rows[0].id })],
       );
@@ -395,7 +395,7 @@ export async function toggleEmergencyControl(control, action, reason, initiatedB
   const staff = await query(`select id from users where role in ('super_admin','admin','ops_manager','support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor') and status = 'active'`);
   for (const s of staff.rows) {
     await query(
-      `insert into notifications (user_id, type, title, message, data)
+      `insert into notifications (user_id, type, title, body, data)
        values ($1, 'emergency_control', $2, $3, $4::jsonb)`,
       [s.id, `EMERGENCY: ${config.label} ${enable ? 'ACTIVATED' : 'DEACTIVATED'}`,
        `Control: ${config.label}\nAction: ${enable ? 'Enabled' : 'Disabled'}\nReason: ${reason || 'No reason provided'}\nBy: Staff ID ${initiatedBy}`,

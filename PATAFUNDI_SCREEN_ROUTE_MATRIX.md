@@ -1,108 +1,100 @@
-# PataFundi Screen and Route Matrix
+# PataFundi — Screen & Route Matrix
 
-Source: [src/routes/AppRoutes.tsx](src/routes/AppRoutes.tsx)
+Frontend is a Vite + React SPA (react-router v6). API is Express under `/api/*`.
+All screens render responsively (360→1920px); app surfaces add mobile bottom navigation.
 
-## Public / customer-facing routes
+Legend: 🔒 = guarded (server-enforced behind the guard) · 🌐 public · 📱 mobile bottom-nav
 
-| Route | Purpose | UI status | Auth status | Evidence level |
-|---|---|---:|---:|---:|
-| `/` | Landing / home | Present | Public | Code-level only |
-| `/auth` | Auth entry | Present | Public | Code-level only |
-| `/maintenance` | Maintenance page | Present | Public | Code-level only |
-| `/status` | Status page | Present | Public | Code-level only |
-| `/demo` | Demo credentials page | Present | DEV-only | Code-level only |
-| `/register/customer` | Customer sign-up | Present | Public | Code-level only |
-| `/register/fundi` | Fundi registration | Present | Public | Code-level only |
-| `/dashboard` | Customer dashboard | Present | Protected customer | Code-level only |
-| `/create-job` | Create service request | Present | Protected customer | Code-level only |
-| `/job/:jobId/tracking` | Job tracking | Present | Protected customer | Code-level only |
-| `/settings` | User settings | Present | Protected customer | Code-level only |
-| `/disputes` | Dispute center | Present | Protected customer | Code-level only |
-| `/services/:slug` | Service detail page | Present | Public | Code-level only |
-| `/customers` | Customer marketing page | Present | Public | Code-level only |
-| `/fundis` | Fundi marketplace page | Present | Public | Code-level only |
-| `/companies` | Company marketplace page | Present | Public | Code-level only |
-| `/about` | About page | Present | Public | Code-level only |
-| `/careers` | Careers page | Present | Public | Code-level only |
-| `/blog` | Blog index | Present | Public | Code-level only |
-| `/blog/:slug` | Blog post | Present | Public | Code-level only |
-| `/press` | Press page | Present | Public | Code-level only |
-| `/how-it-works` | How it works | Present | Public | Code-level only |
-| `/trust-safety` | Trust & safety | Present | Public | Code-level only |
-| `/investors` | Investors page | Present | Public | Code-level only |
-| `/contact` | Contact page | Present | Public | Code-level only |
-| `/help` | Help center | Present | Public | Code-level only |
-| `/safety-guidelines` | Safety guidelines | Present | Public | Code-level only |
-| `/contact-support` | Support contact | Present | Public | Code-level only |
-| `/report-problem` | Report issue | Present | Public | Code-level only |
-| `/socials` | Social links | Present | Public | Code-level only |
-| Policy routes | Privacy, terms, cookies, refund policy, platform rules, etc. | Present | Public | Code-level only |
+## Public website
+| Route | Screen | Data |
+|---|---|---|
+| `/` | Landing (hero, services, providers, business, trust) | live testimonials |
+| `/services/:slug` | Service marketing + fundi list | `GET /services/:slug` |
+| `/companies` | **Company directory (real data)** 📱 | `GET /api/companies` |
+| `/companies/:id` | **Company profile — customer-safe + booking** | `GET /api/companies/:id` |
+| `/partner-program` | **Partner With PataFundi application (4-step)** | `POST /api/company/applications` |
+| `/demo/company` | → redirects to `/companies` | — |
+| `/how-it-works /about /careers /blog /press /trust-safety /investors /contact /help /safety-guidelines /contact-support /report-problem /socials` | content pages (Careers/Blog/Help fetch API) | various |
+| `/privacy /terms /cookies /refund-policy /platform-rules /enforcement /policies/:slug` | policy pages | `GET /policies/:slug` |
 
-## Fundi routes
+## Auth
+| Route | Screen | Notes |
+|---|---|---|
+| `/auth` `/register/customer` | Login / signup + OTP / forgot password | role-aware redirect after login: admin→`/admin`, fundi→`/fundi`, `company_admin`→`/company`, company members→`/company` (technicians→`/technician`), else `/dashboard` |
+| `/register/fundi` | Fundi onboarding (docs upload) | `POST /auth/register/fundi` |
+| `/demo` | One-click demo login (dev-only) | all takeover + legacy accounts |
 
-| Route | Purpose | UI status | Auth status | Evidence level |
-|---|---|---:|---:|---:|
-| `/fundi/register` | Redirect to register | Present | Public | Code-level only |
-| `/fundi/pending` | Pending approval | Present | Protected fundi | Code-level only |
-| `/fundi` | Fundi dashboard | Present | Protected fundi | Code-level only |
-| `/fundi/job/:jobId` | Fundi job detail | Present | Protected fundi | Code-level only |
-| `/fundi/job/active` | Active job | Present | Protected fundi | Code-level only |
-| `/fundi/wallet` | Wallet / payouts | Present | Protected fundi | Code-level only |
-| `/fundi/disputes` | Fundi dispute center | Present | Protected fundi | Code-level only |
-| `/fundi/resources` | Resources | Present | Protected fundi | Code-level only |
-| `/fundi/app` | Fundi app shell/page | Present | Protected fundi | Code-level only |
+## Customer app
+| Route | Screen | Data |
+|---|---|---|
+| `/dashboard` | Customer home: active/completed jobs, cancel, refer & earn | `GET /users/me`, `GET /jobs` |
+| `/create-job` | 4-step booking wizard (property, photos, emergency, schedule) | `POST /jobs` (+propertyId/companyId) |
+| `/job/:jobId/tracking` | Live tracking, payment (STK/dev provider), OTP confirm, review | sockets + polling |
+| `/settings` | Profile, password, saved places, deletion | `PUT /users/me` |
+| `/disputes` | Disputes center | `/disputes` |
 
-## Admin routes
+## Fundi app (individual professionals)
+| Route | Screen |
+|---|---|
+| `/fundi` | Dashboard: online toggle, GPS stream, job requests, subscription |
+| `/fundi/job/:jobId` `/fundi/job/active` | Job execution: check-in, complete + photos |
+| `/fundi/wallet` | Balance, transactions, withdrawals |
+| `/fundi/pending` `/fundi/resources` `/fundi/app` | onboarding status / resources / app funnel |
 
-| Route | Purpose | UI status | Auth status | Evidence level |
-|---|---|---:|---:|---:|
-| `/admin/login` | Admin login | Present | Public | Code-level only |
-| `/admin` | Redirect | Present | Public | Code-level only |
-| `/admin/dashboard` | Admin dashboard | Present | Protected admin | Code-level only |
-| `/admin/fundis` | Fundi verification | Present | Protected admin | Code-level only |
-| `/admin/customers` | Customer management | Present | Protected admin | Code-level only |
-| `/admin/jobs` | Job management | Present | Protected admin | Code-level only |
-| `/admin/payments` | Payments | Present | Protected admin | Code-level only |
-| `/admin/security` | Security | Present | Protected admin | Code-level only |
-| `/admin/reports` | Reports & analytics | Present | Protected admin | Code-level only |
-| `/admin/settings` | Admin settings | Present | Protected admin | Code-level only |
-| `/admin/audit-logs` | Audit logs | Present | Protected admin | Code-level only |
-| `/admin/disputes` | Admin dispute management | Present | Protected admin | Code-level only |
+## Company portal 🔒 📱 (`requireCompanyMember` per request)
+| Route | Screen | Backend |
+|---|---|---|
+| `/company` | Dashboard — real stats + recent jobs | `GET /company/portal/overview` |
+| `/company/jobs` | Dispatch board: Incoming / Dispatch / Open pool / Active / To confirm / Completed; accept, reject, quote, assign/unassign technician | `/company/portal/jobs`, `/company/portal/open-pool`, `/company/jobs/:id/*` |
+| `/company/team` | Team CRUD: roles, availability, suspend, temp-password invite | `/company/portal/team` |
+| `/company/services` | Service catalog CRUD (customer-safe) | `/company/portal/services` |
+| `/company/schedule` | Scheduled jobs + technician availability/workload | `GET /company/portal/schedule` |
+| `/company/quality` | Ratings, reviews, aggregates | `GET /company/portal/reviews` |
+| `/company/finance` | Earnings, settlements (owner/finance only) | `GET /company/portal/finance` |
+| `/company/settings` | Business profile, areas, branches, availability | `GET|PUT /company/portal/profile` |
 
-## Staff routes
+## Technician experience 🔒 📱
+| Route | Screen | Backend |
+|---|---|---|
+| `/technician` | My jobs only: on the way → arrived → start work, navigation, no finance/company admin | `GET /company/technician/assignments`, `PATCH /jobs/:id/status` |
 
-| Route | Purpose | UI status | Auth status | Evidence level |
-|---|---|---:|---:|---:|
-| `/staff/login` | Staff login | Present | Public | Code-level only |
-| `/staff` | Staff layout + overview | Present | Staff-scoped | Code-level only |
-| `/staff/executive` | Executive dashboard | Present | Staff-scoped | Code-level only |
-| `/staff/ai` | AI command center | Present | Staff-scoped | Code-level only |
-| `/staff/security` | Security center | Present | Staff-scoped | Code-level only |
-| `/staff/system` | System settings | Present | Staff-scoped | Code-level only |
-| `/staff/staff-mgmt` | Staff management | Present | Staff-scoped | Code-level only |
-| `/staff/commission` | Commission control | Present | Staff-scoped | Code-level only |
-| `/staff/operations` | Live operations | Present | Staff-scoped | Code-level only |
-| `/staff/dispatch` | Dispatch view | Present | Staff-scoped | Code-level only |
-| `/staff/support` | Support dashboard | Present | Staff-scoped | Code-level only |
-| `/staff/fraud` | Fraud view | Present | Staff-scoped | Code-level only |
-| `/staff/finance` | Finance dashboard | Present | Staff-scoped | Code-level only |
-| `/staff/devops` | DevOps view | Present | Staff-scoped | Code-level only |
-| `/staff/audit` | Audit logs | Present | Staff-scoped | Code-level only |
-| `/staff/admin` | Admin management view | Present | Staff-scoped | Code-level only |
-| `/staff/admin/fundis` | Fundi management | Present | Staff-scoped | Code-level only |
-| `/staff/admin/jobs` | Job management | Present | Staff-scoped | Code-level only |
-| `/staff/admin/users` | User activity | Present | Staff-scoped | Code-level only |
+## Staff portal 🔒 (`/staff` — permission-filtered nav + server RBAC)
+| Route | Screen |
+|---|---|
+| `/staff/login` | Staff-only login |
+| `/staff` `/staff/admin` | **Role-specific dashboards** (ops / dispatch / finance / fraud / audit / devops / support) |
+| `/staff/dispatch` | Active jobs, online fundis, emergencies |
+| `/staff/finance` `/staff/finance/revenue` | Payments, escrow, payouts |
+| `/staff/fraud` | Alerts + risk signals |
+| `/staff/audit` | Audit trail (read-only) |
+| `/staff/devops` | System health + integrations |
+| `/staff/support` `/staff/support/disputes` | Disputes & tickets |
+| `/staff/operations` `/staff/admin/fundis` `/staff/admin/jobs` `/staff/admin/users` | Live ops + data tables |
+| `/staff/executive` `/staff/ai` `/staff/staff-mgmt` `/staff/commission` `/staff/security` `/staff/system` | super_admin surfaces |
 
-## Screen-level assessment
+## Super admin 🔒 (`/admin` — `ProtectedAdminRoute` + server `requireRole('admin')`)
+| Route | Screen |
+|---|---|
+| `/admin/login` `/admin/dashboard` | login, stats + charts |
+| `/admin/fundis` `/admin/customers` `/admin/jobs` | verification, block/unblock, job inspection |
+| `/admin/payments` | transactions + escrow queue actions |
+| **`/admin/companies`** | **application review (approve/reject/review) + company suspend/reactivate** |
+| `/admin/disputes` `/admin/security` `/admin/reports` `/admin/settings` `/admin/audit-logs` | dispute resolution, fraud center, analytics, platform settings, audit trail |
 
-- Route inventory is broad and well-defined.
-- The application has a large number of screens and pages declared in code.
-- No automated browser proof exists here that all screens render without console/runtime faults.
-- This means the route matrix is a code inventory, not a fully-evidenced production QA matrix.
-
-## Overall route confidence
-
-- Code presence: strong
-- Route wiring: strong
-- Browser runtime proof: not yet complete
-- Authorization proof: partial backend evidence only
+## Backend API surface (additions in this takeover)
+```
+GET    /api/companies                      public directory (customer-safe)
+GET    /api/companies/:id                  public profile (customer-safe)
+POST   /api/company/applications           partner application
+GET    /api/company/applications/me
+POST   /api/company/applications/:id/review|approve|submit
+GET    /company/portal/overview|profile|services|team|jobs|open-pool|schedule|reviews|finance
+PUT    /company/portal/profile
+POST   /company/portal/services  · PATCH|DELETE /:serviceId
+POST   /company/portal/team      · PATCH|DELETE /:memberId
+POST   /company/jobs/:jobId/claim|accept|reject|quote|assign-technician|unassign-technician
+GET    /company/technician/assignments?scope=
+POST   /jobs/:id/quote/decision            customer quote approve/reject
+GET|POST|PATCH|DELETE /api/properties       multi-property book
+GET    /admin/company-applications · /admin/companies · POST /admin/companies/:id/action
+```

@@ -487,7 +487,7 @@ export async function processJobCompletionForReferral(jobId, customerId, jobValu
 
   // 9. Create a notification for the referrer
   await query(
-    `insert into notifications (user_id, type, title, message, data)
+    `insert into notifications (user_id, type, title, body, data)
      values ($1, 'referral_voucher_earned',
        'Referral reward earned! 🎁',
        'You earned a ${referral.discount_percentage}% discount voucher for referring a friend. Use it on your next job!',

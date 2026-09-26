@@ -1,82 +1,113 @@
-# PataFundi — ZAI Takeover Audit
+# PataFundi — ZAI Takeover Audit (FINAL)
 
-**Date:** 2026-09-26
-**Auditor:** Super Z (Z.ai) full takeover agent
-**Workspace:** `/home/z/my-project`
+**Date:** 2026-09-26 · **Agent:** Super Z (Z.ai) full takeover
+**Repo:** `Evian1k/Patafundi-9bhsw1` (main branch)
 
 ---
 
-## 1. Workspace Findings
+## 1. What existed (verified before any change)
 
-The takeover brief describes an existing PataFundi codebase "already worked on by other AI coding agents."
-The physical workspace was audited before any changes were made.
+The initial brief assumed an empty sandbox; the real repository was provided
+afterwards and cloned. Audit of the cloned codebase found a substantial system
+built by previous agents:
 
-| Area | Finding |
+- **Backend:** Express 5, 365+ API routes, 32 SQL migrations (~116 tables),
+  JWT auth + OTP + RBAC (94 permissions), geo-matching engine, M-Pesa/escrow
+  framework, fraud service, referrals, staff RBAC, socket.io, test suite.
+- **Frontend:** Vite + React SPA (176 files): landing, customer app, fundi app,
+  admin console, staff console.
+- **Apps:** Expo mobile (customer + fundi) — not runnable in this sandbox.
+- **Docs:** extensive prior audit reports (incl. a brutally honest one).
+
+## 2. Confirmed defects found (reproduced, not assumed)
+
+1. Company dispatch crashed (`jobs.status='assigned'` violated CHECK).
+2. Scheduled job creation crashed (`status='scheduled'` illegal).
+3. Escrow auto-release **always rolled back** (illegal status + missing
+   `fundi_wallets`/`wallet_transactions` tables) — fundis were never credited
+   automatically.
+4. Admin refunds impossible (`payments.status='refunded'` illegal).
+5. **IDOR:** company portal overview returned full data to any authenticated
+   user (`canAccess` computed but never enforced).
+6. Client-trusted money: `acceptJob` took client `estimatedPrice`;
+   `completeJob` took uncapped client `finalPrice`.
+7. No way to add company technicians (no member endpoints at all).
+8. Company frontend = one static marketing page; portal 0% implemented.
+9. Staff dashboards for dispatch/finance/fraud/audit/devops/support rendered a
+   generic placeholder page.
+10. Dead `/partner-program` link; duplicate routes; admin endpoint drift.
+11. `notifications.message` column writes in 3 services (column is `body`).
+12. Commission inconsistencies (0.10 default vs 0.15 fallback; `platform_fee`
+    vs `platform_commission`).
+
+## 3. What was fixed
+(items 1–7, 10–12 above — details in `PATAFUNDI_ROLE_SECURITY_AUDIT.md` §4)
+
+## 4. What was added
+- **Migration 033:** lifecycle extension (`offered/assigned/scheduled/
+  completion_requested`), refund states, wallet tables, `company_services`,
+  `company_settlements`, `customer_properties`, company storefront columns,
+  extended roles, `provider_type`.
+- **Backend:** `settlementService` (single authoritative escrow-release path),
+  `requireCompanyMember` + `companyAccess` middleware, `workerAccess`
+  (company technicians), full company portal API (~30 endpoints), public
+  company directory + customer-safe projections, open job pool, quote
+  decision endpoint, job state machine, dev payment provider (labelled),
+  admin company management.
+- **Frontend:** Partner Program page, company directory + profile (booking),
+  complete Company Portal (8 sections, sidebar + mobile bottom nav),
+  Technician app, staff role-specific dashboards, admin Companies page,
+  role-aware login routing, emerald design-system pass, demo page accounts.
+- **Seed:** 12+ demo accounts (`@patafundi.test`, unified dev password) +
+  Apex Home Services Ltd with lifecycle data.
+- **Tests:** rewritten company suite (isolation + dispatch success) and a
+  39-check E2E journey script.
+
+## 5. What was redesigned
+Staff portal role dashboards (real data per role), Super Admin companies
+surface, company discovery (static page → real marketplace directory), overall
+primary palette to the dark/emerald identity while preserving each app's
+information architecture.
+
+## 6. What was tested — and passed
+- `npm test`: **82/82** (unit + integration incl. rewritten company suite)
+- `node scripts/patafundi-e2e.mjs`: **39/39** (full money journey + security)
+- Agent Browser: landing, directory, profile, partner form, company login →
+  portal (dashboard/finance/dispatch), technician app, customer dashboard,
+  mobile 390px layout — all verified working.
+- Typecheck: frontend `tsc --noEmit` clean.
+
+## 7. What failed / was blocked
+- **Real PostgreSQL:** no server in sandbox → runs on embedded PGlite (real
+  PostgreSQL semantics, single-process). Portable via `DATABASE_URL`.
+  → CREDENTIAL REQUIRED
+- **M-Pesa production:** credentials absent → dev payment provider used in
+  sandbox (clearly labelled; production requires `MPESA_CONSUMER_KEY/SECRET`).
+  → CREDENTIAL REQUIRED
+- **Email/SMS/push:** no provider credentials → in-app + realtime only.
+  → CREDENTIAL REQUIRED
+- **Expo mobile apps:** cannot run/build in this sandbox (no Android/iOS
+  toolchain); code preserved untouched.
+
+## 8. Remaining work (honest)
+- Point `DATABASE_URL` at hosted PostgreSQL for multi-user production.
+- Provide Daraja credentials and re-verify webhook against sandbox.
+- One-tap rebooking button (history exists; wizard re-use is manual).
+- Realtime company-wide rooms (currently owner-notified).
+- Stripe adapter implementation.
+- Mobile apps require EAS build outside sandbox.
+
+## 9. Acceptance criteria — status
+| Criterion | Status |
 |---|---|
-| Git history | 1 commit only (`61a02f6 Initial commit`) — contains only `.env` + `.gitignore` |
-| Existing PataFundi source | **NONE FOUND** — no frontend, no backend, no migrations, no routes, no components |
-| `package.json` | Fresh Next.js 16 + TypeScript scaffold installed by the sandbox initializer |
-| Database | No PataFundi schema, no migrations, no data. `DATABASE_URL=file:/home/z/my-project/db/custom.db` (SQLite) |
-| Upload directory | Empty |
-| Git remote | **Not configured** |
-| Working PataFundi functionality to preserve | **Nothing to preserve** — there was no prior implementation in this workspace |
-
-### Conclusion
-There is no prior PataFundi implementation to preserve, fix, or migrate in this workspace.
-Any claim that "existing code was repaired" would be false. The correct engineering response —
-and the one taken — is documented below.
-
-## 2. Decision
-
-Build the **complete PataFundi platform from scratch, to the takeover specification**, as a
-single connected ecosystem rather than isolated mock apps:
-
-- One platform core (DB + Auth + RBAC + Jobs + Matching + Money + Notifications + Audit)
-- Server-authoritative money calculations
-- Server-side authorization on every sensitive action
-- Company (organization) isolation enforced at the API layer
-- Full role matrix (Customer / Fundi / Company Owner-Dispatcher-Supervisor-Finance / Technician /
-  Staff Ops-Support-Dispatch-Finance-Fraud-DevOps-Auditor / Super Admin)
-- Demo seed ecosystem (12 demo accounts + "Apex Home Services Ltd" demo company)
-
-## 3. Platform Constraints Found (honest disclosure)
-
-| Constraint | Impact | Status |
-|---|---|---|
-| Sandbox exposes **one port (3000)** and one user-visible route (`/`) | Role apps are delivered as a single Next.js App Router page (role-aware SPA) + `/api/*` backend routes | HANDLED |
-| No PostgreSQL server in sandbox; Prisma datasource is **SQLite** (`file:./db/custom.db`) | Schema is written portable (no SQLite-only hacks) so it can be pointed at PostgreSQL by changing `provider = "postgresql"` + `DATABASE_URL`. Active mode is reported honestly: **SQLite local file** | REPORTED |
-| No M-Pesa / Stripe / SMS / email credentials in environment | Payments run through a **development payment provider adapter** (clearly labelled, server-side state machine). Real providers are adapter-ready and marked `CREDENTIAL REQUIRED` | REPORTED |
-| Sandbox blocks outbound SMTP/push | Notifications stored in DB + delivered in-app + over socket.io realtime | REPORTED |
-| Single sign-in surface | JWT (jose) in httpOnly cookie; RBAC enforced **server-side** in every API route | HANDLED |
-
-## 4. External Integration Matrix (initial)
-
-| Integration | Status |
-|---|---|
-| PostgreSQL | CREDENTIAL REQUIRED (sandbox ships SQLite; portable schema ready) |
-| M-Pesa | NOT IMPLEMENTED — adapter interface defined, CREDENTIAL REQUIRED |
-| Stripe | NOT IMPLEMENTED — adapter interface defined, CREDENTIAL REQUIRED |
-| Maps / geocoding | SIMPLIFIED (distance model on lat/lng, no external tiles) |
-| Email / SMS | NOT IMPLEMENTED — CREDENTIAL REQUIRED (in-app + realtime notifications work) |
-| Push | NOT IMPLEMENTED — CREDENTIAL REQUIRED |
-| File storage | LOCAL DISK (public job photos) + private flag honoured for documents |
-| AI assistant | IMPLEMENTED via z-ai-web-dev-sdk (server-side only), advisory-only, no money/auth powers |
-| Monitoring | /api/health + staff devops system-health view (DB, API, integrations status) |
-
-## 5. Takeover Plan (phases executed)
-
-1. Audit (this document)
-2. Foundations: Prisma schema, core libs (auth/RBAC/money/audit/matching)
-3. Authentication + RBAC
-4. Customer + Fundi flows
-5. Company ecosystem (application → approval → portal → dispatch → technician)
-6. Staff portal + Super Admin
-7. Money flow (escrow-style hold → confirmation → settlement → payout → audit)
-8. Notifications + realtime + files
-9. UI/UX upgrade + responsive layouts (360→1920px)
-10. Demo accounts + demo company seed
-11. E2E testing (browser + API + security)
-12. Bug fixing
-13. Final verification + documentation + GitHub push
-
-Result of each phase is recorded in the companion documents listed in `README.md`.
+| Customer discovers/books Fundis AND Companies | ✅ |
+| Company joins → verified → manages business/team → receives jobs → dispatches | ✅ |
+| Technician performs assigned jobs (scoped view) | ✅ |
+| Customer tracks, communicates, approves quotes, confirms completion | ✅ |
+| Payment processed through escrow architecture (dev provider; adapter ready) | ✅ / ⏸ |
+| Fundi earnings + company settlements visible & server-authoritative | ✅ |
+| Staff operate authorized workflows per role | ✅ |
+| Super Admin manages platform incl. companies | ✅ |
+| Roles isolated (403s tested) | ✅ |
+| Important actions audited | ✅ |
+| Major screens/routes work + responsive | ✅ (browser-verified) |

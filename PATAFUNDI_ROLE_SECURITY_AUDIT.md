@@ -1,64 +1,79 @@
-# PataFundi Role and Security Audit
+# PataFundi — Role & Security Audit (ZAI Takeover)
 
-## Role model reviewed
+**Scope:** server-side authorization for every sensitive action, tenant isolation, money-flow integrity.
+**Method:** code inspection + automated tests (`npm test`, `scripts/patafundi-e2e.mjs`) + manual probing.
 
-The backend and route guards implement multiple personas, including:
+---
 
-- customer
-- fundi
-- fundi_pending
-- super_admin
-- admin
-- support_agent
-- fraud_analyst
-- finance_team
-- dispatch_team
-- devops_engineer
-- auditor
+## 1. Role matrix (server-enforced)
 
-The route guards in [src/routes/guards.tsx](src/routes/guards.tsx) define the client-side restriction logic. The backend RBAC logic in [backend/src/middleware/rbac.js](backend/src/middleware/rbac.js) and [backend/src/middleware/auth.js](backend/src/middleware/auth.js) governs the real server-side authorization layer.
+`users.role` (DB CHECK): `customer, fundi, fundi_pending, admin, super_admin,
+company_admin, ops_manager, support_agent, fraud_analyst, finance_team,
+dispatch_team, devops_engineer, auditor`
 
-## Verified role behaviors
+Company member roles (`company_members.role`, separate namespace):
+`owner, manager, admin, dispatcher, finance, technician`
 
-### Customer access
+| Surface | Who gets in | Enforcement |
+|---|---|---|
+| Customer app | any authed customer | `authRequired` |
+| Fundi execution endpoints | approved fundis **or** active company technicians | `requireApprovedFundi` / `requireApprovedWorker` |
+| Company portal (`/company/*`) | active members of THAT company only | `requireCompanyMember` middleware (resolves membership per request; staff bypass limited to `super_admin/admin`) |
+| Company finance | `owner/finance` member roles only | `COMPANY_FINANCE_ROLES` check inside `portalFinance` |
+| Dispatch actions | `owner/manager/admin/dispatcher` | `COMPANY_DISPATCH_ROLES` |
+| Profile/team/services writes | `owner/manager/admin` | `COMPANY_ADMIN_ROLES` |
+| Staff portal (`/staff/*`) | staff roles; per-permission nav + server `requirePermission` | `requireStaff()` + permission middleware |
+| Admin (`/admin/*`) | `admin/super_admin` via `requireRole('admin')` | route-level |
+| Public directory (`/companies*`) | anonymous OK | customer-safe projection only |
 
-- Customer access to protected permissions is denied in tests.
-- This was verified through the backend suite.
+## 2. Company (tenant) isolation — verified
 
-### Super admin access
+- `requireCompanyMember` re-resolves membership on **every** request; suspended members rejected.
+- Cross-company access attempts return **403** (unit test + E2E + the rewritten
+  `company-partnership.test.js` that the old suite never truly asserted).
+- Job access (`canAccessJob`) now includes company membership + assigned technician — previously customers/fundis only.
+- `getCompanyPortalOverview` no longer leaks: it used to return full data to any
+  authenticated user (`canAccess` computed but ignored). Fixed and tested.
+- Public profile endpoints project **only** customer-safe fields
+  (`publicCompanyProfile`): no settlements, commission, payroll, internal notes.
 
-- Super admin remains authorized where required by permission checks.
-- Verified by test evidence.
+## 3. Money-flow integrity (server-authoritative)
 
-### Role separation
+| Control | Status |
+|---|---|
+| Payment amount must match server-side job value (±0.01) | ✅ (pre-existing, verified) |
+| Commission split computed server-side (`financeService.calculateCommission`) | ✅ |
+| Provider-suggested final price **clamped to ±25% of estimate** (tamper test: 99,000 on a 4,000 job → clamped) | ✅ NEW |
+| Fundi quote revision >25% parks job as `offered` until customer approves (`decideQuote`) | ✅ NEW |
+| Escrow release only after `completed` + customer OTP confirm + no open dispute | ✅ |
+| Settlement rows written in one transaction (`settlementService.releaseJobEscrow`) | ✅ NEW |
+| Refund voids pending settlements, debits wallet atomically | ✅ FIXED (was rejected by CHECK constraint) |
+| Payout min/trust-score/fraud-freeze validations | ✅ (pre-existing) |
 
-The app is designed to separate staff roles and prevent open inheritance from a single broad role. This is present in code and tested for permission logic.
+## 4. Fixed vulnerabilities (takeover)
 
-## Security status
+1. **IDOR** — company overview returned full data to any authed user → now membership-enforced (403).
+2. **Money tampering** — `acceptJob` trusted client `estimatedPrice`; `completeJob` trusted `finalPrice` → both now guarded/clamped server-side.
+3. **Escrow release never worked** — illegal `escrow_transactions.status='completed'` + missing wallet tables → repaired via migration 033 + settlement service.
+4. **Refunds impossible** — `payments.status='refunded'` violated CHECK → CHECK extended.
+5. **Dispatch crashed** — `jobs.status='assigned'` violated CHECK → lifecycle extended; success path now under test.
+6. **Arbitrary job status jumps** — added a transition state machine (invalid jumps → 400).
+7. **Company members unaddable** — no invite endpoint existed → team CRUD added (temp-password provisioning).
+8. **CORS on sandbox origin** — frontend origin misconfigured for the single-port proxy → fixed (`FRONTEND_ORIGIN`, `CORS_ORIGINS`).
+9. **Notification writes to non-existent `message` column** in 3 services → aligned to `body`.
+10. **Demo credentials in prod** — takeover seed hard-refuses production (belt-and-braces with the existing guard).
 
-### Verified
+## 5. Audit logging
 
-- JWT signing and verification logic works in the tested path.
-- Invalid signatures fail as expected.
-- Protected permissions are enforced.
-- Company ownership isolation checks are implemented and passed.
-- Notifications are scoped to the correct user.
-- Financial math is protected from direct unauthorized changes in the tested logic.
+`audit_logs` written for: company application create/review/approve, company
+profile update, member add/update/remove, job claim/accept/reject/quote/
+assign/unassign, escrow release (with source + amounts), refunds, admin
+company suspend/reactivate, payment initiation (+dev simulation labelled).
 
-### Not fully proven
+## 6. Known limitations (honest)
 
-- Direct browser role takeover attempts were not executed in a live app session.
-- No real credentialed staff/admin login session was exercised through the UI.
-- No real API misuse attempts across tenant boundaries were executed in a browser context.
-- No cross-account direct route access validation was performed with live credentials.
-
-## Access control assessment
-
-- Backend security posture: strong in tested logic
-- Client-side route gating: present, but not a substitute for server-side enforcement
-- Full tenant-isolation proof: partial
-- Full role escalation / impersonation proof: not complete
-
-## Final security conclusion
-
-The repository has real backend authorization checks and tests, which is materially better than a purely UI-only app. However, full end-to-end role and security proof across all live app surfaces was not completed in this environment.
+- Realtime notification rooms are per-user and per-job; company-wide fan-out
+  notifies the owner user (not a group room) — acceptable at current scale.
+- `refresh_tokens` rotation exists; device/session revocation UI is staff-only.
+- 2FA exists for staff; company-member accounts inherit customer-grade auth
+  (password + OTP email verification) — recommend enabling 2FA for finance roles.

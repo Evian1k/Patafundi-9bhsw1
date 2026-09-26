@@ -97,7 +97,7 @@ export async function logErrorAndNotifyStaff({
     for (const staff of staffResult.rows) {
       try {
         await query(
-          `insert into notifications (user_id, type, title, message, data)
+          `insert into notifications (user_id, type, title, body, data)
            values ($1, 'error_alert', $2, $3, $4::jsonb)`,
           [
             staff.id,

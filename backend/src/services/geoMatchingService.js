@@ -352,7 +352,7 @@ export async function createInternationalBookingRequest(customerId, data) {
     );
     for (const s of supportStaff.rows) {
       await query(
-        `insert into notifications (user_id, type, title, message, data)
+        `insert into notifications (user_id, type, title, body, data)
          values ($1, 'international_booking', 'International Booking Request',
          $2, $3::jsonb)`,
         [s.id, `Customer requested international service to ${data.destinationCountry || 'unknown'}, ${data.destinationCity || 'unknown'}`,
