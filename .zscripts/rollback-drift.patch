@@ -1,0 +1,684 @@
+diff --git a/.gitignore b/.gitignore
+old mode 100644
+new mode 100755
+diff --git a/.zscripts/dev.pid b/.zscripts/dev.pid
+old mode 100644
+new mode 100755
+diff --git a/Caddyfile b/Caddyfile
+old mode 100644
+new mode 100755
+diff --git a/DEMO_ACCOUNTS.md b/DEMO_ACCOUNTS.md
+old mode 100644
+new mode 100755
+diff --git a/Dockerfile.backend b/Dockerfile.backend
+old mode 100644
+new mode 100755
+diff --git a/Dockerfile.frontend b/Dockerfile.frontend
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_COMPANY_ECOSYSTEM.md b/PATAFUNDI_COMPANY_ECOSYSTEM.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_COMPLETE_SYSTEM_SPEC.md b/PATAFUNDI_COMPLETE_SYSTEM_SPEC.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_E2E_TEST_REPORT.md b/PATAFUNDI_E2E_TEST_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_FEATURE_MATRIX.md b/PATAFUNDI_FEATURE_MATRIX.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_ROLE_SECURITY_AUDIT.md b/PATAFUNDI_ROLE_SECURITY_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_SCREEN_ROUTE_MATRIX.md b/PATAFUNDI_SCREEN_ROUTE_MATRIX.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_TEST_REPORT.md b/PATAFUNDI_TEST_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/PATAFUNDI_ZAI_TAKEOVER_AUDIT.md b/PATAFUNDI_ZAI_TAKEOVER_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/.gitignore b/apps/customer-mobile/.gitignore
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/app.json b/apps/customer-mobile/app.json
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/babel.config.js b/apps/customer-mobile/babel.config.js
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/eas.json b/apps/customer-mobile/eas.json
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/expo-entrypoint.js b/apps/customer-mobile/expo-entrypoint.js
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/metro.config.js b/apps/customer-mobile/metro.config.js
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/package.json b/apps/customer-mobile/package.json
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/App.tsx b/apps/customer-mobile/src/App.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/linking.ts b/apps/customer-mobile/src/linking.ts
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/navigation/AuthNavigator.tsx b/apps/customer-mobile/src/navigation/AuthNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/navigation/MainNavigator.tsx b/apps/customer-mobile/src/navigation/MainNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/navigation/RootNavigator.tsx b/apps/customer-mobile/src/navigation/RootNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/AboutScreen.tsx b/apps/customer-mobile/src/screens/AboutScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/AccountSuspendedScreen.tsx b/apps/customer-mobile/src/screens/AccountSuspendedScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/AppUpdateRequiredScreen.tsx b/apps/customer-mobile/src/screens/AppUpdateRequiredScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/AppealScreen.tsx b/apps/customer-mobile/src/screens/AppealScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ChatScreen.tsx b/apps/customer-mobile/src/screens/ChatScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/CreateDisputeScreen.tsx b/apps/customer-mobile/src/screens/CreateDisputeScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/CreateJobScreen.tsx b/apps/customer-mobile/src/screens/CreateJobScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/DisputesScreen.tsx b/apps/customer-mobile/src/screens/DisputesScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/EditProfileScreen.tsx b/apps/customer-mobile/src/screens/EditProfileScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/EmergencySosScreen.tsx b/apps/customer-mobile/src/screens/EmergencySosScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ErrorScreen.tsx b/apps/customer-mobile/src/screens/ErrorScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/FavoritesScreen.tsx b/apps/customer-mobile/src/screens/FavoritesScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ForgotPasswordScreen.tsx b/apps/customer-mobile/src/screens/ForgotPasswordScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/HelpCenterScreen.tsx b/apps/customer-mobile/src/screens/HelpCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/HomeScreen.tsx b/apps/customer-mobile/src/screens/HomeScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/JobTrackingScreen.tsx b/apps/customer-mobile/src/screens/JobTrackingScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/JobsScreen.tsx b/apps/customer-mobile/src/screens/JobsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/LoginScreen.tsx b/apps/customer-mobile/src/screens/LoginScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/LoyaltyProgramScreen.tsx b/apps/customer-mobile/src/screens/LoyaltyProgramScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/MaintenanceModeScreen.tsx b/apps/customer-mobile/src/screens/MaintenanceModeScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/NoInternetScreen.tsx b/apps/customer-mobile/src/screens/NoInternetScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/NotificationsScreen.tsx b/apps/customer-mobile/src/screens/NotificationsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/OnboardingScreen.tsx b/apps/customer-mobile/src/screens/OnboardingScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/OtpScreen.tsx b/apps/customer-mobile/src/screens/OtpScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/PaymentProtectionScreen.tsx b/apps/customer-mobile/src/screens/PaymentProtectionScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/PricingExplainedScreen.tsx b/apps/customer-mobile/src/screens/PricingExplainedScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ProfileScreen.tsx b/apps/customer-mobile/src/screens/ProfileScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ReferEarnScreen.tsx b/apps/customer-mobile/src/screens/ReferEarnScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ReferralProgramScreen.tsx b/apps/customer-mobile/src/screens/ReferralProgramScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/RegisterScreen.tsx b/apps/customer-mobile/src/screens/RegisterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ReleaseNotesScreen.tsx b/apps/customer-mobile/src/screens/ReleaseNotesScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/ReviewScreen.tsx b/apps/customer-mobile/src/screens/ReviewScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/SafetyPromiseScreen.tsx b/apps/customer-mobile/src/screens/SafetyPromiseScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/SavedPlacesScreen.tsx b/apps/customer-mobile/src/screens/SavedPlacesScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/SecurityCenterScreen.tsx b/apps/customer-mobile/src/screens/SecurityCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/SettingsScreen.tsx b/apps/customer-mobile/src/screens/SettingsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/SupportScreen.tsx b/apps/customer-mobile/src/screens/SupportScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/TrustCenterScreen.tsx b/apps/customer-mobile/src/screens/TrustCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/VerifiedFundisScreen.tsx b/apps/customer-mobile/src/screens/VerifiedFundisScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/screens/WalletScreen.tsx b/apps/customer-mobile/src/screens/WalletScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/src/store/authStore.ts b/apps/customer-mobile/src/store/authStore.ts
+old mode 100644
+new mode 100755
+diff --git a/apps/customer-mobile/tsconfig.json b/apps/customer-mobile/tsconfig.json
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/.gitignore b/apps/fundi-mobile/.gitignore
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/app.json b/apps/fundi-mobile/app.json
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/babel.config.js b/apps/fundi-mobile/babel.config.js
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/eas.json b/apps/fundi-mobile/eas.json
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/expo-entrypoint.js b/apps/fundi-mobile/expo-entrypoint.js
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/metro.config.js b/apps/fundi-mobile/metro.config.js
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/package.json b/apps/fundi-mobile/package.json
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/App.tsx b/apps/fundi-mobile/src/App.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/hooks/useFundiLocation.ts b/apps/fundi-mobile/src/hooks/useFundiLocation.ts
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/navigation/AuthNavigator.tsx b/apps/fundi-mobile/src/navigation/AuthNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/navigation/MainNavigator.tsx b/apps/fundi-mobile/src/navigation/MainNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/navigation/PendingApprovalNavigator.tsx b/apps/fundi-mobile/src/navigation/PendingApprovalNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/navigation/RootNavigator.tsx b/apps/fundi-mobile/src/navigation/RootNavigator.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/AvailabilityScreen.tsx b/apps/fundi-mobile/src/screens/AvailabilityScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/DashboardScreen.tsx b/apps/fundi-mobile/src/screens/DashboardScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/EarningsScreen.tsx b/apps/fundi-mobile/src/screens/EarningsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/EditProfileScreen.tsx b/apps/fundi-mobile/src/screens/EditProfileScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiAboutScreen.tsx b/apps/fundi-mobile/src/screens/FundiAboutScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiEmergencySosScreen.tsx b/apps/fundi-mobile/src/screens/FundiEmergencySosScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiHelpCenterScreen.tsx b/apps/fundi-mobile/src/screens/FundiHelpCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiOnboardingScreen.tsx b/apps/fundi-mobile/src/screens/FundiOnboardingScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiOtpScreen.tsx b/apps/fundi-mobile/src/screens/FundiOtpScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiRegisterScreen.tsx b/apps/fundi-mobile/src/screens/FundiRegisterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiSafetyPromiseScreen.tsx b/apps/fundi-mobile/src/screens/FundiSafetyPromiseScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/FundiTrustCenterScreen.tsx b/apps/fundi-mobile/src/screens/FundiTrustCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/JobChatScreen.tsx b/apps/fundi-mobile/src/screens/JobChatScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/JobDetailScreen.tsx b/apps/fundi-mobile/src/screens/JobDetailScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/JobsScreen.tsx b/apps/fundi-mobile/src/screens/JobsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/LoginScreen.tsx b/apps/fundi-mobile/src/screens/LoginScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/PendingApprovalScreen.tsx b/apps/fundi-mobile/src/screens/PendingApprovalScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/PortfolioScreen.tsx b/apps/fundi-mobile/src/screens/PortfolioScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/ProfileScreen.tsx b/apps/fundi-mobile/src/screens/ProfileScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/RequestPayoutScreen.tsx b/apps/fundi-mobile/src/screens/RequestPayoutScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/ReviewsScreen.tsx b/apps/fundi-mobile/src/screens/ReviewsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/SettingsScreen.tsx b/apps/fundi-mobile/src/screens/SettingsScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/VerificationScreen.tsx b/apps/fundi-mobile/src/screens/VerificationScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/screens/WalletScreen.tsx b/apps/fundi-mobile/src/screens/WalletScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/src/store/authStore.ts b/apps/fundi-mobile/src/store/authStore.ts
+old mode 100644
+new mode 100755
+diff --git a/apps/fundi-mobile/tsconfig.json b/apps/fundi-mobile/tsconfig.json
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/020_enterprise_completeness.sql b/backend/migrations/020_enterprise_completeness.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/021_business_roadmap.sql b/backend/migrations/021_business_roadmap.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/022_fix_role_constraint.sql b/backend/migrations/022_fix_role_constraint.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/023_fraud_prevention.sql b/backend/migrations/023_fraud_prevention.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/024_geo_matching.sql b/backend/migrations/024_geo_matching.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/025_phase2_enterprise.sql b/backend/migrations/025_phase2_enterprise.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/026_queue_worker_support.sql b/backend/migrations/026_queue_worker_support.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/027_career_applications.sql b/backend/migrations/027_career_applications.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/028_pricing_engine.sql b/backend/migrations/028_pricing_engine.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/029_commission_campaigns.sql b/backend/migrations/029_commission_campaigns.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/030_global_multi_country.sql b/backend/migrations/030_global_multi_country.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/031_registration_enhancements.sql b/backend/migrations/031_registration_enhancements.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/032_company_partnership.sql b/backend/migrations/032_company_partnership.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/033_takeover_fixes.sql b/backend/migrations/033_takeover_fixes.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/migrations/034_lifecycle_hardening.sql b/backend/migrations/034_lifecycle_hardening.sql
+old mode 100644
+new mode 100755
+diff --git a/backend/scripts/seed-takeover.js b/backend/scripts/seed-takeover.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/company-partnership.test.js b/backend/src/company-partnership.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/companyController.js b/backend/src/controllers/companyController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/enterpriseController2.js b/backend/src/controllers/enterpriseController2.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/enterpriseController3.js b/backend/src/controllers/enterpriseController3.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/financialController.js b/backend/src/controllers/financialController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/fraudPreventionController.js b/backend/src/controllers/fraudPreventionController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/geoMatchingController.js b/backend/src/controllers/geoMatchingController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/globalController.js b/backend/src/controllers/globalController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/controllers/pricingController.js b/backend/src/controllers/pricingController.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/critical-backend.e2e.test.js b/backend/src/critical-backend.e2e.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/db-table-check.js b/backend/src/db-table-check.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/db-table-check.test.js b/backend/src/db-table-check.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/debug-company.js b/backend/src/debug-company.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/middleware/companyAccess.js b/backend/src/middleware/companyAccess.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/middleware/rbac.test.js b/backend/src/middleware/rbac.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/middleware/workerAccess.js b/backend/src/middleware/workerAccess.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/pg-config.test.js b/backend/src/pg-config.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/pglite-instance.test.js b/backend/src/pglite-instance.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/queueWorker.js b/backend/src/queueWorker.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/dataRetentionService.js b/backend/src/services/dataRetentionService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/encryptionService.test.js b/backend/src/services/encryptionService.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/enterpriseService2.js b/backend/src/services/enterpriseService2.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/enterpriseService3.js b/backend/src/services/enterpriseService3.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/financeService.test.js b/backend/src/services/financeService.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/financialConfidentialityService.js b/backend/src/services/financialConfidentialityService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/financialConfidentialityService.test.js b/backend/src/services/financialConfidentialityService.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/fraudPreventionService.js b/backend/src/services/fraudPreventionService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/fraudService.test.js b/backend/src/services/fraudService.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/geoMatchingService.js b/backend/src/services/geoMatchingService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/globalService.js b/backend/src/services/globalService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/mpesaService.test.js b/backend/src/services/mpesaService.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/pricingEngineService.js b/backend/src/services/pricingEngineService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/services/settlementService.js b/backend/src/services/settlementService.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/utils/geocoding.test.js b/backend/src/utils/geocoding.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/utils/http.test.js b/backend/src/utils/http.test.js
+old mode 100644
+new mode 100755
+diff --git a/backend/src/utils/logError.js b/backend/src/utils/logError.js
+old mode 100644
+new mode 100755
+diff --git a/docker-compose.dev.yml b/docker-compose.dev.yml
+old mode 100644
+new mode 100755
+diff --git a/docs/IMPLEMENTATION_AUDIT.md b/docs/IMPLEMENTATION_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/BRUTALLY_HONEST_AUDIT.md b/docs/archive/BRUTALLY_HONEST_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/COMPREHENSIVE_ENTERPRISE_AUDIT.md b/docs/archive/COMPREHENSIVE_ENTERPRISE_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/ENTERPRISE_FINAL_VERIFICATION.md b/docs/archive/ENTERPRISE_FINAL_VERIFICATION.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/FINAL_ENTERPRISE_CERTIFICATION.md b/docs/archive/FINAL_ENTERPRISE_CERTIFICATION.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_ARCHITECTURE.md b/docs/archive/PATAFUNDI_ARCHITECTURE.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_AUDIT_REPORT_2025.md b/docs/archive/PATAFUNDI_AUDIT_REPORT_2025.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_COMPANY_E2E_TEST_REPORT.md b/docs/archive/PATAFUNDI_COMPANY_E2E_TEST_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_COMPANY_ECOSYSTEM_SPEC.md b/docs/archive/PATAFUNDI_COMPANY_ECOSYSTEM_SPEC.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_DEPLOYMENT_GUIDE.md b/docs/archive/PATAFUNDI_DEPLOYMENT_GUIDE.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_ENVIRONMENT_REQUIREMENTS.md b/docs/archive/PATAFUNDI_ENVIRONMENT_REQUIREMENTS.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_EXPO_FIX_REPORT.md b/docs/archive/PATAFUNDI_EXPO_FIX_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_FINAL_PRODUCT_AUDIT.md b/docs/archive/PATAFUNDI_FINAL_PRODUCT_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_FINAL_VERIFICATION_REPORT.md b/docs/archive/PATAFUNDI_FINAL_VERIFICATION_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_FULL_E2E_TEST_REPORT.md b/docs/archive/PATAFUNDI_FULL_E2E_TEST_REPORT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_FULL_SYSTEM_AUDIT.md b/docs/archive/PATAFUNDI_FULL_SYSTEM_AUDIT.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_MASTER_GAP_ANALYSIS.md b/docs/archive/PATAFUNDI_MASTER_GAP_ANALYSIS.md
+old mode 100644
+new mode 100755
+diff --git a/docs/archive/PATAFUNDI_PROGRESS_TRACKER.md b/docs/archive/PATAFUNDI_PROGRESS_TRACKER.md
+old mode 100644
+new mode 100755
+diff --git a/frontend/nginx.conf b/frontend/nginx.conf
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/components/landing/BusinessSection.tsx b/frontend/src/components/landing/BusinessSection.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/components/landing/ProviderSection.tsx b/frontend/src/components/landing/ProviderSection.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/components/system/NotificationBell.tsx b/frontend/src/components/system/NotificationBell.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/CompanyPage.tsx b/frontend/src/pages/CompanyPage.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/admin/CompanyApplications.tsx b/frontend/src/pages/admin/CompanyApplications.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/CompanyDirectory.tsx b/frontend/src/pages/company/CompanyDirectory.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/CompanyPortalLayout.tsx b/frontend/src/pages/company/CompanyPortalLayout.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/CompanyProfile.tsx b/frontend/src/pages/company/CompanyProfile.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PartnerProgram.tsx b/frontend/src/pages/company/PartnerProgram.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalDashboard.tsx b/frontend/src/pages/company/PortalDashboard.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalFinance.tsx b/frontend/src/pages/company/PortalFinance.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalJobs.tsx b/frontend/src/pages/company/PortalJobs.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalQuality.tsx b/frontend/src/pages/company/PortalQuality.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalSchedule.tsx b/frontend/src/pages/company/PortalSchedule.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalServices.tsx b/frontend/src/pages/company/PortalServices.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalSettings.tsx b/frontend/src/pages/company/PortalSettings.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/PortalTeam.tsx b/frontend/src/pages/company/PortalTeam.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/company/TechnicianApp.tsx b/frontend/src/pages/company/TechnicianApp.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/fundi/FundiMyReviews.tsx b/frontend/src/pages/fundi/FundiMyReviews.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/fundi/FundiProfileEdit.tsx b/frontend/src/pages/fundi/FundiProfileEdit.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/staff/ErrorLogs.tsx b/frontend/src/pages/staff/ErrorLogs.tsx
+old mode 100644
+new mode 100755
+diff --git a/frontend/src/pages/staff/StaffRoleHome.tsx b/frontend/src/pages/staff/StaffRoleHome.tsx
+old mode 100644
+new mode 100755
+diff --git a/package.json b/package.json
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/package-lock.json b/packages/shared/package-lock.json
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/package.json b/packages/shared/package.json
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/apiClient.ts b/packages/shared/src/apiClient.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/authStore.ts b/packages/shared/src/authStore.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/components/InfoPageScreen.tsx b/packages/shared/src/components/InfoPageScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/components/ScreenHeader.tsx b/packages/shared/src/components/ScreenHeader.tsx
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/components/ui.tsx b/packages/shared/src/components/ui.tsx
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/index.ts b/packages/shared/src/index.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/screens/LegalPageScreen.tsx b/packages/shared/src/screens/LegalPageScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/screens/TrustCenterScreen.tsx b/packages/shared/src/screens/TrustCenterScreen.tsx
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/socketEvents.ts b/packages/shared/src/socketEvents.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/theme.ts b/packages/shared/src/theme.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/src/types.ts b/packages/shared/src/types.ts
+old mode 100644
+new mode 100755
+diff --git a/packages/shared/tsconfig.json b/packages/shared/tsconfig.json
+old mode 100644
+new mode 100755
+diff --git a/scripts/debug-auth-login.mjs b/scripts/debug-auth-login.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/debug-pg-query.mjs b/scripts/debug-pg-query.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/debug-pglite-demo-user.mjs b/scripts/debug-pglite-demo-user.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/debug-pglite-migration.mjs b/scripts/debug-pglite-migration.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/dev-db-up.ps1 b/scripts/dev-db-up.ps1
+old mode 100644
+new mode 100755
+diff --git a/scripts/full_e2e_test.mjs b/scripts/full_e2e_test.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/inspect-demo-passwords.mjs b/scripts/inspect-demo-passwords.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/live-auth-test.mjs b/scripts/live-auth-test.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/patafundi-e2e.mjs b/scripts/patafundi-e2e.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/reset-demo-passwords.mjs b/scripts/reset-demo-passwords.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/security-probe.mjs b/scripts/security-probe.mjs
+old mode 100644
+new mode 100755
+diff --git a/worklog.md b/worklog.md
+old mode 100644
+new mode 100755
