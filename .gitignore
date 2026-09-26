@@ -65,3 +65,7 @@ dev.log
 # AI editor extension local data (Kilo Code etc.) — never part of the product
 .kilo/
 .kilocode/
+
+# workspace runtime (session supervisors, logs)
+.zscripts/*.log
+.zscripts/sup-*.log
