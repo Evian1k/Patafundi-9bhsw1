@@ -70,7 +70,7 @@ async function getDemandMultiplier(county) {
   );
   const supplyResult = await query(
     `SELECT COUNT(*)::int as count FROM fundis
-     WHERE approval_status = 'approved' AND is_online = true`,
+     WHERE approval_status = 'approved' AND online = true`,
     [],
   );
 

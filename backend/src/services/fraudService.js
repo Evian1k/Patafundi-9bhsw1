@@ -65,7 +65,14 @@ async function sendNotification({ userId, type, title, body, data = {} }) {
 }
 
 async function notifyAdmins({ title, body, data = {} }) {
-  const admins = await query(`select id from users where role = 'admin' and status = 'active'`);
+  // Route to every platform-operations role: the platform owner is
+  // super_admin (deployments may not have a separate 'admin' account),
+  // and finance/fraud staff act on commission-bypass alerts.
+  const admins = await query(
+    `select id from users
+     where role in ('admin', 'super_admin', 'fraud_analyst', 'finance_team')
+       and status = 'active'`,
+  );
   for (const admin of admins.rows) {
     await sendNotification({ userId: admin.id, type: 'admin_fraud_alert', title, body, data });
   }

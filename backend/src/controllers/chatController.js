@@ -6,12 +6,41 @@ import { uploadPrivateFile, getSignedAccessUrl } from '../services/storageServic
 import { mapMulterFile } from '../middleware/upload.js';
 
 async function assertJobAccess(userId, role, jobId) {
-  const result = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
+  const result = await query(
+    'select customer_id, fundi_id, company_id, technician_user_id, status, updated_at from jobs where id = $1',
+    [jobId],
+  );
   const job = result.rows[0];
   if (!job) throw notFound('Job not found');
-  if (role === 'admin') return job;
+  if (role === 'admin' || role === 'super_admin') return job;
   if (job.customer_id === userId || job.fundi_id === userId) return job;
+  // Assigned company technician may participate in the job chat.
+  if (job.technician_user_id === userId) return job;
+  if (job.company_id) {
+    const member = await query(
+      'select 1 from company_members where company_id = $1 and user_id = $2 limit 1',
+      [job.company_id, userId],
+    );
+    if (member.rows[0]) return job;
+  }
   throw forbidden('Not allowed to access this job chat');
+}
+
+// ── Post-job messaging policy (spec §22): chat closes when the job ends.
+// Completed jobs keep a 30-day window for receipts/disputes context;
+// cancelled/failed/expired jobs close immediately. Older history stays readable.
+const POST_JOB_CHAT_WINDOW_DAYS = 30;
+function assertMessagingAllowed(job) {
+  if (['cancelled', 'failed', 'expired'].includes(job.status)) {
+    throw forbidden('Chat is closed for cancelled jobs');
+  }
+  if (job.status === 'completed') {
+    const endedAt = new Date(job.updated_at).getTime();
+    const windowMs = POST_JOB_CHAT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    if (Date.now() - endedAt > windowMs) {
+      throw forbidden('Chat window for this job has closed');
+    }
+  }
 }
 
 export async function listMessages(req, res) {
@@ -30,6 +59,7 @@ export async function sendMessage(req, res) {
   const file = mapMulterFile(req.file);
   if (!body?.trim() && !file) throw badRequest('Message body or attachment is required');
   const job = await assertJobAccess(req.user.id, req.user.role, req.params.jobId);
+  assertMessagingAllowed(job);
   const detection = detectBypass(body || '');
   if (detection.isBypass) {
     await recordFraudAlert({

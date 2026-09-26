@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import { query } from '../db.js';
 import { badRequest, forbidden } from '../utils/http.js';
+import { encrypt, decrypt } from './encryptionService.js';
 
 // ============================================================
 // 1. TOTP 2FA (uses otplib + qrcode which are in package.json)
@@ -31,6 +32,18 @@ async function getQrLib() {
   return qrLib;
 }
 
+// ── Encryption helpers: TOTP secrets and recovery codes are credentials and
+// must not sit in plaintext columns (spec §9). Values written before this
+// change (or when ENCRYPTION_KEY is unset) are still verifiable via fallback.
+function tryDecrypt(value) {
+  if (!value) return value;
+  try {
+    return decrypt(value);
+  } catch {
+    return value; // legacy plaintext
+  }
+}
+
 export async function setup2FA(userId) {
   const otpLib = await getTotpLib();
   const secret = otpLib.authenticator.generateSecret();
@@ -38,8 +51,10 @@ export async function setup2FA(userId) {
   const email = user.rows[0]?.email || 'user';
   const otpauthUrl = otpLib.authenticator.keyuri(email, 'PataFundi', secret);
 
-  // Store secret temporarily (not enabled until verified)
-  await query('update users set totp_secret = $2 where id = $1', [userId, secret]);
+  // Store secret temporarily (not enabled until verified) — encrypted at rest.
+  let storedSecret = secret;
+  try { storedSecret = encrypt(secret); } catch { /* encryption unavailable */ }
+  await query('update users set totp_secret = $2 where id = $1', [userId, storedSecret]);
 
   const qr = await getQrLib();
   const qrCode = await qr.toDataURL(otpauthUrl);
@@ -50,18 +65,20 @@ export async function setup2FA(userId) {
 export async function verify2FASetup(userId, token) {
   const otpLib = await getTotpLib();
   const user = await query('select totp_secret from users where id = $1', [userId]);
-  const secret = user.rows[0]?.totp_secret;
+  const secret = tryDecrypt(user.rows[0]?.totp_secret);
   if (!secret) throw badRequest('2FA not set up. Call setup first.');
 
   const isValid = otpLib.authenticator.verify({ token: String(token), secret });
   if (!isValid) throw badRequest('Invalid verification code');
 
-  // Generate recovery codes
+  // Generate recovery codes (stored encrypted at rest)
   const recoveryCodes = Array.from({ length: 8 }, () => crypto.randomBytes(5).toString('hex'));
 
+  let storedCodes = JSON.stringify(recoveryCodes);
+  try { storedCodes = encrypt(storedCodes); } catch { /* encryption unavailable */ }
   await query(
     'update users set totp_enabled = true, totp_recovery_codes = $2::jsonb where id = $1',
-    [userId, JSON.stringify(recoveryCodes)],
+    [userId, storedCodes],
   );
 
   return { recoveryCodes };
@@ -70,8 +87,13 @@ export async function verify2FASetup(userId, token) {
 export async function verify2FALogin(userId, token) {
   const otpLib = await getTotpLib();
   const user = await query('select totp_secret, totp_recovery_codes from users where id = $1', [userId]);
-  const secret = user.rows[0]?.totp_secret;
-  const recoveryCodes = user.rows[0]?.totp_recovery_codes || [];
+  const secret = tryDecrypt(user.rows[0]?.totp_secret);
+  let recoveryCodes = [];
+  try {
+    recoveryCodes = JSON.parse(tryDecrypt(user.rows[0]?.totp_recovery_codes) || '[]');
+  } catch {
+    recoveryCodes = [];
+  }
 
   if (!secret) return { valid: false, reason: '2FA not set up' };
 
@@ -94,7 +116,9 @@ export async function disable2FA(userId) {
 
 export async function regenerateRecoveryCodes(userId) {
   const recoveryCodes = Array.from({ length: 8 }, () => crypto.randomBytes(5).toString('hex'));
-  await query('update users set totp_recovery_codes = $2::jsonb where id = $1', [userId, JSON.stringify(recoveryCodes)]);
+  let storedCodes = JSON.stringify(recoveryCodes);
+  try { storedCodes = encrypt(storedCodes); } catch { /* encryption unavailable */ }
+  await query('update users set totp_recovery_codes = $2::jsonb where id = $1', [userId, storedCodes]);
   return recoveryCodes;
 }
 

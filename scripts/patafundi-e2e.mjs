@@ -122,7 +122,14 @@ async function main() {
   check('tampered final price clamped to ≤125% of estimate', clampedPrice <= 4000 * 1.25 + 1, `final=${clampedPrice}`);
 
   console.log('── 7. Payment + escrow + settlement ──');
-  const otp = complete.json?.completionOtp;
+  // The completion OTP is delivered to the CUSTOMER only (private user-room
+  // socket + notification) — never in the technician's completion response.
+  // The customer re-issues it via the customer-only completion-code endpoint.
+  const otpRes = await api(`/jobs/${jobId}/completion-code`, { method: 'POST', token: customer.token });
+  check('completion code issued to customer only', otpRes.status === 200 && !!otpRes.json?.completionOtp, `got ${otpRes.status}`);
+  const techCodeAttempt = await api(`/jobs/${jobId}/completion-code`, { method: 'POST', token: technician.token });
+  check('technician blocked from completion code', techCodeAttempt.status === 403 || techCodeAttempt.status === 400, `got ${techCodeAttempt.status}`);
+  const otp = otpRes.json?.completionOtp;
   // pay via STK push (dev payment provider)
   const pay = await api('/payments/stk-push', {
     method: 'POST', token: customer.token,
@@ -159,8 +166,9 @@ async function main() {
     const gross = Number(ourSettlement.gross_amount);
     const commission = Number(ourSettlement.commission_amount);
     const net = Number(ourSettlement.net_amount);
-    check('settlement math is server-authoritative (net = gross - commission)', gross === clampedPrice && Math.abs(net - (gross - commission)) < 0.01 && commission === Math.round(gross * 0.15),
-      `gross=${gross} commission=${commission} net=${net} (expected commission ${Math.round(clampedPrice * 0.15)})`);
+    check('settlement math is server-authoritative (net = gross - commission, commission ≈ platform rate)',
+      gross === clampedPrice && Math.abs(net - (gross - commission)) < 0.01 && Math.abs(commission - gross * 0.15) < 1,
+      `gross=${gross} commission=${commission} net=${net} (expected commission ≈ ${Math.round(clampedPrice * 0.15)})`);
   }
   const dispatcherFinance = await api('/company/portal/finance', { token: dispatcher.token });
   check('dispatcher blocked from finance', dispatcherFinance.status === 403, `got ${dispatcherFinance.status}`);

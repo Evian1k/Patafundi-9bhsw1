@@ -1,4 +1,5 @@
 import express from 'express';
+import { query } from './db.js';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
 import { requireFundiAccount, requireApprovedFundi } from './middleware/fundiAccess.js';
 import { requireApprovedWorker } from './middleware/workerAccess.js';
@@ -118,6 +119,7 @@ router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
 router.post('/jobs/:id/check-in', authRequired, requireApprovedWorker, asyncHandler(jobs.checkIn));
 router.post('/jobs/:id/complete', authRequired, requireApprovedWorker, imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
 router.post('/jobs/:id/confirm-completion', authRequired, asyncHandler(jobs.confirmCompletion));
+router.post('/jobs/:id/completion-code', authRequired, asyncHandler(jobs.resendCompletionCode));
 router.post('/jobs/:id/review', authRequired, asyncHandler(jobs.submitReview));
 router.post('/reviews', authRequired, asyncHandler(jobs.submitReview));
 
@@ -314,7 +316,6 @@ router.post('/client-errors', asyncHandler(async (req, res) => {
 // Permission-based dashboard access (alternative to /admin/dashboard which requires 'admin' role)
 router.get('/staff/dashboard', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.dashboard));
 router.get('/staff/reports/analytics', authRequired, requirePermission('can_view_metrics'), asyncHandler(admin.reports));
-router.get('/staff/revenue', authRequired, requirePermission('can_view_revenue'), asyncHandler(admin.revenueDashboard));
 router.get('/staff/support/tickets', authRequired, requirePermission('can_view_tickets'), asyncHandler(content.listSupportTickets));
 
 // ============================================================
@@ -338,7 +339,22 @@ import * as ent2 from './controllers/enterpriseController2.js';
 import { requirePermission as requirePerm } from './middleware/rbac.js';
 
 // Quality scores (Phase 4)
-router.get('/fundi/:fundiId/quality', authRequired, asyncHandler(enterprise.getFundiQuality));
+// Fundi quality score is internal operational data (spec §7): readable by the
+// fundi themself and by staff with fundi visibility — not by arbitrary callers.
+router.get('/fundi/:fundiId/quality', authRequired, asyncHandler(async (req, res) => {
+  let isSelf = false;
+  if (req.user.role === 'fundi') {
+    const own = await query('select 1 from fundis where id = $1 and user_id = $2', [req.params.fundiId, req.user.id]);
+    isSelf = Boolean(own.rows[0]);
+  }
+  if (!isSelf) {
+    const { requireAnyPermission } = await import('./middleware/rbac.js');
+    await new Promise((resolve, reject) => {
+      requireAnyPermission('can_view_fundis')(req, res, (err) => (err ? reject(err) : resolve()));
+    });
+  }
+  await enterprise.getFundiQuality(req, res);
+}));
 router.post('/admin/quality/recalculate', authRequired, requireRole('admin'), asyncHandler(enterprise.recalculateQuality));
 router.post('/admin/quality/:fundiId/calculate', authRequired, requireRole('admin'), asyncHandler(enterprise.calculateFundiQuality));
 
@@ -645,7 +661,6 @@ router.put('/admin/commission-overrides', authRequired, requirePerm('can_manage_
 
 // ── Staff Lifecycle ────────────────────────────────────────────
 router.post('/admin/staff/:id/reset-password', authRequired, requirePerm('can_reset_staff_password'), asyncHandler(ent2.resetStaffPasswordHandler));
-router.post('/admin/users/:id/force-logout', authRequired, requirePerm('can_force_logout'), asyncHandler(ent2.forceLogoutHandler));
 router.post('/admin/staff/:id/require-2fa', authRequired, requirePerm('can_require_2fa'), asyncHandler(ent2.require2FAHandler));
 
 // ── System Health ──────────────────────────────────────────────

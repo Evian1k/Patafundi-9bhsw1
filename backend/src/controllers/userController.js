@@ -1,6 +1,26 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
+import { encrypt as encryptField, decrypt as decryptField } from '../services/encryptionService.js';
+
+// Phone numbers are stored AES-256-GCM encrypted at registration (spec §9);
+// profile updates must not silently downgrade them to plaintext.
+function protectPhone(phone) {
+  if (phone == null) return null;
+  try {
+    return encryptField(String(phone));
+  } catch {
+    return String(phone); // encryption not configured in this environment
+  }
+}
+function safeDecryptPhone(phone) {
+  if (!phone) return phone;
+  try {
+    return decryptField(phone);
+  } catch {
+    return phone; // legacy plaintext value
+  }
+}
 
 function publicUser(user) {
   if (!user) return null;
@@ -24,9 +44,11 @@ export async function updateMe(req, res) {
   const result = await query(
     `update users set full_name = coalesce($2, full_name), phone = coalesce($3, phone), updated_at = now()
      where id = $1 returning id, email, full_name, phone, role, status, trust_score`,
-    [req.user.id, fullName, phone],
+    [req.user.id, fullName, phone ? protectPhone(phone) : null],
   );
-  res.json({ success: true, user: result.rows[0] });
+  const user = result.rows[0];
+  if (user) user.phone = safeDecryptPhone(user.phone);
+  res.json({ success: true, user });
 }
 
 export async function settings(req, res) {
@@ -74,12 +96,25 @@ export async function deleteSavedPlace(req, res) {
   res.json({ success: true });
 }
 
+const PASSWORD_MIN_LENGTH = 8;
+function assertPasswordStrength(password) {
+  if (typeof password !== 'string' || password.length < PASSWORD_MIN_LENGTH) {
+    throw badRequest('New password must be at least 8 characters long');
+  }
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    throw badRequest('New password must contain both letters and numbers');
+  }
+}
+
 export async function changePassword(req, res) {
   const { currentPassword, newPassword } = req.body || {};
   if (!currentPassword || !newPassword) throw badRequest('Current and new passwords are required');
+  assertPasswordStrength(newPassword);
   const result = await query('select password_hash from users where id = $1', [req.user.id]);
   if (!(await bcrypt.compare(currentPassword, result.rows[0].password_hash))) throw forbidden('Current password is incorrect');
   await query('update users set password_hash = $2, updated_at = now() where id = $1', [req.user.id, await bcrypt.hash(newPassword, 12)]);
+  // Revoke every refresh token: a stolen session cannot survive a password change.
+  await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [req.user.id]);
   res.json({ success: true });
 }
 

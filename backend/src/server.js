@@ -9,7 +9,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { config, logProductionConfigWarnings } from './config.js';
 import { router } from './routes.js';
 import { attachRealtime } from './realtime.js';
-import { healthcheck } from './db.js';
+import { healthcheck, query } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { csrfProtection } from './middleware/auth.js';
 import { authRateLimit, otpRateLimit, paymentWebhookRateLimit, mapsRateLimit } from './middleware/rateLimit.js';
@@ -110,8 +110,20 @@ app.get('/', (_req, res) => {
     status: 'API running',
     service: 'patafundi-api',
     health: '/health',
+    ready: '/ready',
     api: '/api',
   });
+});
+
+// Readiness probe (spec §35): cheap check that the process can serve traffic —
+// DB reachable. Used by Docker health checks and future orchestrators.
+app.get('/ready', async (_req, res) => {
+  try {
+    await query('select 1');
+    res.json({ status: 'ready', service: 'patafundi-api' });
+  } catch {
+    res.status(503).json({ status: 'not_ready', service: 'patafundi-api' });
+  }
 });
 
 app.get('/health', async (_req, res) => {
@@ -367,6 +379,45 @@ server.listen(port, host, () => {
   };
   runScheduledJobs();
   setInterval(runScheduledJobs, 60 * 1000); // check every minute
+
+  // ── Job expiry reaper (spec §17 failure states) ──────────────────
+  // Offers not answered within 5 minutes return to matching so another
+  // provider can take the job; requests unmatched after 24h expire.
+  const runJobExpiry = async () => {
+    try {
+      const { query } = await import('./db.js');
+      const { emitEvent } = await import('./realtime.js');
+      const requeued = await query(
+        `update jobs set status = 'matching', updated_at = now()
+         where status = 'offered' and updated_at < now() - interval '5 minutes'
+         returning id, customer_id`,
+      );
+      for (const job of requeued.rows) {
+        emitEvent('job:status', { jobId: job.id, status: 'matching', reason: 'offer_expired' }, `job:${job.id}`);
+      }
+      const expired = await query(
+        `update jobs set status = 'expired', updated_at = now()
+         where status in ('pending', 'matching')
+           and created_at < now() - interval '24 hours'
+         returning id, customer_id`,
+      );
+      for (const job of expired.rows) {
+        await query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'job_expired', 'Request expired', 'No provider accepted your request within 24 hours. You can book again any time.', $2::jsonb)`,
+          [job.customer_id, JSON.stringify({ jobId: job.id })],
+        );
+        emitEvent('job:status', { jobId: job.id, status: 'expired' }, `job:${job.id}`);
+      }
+      if (requeued.rows.length || expired.rows.length) {
+        console.log(`[expiry] requeued=${requeued.rows.length} expired=${expired.rows.length}`);
+      }
+    } catch (err) {
+      console.error('[expiry] error:', err.message);
+    }
+  };
+  runJobExpiry();
+  setInterval(runJobExpiry, 60 * 1000);
 
   // ── Scheduled maintenance checker ─────────────────────────────────
   // Runs every minute to check if the current time falls within a

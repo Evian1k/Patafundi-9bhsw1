@@ -177,10 +177,35 @@ export async function createJob(req, res) {
 
   // ── Referral voucher application ────────────────────────────────────
   // If the customer requests to use a voucher AND has an active voucher,
-  // apply the discount to the job's estimated_price.
+  // apply the discount to the job's server-computed price.
   // Single-use, non-stackable, validated server-side.
   let voucherApplied = null;
-  let finalPrice = body.estimatedPrice || body.estimated_price || null;
+
+  // ── Server-authoritative pricing (spec §14): the customer never sets the
+  // price. The pricing engine computes the estimate from the category's
+  // configured pricing rules; the client's estimate is only a fallback for
+  // custom categories that have no pricing configuration yet.
+  let finalPrice = null;
+  let pricingSource = 'client_estimate_fallback';
+  try {
+    const { calculateJobPrice } = await import('../services/pricingEngineService.js');
+    const enginePrice = await calculateJobPrice({
+      serviceCategory,
+      distanceKm: 0,
+      county: body.county || body.customer_county || null,
+      isEmergency: (body.urgency || 'normal') === 'emergency',
+      isImmediate: (body.urgency || 'normal') === 'immediate',
+      complexity: body.complexity || 'simple',
+      scheduledFor: scheduledAt,
+    });
+    finalPrice = enginePrice.total;
+    pricingSource = 'pricing_engine';
+  } catch (pricingErr) {
+    // No pricing configured for this category — fall back to the client
+    // estimate (still validated/clamped downstream at completion/payment).
+    finalPrice = body.estimatedPrice || body.estimated_price || null;
+    logNonFatal('job.createJob.pricingFallback', pricingErr, { serviceCategory });
+  }
   if (body.useReferralVoucher === true && finalPrice && Number(finalPrice) > 0) {
     try {
       const { applyVoucherToJob, confirmVoucherRedemption } = await import('../services/referralService.js');
@@ -233,7 +258,7 @@ export async function createJob(req, res) {
     eventType: 'job_created',
     actorId: req.user.id,
     actorRole: req.user.role,
-    metadata: { serviceCategory, urgency: body.urgency || 'normal', voucherApplied },
+    metadata: { serviceCategory, urgency: body.urgency || 'normal', voucherApplied, pricingSource, estimatedPrice: finalPrice },
   });
   await recordTimelineEvent({
     jobId: job.id,
@@ -250,7 +275,7 @@ export async function createJob(req, res) {
         voucherId: voucherApplied.voucherId,
         jobId: job.id,
         userId: req.user.id,
-        originalPrice: Number(body.estimatedPrice || body.estimated_price || 0),
+        originalPrice: Number(finalPrice),
         discountApplied: voucherApplied.discountKes,
         ipAddress: req.ip,
       });
@@ -389,6 +414,7 @@ const JOB_TRANSITIONS = {
   completed: [],
   cancelled: [],
   failed: [],
+  expired: [],
 };
 
 export async function patchJob(req, res) {
@@ -513,6 +539,16 @@ export async function checkIn(req, res) {
   if (!allowedStatuses.includes(status)) throw badRequest('Invalid check-in status');
   const job = await loadJob(req.params.id);
   requireAssignedFundi(req.user, job);
+  // ── State-machine enforcement (spec §17): check-in may only advance the
+  // lifecycle forward — never skip backwards or resurrect a finished job.
+  const CHECKIN_TRANSITIONS = {
+    on_the_way: ['accepted', 'assigned', 'scheduled'],
+    arrived: ['on_the_way', 'accepted', 'assigned'],
+    in_progress: ['arrived', 'on_the_way', 'accepted', 'assigned'],
+  };
+  if (!CHECKIN_TRANSITIONS[status].includes(job.status)) {
+    throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
+  }
   // GPS distance validation: if checking in as 'arrived', verify the fundi is
   // actually near the customer location (within 2km). This prevents fake
   // check-ins from a remote location. For 'on_the_way' status, no distance
@@ -561,7 +597,11 @@ export async function checkIn(req, res) {
 export async function completeJob(req, res) {
   const job = await loadJob(req.params.id);
   requireAssignedFundi(req.user, job);
-  if (!['in_progress', 'arrived'].includes(job.status)) throw badRequest('Job must be in progress before completion');
+  // State-machine enforcement: completion is only valid while work is in
+  // progress (arrived → complete skips the started-work step).
+  if (job.status !== 'in_progress') {
+    throw badRequest('Job must be in progress before completion — start work first');
+  }
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = await bcrypt.hash(otp, 10);
   // ── Server-authoritative final price (spec §17): the provider-suggested
@@ -587,7 +627,9 @@ export async function completeJob(req, res) {
     actorId: req.user.id,
     actorRole: req.user.role,
   });
-  // Deliver the OTP to the customer via socket + notification so they can confirm completion.
+  // Deliver the OTP to the customer ONLY on their private user room +
+  // notification. Never broadcast the completion OTP to the job room —
+  // the fundi is in that room and must not see the confirmation code.
   await query(
     `insert into notifications (user_id, type, title, body, data)
      values ($1, 'job_completion_otp', 'Job Complete — Confirm with Code', $2, $3::jsonb)`,
@@ -597,10 +639,38 @@ export async function completeJob(req, res) {
       JSON.stringify({ jobId: job.id, otp }),
     ],
   );
-  emitEvent('job:completed', { jobId: req.params.id, completionOtp: otp }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]), completionOtp: otp }, `job:${req.params.id}`);
+  emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
+  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true, completionOtp: otp });
+  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
+}
+
+// ── Resend completion code (customer-only): re-issues a fresh OTP while the
+// job is completed-but-unconfirmed. Covers missed sockets/notifications.
+export async function resendCompletionCode(req, res) {
+  const existing = await query('select * from jobs where id = $1', [req.params.id]);
+  const job = existing.rows[0];
+  if (!job) throw notFound('Job not found');
+  requireCustomer(req.user, job);
+  if (job.status !== 'completed' || job.customer_completion_confirmed) {
+    throw badRequest('No pending completion confirmation for this job');
+  }
+  const otp = String(crypto.randomInt(100000, 999999));
+  const otpHash = await bcrypt.hash(otp, 10);
+  await query(
+    'update jobs set completion_otp_hash = $2, updated_at = now() where id = $1',
+    [req.params.id, otpHash],
+  );
+  await query(
+    `insert into notifications (user_id, type, title, body, data)
+     values ($1, 'job_completion_otp', 'Your confirmation code', $2, $3::jsonb)`,
+    [job.customer_id, `Use code ${otp} to confirm the completed job.`, JSON.stringify({ jobId: job.id, otp })],
+  );
+  emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
+  // Returning the code to the authenticated CUSTOMER is correct — it is their
+  // confirmation code (the fundi can never fetch this endpoint). This powers
+  // the "resend code" affordance and keeps confirmation working without sockets.
+  res.json({ success: true, completionOtpIssued: true, completionOtp: otp });
 }
 
 export async function confirmCompletion(req, res) {

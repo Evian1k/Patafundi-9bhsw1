@@ -57,11 +57,11 @@ export async function calculatePrice(req, res) {
     }
   }
 
-  // Get fundi tier if fundiId provided
+  // Get fundi tier if fundiId provided (column is fundis.fundi_tier)
   let fundiTier = 'bronze';
   if (fundiId) {
     const tierResult = await query(
-      'SELECT tier FROM fundis WHERE user_id = $1',
+      'SELECT fundi_tier as tier FROM fundis WHERE user_id = $1',
       [fundiId],
     );
     fundiTier = tierResult.rows[0]?.tier || 'bronze';
@@ -83,10 +83,22 @@ export async function calculatePrice(req, res) {
   // Log the calculation for audit + AI learning
   const calcId = await logPriceCalculation(null, req.user?.id || null, serviceCategory, price);
 
+  // ── Financial visibility (spec §13): commission internals are platform-only.
+  // Customers and fundis see the price composition they pay/earn against —
+  // never the platform commission split. Staff roles see the full breakdown.
+  const PLATFORM_STAFF_ROLES = new Set([
+    'super_admin', 'admin', 'support_agent', 'fraud_analyst', 'finance_team',
+    'dispatch_team', 'devops_engineer', 'auditor', 'ops_manager',
+  ]);
+  const visiblePrice = PLATFORM_STAFF_ROLES.has(req.user?.role) ? price : (() => {
+    const { commissionPercent, commissionAmount, fundiEarnings, ...rest } = price;
+    return rest;
+  })();
+
   res.json({
     success: true,
     calculationId: calcId,
-    price,
+    price: visiblePrice,
   });
 }
 

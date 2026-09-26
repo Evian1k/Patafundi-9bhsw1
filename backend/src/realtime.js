@@ -35,14 +35,25 @@ let ioRef = null;
 
 async function canAccessJobRoom(userId, role, jobId) {
   if (!userId || !jobId) return false;
-  if (role === 'admin') return true;
+  if (role === 'admin' || role === 'super_admin') return true;
   const result = await query(
-    'select customer_id, fundi_id from jobs where id = $1',
+    'select customer_id, fundi_id, company_id, technician_user_id from jobs where id = $1',
     [jobId],
   );
   const job = result.rows[0];
   if (!job) return false;
-  return job.customer_id === userId || job.fundi_id === userId;
+  if (job.customer_id === userId || job.fundi_id === userId) return true;
+  // Assigned company technicians and members of the job's company can follow
+  // the job room (tenant-scoped — membership is checked against company_id).
+  if (job.technician_user_id === userId) return true;
+  if (job.company_id) {
+    const member = await query(
+      `select 1 from company_members where company_id = $1 and user_id = $2 limit 1`,
+      [job.company_id, userId],
+    );
+    if (member.rows[0]) return true;
+  }
+  return false;
 }
 
 // ── Per-IP connection rate limiting ─────────────────────────────────
@@ -97,6 +108,16 @@ export function attachRealtime(io) {
   io.on('connection', (socket) => {
     if (socket.userId) socket.join(`user:${socket.userId}`);
 
+    // Platform staff join the operations room (payout events, operational
+    // alerts). Customer/fundi connections never join this room.
+    const STAFF_SOCKET_ROLES = new Set([
+      'super_admin', 'admin', 'support_agent', 'fraud_analyst', 'finance_team',
+      'dispatch_team', 'devops_engineer', 'auditor', 'ops_manager',
+    ]);
+    if (socket.userId && STAFF_SOCKET_ROLES.has(socket.userRole)) {
+      socket.join('staff:ops');
+    }
+
     socket.on('job:subscribe', async ({ jobId }) => {
       if (!jobId) return;
       const allowed = await canAccessJobRoom(socket.userId, socket.userRole, jobId);
@@ -114,9 +135,10 @@ export function attachRealtime(io) {
 
     socket.on('fundi:location:update', async (payload) => {
       if (!socket.userId || !payload?.jobId) return;
-      const job = await query('select fundi_id, status from jobs where id = $1', [payload.jobId]);
+      const job = await query('select fundi_id, technician_user_id, status from jobs where id = $1', [payload.jobId]);
       if (!job.rows[0]) return;
-      if (socket.userRole !== 'admin' && job.rows[0].fundi_id !== socket.userId) return;
+      const isAssignedWorker = job.rows[0].fundi_id === socket.userId || job.rows[0].technician_user_id === socket.userId;
+      if (socket.userRole !== 'admin' && socket.userRole !== 'super_admin' && !isAssignedWorker) return;
       if (['completed', 'cancelled', 'failed'].includes(job.rows[0].status)) return;
       io.to(`job:${payload.jobId}`).emit('fundi:location:update', {
         ...payload,

@@ -119,7 +119,7 @@ export async function getActiveCampaign(fundiId, serviceCategory, county) {
        AND is_active = true
        AND now() BETWEEN starts_at AND ends_at
        AND (fundi_tier IS NULL OR fundi_tier = (
-         SELECT tier FROM fundis WHERE user_id = $1
+         SELECT fundi_tier FROM fundis WHERE user_id = $1
        ))
        AND (county IS NULL OR county = $3)
        AND (service_category IS NULL OR service_category = $2)

@@ -203,7 +203,7 @@ export async function login(req, res) {
   }
 
   const result = await query(
-    `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at
+    `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at, totp_enabled
      from users where lower(email) = lower($1)`,
     [email],
   );
@@ -227,6 +227,26 @@ export async function login(req, res) {
   if (user.status !== 'active') throw forbidden('Account is not active');
   if (!user.email_verified_at) {
     throw forbidden('Email not verified. Please check your inbox for the verification code.');
+  }
+
+  // ── MFA enforcement (spec §9): users who enabled TOTP 2FA MUST present a
+  // valid code before any session is issued. Respond with a typed challenge
+  // the client renders as a code prompt — never issue tokens on password alone.
+  if (user.totp_enabled) {
+    const totpToken = req.body?.totpToken || req.body?.totp_token;
+    if (!totpToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Two-factor authentication code required',
+        code: '2FA_REQUIRED',
+      });
+    }
+    const { verify2FALogin } = await import('../services/securityService.js');
+    const verification = await verify2FALogin(user.id, String(totpToken));
+    if (!verification.valid) {
+      await recordFailedLogin(email, req.ip || 'unknown');
+      throw forbidden('Invalid two-factor authentication code');
+    }
   }
 
   // ── Record successful login ──────────────────────────────────────

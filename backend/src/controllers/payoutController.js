@@ -39,6 +39,10 @@ export async function requestPayout(req, res) {
   const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
   const requestedAmount = parsePositiveAmount(amount);
   const payout = await transaction(async (client) => {
+    // Serialize concurrent payout requests per fundi: lock the fundi row
+    // before reading balances so two parallel requests cannot both pass
+    // the available-balance check (double-payout race).
+    await client.query('select id from fundis where user_id = $1 for update', [req.user.id]);
     if (idempotencyKey) {
       const duplicate = await client.query('select * from payouts where idempotency_key = $1', [idempotencyKey]);
       if (duplicate.rows[0]) return duplicate.rows[0];
@@ -120,7 +124,10 @@ export async function requestPayout(req, res) {
     metadata: { payoutId: payout.id, amount: payout.amount },
   });
   await auditLog({ userId: req.user.id, action: 'payout.request', entityType: 'payout', entityId: payout.id });
-  emitEvent('payout:requested', { payoutId: payout.id, fundiId: req.user.id });
+  // Payout events are financial operations data: emit to the staff ops room
+  // and the requesting fundi's private room — never broadcast to all clients.
+  emitEvent('payout:requested', { payoutId: payout.id, fundiId: req.user.id }, 'staff:ops');
+  emitEvent('payout:requested', { payoutId: payout.id }, `user:${req.user.id}`);
   res.status(201).json({ success: true, payout });
 }
 
