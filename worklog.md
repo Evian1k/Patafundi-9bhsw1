@@ -24,3 +24,22 @@ Stage Summary:
 - Stack running: vite :3000 (preview) + Express :4000 + PGlite embedded PostgreSQL
 - All 52 spec phases addressed; blocking items documented (PostgreSQL/M-Pesa/email credentials required)
 - Key files: backend/migrations/033_takeover_fixes.sql, backend/src/services/settlementService.js, backend/src/middleware/companyAccess.js, backend/src/controllers/companyController.js, frontend/src/pages/company/*, scripts/patafundi-e2e.mjs, DEMO_ACCOUNTS.md
+
+---
+Task ID: error-handling-feature
+Agent: Super Z (main)
+Task: User-requested feature — users (fundis/customers) must never see raw errors; errors must be routed to staff under the specific role responsible.
+
+Work Log:
+- Upgraded server.js global error handler: error classification, user-safe message mapping, ERR-XXXXXX reference codes, dev-only debug field
+- Upgraded errorNotificationService.js: reference/source/user_role columns, role routing map (client→devops, payment→finance, fraud/security→fraud_analyst), 10-min dedupe, audit log entries
+- Fixed dedupe ordering bug found during live testing (self-matching fingerprint suppressed all notifications)
+- Added POST /api/client-errors public intake; issues reference up-front
+- Enhanced GET /api/staff/error-logs with reference/type/resolved filters
+- Frontend: api.ts 5xx sanitization safety net + ApiError.reference; RouteErrorBoundary hides raw errors, reports crashes w/ CSRF header, shows reference
+- New staff ErrorLogs.tsx viewer at /staff/devops/errors (search by reference, type filters, resolve, stack expand); DevopsHome stat card + link
+- Verified live: 82/82 unit tests, tsc clean, prod build ok, role routing (devops+admin 2 notifications, finance/fraud 0), dedupe (3 rows logged, 2 notified), reference lookup
+
+Stage Summary:
+- Commit f3556ee pushed to main on github.com/Evian1k/Patafundi-9bhsw1
+- Error pipeline: user sees friendly msg + reference → server logs full detail + pings responsible role → staff triages in Error Logs viewer
