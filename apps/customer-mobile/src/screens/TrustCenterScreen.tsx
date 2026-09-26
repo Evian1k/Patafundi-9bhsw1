@@ -22,7 +22,7 @@ export function TrustCenterScreen({ navigation }: any): JSX.Element {
     <SharedTrustCenterScreen
       navigation={navigation}
       cards={TRUST_CARDS}
-      heroSubtitle="Your safety is our priority. Explore the protections that keep every PataFundi job secure."
+      heroSubtitle="Your safety is our priority. Explore the protections that keep every FundiHub job secure."
     />
   );
 }

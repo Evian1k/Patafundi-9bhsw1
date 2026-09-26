@@ -15,11 +15,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
 
 const demoUsers = [
-  // Public platform users
+  // Platform owner (spec §3): the authorized owner account, always provisioned.
+  // In production use scripts/bootstrap-owner.js instead (env-controlled password).
+  { email: 'emmanuelevian@gmail.com', password: 'FundiHubOwner@2026', fullName: 'Emmanuel Evian', role: 'super_admin', phone: '254712000000' },
+  // Public platform users — FundiHub-branded demo set (legacy @patafundi.com
+  // twins below are kept seeded for backward compatibility).
+  { email: 'demo@fundihub.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712100001' },
+  { email: 'company@fundihub.com', password: 'Company@2024!', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712100002' },
+  { email: 'fundi@fundihub.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712100003' },
+  // Internal staff (enterprise RBAC — see migration 009)
+  { email: 'admin@fundihub.com', password: 'Admin@2024!', fullName: 'Super Admin', role: 'super_admin', phone: '254712100004' },
+  { email: 'ops@fundihub.com', password: 'Ops@2024!', fullName: 'Ops Manager', role: 'admin', phone: '254712100005' },
+  { email: 'support@fundihub.com', password: 'Support@2024!', fullName: 'Support Agent', role: 'support_agent', phone: '254712100006' },
+  { email: 'fraud@fundihub.com', password: 'Fraud@2024!', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712100007' },
+  { email: 'finance@fundihub.com', password: 'Finance@2024!', fullName: 'Finance Team', role: 'finance_team', phone: '254712100008' },
+  { email: 'dispatch@fundihub.com', password: 'Dispatch@2024!', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712100009' },
+  { email: 'devops@fundihub.com', password: 'Devops@2024!', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712100010' },
+  { email: 'auditor@fundihub.com', password: 'Auditor@2024!', fullName: 'Auditor', role: 'auditor', phone: '254712100011' },
+  // ── Legacy PataFundi-branded set (still seeded; not shown on the demo page) ──
   { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },
   { email: 'company@patafundi.com', password: 'Company@2024!', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712000002' },
   { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000003' },
-  // Internal staff (enterprise RBAC — see migration 009)
   { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Super Admin', role: 'super_admin', phone: '254712000004' },
   { email: 'ops@patafundi.com', password: 'Ops@2024!', fullName: 'Ops Manager', role: 'admin', phone: '254712000005' },
   { email: 'support@patafundi.com', password: 'Support@2024!', fullName: 'Support Agent', role: 'support_agent', phone: '254712000006' },
@@ -264,7 +280,7 @@ async function ensurePostgresDatabase(databaseUrl) {
       const admin = new pg.Pool(getPgPoolConfig(adminUrl, { connectionTimeoutMillis: 3000 }));
       try {
         await admin.query(`create database "${dbName.replace(/"/g, '""')}"`);
-        console.log(`[PataFundi] Created database ${dbName}`);
+        console.log(`[FundiHub] Created database ${dbName}`);
       } finally {
         await admin.end();
       }
@@ -272,7 +288,7 @@ async function ensurePostgresDatabase(databaseUrl) {
     }
     // Any other connection failure (ECONNREFUSED, wrong protocol, bad URL, etc.)
     // should not crash the server — fall through to embedded DB instead.
-    console.warn(`[PataFundi] PostgreSQL unreachable (${error.message}); falling back to embedded DB`);
+    console.warn(`[FundiHub] PostgreSQL unreachable (${error.message}); falling back to embedded DB`);
     return false;
   }
 }
@@ -295,7 +311,7 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
   if (process.env.NODE_ENV === 'production' && isLocalDatabaseUrl(databaseUrl)) {
     const msg = 'DATABASE_URL must not point to localhost in production';
     if (required) throw new Error(msg);
-    console.error(`[PataFundi] ${msg}`);
+    console.error(`[FundiHub] ${msg}`);
     return false;
   }
 
@@ -334,12 +350,12 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
     await ensureCustomersTable(pool);
     await seedIfEmpty(pool);
     await pool.end();
-    console.log('[PataFundi] PostgreSQL database ready');
+    console.log('[FundiHub] PostgreSQL database ready');
     return true;
   } catch (error) {
     await pool.end().catch(() => {});
     if (required) throw error;
-    console.warn(`[PataFundi] PostgreSQL unavailable (${error.message}); falling back to embedded DB`);
+    console.warn(`[FundiHub] PostgreSQL unavailable (${error.message}); falling back to embedded DB`);
     return false;
   }
 }
@@ -369,12 +385,12 @@ export async function ensureDevDatabase() {
     await applyMigrations(db);
     await ensureCustomersTable(db);
     await seedIfEmpty(db);
-    console.log('[PataFundi] Embedded database ready');
+    console.log('[FundiHub] Embedded database ready');
     return true;
   } catch (error) {
     console.error('');
     console.error('============================================================');
-    console.error('[PataFundi] DATABASE INITIALIZATION FAILED');
+    console.error('[FundiHub] DATABASE INITIALIZATION FAILED');
     console.error('============================================================');
     console.error(error.message);
     console.error('');
@@ -394,7 +410,7 @@ if (isDirectRun) {
   ensureDevDatabase()
     .then(() => process.exit(0))
     .catch((error) => {
-      console.error('[PataFundi]', error.message);
+      console.error('[FundiHub]', error.message);
       process.exit(1);
     });
 }

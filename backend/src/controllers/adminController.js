@@ -743,3 +743,95 @@ export async function updateSettings(req, res) {
   finalSettings.maintenanceMode = maintenanceMode ?? false;
   res.json({ success: true, settings: finalSettings });
 }
+
+// ════════════════════════════════════════════════════════════════
+// FUNDIHUB completion additions (spec §4-§8, §20, §29)
+// ════════════════════════════════════════════════════════════════
+
+// GET /admin/payouts — full payout ledger for the finance control center
+export async function listPayouts(req, res) {
+  const status = req.query?.status || null;
+  const params = [];
+  let where = '';
+  if (status && status !== 'all') {
+    params.push(status);
+    where = `where p.status = $${params.length}`;
+  }
+  const result = await query(
+    `select p.*, u.full_name as fundi_name, u.email as fundi_email, u.phone as fundi_phone
+     from payouts p join users u on u.id = p.fundi_id
+     ${where} order by p.created_at desc limit 200`,
+    params,
+  );
+  const stats = await query(
+    `select status, count(*)::int as count, coalesce(sum(amount), 0) as total from payouts group by status`,
+  );
+  res.json({ success: true, payouts: result.rows, stats: stats.rows });
+}
+
+// GET /admin/subscriptions — platform subscription book, split by subscriber type
+export async function listSubscriptions(req, res) {
+  const result = await query(
+    `select s.*, u.full_name as subscriber_name, u.email as subscriber_email, u.role as subscriber_role
+     from subscriptions s join users u on u.id = s.fundi_id
+     order by s.created_at desc limit 200`,
+  );
+  const stats = await query(
+    `select subscriber_type, status, count(*)::int as count, coalesce(sum(amount), 0) as total
+     from subscriptions group by subscriber_type, status`,
+  );
+  res.json({ success: true, subscriptions: result.rows, stats: stats.rows });
+}
+
+// GET /admin/reviews — moderation view with job + provider context
+export async function listReviews(req, res) {
+  const result = await query(
+    `select r.*, j.service_category, j.fundi_id, j.company_id, j.provider_type,
+            reviewer.full_name as reviewer_name,
+            reviewed.full_name as fundi_name
+     from reviews r
+     join jobs j on j.id = r.job_id
+     join users reviewer on reviewer.id = r.reviewer_id
+     left join users reviewed on reviewed.id = j.fundi_id
+     order by r.created_at desc limit 200`,
+  );
+  res.json({ success: true, reviews: result.rows });
+}
+
+// POST /admin/reviews/:id/hide — moderation: hidden reviews drop from aggregates
+export async function hideReview(req, res) {
+  const { hidden } = req.body || {};
+  const result = await query(
+    `update reviews set hidden = $2 where id = $1 returning *`,
+    [req.params.id, hidden !== false],
+  );
+  if (!result.rows[0]) throw notFound('Review not found');
+  await auditLog({
+    userId: req.user.id,
+    action: hidden !== false ? 'review.hidden' : 'review.unhidden',
+    entityType: 'review',
+    entityId: req.params.id,
+  });
+  res.json({ success: true, review: result.rows[0] });
+}
+
+// POST /admin/fundis/:id/verification-level — spec §6 action
+export async function setFundiVerificationLevel(req, res) {
+  const { level } = req.body || {};
+  if (!['standard', 'enhanced', 'top_pro'].includes(level)) {
+    throw badRequest('level must be standard, enhanced or top_pro');
+  }
+  const result = await query(
+    `update fundis set verification_level = $2, updated_at = now() where user_id = $1 returning user_id, verification_level`,
+    [req.params.id, level],
+  );
+  if (!result.rows[0]) throw notFound('Fundi not found');
+  await auditLog({
+    userId: req.user.id,
+    action: 'fundi.verification_level_changed',
+    entityType: 'fundi',
+    entityId: req.params.id,
+    metadata: { level },
+  });
+  res.json({ success: true, fundi: result.rows[0] });
+}

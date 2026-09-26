@@ -33,23 +33,23 @@ async function login(email, password) {
   return { token, status: r.status, user: r.json?.user };
 }
 
-const PW = 'PataFundi#2026';
+const PW = 'FundiHub#2026';
 
 async function main() {
   console.log('── 1. Demo account logins ──');
-  const customer = await login('customer.demo@patafundi.test', PW);
+  const customer = await login('customer.demo@fundihub.test', PW);
   check('customer login', customer.status === 200 && !!customer.token, `got ${customer.status}`);
-  const company = await login('company.demo@patafundi.test', PW);
+  const company = await login('company.demo@fundihub.test', PW);
   check('company owner login', company.status === 200 && !!company.token);
-  const dispatcher = await login('dispatcher.demo@patafundi.test', PW);
+  const dispatcher = await login('dispatcher.demo@fundihub.test', PW);
   check('dispatcher login', dispatcher.status === 200 && !!dispatcher.token);
-  const technician = await login('technician.demo@patafundi.test', PW);
+  const technician = await login('technician.demo@fundihub.test', PW);
   check('technician login', technician.status === 200 && !!technician.token);
-  const staffOps = await login('operations.demo@patafundi.test', PW);
+  const staffOps = await login('operations.demo@fundihub.test', PW);
   check('staff operations login', staffOps.status === 200 && !!staffOps.token);
-  const staffFinance = await login('finance.demo@patafundi.test', PW);
+  const staffFinance = await login('finance.demo@fundihub.test', PW);
   check('staff finance login', staffFinance.status === 200 && !!staffFinance.token);
-  const superAdmin = await login('admin.demo@patafundi.test', PW);
+  const superAdmin = await login('admin.demo@fundihub.test', PW);
   check('super admin login', superAdmin.status === 200 && !!superAdmin.token);
 
   console.log('── 2. Public company directory (customer-safe) ──');
@@ -86,7 +86,7 @@ async function main() {
 
   const team = await api('/company/portal/team', { token: company.token });
   check('team list loads', team.status === 200 && Array.isArray(team.json?.team) && team.json.team.length >= 4);
-  const techMember = team.json.team.find((m) => m.email === 'technician.demo@patafundi.test');
+  const techMember = team.json.team.find((m) => m.email === 'technician.demo@fundihub.test');
 
   const assign = await api(`/company/jobs/${jobId}/assign-technician`, {
     method: 'POST', token: dispatcher.token, body: { technicianMemberId: techMember.id },
@@ -97,7 +97,7 @@ async function main() {
   console.log('── 5. Cross-company isolation (IDOR attempt) ──');
   const outsider = await api(`/company/portal/overview`, { token: customer.token });
   check('customer blocked from company portal', outsider.status === 403, `got ${outsider.status}`);
-  const fundiPortal = await api(`/company/portal/overview`, { token: (await login('fundi.demo@patafundi.test', PW)).token });
+  const fundiPortal = await api(`/company/portal/overview`, { token: (await login('fundi.demo@fundihub.test', PW)).token });
   check('fundi blocked from company portal', fundiPortal.status === 403, `got ${fundiPortal.status}`);
 
   console.log('── 6. Technician executes work ──');

@@ -61,8 +61,8 @@ export function AboutScreen({ navigation }: any): JSX.Element {
   const handleShare = async (): Promise<void> => {
     try {
       await Share.share({
-        message: `Check out PataFundi — East Africa's premier on-demand services marketplace. ${WEBSITE_URL}`,
-        title: 'PataFundi',
+        message: `Check out FundiHub — East Africa's premier on-demand services marketplace. ${WEBSITE_URL}`,
+        title: 'FundiHub',
       });
     } catch {
       // ignore
@@ -92,7 +92,7 @@ export function AboutScreen({ navigation }: any): JSX.Element {
         <Ionicons name="flash" size={48} color={colors.primaryForeground} />
       </LinearGradient>
 
-      <Text style={styles.appName}>PataFundi</Text>
+      <Text style={styles.appName}>FundiHub</Text>
       <Text style={styles.version}>Version {APP_VERSION}</Text>
       <Text style={styles.tagline}>
         East Africa’s premier on-demand services marketplace
@@ -132,7 +132,7 @@ export function AboutScreen({ navigation }: any): JSX.Element {
         ))}
       </View>
 
-      <Text style={styles.copyright}>© 2026 PataFundi. All rights reserved.</Text>
+      <Text style={styles.copyright}>© 2026 FundiHub. All rights reserved.</Text>
     </ScrollView>
   );
 }

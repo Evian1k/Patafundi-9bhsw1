@@ -78,9 +78,9 @@ export function ReferEarnScreen({ navigation }: any): JSX.Element {
     if (!code) return;
     try {
       await Share.share({
-        message: `Join me on PataFundi! Use my referral code ${code} to get started. ${link ?? ''}`.trim(),
+        message: `Join me on FundiHub! Use my referral code ${code} to get started. ${link ?? ''}`.trim(),
         url: link,
-        title: 'PataFundi referral',
+        title: 'FundiHub referral',
       });
     } catch {
       // ignore cancellation

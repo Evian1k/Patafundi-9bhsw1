@@ -1,4 +1,4 @@
-// seed-takeover.js — PataFundi ZAI takeover demo ecosystem (DEVELOPMENT ONLY).
+// seed-takeover.js — FundiHub (formerly PataFundi) takeover demo ecosystem (DEVELOPMENT ONLY).
 // Idempotent: safe to run repeatedly. Creates:
 //   • 12 demo accounts matching DEMO_ACCOUNTS.md (all roles, unified password)
 //   • "Apex Home Services Ltd" demo company (branches, technicians, services)
@@ -11,21 +11,21 @@ import pg from 'pg';
 
 if (process.env.NODE_ENV !== 'production') dotenv.config();
 
-export const DEMO_PASSWORD = 'PataFundi#2026';
+export const DEMO_PASSWORD = 'FundiHub#2026';
 
 const DEMO_USERS = [
-  { email: 'customer.demo@patafundi.test', fullName: 'Amina Customer (Demo)', role: 'customer', phone: '254730000001' },
-  { email: 'fundi.demo@patafundi.test', fullName: 'John Kamau (Demo Fundi)', role: 'fundi', phone: '254730000002' },
-  { email: 'company.demo@patafundi.test', fullName: 'Grace Owner (Demo Company)', role: 'company_admin', phone: '254730000003' },
-  { email: 'dispatcher.demo@patafundi.test', fullName: 'David Dispatcher (Demo)', role: 'customer', phone: '254730000004' },
-  { email: 'technician.demo@patafundi.test', fullName: 'Peter Tech (Demo Technician)', role: 'customer', phone: '254730000005' },
-  { email: 'operations.demo@patafundi.test', fullName: 'Faith Ops (Demo Staff)', role: 'admin', phone: '254730000006' },
-  { email: 'support.demo@patafundi.test', fullName: 'Sam Support (Demo Staff)', role: 'support_agent', phone: '254730000007' },
-  { email: 'finance.demo@patafundi.test', fullName: 'Nancy Finance (Demo Staff)', role: 'finance_team', phone: '254730000008' },
-  { email: 'fraud.demo@patafundi.test', fullName: 'Oscar Fraud (Demo Staff)', role: 'fraud_analyst', phone: '254730000009' },
-  { email: 'devops.demo@patafundi.test', fullName: 'Dennis DevOps (Demo Staff)', role: 'devops_engineer', phone: '254730000010' },
-  { email: 'auditor.demo@patafundi.test', fullName: 'Alice Auditor (Demo Staff)', role: 'auditor', phone: '254730000011' },
-  { email: 'admin.demo@patafundi.test', fullName: 'Super Admin (Demo)', role: 'super_admin', phone: '254730000012' },
+  { email: 'customer.demo@fundihub.test', fullName: 'Amina Customer (Demo)', role: 'customer', phone: '254730000001' },
+  { email: 'fundi.demo@fundihub.test', fullName: 'John Kamau (Demo Fundi)', role: 'fundi', phone: '254730000002' },
+  { email: 'company.demo@fundihub.test', fullName: 'Grace Owner (Demo Company)', role: 'company_admin', phone: '254730000003' },
+  { email: 'dispatcher.demo@fundihub.test', fullName: 'David Dispatcher (Demo)', role: 'customer', phone: '254730000004' },
+  { email: 'technician.demo@fundihub.test', fullName: 'Peter Tech (Demo Technician)', role: 'customer', phone: '254730000005' },
+  { email: 'operations.demo@fundihub.test', fullName: 'Faith Ops (Demo Staff)', role: 'admin', phone: '254730000006' },
+  { email: 'support.demo@fundihub.test', fullName: 'Sam Support (Demo Staff)', role: 'support_agent', phone: '254730000007' },
+  { email: 'finance.demo@fundihub.test', fullName: 'Nancy Finance (Demo Staff)', role: 'finance_team', phone: '254730000008' },
+  { email: 'fraud.demo@fundihub.test', fullName: 'Oscar Fraud (Demo Staff)', role: 'fraud_analyst', phone: '254730000009' },
+  { email: 'devops.demo@fundihub.test', fullName: 'Dennis DevOps (Demo Staff)', role: 'devops_engineer', phone: '254730000010' },
+  { email: 'auditor.demo@fundihub.test', fullName: 'Alice Auditor (Demo Staff)', role: 'auditor', phone: '254730000011' },
+  { email: 'admin.demo@fundihub.test', fullName: 'Super Admin (Demo)', role: 'super_admin', phone: '254730000012' },
 ];
 
 async function getDb() {
@@ -98,6 +98,14 @@ export async function seedTakeover() {
     );
   });
 
+  // Demo fundis need coordinates or the geo matching engine can never see
+  // them (findNearbyFundis / findNearestFundis both require lat/lng).
+  await db.query(
+    `update fundis set latitude = -1.2921, longitude = 36.8219, location_accuracy = 20
+     where user_id = any($1::uuid[]) and (latitude is null or longitude is null)`,
+    [[ids.fundi, ids.technician, ids.tech2, ids.tech3].filter(Boolean)],
+  ).catch(() => {});
+
   // 3. Demo customer property ──────────────────────────────────────────────
   const propRes = await db.query(
     `select id from customer_properties where customer_id = $1 and label = 'Home' limit 1`,
@@ -132,7 +140,7 @@ export async function seedTakeover() {
           company_registration_number, business_categories, service_areas, branches,
           technician_count, license_details, description, status, approved_at)
        values ($1, 'Apex Home Services Ltd', 'Apex Home Services Limited', 'Grace Owner',
-         'company.demo@patafundi.test', '254730000003', 'PVT-XYZ890',
+         'company.demo@fundihub.test', '254730000003', 'PVT-XYZ890',
          $2, $3, $4, 4, 'NEMA & EPRA licensed (DEMO)', $5, 'approved', now())
        returning id`,
       [ids.company,
@@ -151,7 +159,7 @@ export async function seedTakeover() {
           technician_count, license_details, description, status, rating, completed_jobs,
           availability, guarantees, team_size)
        values ($1, $2, 'Apex Home Services Ltd', 'Apex Home Services Limited', 'Grace Owner',
-         'company.demo@patafundi.test', '254730000003', 'PVT-XYZ890', $3, $4, $5, 4,
+         'company.demo@fundihub.test', '254730000003', 'PVT-XYZ890', $3, $4, $5, 4,
          'NEMA & EPRA licensed (DEMO)', $6, 'approved', 4.8, 1284, 'available', $7, 4)
        returning id`,
       [appRes.rows[0].id, ids.company,
@@ -179,8 +187,8 @@ export async function seedTakeover() {
   ];
   // two extra demo technicians
   for (const extra of [
-    { email: 'tech2.demo@patafundi.test', fullName: 'Brian Electric (Demo Technician)', role: 'customer', phone: '254730000013', skills: ['electrical', 'hvac'] },
-    { email: 'tech3.demo@patafundi.test', fullName: 'Carol Fixit (Demo Technician)', role: 'customer', phone: '254730000014', skills: ['appliance_repair', 'hvac'] },
+    { email: 'tech2.demo@fundihub.test', fullName: 'Brian Electric (Demo Technician)', role: 'customer', phone: '254730000013', skills: ['electrical', 'hvac'] },
+    { email: 'tech3.demo@fundihub.test', fullName: 'Carol Fixit (Demo Technician)', role: 'customer', phone: '254730000014', skills: ['appliance_repair', 'hvac'] },
   ]) {
     const user = await upsertUser(db, extra, hash);
     ids[extra.email.split('@')[0].split('.')[0] + '2'] = user.id;
@@ -326,7 +334,7 @@ export async function seedTakeover() {
   // 9. Sample notifications for demo customer + company owner ──────────────
   await db.query(
     `insert into notifications (user_id, type, title, body, data)
-     select $1, 'welcome', 'Welcome to PataFundi', 'Your demo account is ready. Book a verified Fundi or Company to get started.', '{}'::jsonb
+     select $1, 'welcome', 'Welcome to FundiHub', 'Your demo account is ready. Book a verified fundi or company to get started.', '{}'::jsonb
      where not exists (select 1 from notifications where user_id = $1 and type = 'welcome')`,
     [ids.customer],
   );

@@ -5,7 +5,8 @@ import { uploadPrivateFile, getSignedAccessUrl } from '../services/storageServic
 import { mapMulterFiles } from '../middleware/upload.js';
 
 function canAccessJob(user, job) {
-  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+  // super_admin must be recognized everywhere (isAdminRole parity, Task 4 fix)
+  return user.role === 'admin' || user.role === 'super_admin' || job.customer_id === user.id || job.fundi_id === user.id;
 }
 
 export async function createDispute(req, res) {

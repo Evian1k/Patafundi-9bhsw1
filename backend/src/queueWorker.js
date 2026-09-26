@@ -26,9 +26,12 @@ export function registerQueueHandler(queueName, handler) {
 }
 
 async function processOne() {
+  // NOTE: job_queue.status CHECK allows ('pending','running','completed',
+  // 'failed','dead_letter') — 'processing' would violate the constraint and
+  // silently kill every queued job.
   const result = await query(
     `update job_queue
-     set status = 'processing',
+     set status = 'running',
          started_at = now(),
          attempts = coalesce(attempts, 0) + 1
      where id = (

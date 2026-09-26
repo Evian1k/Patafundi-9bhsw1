@@ -1,6 +1,6 @@
 /**
- * API Client for PataFundi — Node.js Express Backend
- * All routes map to /api/* on the PataFundi backend.
+ * API Client for FundiHub — Node.js Express Backend
+ * All routes map to /api/* on the FundiHub backend.
  */
 
 import { buildApiUrl, isApiConfigured } from '@/api/config';
@@ -480,6 +480,47 @@ class ApiClient {
 
   async cancelJob(jobId: string, reason: string | null = null) {
     return this.request(`/jobs/${jobId}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+
+  // ── AI Assistant (spec §31) ──
+  async analyzeJobDescription(description: string) {
+    return this.request('/ai/analyze-job', { method: 'POST', body: JSON.stringify({ description }) });
+  }
+  async improveProfileText(text: string, kind: 'fundi' | 'company' = 'fundi') {
+    return this.request('/ai/profile-improve', { method: 'POST', body: JSON.stringify({ text, kind }) });
+  }
+
+  // ── Refund requests (spec §8/§23) ──
+  async requestRefund(jobId: string, payload: { reason: string; details?: string; amount?: number }) {
+    return this.request(`/jobs/${jobId}/refund-request`, { method: 'POST', body: JSON.stringify(payload) });
+  }
+  async listMyRefundRequests() {
+    return this.request('/refunds/mine');
+  }
+
+  // ── Review replies (spec §29) ──
+  async replyToReview(reviewId: string, reply: string) {
+    return this.request(`/reviews/${reviewId}/reply`, { method: 'POST', body: JSON.stringify({ reply }) });
+  }
+
+  // ── Admin: payouts / subscriptions / refunds / reviews (spec §20) ──
+  async adminListPayouts(status?: string) {
+    return this.request(`/admin/payouts${status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : ''}`);
+  }
+  async adminListSubscriptions() {
+    return this.request('/admin/subscriptions');
+  }
+  async adminListRefundRequests(status?: string) {
+    return this.request(`/admin/refund-requests${status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : ''}`);
+  }
+  async adminDecideRefundRequest(id: string, action: 'approve' | 'reject', opts: { notes?: string; amount?: number } = {}) {
+    return this.request(`/admin/refund-requests/${id}/decision`, { method: 'POST', body: JSON.stringify({ action, notes: opts.notes, amount: opts.amount }) });
+  }
+  async adminListReviews() {
+    return this.request('/admin/reviews');
+  }
+  async adminHideReview(id: string, hidden: boolean) {
+    return this.request(`/admin/reviews/${id}/hide`, { method: 'POST', body: JSON.stringify({ hidden }) });
   }
 
   async updateJobStatus(jobId: string, status: string) {

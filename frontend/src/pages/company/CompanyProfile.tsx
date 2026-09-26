@@ -54,37 +54,19 @@ export default function CompanyProfile() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const book = async (service?: ServiceItem) => {
+  const book = (service?: ServiceItem) => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
       sessionStorage.setItem("pf_booking_company", id || "");
       navigate("/auth?mode=login&next=" + encodeURIComponent(`/companies/${id}`));
       return;
     }
-    setBooking(true); setBookMsg(null);
-    try {
-      const description = service
-        ? `Booking request: ${service.name} (${service.category}).`
-        : `General service request for ${company?.companyName}.`;
-      await apiClient.request("/jobs", {
-        method: "POST",
-        body: {
-          serviceCategory: service?.category || company?.businessCategories?.[0] || "plumbing",
-          description,
-          latitude: -1.2921, longitude: 36.7819,
-          formattedAddress: company?.branches?.[0]?.address || "Nairobi",
-          estimatedPrice: Number(service?.basePrice || 0) || 3000,
-          companyId: id,
-          urgency: "normal",
-        },
-      });
-      setBookMsg("Request sent! The company will confirm your booking — track it in My Jobs.");
-      setTimeout(() => navigate("/dashboard"), 1400);
-    } catch (e: unknown) {
-      setBookMsg(e instanceof Error ? e.message : "Could not send request.");
-    } finally {
-      setBooking(false);
-    }
+    // Send the customer into the booking wizard with this company preselected
+    // (spec §2/§24): the wizard captures the customer's real location and the
+    // server prices the job — the client never fabricates coordinates or prices.
+    const params = new URLSearchParams({ company: id || "" });
+    if (service?.category) params.set("service", service.name);
+    navigate(`/create-job?${params.toString()}`);
   };
 
   if (loading) {

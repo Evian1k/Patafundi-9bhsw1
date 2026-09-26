@@ -5,8 +5,13 @@ import {
   LayoutDashboard, Users, Shield, TrendingUp, BarChart3,
   Settings, LogOut, Menu, Briefcase, CreditCard,
   AlertTriangle, FileText, Scale, ChevronRight,
+  Banknote,
+  Undo2,
+  Repeat,
+  Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import NotificationBell from "@/components/system/NotificationBell";
 import { apiClient } from "@/lib/api";
 import { realtimeService } from "@/services/realtime";
 import { toast } from "sonner";
@@ -31,6 +36,10 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: Users, label: "Customers", path: "/admin/customers", color: "text-purple-500" },
   { icon: Briefcase, label: "Jobs", path: "/admin/jobs", color: "text-orange-500" },
   { icon: CreditCard, label: "Payments", path: "/admin/payments", color: "text-emerald-500" },
+  { icon: Banknote, label: "Payouts", path: "/admin/payouts", color: "text-teal-500" },
+  { icon: Undo2, label: "Refunds", path: "/admin/refunds", color: "text-rose-500" },
+  { icon: Repeat, label: "Subscriptions", path: "/admin/subscriptions", color: "text-lime-500" },
+  { icon: Star, label: "Reviews", path: "/admin/reviews", color: "text-amber-500" },
   { icon: Scale, label: "Disputes", path: "/admin/disputes", color: "text-violet-500" },
   { icon: AlertTriangle, label: "Security", path: "/admin/security", color: "text-red-500" },
   { icon: BarChart3, label: "Reports", path: "/admin/reports", color: "text-cyan-500" },
@@ -223,6 +232,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
               {MENU_ITEMS.find((m) => m.path === location.pathname)?.label || "Admin Panel"}
             </p>
           </div>
+          <NotificationBell />
           {localDisputeBadge > 0 && !location.pathname.includes("/admin/disputes") && (
             <Link
               to="/admin/disputes"

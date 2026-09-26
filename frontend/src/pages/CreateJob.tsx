@@ -43,6 +43,20 @@ interface JobFormData {
   scheduledDate?: string;
   scheduledTime?: string;
   photos: PhotoData[];
+  providerChoice: "individual" | "company" | "platform_match";
+  preferredFundiId?: string;
+  companyId?: string;
+}
+
+interface AiAnalysis {
+  engine?: string;
+  category?: string;
+  urgency?: string;
+  suggestedProviderType?: string;
+  questions?: string[];
+  improvedDescription?: string;
+  estimateRange?: { min: number; max: number } | null;
+  disclaimers?: string[];
 }
 
 const services = [
@@ -54,6 +68,30 @@ const services = [
   { id: "auto", name: "Auto Repair", icon: Car, color: "from-red-500 to-rose-500" },
   { id: "painting", name: "Painting", icon: PaintBucket, color: "from-purple-500 to-pink-500" },
   { id: "general", name: "General Repair", icon: Wrench, color: "from-gray-500 to-slate-500" },
+];
+
+const providerChoices = [
+  {
+    id: "platform_match" as const,
+    title: "Let FundiHub Match",
+    subtitle: "Recommended",
+    description: "Our matching engine picks the best available professional for your job, based on skills, distance, rating and workload.",
+    icon: Sparkles,
+  },
+  {
+    id: "individual" as const,
+    title: "Individual Fundi",
+    subtitle: "Choose your professional",
+    description: "Book a specific verified independent professional. Browse fundis first, or get matched with one.",
+    icon: Wrench,
+  },
+  {
+    id: "company" as const,
+    title: "Service Company",
+    subtitle: "Team & equipment jobs",
+    description: "Book a verified company with teams, tools and dispatchers — ideal for bigger or scheduled jobs.",
+    icon: CheckCircle,
+  },
 ];
 
 const urgencyOptions = [
@@ -81,7 +119,41 @@ const CreateJob = () => {
     scheduledDate: "",
     scheduledTime: "",
     photos: [],
+    // Spec §2: customer explicitly chooses Individual / Company / Smart Match.
+    providerChoice: (searchParams.get("fundi") && "individual") || (searchParams.get("company") && "company") || "platform_match",
+    preferredFundiId: searchParams.get("fundi") || undefined,
+    companyId: searchParams.get("company") || undefined,
   });
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+
+  const runAiAnalysis = async () => {
+    if (jobData.description.trim().length < 10) {
+      toast.error("Write a few words about the problem first.");
+      return;
+    }
+    setAiAnalyzing(true);
+    try {
+      const res = await apiClient.analyzeJobDescription(jobData.description) as { analysis?: AiAnalysis; disclaimer?: string };
+      if (res?.analysis) {
+        setAiAnalysis(res.analysis);
+        // Auto-suggest the category when the AI recognized a known one.
+        const cat = (res.analysis.category || "").toLowerCase();
+        const known = services.find((s) => s.id === cat || s.name.toLowerCase().includes(cat));
+        if (known && known.id !== jobData.service) {
+          setJobData((prev) => ({ ...prev, service: known.name }));
+          toast.success(`FundiHub AI suggests: ${known.name}`);
+        }
+        if (res.analysis.suggestedProviderType === "company" && jobData.providerChoice === "platform_match") {
+          toast("Tip: FundiHub AI suggests a service company for this job.", { duration: 5000 });
+        }
+      }
+    } catch {
+      toast.error("AI assistant is unavailable right now — you can continue without it.");
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -131,7 +203,8 @@ const CreateJob = () => {
   const canProceed = () => {
     if (step === 1) return !!jobData.service;
     if (step === 2) return jobData.description.trim().length >= 10;
-    if (step === 3) {
+    if (step === 3) return !!jobData.providerChoice;
+    if (step === 4) {
       return !!jobData.urgency
         && !!locationSelection?.formattedAddress
         && jobData.latitude !== undefined
@@ -158,6 +231,10 @@ const CreateJob = () => {
         urgency: jobData.urgency,
         scheduledDate: jobData.urgency === "scheduled" ? jobData.scheduledDate : undefined,
         scheduledTime: jobData.urgency === "scheduled" ? jobData.scheduledTime : undefined,
+        // Spec §2 three-way booking model
+        providerType: jobData.providerChoice,
+        preferredFundiId: jobData.providerChoice === "individual" ? jobData.preferredFundiId : undefined,
+        companyId: jobData.providerChoice === "company" ? jobData.companyId : undefined,
       };
 
       const res = await apiClient.createJob(payload) as { job?: { id: string } };
@@ -192,12 +269,12 @@ const CreateJob = () => {
           <div className="flex-1">
             <h1 className="font-semibold text-sm">Create Job Request</h1>
             <div className="flex gap-1 mt-1">
-              {[1, 2, 3, 4].map((s) => (
+              {[1, 2, 3, 4, 5].map((s) => (
                 <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-muted"}`} />
               ))}
             </div>
           </div>
-          <span className="text-xs text-muted-foreground">{step}/4</span>
+          <span className="text-xs text-muted-foreground">{step}/5</span>
         </div>
       </div>
 
@@ -245,6 +322,63 @@ const CreateJob = () => {
                     className="w-full px-4 py-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none text-sm"
                   />
                   <p className="text-xs text-muted-foreground mt-1">{jobData.description.length}/500 characters (min 10)</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={runAiAnalysis}
+                      disabled={aiAnalyzing || jobData.description.trim().length < 10}
+                      className="gap-2"
+                    >
+                      {aiAnalyzing ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-emerald-500" />}
+                      {aiAnalyzing ? "Analyzing…" : "Ask FundiHub AI"}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">Get category, questions & an estimated price range</span>
+                  </div>
+
+                  {aiAnalysis && (
+                    <div className="mt-3 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-500" />
+                        <p className="text-sm font-semibold">FundiHub AI analysis</p>
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground ml-auto">
+                          {aiAnalysis.engine === "heuristic" ? "basic mode" : "AI estimate"}
+                        </span>
+                      </div>
+                      {aiAnalysis.improvedDescription && (
+                        <div className="text-sm">
+                          <p className="text-muted-foreground text-xs mb-1">Suggested description:</p>
+                          <p>{aiAnalysis.improvedDescription}</p>
+                          <button
+                            type="button"
+                            onClick={() => setJobData((prev) => ({ ...prev, description: aiAnalysis.improvedDescription || prev.description }))}
+                            className="text-xs font-medium text-emerald-600 hover:underline mt-1"
+                          >
+                            Use this description
+                          </button>
+                        </div>
+                      )}
+                      {aiAnalysis.questions && aiAnalysis.questions.length > 0 && (
+                        <div className="text-sm">
+                          <p className="text-muted-foreground text-xs mb-1">A pro will likely ask:</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            {aiAnalysis.questions.map((q, i) => <li key={i}>{q}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {aiAnalysis.estimateRange && (
+                        <p className="text-sm">
+                          <span className="text-muted-foreground text-xs">Typical range: </span>
+                          <span className="font-semibold">KES {aiAnalysis.estimateRange.min.toLocaleString()} – {aiAnalysis.estimateRange.max.toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground"> (estimate, not a quote)</span>
+                        </p>
+                      )}
+                      {aiAnalysis.disclaimers?.map((d, i) => (
+                        <p key={i} className="text-[11px] text-muted-foreground">{d}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Photos */}
@@ -285,9 +419,71 @@ const CreateJob = () => {
             </motion.div>
           )}
 
-          {/* Step 3: Location & Urgency */}
+          {/* Step 3: Provider Choice (spec §2 — Individual / Company / Smart Match) */}
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <h2 className="text-xl font-display font-bold mb-2">Who should handle it?</h2>
+              <p className="text-muted-foreground text-sm mb-6">You choose — an individual professional, a verified company, or let FundiHub match you.</p>
+              <div className="grid gap-3">
+                {providerChoices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    onClick={() => setJobData((prev) => ({ ...prev, providerChoice: choice.id }))}
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex gap-4 items-start ${
+                      jobData.providerChoice === choice.id
+                        ? "border-primary bg-primary/5 shadow-md"
+                        : "border-border bg-card hover:border-primary/30"
+                    }`}
+                  >
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                      jobData.providerChoice === choice.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    }`}>
+                      <choice.icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm">{choice.title}</p>
+                        <span className="text-[10px] uppercase tracking-wide font-semibold text-emerald-600 bg-emerald-500/10 rounded-full px-2 py-0.5">{choice.subtitle}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{choice.description}</p>
+                      {choice.id === "individual" && jobData.preferredFundiId && (
+                        <p className="text-xs font-medium text-emerald-600 mt-1">
+                          ✓ Booking your chosen professional (from their profile)
+                        </p>
+                      )}
+                      {choice.id === "company" && jobData.companyId && (
+                        <p className="text-xs font-medium text-emerald-600 mt-1">
+                          ✓ Booking your chosen company (from their profile)
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {jobData.providerChoice === "individual" && !jobData.preferredFundiId && (
+                <div className="mt-4 p-4 rounded-xl border border-border bg-card">
+                  <p className="text-sm font-medium">No fundi selected yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified professionals and pick one, or submit and FundiHub will broadcast your job to qualified fundis.</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => navigate("/services/plumbing")}>
+                    Browse fundis
+                  </Button>
+                </div>
+              )}
+              {jobData.providerChoice === "company" && !jobData.companyId && (
+                <div className="mt-4 p-4 rounded-xl border border-border bg-card">
+                  <p className="text-sm font-medium">No company selected yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified service companies, or submit and your job will go to the company open pool — the first eligible company claims it.</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => navigate("/companies")}>
+                    Browse companies
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Step 4: Location & Urgency */}
+          {step === 4 && (
+            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">Location & urgency</h2>
               <p className="text-muted-foreground text-sm mb-6">When and where do you need the service?</p>
 
@@ -366,9 +562,9 @@ const CreateJob = () => {
             </motion.div>
           )}
 
-          {/* Step 4: Review & Submit */}
-          {step === 4 && (
-            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+          {/* Step 5: Review & Submit */}
+          {step === 5 && (
+            <motion.div key="step5" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">Review your request</h2>
               <p className="text-muted-foreground text-sm mb-6">Check the details before submitting.</p>
               <div className="space-y-4">

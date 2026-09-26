@@ -25,7 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const STATUS_PAGE_URL = 'https://patafundi-9bhsw1.vercel.app/status';
-const SUPPORT_EMAIL_URL = 'mailto:support@patafundi.com?subject=PataFundi%20Maintenance';
+const SUPPORT_EMAIL_URL = 'mailto:support@patafundi.com?subject=FundiHub%20Maintenance';
 
 export function MaintenanceModeScreen({ route, navigation }: any): JSX.Element {
   const insets = useSafeAreaInsets();
@@ -122,7 +122,7 @@ export function MaintenanceModeScreen({ route, navigation }: any): JSX.Element {
 
       <Text style={styles.title}>We'll be right back</Text>
       <Text style={styles.subtitle}>
-        PataFundi is undergoing scheduled maintenance to bring you a better experience.
+        FundiHub is undergoing scheduled maintenance to bring you a better experience.
       </Text>
 
       {message ? (

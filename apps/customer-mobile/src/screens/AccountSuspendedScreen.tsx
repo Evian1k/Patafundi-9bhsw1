@@ -67,7 +67,7 @@ export function AccountSuspendedScreen({ route, navigation }: any): JSX.Element 
 
         <Text style={styles.title}>Account Under Review</Text>
         <Text style={styles.subtitle}>
-          We take the safety of the PataFundi community seriously. Your account is temporarily under review.
+          We take the safety of the FundiHub community seriously. Your account is temporarily under review.
         </Text>
 
         <View style={styles.reasonCard}>

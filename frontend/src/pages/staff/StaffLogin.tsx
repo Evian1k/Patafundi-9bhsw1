@@ -125,7 +125,7 @@ export default function StaffLogin() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@patafundi.com"
+                placeholder="you@fundihub.com"
                 required
                 disabled={loading}
                 autoComplete="email"
@@ -172,15 +172,15 @@ export default function StaffLogin() {
             <div className="mt-6 pt-6 border-t border-white/10">
               <p className="text-xs text-emerald-100/50 mb-2 text-center">Staff demo accounts:</p>
               <div className="grid grid-cols-2 gap-1.5 text-[10px] text-emerald-100/70">
-                <div>admin.demo@patafundi.test</div>
-                <div>support.demo@patafundi.test</div>
-                <div>fraud.demo@patafundi.test</div>
-                <div>finance.demo@patafundi.test</div>
-                <div>dispatcher.demo@patafundi.test</div>
-                <div>devops.demo@patafundi.test</div>
-                <div>auditor.demo@patafundi.test</div>
-                <div>operations.demo@patafundi.test</div>
-                <div className="col-span-2 text-center text-emerald-100/50">password: PataFundi#2026</div>
+                <div>admin.demo@fundihub.test</div>
+                <div>support.demo@fundihub.test</div>
+                <div>fraud.demo@fundihub.test</div>
+                <div>finance.demo@fundihub.test</div>
+                <div>dispatcher.demo@fundihub.test</div>
+                <div>devops.demo@fundihub.test</div>
+                <div>auditor.demo@fundihub.test</div>
+                <div>operations.demo@fundihub.test</div>
+                <div className="col-span-2 text-center text-emerald-100/50">password: FundiHub#2026</div>
               </div>
               <div className="mt-3 text-center">
                 <Link to="/demo" className="text-xs text-primary hover:underline">
@@ -206,7 +206,7 @@ export default function StaffLogin() {
         <div className="mt-6 text-center">
           <BrandLogo size="sm" />
           <p className="mt-2 text-[10px] text-emerald-100/40">
-            PataFundi Staff Portal · Authorized personnel only
+            FundiHub Staff Portal · Authorized personnel only
           </p>
         </div>
       </motion.div>

@@ -20,6 +20,8 @@ import * as storage from './controllers/storageController.js';
 import * as verification from './controllers/verificationController.js';
 import * as referral from './controllers/referralController.js';
 import * as company from './controllers/companyController.js';
+import * as aiAssistant from './controllers/aiAssistantController.js';
+import * as refunds from './controllers/refundController.js';
 import {
   requireAdminDocumentAccess,
   requireJobPhotoAccess,
@@ -27,6 +29,7 @@ import {
   requireProfilePhotoAccess,
 } from './middleware/storageAccess.js';
 import { asyncHandler } from './utils/http.js';
+import { aiRateLimit } from './middleware/rateLimit.js';
 
 export const router = express.Router();
 
@@ -122,6 +125,19 @@ router.post('/jobs/:id/confirm-completion', authRequired, asyncHandler(jobs.conf
 router.post('/jobs/:id/completion-code', authRequired, asyncHandler(jobs.resendCompletionCode));
 router.post('/jobs/:id/review', authRequired, asyncHandler(jobs.submitReview));
 router.post('/reviews', authRequired, asyncHandler(jobs.submitReview));
+router.post('/reviews/:id/reply', authRequired, asyncHandler(jobs.replyToReview));
+
+// ── AI Assistant (spec §31-32): real LLM features, advisory-only, rate-limited
+router.post('/ai/analyze-job', authRequired, aiRateLimit, asyncHandler(aiAssistant.analyzeJob));
+router.post('/ai/profile-improve', authRequired, aiRateLimit, asyncHandler(aiAssistant.improveProfile));
+router.post('/ai/dispute-summary', authRequired, requireRole('admin'), aiRateLimit, asyncHandler(aiAssistant.summarizeDispute));
+router.get('/ai/status', authRequired, asyncHandler(aiAssistant.aiStatus));
+
+// ── Refund requests (spec §8/§23): customer request → admin decision
+router.post('/jobs/:id/refund-request', authRequired, asyncHandler(refunds.createRefundRequest));
+router.get('/refunds/mine', authRequired, asyncHandler(refunds.listMyRefundRequests));
+router.get('/admin/refund-requests', authRequired, requireRole('admin'), asyncHandler(refunds.listRefundRequests));
+router.post('/admin/refund-requests/:id/decision', authRequired, requireRole('admin'), asyncHandler(refunds.decideRefundRequest));
 
 router.post('/payments/stk-push', authRequired, asyncHandler(payments.stkPush));
 router.post('/payments/process/:jobId', authRequired, asyncHandler(payments.legacyProcess));
@@ -175,6 +191,11 @@ router.get('/admin/escrow-queue', authRequired, requireRole('admin'), asyncHandl
 router.post('/admin/escrow/:jobId/release', authRequired, requireRole('admin'), asyncHandler(payouts.releaseEscrow));
 router.post('/admin/escrow/:jobId/freeze', authRequired, requireRole('admin'), asyncHandler(payouts.freezeEscrow));
 router.post('/admin/payouts/:id/complete', authRequired, requireRole('admin'), asyncHandler(payouts.completePayout));
+router.get('/admin/payouts', authRequired, requireRole('admin'), asyncHandler(admin.listPayouts));
+router.get('/admin/subscriptions', authRequired, requireRole('admin'), asyncHandler(admin.listSubscriptions));
+router.get('/admin/reviews', authRequired, requireRole('admin'), asyncHandler(admin.listReviews));
+router.post('/admin/reviews/:id/hide', authRequired, requireRole('admin'), asyncHandler(admin.hideReview));
+router.post('/admin/fundis/:id/verification-level', authRequired, requireRole('admin'), asyncHandler(admin.setFundiVerificationLevel));
 router.get('/admin/disputes', authRequired, requireRole('admin'), asyncHandler(disputes.listDisputes));
 router.post('/admin/disputes/:id/resolve', authRequired, requireRole('admin'), asyncHandler(disputes.resolveDispute));
 router.get('/admin/audit-logs', authRequired, requireRole('admin'), asyncHandler(admin.listTable('audit_logs', 'logs')));
@@ -521,8 +542,10 @@ const SUBSCRIPTION_PLAN_PRICES = Object.freeze({
 });
 
 router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
-  if (!req.user || req.user.role !== 'fundi') {
-    return res.status(403).json({ success: false, message: 'Only fundis can activate subscriptions' });
+  // Spec §7: companies subscribe like fundis. The paying principal is the
+  // company owner/admin user; the subscription row records subscriber_type.
+  if (!req.user || !['fundi', 'company_admin'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Only fundis and companies can activate subscriptions' });
   }
   const { plan = 'monthly', mpesaNumber } = req.body || {};
   const amount = SUBSCRIPTION_PLAN_PRICES[plan];
@@ -539,10 +562,10 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
   // Create subscription as 'pending' — not active until payment confirmed.
   // expires_at here is a placeholder; it is set from plan duration on activation.
   const subResult = await query(
-    `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at)
-     values ($1, $2, $3, 'pending', now(), now() + interval '30 days')
+    `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at, subscriber_type)
+     values ($1, $2, $3, 'pending', now(), now() + interval '30 days', $4)
      returning *`,
-    [req.user.id, plan, amount],
+    [req.user.id, plan, amount, req.user.role === 'company_admin' ? 'company' : 'fundi'],
   );
 
   // Initiate M-Pesa STK push for the subscription fee
@@ -551,7 +574,7 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
       phone: mpesaNumber,
       amount,
       accountReference: `SUB-${req.user.id.slice(0, 8)}`,
-      transactionDesc: `PataFundi ${plan} subscription`,
+      transactionDesc: `FundiHub ${plan} subscription`,
     });
 
     // Store checkout_request_id on the subscription for webhook matching

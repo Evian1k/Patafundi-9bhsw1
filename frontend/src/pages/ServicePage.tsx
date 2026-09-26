@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import { apiClient } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ export default function ServicePage() {
   const { slug = "" } = useParams();
   const [service, setService] = useState<{ slug: string; name: string; description: string } | null>(null);
   const [fundis, setFundis] = useState<Fundi[]>([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +79,11 @@ export default function ServicePage() {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {(f.skills || []).slice(0, 6).map((s) => <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>)}
+                    </div>
+                    <div className="mt-4">
+                      <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/create-job?fundi=${f.id}&service=${encodeURIComponent(f.skills?.[0] || slug || "")}`)}>
+                        Book this fundi
+                      </Button>
                     </div>
                   </div>
                 ))}

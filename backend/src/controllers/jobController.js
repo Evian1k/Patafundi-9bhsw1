@@ -28,15 +28,21 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
   // A disabled/banned/pending fundi can NEVER receive a job match.
   const baseWhere = `u.role = 'fundi' and u.status = 'active' and f.approval_status = 'approved' and f.online = true`;
 
-  if (latitude == null || longitude == null) {
+  // Fallback used when the customer has no coordinates OR no geo candidates:
+  // return globally top-rated matching fundis (distance unknown, not fake).
+  const topRatedFallback = async () => {
     const fallback = await query(
       `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score
        from fundis f join users u on u.id = f.user_id
-       where ${baseWhere}
+       where ${baseWhere} ${skill ? `and $2 = any(f.skills)` : ''}
        order by f.rating desc nulls last, f.trust_score desc nulls last limit $1`,
-      [limit],
+      skill ? [limit, String(skill)] : [limit],
     );
     return fallback.rows.map((row) => ({ ...row, distanceKm: null }));
+  };
+
+  if (latitude == null || longitude == null) {
+    return topRatedFallback();
   }
   const result = await query(
     `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score,
@@ -45,7 +51,7 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
      where ${baseWhere}
        and f.latitude is not null and f.longitude is not null`,
   );
-  return result.rows
+  const geoMatches = result.rows
     .map((row) => ({
       ...row,
       distanceKm: haversineKm(latitude, longitude, Number(row.latitude), Number(row.longitude)),
@@ -62,6 +68,10 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
       return Number(b.trust_score || 0) - Number(a.trust_score || 0);
     })
     .slice(0, limit);
+  if (geoMatches.length) return geoMatches;
+  // No fundi has coordinates (or none matched the skill geo-wise) — degrade
+  // gracefully to the top-rated fallback instead of silently matching nobody.
+  return topRatedFallback();
 }
 
 async function canAccessJob(user, job) {
@@ -149,6 +159,41 @@ function publicJob(job) {
   };
 }
 
+/**
+ * Provider-facing job view (spec §24 privacy): before a provider is ACCEPTED,
+ * they must not see the customer's exact address or precise coordinates.
+ * We keep an area-level name and ~1km-rounded coordinates so distance and
+ * neighbourhood context remain usable for the accept/reject decision.
+ */
+function coarseCoord(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.round(n * 100) / 100; // ≈1.1km grid
+}
+
+function areaOnlyName(name) {
+  if (!name) return name;
+  const parts = String(name).split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 2) return parts.join(', ');
+  return parts.slice(-2).join(', '); // drop street-level detail, keep area + city
+}
+
+function providerJobView(job) {
+  const pub = publicJob(job);
+  const revealed = Boolean(job.fundi_id) || job.status === 'accepted' || job.status === 'assigned';
+  if (revealed) return pub;
+  const coarse = {
+    ...pub,
+    locationName: areaOnlyName(job.location_name),
+    location_name: areaOnlyName(job.location_name),
+    location: areaOnlyName(job.location_name),
+  };
+  for (const key of ['customerLatitude', 'customer_latitude', 'customerLongitude', 'customer_longitude', 'latitude', 'longitude']) {
+    coarse[key] = coarseCoord(pub[key]);
+  }
+  return coarse;
+}
+
 export async function createJob(req, res) {
   const body = req.body || {};
   const serviceCategory = body.serviceCategory || body.service_category || body.category;
@@ -158,7 +203,26 @@ export async function createJob(req, res) {
   const longitude = body.longitude || body.customer_longitude || null;
   const scheduledAt = body.scheduledDate || body.scheduled_at || null;
   const propertyId = body.propertyId || body.property_id || null;
-  let providerType = body.providerType === 'company' || body.provider_type === 'company' ? 'company' : 'fundi';
+  let providerType = body.providerType === 'company' || body.provider_type === 'company'
+    ? 'company'
+    : (body.providerType === 'platform_match' || body.provider_type === 'platform_match')
+      ? 'platform_match'
+      : 'fundi';
+
+  // ── Option A (spec §2): customer books a SPECIFIC verified fundi ──
+  let preferredFundiId = body.preferredFundiId || body.preferred_fundi_id || body.fundiId || null;
+  if (preferredFundiId) {
+    const fundiRes = await query(
+      `select f.user_id, f.online, f.approval_status, u.status as user_status
+       from fundis f join users u on u.id = f.user_id where f.user_id = $1`,
+      [preferredFundiId],
+    );
+    const f = fundiRes.rows[0];
+    if (!f || f.approval_status !== 'approved' || f.user_status !== 'active') {
+      throw badRequest('This professional is not currently available for booking');
+    }
+    providerType = 'fundi'; // a direct fundi booking is still an individual-provider job
+  }
 
   // ── Direct company booking (spec §5): customer books a specific company ──
   let companyId = body.companyId || body.company_id || null;
@@ -173,6 +237,12 @@ export async function createJob(req, res) {
     providerType = 'company';
   } else if (providerType === 'company') {
     companyId = null; // open pool — any eligible company can claim
+  }
+
+  if (preferredFundiId) {
+    // Company choice and fundi choice are mutually exclusive (spec §2).
+    companyId = null;
+    if (providerType === 'company') providerType = 'fundi';
   }
 
   // ── Referral voucher application ────────────────────────────────────
@@ -225,12 +295,19 @@ export async function createJob(req, res) {
   }
 
   // Company jobs wait for company acceptance (or dispatcher assignment);
-  // individual jobs enter geo matching. Scheduled jobs (either kind) park as scheduled.
+  // individual jobs enter geo matching. Direct fundi bookings enter matching
+  // too but are only VISIBLE to the chosen fundi (match_metadata guard).
+  // Scheduled jobs (either kind) park as scheduled.
   const initialStatus = companyId ? 'pending' : (providerType === 'company' ? 'matching' : (scheduledAt ? 'scheduled' : 'matching'));
+  const matchMetadata = {
+    ...(preferredFundiId ? { preferredFundiId, choice: 'individual' } : {}),
+    ...(providerType === 'platform_match' ? { choice: 'platform_match' } : {}),
+    ...(providerType === 'company' ? { choice: companyId ? 'company_direct' : 'company_pool' } : {}),
+  };
   const result = await query(
     `insert into jobs (customer_id, service_category, description, location_name, customer_latitude,
-      customer_longitude, status, urgency, estimated_price, scheduled_at, company_id, provider_type, property_id)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
+      customer_longitude, status, urgency, estimated_price, scheduled_at, company_id, provider_type, property_id, match_metadata)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb) returning *`,
     [
       req.user.id,
       serviceCategory,
@@ -246,12 +323,17 @@ export async function createJob(req, res) {
       companyId,
       providerType,
       propertyId,
+      JSON.stringify(matchMetadata),
     ],
   );
   const job = result.rows[0];
   await query(
     `insert into job_status_updates (job_id, status, actor_id, note) values ($1, 'matching', $2, 'Job created')`,
     [job.id, req.user.id],
+  );
+  await query(
+    `update jobs set match_metadata = $2::jsonb where id = $1`,
+    [job.id, JSON.stringify(matchMetadata)],
   );
   await recordTimelineEvent({
     jobId: job.id,
@@ -320,12 +402,77 @@ export async function createJob(req, res) {
     });
   }
 
-  const candidates = await findNearestFundis(latitude, longitude, serviceCategory);
+  // ── Option A: direct booking — ONLY the chosen fundi is offered the job ──
+  if (preferredFundiId) {
+    const offerJob = providerJobView(job);
+    emitEvent(
+      'job:created',
+      { jobId: job.id, job: offerJob, status: 'matching', directRequest: true },
+      `user:${preferredFundiId}`,
+    );
+    const { notify } = await import('../services/notificationService.js');
+    await notify({
+      userId: preferredFundiId,
+      type: 'job_direct_request',
+      title: 'Direct Booking Request',
+      body: `A customer specifically requested you for a ${serviceCategory} job. Respond soon to keep the booking.`,
+      data: { jobId: job.id },
+    });
+    return res.status(201).json({
+      success: true,
+      job: publicJob(job),
+      matching: {
+        providerType: 'fundi',
+        mode: 'direct',
+        preferredFundiId,
+        candidates: [],
+        failed: false,
+      },
+    });
+  }
+
+  // ── Option C (spec §2/§13): "Let FundiHub match" — weighted smart match ──
+  // Uses the full scoring engine (distance, rating, quality, acceptance,
+  // completion, cancellation history, verification, workload) instead of the
+  // distance-first fallback. Falls back to nearest-fundis if the engine fails.
+  let matchMode = 'broadcast';
+  let scoredCandidates = null;
+  if (providerType === 'platform_match') {
+    try {
+      const { findNearbyFundis } = await import('../services/geoMatchingService.js');
+      const scored = await findNearbyFundis({
+        latitude: latitude != null ? Number(latitude) : null,
+        longitude: longitude != null ? Number(longitude) : null,
+        serviceCategory,
+        isEmergency: (body.urgency || 'normal') === 'emergency',
+        customerId: req.user.id,
+      });
+      if (scored.length) {
+        scoredCandidates = scored.slice(0, 8).map((c) => ({
+          user_id: c.user_id,
+          name: c.name,
+          rating: c.rating,
+          distanceKm: c.distance_km,
+          weighted_score: c.weighted_score,
+          scores: c.scores,
+          completed_jobs: c.completed_jobs,
+          active_jobs: c.active_jobs,
+        }));
+        matchMode = 'smart_match';
+      }
+    } catch (matchErr) {
+      logNonFatal('job.createJob.smartMatch', matchErr, { jobId: job.id });
+    }
+  }
+
+  const candidates = scoredCandidates || await findNearestFundis(latitude, longitude, serviceCategory);
   if (!candidates.length) {
     emitEvent('job:search:failed', { jobId: job.id, reason: 'No online fundis available' }, `job:${job.id}`);
-    return res.status(201).json({ success: true, job: publicJob(job), matching: { candidates: [], failed: true } });
+    return res.status(201).json({ success: true, job: publicJob(job), matching: { candidates: [], failed: true, mode: matchMode } });
   }
-  const publishedJob = publicJob(job);
+  // Privacy (spec §24): providers that have NOT been accepted yet receive a
+  // coarse, area-level view — never the customer's exact address/coordinates.
+  const publishedJob = providerJobView(job);
   for (const candidate of candidates) {
     emitEvent(
       'job:created',
@@ -334,7 +481,7 @@ export async function createJob(req, res) {
     );
   }
   emitEvent('job:created', { jobId: job.id, job: publishedJob, candidates, status: 'matching' }, `job:${job.id}`);
-  res.status(201).json({ success: true, job: publishedJob, matching: { candidates, failed: false } });
+  res.status(201).json({ success: true, job: publicJob(job), matching: { candidates, failed: false, mode: matchMode } });
 }
 
 export async function uploadJobPhotos(req, res) {
@@ -494,7 +641,17 @@ export async function patchJob(req, res) {
         break;
     }
   }
-  const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
+  // Race protection (spec §15): the UPDATE only succeeds when the status is
+  // still the value we validated. Two concurrent transitions cannot both win —
+  // the loser gets a 409 instead of silently overwriting the winner.
+  const result = await query(
+    'update jobs set status = $2, updated_at = now() where id = $1 and status = $3 returning *',
+    [req.params.id, status, job.status],
+  );
+  if (!result.rows[0]) {
+    const current = await query('select status from jobs where id = $1', [req.params.id]);
+    throw Object.assign(new Error(`Job status changed concurrently (now ${current.rows[0]?.status || 'unknown'}) — reload and try again`), { statusCode: 409 });
+  }
   await recordJobStatusTimeline(result.rows[0], status, req.user.id, req.user.role);
   emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
@@ -521,10 +678,18 @@ export async function acceptJob(req, res) {
   }
   const result = await query(
     `update jobs set fundi_id = $2, status = 'accepted', estimated_price = coalesce($3, estimated_price), updated_at = now()
-     where id = $1 and status in ('pending', 'matching') returning *`,
-    [req.params.id, req.user.id, req.body?.estimatedPrice || null],
+     where id = $1 and status in ('pending', 'matching')
+       and (match_metadata->>'preferredFundiId' is null or match_metadata->>'preferredFundiId' = $4)
+     returning *`,
+    [req.params.id, req.user.id, req.body?.estimatedPrice || null, req.user.id],
   );
-  if (!result.rows[0]) throw badRequest('Job cannot be accepted');
+  if (!result.rows[0]) {
+    // Distinguish "already taken" from "reserved for another fundi" (direct booking)
+    const current = await query('select match_metadata, status from jobs where id = $1', [req.params.id]);
+    const pref = current.rows[0]?.match_metadata?.preferredFundiId;
+    if (pref && pref !== req.user.id) throw forbidden('This job was booked directly with another professional');
+    throw badRequest('Job cannot be accepted');
+  }
   const job = result.rows[0];
 
   // ── Quote revision (spec §4/§22): if the fundi's quote differs materially
@@ -573,6 +738,15 @@ export async function acceptJob(req, res) {
     actorId: req.user.id,
     actorRole: req.user.role,
     metadata: { estimatedPrice: job.estimated_price },
+  });
+  // Central notification (spec §27): the customer must know their job was accepted.
+  const { notify } = await import('../services/notificationService.js');
+  await notify({
+    userId: job.customer_id,
+    type: 'job_accepted',
+    title: 'Your job was accepted',
+    body: 'A verified professional has accepted your job and will be on the way. Track progress live from your dashboard.',
+    data: { jobId: job.id, fundiId: req.user.id },
   });
   emitEvent('job:accepted', { jobId: req.params.id, fundiId: req.user.id, status: 'accepted', job: publicJob(job) }, `job:${req.params.id}`);
   emitEvent('fundi:response:ok', { accepted: true, jobId: req.params.id }, `user:${req.user.id}`);
@@ -813,11 +987,16 @@ export async function activeFundiJob(req, res) {
 
   const fundi = await query('select skills, latitude, longitude, online from fundis where user_id = $1 and approval_status = $2', [req.user.id, 'approved']);
   if (!fundi.rows[0]?.online) return res.json({ success: true, job: null });
+  // Open pool + jobs directly booked with THIS fundi (spec §2 Option A).
+  // Direct bookings (match_metadata.preferredFundiId) are invisible to everyone else.
   const available = await query(
     `select j.*, u.full_name as customer_name
      from jobs j join users u on u.id = j.customer_id
      where j.fundi_id is null and j.status = 'matching'
+       and (j.provider_type = 'fundi' or j.provider_type = 'platform_match')
+       and (j.match_metadata->>'preferredFundiId' is null or j.match_metadata->>'preferredFundiId' = $1)
      order by j.created_at asc limit 25`,
+    [req.user.id],
   );
   const skills = (fundi.rows[0].skills || []).map((skill) => String(skill).toLowerCase());
   const lat = Number(fundi.rows[0].latitude);
@@ -836,7 +1015,7 @@ export async function activeFundiJob(req, res) {
   res.json({
     success: true,
     job: {
-      ...publicJob(next),
+      ...providerJobView(next),
       customer_name: next.customer_name,
       distanceKm: next.distanceKm,
     },
@@ -983,4 +1162,50 @@ export async function deleteProperty(req, res) {
   );
   if (!result.rows[0]) throw notFound('Property not found');
   res.json({ success: true });
+}
+
+// ── Provider review response (spec §29): only the reviewed provider can
+// reply to a review tied to their own completed job. One editable reply. ──
+export async function replyToReview(req, res) {
+  const reviewId = parseUuid(req.params.id, 'review id');
+  const { reply } = req.body || {};
+  const text = String(reply || '').trim();
+  if (!text) throw badRequest('Reply text is required');
+  if (text.length > 1000) throw badRequest('Reply is too long (1000 characters max)');
+
+  const reviewRes = await query(
+    `select r.*, j.fundi_id, j.company_id, j.provider_type
+     from reviews r join jobs j on j.id = r.job_id
+     where r.id = $1`,
+    [reviewId],
+  );
+  const review = reviewRes.rows[0];
+  if (!review) throw notFound('Review not found');
+  if (review.hidden) throw badRequest('This review is under moderation and cannot be replied to');
+
+  let allowed = review.fundi_id === req.user.id;
+  if (!allowed && review.company_id) {
+    const { getMembership } = await import('../middleware/companyAccess.js');
+    const membership = await getMembership(review.company_id, req.user.id);
+    allowed = Boolean(membership && membership.status === 'active'
+      && ['owner', 'admin', 'manager'].includes(membership.role));
+  }
+  if (!allowed) throw forbidden('Only the reviewed provider can respond to this review');
+
+  if (text) {
+    const scan = await scanContent({
+      content: text,
+      userId: req.user.id,
+      userRole: req.user.role,
+      jobId: review.job_id,
+      source: 'review_reply',
+    });
+    if (scan.blocked) throw forbidden('Reply contains off-platform contact or payment information');
+  }
+
+  const result = await query(
+    `update reviews set provider_reply = $2, provider_reply_at = now() where id = $1 returning *`,
+    [reviewId, text],
+  );
+  res.json({ success: true, review: result.rows[0] });
 }

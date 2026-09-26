@@ -21,14 +21,15 @@ import { auditLog } from './auditService.js';
 // ============================================================
 
 const MATCHING_WEIGHTS = {
-  distance: 0.30,
-  rating: 0.20,
-  quality_score: 0.15,
+  distance: 0.27,
+  rating: 0.18,
+  quality_score: 0.13,
   acceptance_rate: 0.10,
   completion_rate: 0.10,
+  cancellation: 0.10, // spec §13: cancellation rate is a first-class factor
   response_time: 0.05,
-  verified_status: 0.05,
-  recent_activity: 0.05,
+  verified_status: 0.04,
+  recent_activity: 0.03,
 };
 
 /**
@@ -76,6 +77,7 @@ export async function findNearbyFundis({
             (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'completed') as completed_jobs,
             (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status not in ('completed','cancelled','failed')) as active_jobs,
             (select count(*)::int from jobs j where j.fundi_id = f.user_id) as total_jobs,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'cancelled') as cancelled_jobs,
             coalesce(fts.max_travel_km, 20) as max_travel_km,
             coalesce(fts.emergency_available, false) as emergency_available
      from fundis f
@@ -122,6 +124,9 @@ export async function findNearbyFundis({
     const qualityScore = fundi.quality_score || 0;
     const acceptanceRate = fundi.total_jobs > 0 ? (fundi.completed_jobs / fundi.total_jobs) * 100 : 0;
     const completionRate = acceptanceRate; // simplified
+    // Cancellation history: 0 cancellations → 100, ≥30% → 0 (smooth decay)
+    const cancellationRate = fundi.total_jobs > 0 ? fundi.cancelled_jobs / fundi.total_jobs : 0;
+    const cancellationScore = Math.max(0, 100 - cancellationRate * 333);
     const responseScore = 80; // would need actual response time data
     const verifiedScore = fundi.verification_badge ? 100 : 50;
     const recentActivityScore = fundi.active_jobs > 0 ? 80 : 60;
@@ -132,6 +137,7 @@ export async function findNearbyFundis({
       qualityScore * MATCHING_WEIGHTS.quality_score +
       acceptanceRate * MATCHING_WEIGHTS.acceptance_rate +
       completionRate * MATCHING_WEIGHTS.completion_rate +
+      cancellationScore * MATCHING_WEIGHTS.cancellation +
       responseScore * MATCHING_WEIGHTS.response_time +
       verifiedScore * MATCHING_WEIGHTS.verified_status +
       recentActivityScore * MATCHING_WEIGHTS.recent_activity;
@@ -140,12 +146,14 @@ export async function findNearbyFundis({
       ...fundi,
       distance_km: Math.round(distance * 10) / 10,
       weighted_score: Math.round(weightedScore * 10) / 10,
+      cancellation_rate: Math.round(cancellationRate * 100),
       scores: {
         distance: Math.round(distanceScore),
         rating: Math.round(ratingScore),
         quality: Math.round(qualityScore),
         acceptance: Math.round(acceptanceRate),
         completion: Math.round(completionRate),
+        cancellation: Math.round(cancellationScore),
         verified: verifiedScore,
       },
     };

@@ -33,7 +33,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: 'flash',
-    title: 'PataFundi Fundi',
+    title: 'FundiHub Fundi',
     subtitle: 'Earn money on your schedule. Turn your skills into income.',
   },
   {

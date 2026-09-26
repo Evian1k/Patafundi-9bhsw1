@@ -6,7 +6,7 @@ export default function FundiResources() {
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-2xl">
         <h1 className="text-4xl font-display font-bold mb-4">Fundi Resources</h1>
-        <p className="text-muted-foreground mb-8">Guidance for verified professionals using PataFundi.</p>
+        <p className="text-muted-foreground mb-8">Guidance for verified professionals using FundiHub.</p>
         <div className="space-y-5">
           <div className="p-5 bg-card rounded-2xl border border-border/50">
             <h2 className="font-semibold mb-2">Verification tips</h2>

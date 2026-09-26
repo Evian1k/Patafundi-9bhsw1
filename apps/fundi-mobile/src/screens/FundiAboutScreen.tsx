@@ -61,8 +61,8 @@ export function FundiAboutScreen({ navigation }: any): JSX.Element {
   const handleShare = async (): Promise<void> => {
     try {
       await Share.share({
-        message: `Earn money on your schedule with PataFundi Fundi. Sign up at ${WEBSITE_URL}`,
-        title: 'PataFundi Fundi',
+        message: `Earn money on your schedule with FundiHub Fundi. Sign up at ${WEBSITE_URL}`,
+        title: 'FundiHub Fundi',
       });
     } catch {
       // ignore
@@ -106,7 +106,7 @@ export function FundiAboutScreen({ navigation }: any): JSX.Element {
         <Ionicons name="build" size={48} color={colors.primaryForeground} />
       </LinearGradient>
 
-      <Text style={styles.appName}>PataFundi Fundi</Text>
+      <Text style={styles.appName}>FundiHub Fundi</Text>
       <Text style={styles.version}>Version {APP_VERSION}</Text>
       <Text style={styles.tagline}>Earn money on your schedule</Text>
 
@@ -144,7 +144,7 @@ export function FundiAboutScreen({ navigation }: any): JSX.Element {
         ))}
       </View>
 
-      <Text style={styles.copyright}>© 2026 PataFundi. All rights reserved.</Text>
+      <Text style={styles.copyright}>© 2026 FundiHub. All rights reserved.</Text>
     </ScrollView>
   );
 }

@@ -50,7 +50,7 @@ export default function Careers() {
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         <h1 className="text-4xl font-display font-bold mb-4">Careers</h1>
-        <p className="text-muted-foreground mb-8">Build the future of trusted local services with PataFundi.</p>
+        <p className="text-muted-foreground mb-8">Build the future of trusted local services with FundiHub.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <h2 className="font-semibold text-lg mb-4">Open roles</h2>

@@ -8,7 +8,7 @@ export default function TrustSafety() {
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-3xl">
         <h1 className="text-4xl font-display font-bold mb-4">Trust & Safety</h1>
-        <p className="text-muted-foreground text-lg mb-8">Trust is the product. We design PataFundi to reduce fraud and keep users safe.</p>
+        <p className="text-muted-foreground text-lg mb-8">Trust is the product. We design FundiHub to reduce fraud and keep users safe.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
             { icon: Shield, title: "Verification", desc: "Fundis submit identity documents and verification evidence. Suspicious submissions can be flagged for review." },

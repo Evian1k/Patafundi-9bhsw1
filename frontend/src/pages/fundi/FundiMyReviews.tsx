@@ -5,6 +5,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import TrustBadge from "@/components/ui/TrustBadge";
 
@@ -12,6 +14,7 @@ interface ReviewRow {
   id?: string;
   rating?: number;
   comment?: string | null;
+  provider_reply?: string | null;
   customerName?: string | null;
   customer_name?: string | null;
   created_at?: string;
@@ -35,6 +38,30 @@ export default function FundiMyReviews() {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [replyFor, setReplyFor] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySaving, setReplySaving] = useState(false);
+
+  const saveReply = async (reviewId: string) => {
+    if (replyText.trim().length < 2) {
+      toast.error("Write a short reply first.");
+      return;
+    }
+    setReplySaving(true);
+    try {
+      await apiClient.replyToReview(reviewId, replyText.trim());
+      toast.success("Reply posted.");
+      setReplyFor(null);
+      setReplyText("");
+      // Refresh list so the reply shows immediately
+      const res = await apiClient.getFundiRatings(50, 0) as { ratings?: ReviewRow[] };
+      setReviews(res.ratings || []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not post reply");
+    } finally {
+      setReplySaving(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -109,9 +136,36 @@ export default function FundiMyReviews() {
                     </span>
                   </div>
                   {r.comment && <p className="text-sm">{r.comment}</p>}
+                  {r.provider_reply && (
+                    <p className="text-xs text-muted-foreground border-l-2 border-primary/40 pl-2">
+                      Your reply: {r.provider_reply}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {r.customerName || r.customer_name || "Customer"}
                   </p>
+                  {r.id && !r.provider_reply && replyFor !== r.id && (
+                    <Button variant="ghost" size="sm" className="text-primary" onClick={() => { setReplyFor(r.id); setReplyText(""); }}>
+                      Reply to this review
+                    </Button>
+                  )}
+                  {r.id && replyFor === r.id && (
+                    <div className="space-y-2 pt-1">
+                      <textarea
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm resize-none"
+                        rows={2}
+                        placeholder="Thank the customer or explain your side…"
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => setReplyFor(null)}>Cancel</Button>
+                        <Button size="sm" disabled={replySaving} onClick={() => r.id && saveReply(r.id)}>
+                          {replySaving ? "Posting…" : "Post reply"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}

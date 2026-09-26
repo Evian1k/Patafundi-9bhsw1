@@ -47,6 +47,8 @@ export function clearAuthCookies(res) {
   res.clearCookie('csrf_token', { sameSite: 'strict', secure: config.cookieSecure, path: '/' });
 }
 
+import { timingSafeEqual } from 'node:crypto';
+
 export function csrfProtection(req, _res, next) {
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (safeMethods.includes(req.method)) return next();
@@ -55,7 +57,12 @@ export function csrfProtection(req, _res, next) {
   if (!req.cookies?.access_token && !req.cookies?.refresh_token) return next();
   const provided = req.get('x-csrf-token');
   const expected = req.cookies?.csrf_token;
-  if (!provided || !expected || provided !== expected) return next(forbidden('Invalid CSRF token'));
+  // Constant-time comparison — never leak token bytes through timing.
+  const a = Buffer.from(String(provided || ''));
+  const b = Buffer.from(String(expected || ''));
+  if (!provided || !expected || a.length !== b.length || !timingSafeEqual(a, b)) {
+    return next(forbidden('Invalid CSRF token'));
+  }
   return next();
 }
 

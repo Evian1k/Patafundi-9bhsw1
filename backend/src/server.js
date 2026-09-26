@@ -318,7 +318,7 @@ const dbUrlSet = Boolean(config.databaseUrl);
 const dbUrlSource = dbUrlSet ? (config.databaseUrl.includes('localhost') ? 'local' : config.databaseUrl.includes('neon') ? 'Neon' : config.databaseUrl.includes('supabase') ? 'Supabase' : 'cloud') : 'none';
 console.log('');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('  PataFundi API — starting...');
+console.log('  FundiHub API — starting...');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log(`  Environment:    ${config.nodeEnv}`);
 console.log(`  DATABASE_URL:   ${dbUrlSet ? `set (${dbUrlSource})` : 'NOT SET — will use PGlite embedded DB'}`);
@@ -491,6 +491,30 @@ server.listen(port, host, () => {
       registerQueueHandler('email_fraud', async (payload) => {
         const { sendFraudWarningEmail } = await import('./services/emailService.js');
         await sendFraudWarningEmail(payload);
+      });
+
+      // Handler: generic notification emails (central notification service §27)
+      registerQueueHandler('email_notification', async (payload) => {
+        const { query } = await import('./db.js');
+        const { sendNotificationEmail } = await import('./services/emailService.js');
+        const user = await query('select email from users where id = $1', [payload.userId]);
+        if (!user.rows[0]?.email) return;
+        await sendNotificationEmail({
+          to: user.rows[0].email,
+          subject: payload.title,
+          title: payload.title,
+          body: payload.body,
+        });
+      });
+
+      // Handler: SMS notifications (central notification service §27) —
+      // sends only when an SMS provider is configured (see smsService status).
+      registerQueueHandler('sms_notification', async (payload) => {
+        const { query } = await import('./db.js');
+        const { sendSms } = await import('./services/smsService.js');
+        const user = await query('select phone from users where id = $1', [payload.userId]);
+        if (!user.rows[0]?.phone) return;
+        await sendSms({ to: user.rows[0].phone, message: `${payload.title}\n${payload.body || ''}`.slice(0, 320) });
       });
 
       startQueueWorker();

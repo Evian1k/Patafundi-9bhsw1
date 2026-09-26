@@ -1,5 +1,5 @@
 /**
- * Partner With PataFundi — public company application experience (spec §7).
+ * Partner With FundiHub — public company application experience (spec §7).
  * Submits to POST /api/company/applications. The frontend can NEVER approve
  * a company — approval happens in the staff/admin review queue.
  */
@@ -101,7 +101,7 @@ export default function PartnerProgram() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-30 bg-background/80 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="font-semibold tracking-tight">PataFundi <span className="text-emerald-500">Partners</span></Link>
+          <Link to="/" className="font-semibold tracking-tight">FundiHub <span className="text-emerald-500">Partners</span></Link>
           <Link to="/companies" className="text-sm text-muted-foreground hover:text-foreground">Company directory</Link>
         </div>
       </header>
@@ -114,7 +114,7 @@ export default function PartnerProgram() {
                 <Building2 className="h-3.5 w-3.5" /> Company Partner Program
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance">
-                Grow your service business with PataFundi
+                Grow your service business with FundiHub
               </h1>
               <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                 Join Kenya's verified services marketplace as a professional company.
@@ -139,7 +139,7 @@ export default function PartnerProgram() {
             </ul>
             <div className="rounded-2xl border bg-card p-4 text-xs text-muted-foreground flex gap-2">
               <FileCheck2 className="h-4 w-4 shrink-0 text-primary" />
-              Lifecycle: submitted → under review → approved. PataFundi staff verify
+              Lifecycle: submitted → under review → approved. FundiHub staff verify
               your business before you go live — never automatic.
             </div>
           </aside>
@@ -227,7 +227,7 @@ export default function PartnerProgram() {
                   <Row k="Technicians" v={form.technicianCount || "—"} />
                   <p className="text-xs text-muted-foreground pt-2">
                     By submitting you confirm the information is accurate. Applications move
-                    through review by PataFundi staff; you will be notified of the decision.
+                    through review by FundiHub staff; you will be notified of the decision.
                   </p>
                 </div>
               )}

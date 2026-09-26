@@ -32,3 +32,14 @@ export const mapsRateLimit = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Maps API rate limit exceeded.' },
 });
+
+// AI assistant endpoints (spec §31-32): generous enough for a booking flow,
+// tight enough to make LLM cost abuse impractical.
+export const aiRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'AI assistant rate limit reached. Please try again in a few minutes.' },
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.user?.id || 'anon'}`,
+});

@@ -128,6 +128,10 @@ export default function FundiTracker({
 
   // UI state
   const [showChat, setShowChat] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundDetails, setRefundDetails] = useState("");
+  const [refundLoading, setRefundLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
   const blockBackRef = useRef<boolean>(false);
@@ -567,6 +571,25 @@ export default function FundiTracker({
   };
   const currentStep = stepIndex[status] ?? 0;
 
+  const submitRefundRequest = async () => {
+    if (refundReason.trim().length < 3) {
+      toast.error("Please pick or write a reason for the refund.");
+      return;
+    }
+    setRefundLoading(true);
+    try {
+      await apiClient.requestRefund(jobId, { reason: refundReason.trim(), details: refundDetails.trim() || undefined });
+      toast.success("Refund request submitted — our team will review it and notify you.");
+      setRefundOpen(false);
+      setRefundReason("");
+      setRefundDetails("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not submit refund request");
+    } finally {
+      setRefundLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero p-4 md:p-6">
       {showChat && jobId && currentUser && (
@@ -842,7 +865,7 @@ export default function FundiTracker({
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
                 <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-blue-800">Protected by PataFundi Escrow</p>
+                  <p className="text-xs font-semibold text-blue-800">Protected by FundiHub Escrow</p>
                   <p className="text-xs text-blue-700 mt-0.5">Your payment is held securely until the fundi payout is approved.</p>
                 </div>
               </div>
@@ -924,7 +947,7 @@ export default function FundiTracker({
               </div>
               <div>
                 <h3 className="font-semibold text-base">Payment Receipt</h3>
-                <p className="text-xs text-muted-foreground">Official PataFundi transaction record</p>
+                <p className="text-xs text-muted-foreground">Official FundiHub transaction record</p>
               </div>
             </div>
             <div className="rounded-xl border border-border/60 divide-y divide-border/40 text-sm">
@@ -952,6 +975,42 @@ export default function FundiTracker({
             <p className="text-[11px] text-muted-foreground">
               Keep this receipt for your records. Funds are held in escrow until you confirm the completed work.
             </p>
+            {!refundOpen ? (
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setRefundOpen(true)}>
+                Something wrong? Request a refund
+              </Button>
+            ) : (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <select
+                  className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                >
+                  <option value="">Select a reason…</option>
+                  <option value="work_not_done">Work was not done or incomplete</option>
+                  <option value="wrong_service">Different service than requested</option>
+                  <option value="damaged_property">Property was damaged</option>
+                  <option value="duplicate_payment">Duplicate / wrong payment</option>
+                  <option value="other">Other</option>
+                </select>
+                <textarea
+                  className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm resize-none"
+                  rows={2}
+                  placeholder="Add details (optional)"
+                  value={refundDetails}
+                  onChange={(e) => setRefundDetails(e.target.value)}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setRefundOpen(false)}>Cancel</Button>
+                  <Button size="sm" variant="destructive" disabled={refundLoading} onClick={submitRefundRequest}>
+                    {refundLoading ? "Submitting…" : "Submit request"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  A FundiHub administrator reviews every request — approval triggers a real, audited reversal to your original payment method.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -995,7 +1054,7 @@ export default function FundiTracker({
               <ShieldCheck className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="font-semibold text-xl">All Done!</h3>
-            <p className="text-muted-foreground text-sm">Thank you for using PataFundi.</p>
+            <p className="text-muted-foreground text-sm">Thank you for using FundiHub.</p>
             <Button onClick={() => (window.location.href = "/dashboard")} className="bg-gradient-primary">
               Back to Dashboard
             </Button>
