@@ -1,0 +1,15 @@
+{
+  "name": "patafundi-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PataFundi API (Express + Postgres/PGlite). `npm run dev` inside backend/ starts ONLY the API on :4000 — no frontend, no port 3000 conflict. Dependencies are installed from the repo root (node_modules resolution walks up).",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "db:migrate": "node scripts/ensure-dev-db.js",
+    "db:seed": "node scripts/seed-takeover.js",
+    "db:push": "node scripts/ensure-dev-db.js && node scripts/seed-takeover.js"
+  }
+}

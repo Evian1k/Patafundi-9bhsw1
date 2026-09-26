@@ -2,9 +2,19 @@ import dotenv from 'dotenv';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { isLocalDatabaseUrl } from './pg-config.js';
 
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+
+// ── .env resolution is cwd-INDEPENDENT ────────────────────────────────
+// The backend can now be started from two places:
+//   • repo root:            `npm run dev:backend`  (cwd = repo root)
+//   • inside backend/:      `cd backend && npm run dev` (cwd = backend/)
+// Both must load the SAME repo-root .env. backend/src/config.js → ../.. = repo root.
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT_ENV_PATH = path.join(ROOT_DIR, '.env');
+const CWD_ENV_PATH = path.join(process.cwd(), '.env');
 
 /**
  * Auto-create a .env file in dev mode if it doesn't exist.
@@ -20,8 +30,10 @@ const isProduction = (process.env.NODE_ENV || 'development') === 'production';
  */
 function ensureDevEnvFile() {
   if (isProduction) return;
-  const envPath = path.join(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) return;
+  // Auto-create ONLY at the repo root (never a stray backend/.env), and only
+  // when no .env exists anywhere we would look.
+  const envPath = ROOT_ENV_PATH;
+  if (fs.existsSync(envPath) || fs.existsSync(CWD_ENV_PATH)) return;
 
   const jwtSecret = crypto.randomBytes(32).toString('hex');
   const refreshSecret = crypto.randomBytes(32).toString('hex');
@@ -59,8 +71,12 @@ CORS_ORIGINS=http://127.0.0.1:8080,http://localhost:8080,http://localhost:8081
 ensureDevEnvFile();
 
 // Load .env with override: true so .env values beat inherited env vars.
+// Repo-root .env loads first; a cwd-local .env (backend/ dev override) layers on top.
 if (!isProduction) {
-  dotenv.config({ override: true });
+  dotenv.config({ override: true, path: ROOT_ENV_PATH });
+  if (CWD_ENV_PATH !== ROOT_ENV_PATH && fs.existsSync(CWD_ENV_PATH)) {
+    dotenv.config({ override: true, path: CWD_ENV_PATH });
+  }
 }
 
 /**

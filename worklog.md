@@ -157,3 +157,21 @@ Work Log:
 Stage Summary:
 - Local dev now works out of the box: git pull → npm run dev → every demo account + button functional
 - User still needs to free port 3000 locally (stale vite process) — documented for handoff
+
+---
+Task ID: 7 (separate dev scripts: backend & frontend standalone npm run dev)
+Agent: Super Z (main agent)
+Task: User wants `npm run dev` to work independently in backend/ and frontend/ — no combined fallback, no port 3000 conflict when starting the backend alone.
+
+Work Log:
+- Root cause found: backend/package.json DID NOT EXIST → `cd backend && npm run dev` fell through npm's package.json walk-up to the ROOT script (concurrently: backend + frontend) → the frontend leg always crashed with "Port 3000 already in use" whenever a standalone vite was running
+- Created backend/package.json: name patafundi-backend, "type": "module" (critical — nearest-package.json ESM rule), dev/start/db:migrate/db:seed/db:push scripts; deps resolve by walking up to root node_modules
+- config.js: .env resolution made cwd-INDEPENDENT — ROOT_ENV_PATH derived from import.meta.url (backend/src → ../.. = repo root); dotenv loads root .env first, then an optional cwd-local backend/.env layers overrides; ensureDevEnvFile now auto-creates ONLY at repo root (never a stray backend/.env with the 8080-oriented template)
+- Verified standalone from backend/ cwd on throwaway .pgdata (PORT=4100): boot log shows "injected env (N) from ../.env" (root .env found); migrations 001-035 + seed-takeover auto-ran; CORS preflight Origin localhost:3000 → 204 + Allow-Origin + credentials; logins admin@patafundi.com → 200, admin.demo@patafundi.test → 200, customer.demo@patafundi.test → 200; evil origin blocked (no allow-origin)
+- Confirmed ensure-dev-db.js seeds all 11 legacy @patafundi.com accounts at boot + seed-takeover.js the 12 @patafundi.test → all 16 DemoPage Quick Login accounts exist on a FRESH machine (tested on brand-new throwaway DB)
+- 82/82 unit tests pass; live supervisor stack (:4000/:3000) untouched and healthy
+- Pushed (includes stray 9d94500 worklog commit)
+
+Stage Summary:
+- New local workflow: Terminal 1 `cd backend; npm run dev` → API :4000 only; Terminal 2 `cd frontend; npm run dev` → web :3000 only; root `npm run dev` still runs both — user picks ONE mode
+- User-side remaining: kill stale PID on :3000 (taskkill /F /PID from netstat), git pull
