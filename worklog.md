@@ -175,3 +175,23 @@ Work Log:
 Stage Summary:
 - New local workflow: Terminal 1 `cd backend; npm run dev` → API :4000 only; Terminal 2 `cd frontend; npm run dev` → web :3000 only; root `npm run dev` still runs both — user picks ONE mode
 - User-side remaining: kill stale PID on :3000 (taskkill /F /PID from netstat), git pull
+
+---
+Task ID: 8 (sandbox rollback + stuck-boot recovery; user image upload missing)
+Agent: Super Z (main agent)
+Task: User re-sent the MASTER IMPLEMENTATION PROMPT + screenshot ("make everything function like that") — image never arrived on server; simultaneously found the sandbox workspace rolled back and the backend stuck.
+
+Work Log:
+- Upload missing: /home/z/my-project/upload/ EMPTY — pasted_image_1790438544800.png not delivered by gateway; searched whole filesystem → not found. Refused to guess content per master prompt rule; asked user to re-send
+- Incident 1 — stuck boot: platform dev.sh restarted stack at 16:03 after sandbox recycle; backend PID 1011 spun at 99% CPU for 5.5 min WITHOUT listening; .pgdata/pg_wal = 33M → pathological PGlite WAL replay after unclean recycle; SIGKILL'd it
+- Incident 2 — workspace rollback: recycle restored git refs AND disk to 4f23128 (post-Task-4 snapshot): backend/package.json GONE, cors.js/config.js fixes GONE, stack-supervisor.py GONE; GitHub origin/main intact at aa6141a
+- Drift forensics: git diff vs old HEAD = 228 files, 0 insertions/0 deletions (file-mode noise only) → nothing valuable uncommitted; saved .zscripts/rollback-drift.patch as evidence
+- Recovery: git fetch (origin/main 4f23128..aa6141a) → git reset --hard origin/main → verified restored (localhost:3000 CORS, ROOT_ENV_PATH ×4, backend/package.json, supervisor script, .env present)
+- Wiped pathological .pgdata (fully reproducible: migrations 001-035 + boot seeds); rebuilt — clean boot ~40s vs >5.5 min stuck
+- Relaunched stack-supervisor.py via setsid nohup → backend :4000 200 + frontend :3000 200
+- Evidence: CORS preflight via :3000 proxy → 204; ALL 16 demo accounts login 200 through proxy with localhost Origin (11 @patafundi.com + 5 @patafundi.test)
+- Master prompt status re-confirmed: PHASE 0-12 already executed in prior sessions with evidence (82/82 unit, 41/41 E2E, 19/19 security battery, docker, mobile) — no code changes needed this turn beyond infra recovery
+
+Stage Summary:
+- Stack restored to aa6141a, supervisor-maintained, all demo accounts + CORS verified live
+- BLOCKED: image-driven UI work — waiting for user to re-upload the screenshot
