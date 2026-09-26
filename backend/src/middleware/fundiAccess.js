@@ -17,7 +17,7 @@ export function requireFundiAccount(req, res, next) {
 /** Approved fundi operators only (plus admin). */
 export async function requireApprovedFundi(req, res, next) {
   try {
-    if (req.user?.role === 'admin') {
+    if (req.user?.isAdmin) {
       await logAccessDecision(req, 'requireApprovedFundi:admin_bypass');
       return next();
     }

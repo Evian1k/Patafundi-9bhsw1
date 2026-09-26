@@ -59,7 +59,7 @@ export async function requireJobPhotoAccess(req, res, next) {
     const result = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
     const job = result.rows[0];
     if (!job) throw notFound('Job not found');
-    if (req.user.role === 'admin') {
+    if (req.user.isAdmin) {
       req.jobAccess = job;
       return next();
     }
@@ -85,7 +85,7 @@ export async function requireDisputeAccess(req, res, next) {
     );
     const dispute = result.rows[0];
     if (!dispute) throw notFound('Dispute not found');
-    if (req.user.role === 'admin') {
+    if (req.user.isAdmin) {
       req.disputeAccess = dispute;
       return next();
     }
@@ -109,7 +109,7 @@ export async function requireChatAttachmentAccess(req, res, next) {
 export async function requireProfilePhotoAccess(req, res, next) {
   try {
     const userId = req.params.userId || req.params.id;
-    if (req.user.role === 'admin' || req.user.id === userId) {
+    if (req.user.isAdmin || req.user.id === userId) {
       return next();
     }
     const fundi = await query(

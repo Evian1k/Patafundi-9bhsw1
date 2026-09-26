@@ -20,7 +20,7 @@ import {
 } from '../services/fraudService.js';
 
 function canAccessJob(user, job) {
-  return user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id;
+  return user.isAdmin || user.role === 'admin' || user.role === 'super_admin' || job.customer_id === user.id || job.fundi_id === user.id;
 }
 
 function parsePositiveAmount(value, label = 'Amount') {
@@ -322,7 +322,7 @@ export async function paymentForJob(req, res) {
   const result = await query(
     `select p.* from payments p
      join jobs j on j.id = p.job_id
-     where p.job_id = $1 and ($2 = 'admin' or j.customer_id = $3 or j.fundi_id = $3)
+     where p.job_id = $1 and ($2 in ('admin', 'super_admin') or j.customer_id = $3 or j.fundi_id = $3)
      order by p.created_at desc limit 1`,
     [jobId, req.user.role, req.user.id],
   );

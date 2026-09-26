@@ -106,6 +106,7 @@ export async function authRequired(req, _res, next) {
     if (!result.rows[0]) throw forbidden('User account not found');
     if (result.rows[0].status !== 'active') throw forbidden('Account is not active');
     req.user = result.rows[0];
+    req.user.isAdmin = isAdminRole(req.user);
     req.authPayload = payload;
     await logAccessDecision(req, 'authRequired:ok', { jwtRole: payload.role ?? null });
     next();
@@ -113,6 +114,16 @@ export async function authRequired(req, _res, next) {
     error.status = error.status || 401;
     next(error);
   }
+}
+
+
+/**
+ * Platform-owner roles (spec §7/§8): 'admin' staff and the 'super_admin'
+ * owner must both pass object-level admin checks. Object-level checks MUST
+ * use this helper (or req.user.isAdmin) — never a bare `=== 'admin'`.
+ */
+export function isAdminRole(user) {
+  return Boolean(user && (user.role === 'admin' || user.role === 'super_admin'));
 }
 
 export function requireRole(...roles) {

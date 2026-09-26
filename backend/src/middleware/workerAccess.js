@@ -6,7 +6,7 @@ import { forbidden } from '../utils/http.js';
 
 export async function isApprovedWorker(user) {
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (user.isAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
   const fundi = await query(
     `select approval_status from fundis where user_id = $1`,
     [user.id],

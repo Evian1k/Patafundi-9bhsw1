@@ -104,7 +104,7 @@ export async function getDisputeFiles(req, res) {
 
 export async function getProfilePhotoSignedUrl(req, res) {
   const userId = req.params.userId;
-  if (req.user.role !== 'admin' && req.user.id !== userId) {
+  if (!req.user.isAdmin && req.user.id !== userId) {
     const approved = await query(
       `select 1 from fundis where user_id = $1 and approval_status = 'approved'`,
       [userId],
@@ -144,7 +144,7 @@ export async function serveLocalFile(req, res) {
   if (!r2Key || r2Key.includes('..') || r2Key.includes('\0')) throw forbidden('Invalid path');
 
   // Verification documents: admin only (already enforced via route middleware, but double-check here).
-  if (r2Key.startsWith('verification/') && req.user.role !== 'admin') throw forbidden('Admin only');
+  if (r2Key.startsWith('verification/') && !req.user.isAdmin) throw forbidden('Admin only');
 
   // Job photos / dispute evidence / chat attachments: caller must be an involved party or admin.
   // This prevents enumeration of other users' files when running with the local-fallback
@@ -155,7 +155,7 @@ export async function serveLocalFile(req, res) {
     const jobId = jobMatch[1];
     const job = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
     if (!job.rows[0]) throw notFound('Not found');
-    if (req.user.role !== 'admin' && job.rows[0].customer_id !== req.user.id && job.rows[0].fundi_id !== req.user.id) {
+    if (!req.user.isAdmin && job.rows[0].customer_id !== req.user.id && job.rows[0].fundi_id !== req.user.id) {
       throw forbidden('Not allowed to access this file');
     }
   }
@@ -166,7 +166,7 @@ export async function serveLocalFile(req, res) {
     const job = await query('select customer_id, fundi_id, technician_user_id, company_id from jobs where id = $1', [jobId]);
     if (!job.rows[0]) throw notFound('Not found');
     const j = job.rows[0];
-    let chatAllowed = req.user.role === 'admin' || j.customer_id === req.user.id || j.fundi_id === req.user.id
+    let chatAllowed = req.user.isAdmin || j.customer_id === req.user.id || j.fundi_id === req.user.id
       || j.technician_user_id === req.user.id;
     if (!chatAllowed && j.company_id) {
       const member = await query(
@@ -183,7 +183,7 @@ export async function serveLocalFile(req, res) {
   const profileMatch = r2Key.match(/^profiles\/public\/([0-9a-f-]{36})\//i);
   if (profileMatch) {
     const targetUserId = profileMatch[1];
-    if (req.user.role !== 'admin' && req.user.id !== targetUserId) {
+    if (!req.user.isAdmin && req.user.id !== targetUserId) {
       const approved = await query(`select 1 from fundis where user_id = $1 and approval_status = 'approved'`, [targetUserId]);
       if (!approved.rows[0]) throw forbidden('Not allowed');
     }
@@ -203,7 +203,7 @@ export async function getChatAttachmentSignedUrl(req, res) {
   );
   if (!att.rows[0]) throw notFound('Attachment not found');
   const row = att.rows[0];
-  if (req.user.role !== 'admin' && req.user.id !== row.customer_id && req.user.id !== row.fundi_id) {
+  if (!req.user.isAdmin && req.user.id !== row.customer_id && req.user.id !== row.fundi_id) {
     // Align with chat participant policy (chatController.assertJobAccess):
     // the assigned company technician and active members of the job's company
     // can read the chat, so they can read its attachments too.

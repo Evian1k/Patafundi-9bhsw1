@@ -66,7 +66,7 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
 
 async function canAccessJob(user, job) {
   if (!user) return false;
-  if (user.role === 'admin' || job.customer_id === user.id || job.fundi_id === user.id) return true;
+  if (user.isAdmin || user.role === 'admin' || user.role === 'super_admin' || job.customer_id === user.id || job.fundi_id === user.id) return true;
   // Company workflow: assigned technician + members of the owning company
   if (job.technician_user_id && job.technician_user_id === user.id) return true;
   if (job.company_id) {
@@ -82,12 +82,12 @@ async function requireJobAccess(user, job) {
 }
 
 function requireAssignedFundi(user, job) {
-  if (user.role === 'admin') return;
+  if (user.isAdmin || user.role === 'super_admin') return;
   if (job.fundi_id !== user.id) throw forbidden('Only the assigned fundi can update this job');
 }
 
 function requireCustomer(user, job) {
-  if (user.role === 'admin') return;
+  if (user.isAdmin || user.role === 'super_admin') return;
   if (job.customer_id !== user.id) throw forbidden('Only the customer can perform this action');
 }
 
@@ -456,7 +456,7 @@ export async function patchJob(req, res) {
   if (!JOB_TRANSITIONS[job.status]?.includes(status)) {
     throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
   }
-  if (req.user.role !== 'admin') {
+  if (!req.user.isAdmin) {
     const actor = JOB_STATUS_ACTORS[status];
     const isCustomer = job.customer_id === req.user.id;
     const isAssignedFundi = job.fundi_id === req.user.id;
@@ -516,7 +516,7 @@ export async function acceptJob(req, res) {
   await logAccessDecision(req, 'jobs.acceptJob:precheck', {
     approvalStatus: fundi.rows[0]?.approval_status ?? null,
   });
-  if (req.user.role !== 'admin' && fundi.rows[0]?.approval_status !== 'approved') {
+  if (!req.user.isAdmin && fundi.rows[0]?.approval_status !== 'approved') {
     throw forbidden('Only approved fundis can accept jobs');
   }
   const result = await query(
@@ -582,7 +582,7 @@ export async function acceptJob(req, res) {
 export async function cancelJob(req, res) {
   const job = await loadJob(req.params.id);
   await requireJobAccess(req.user, job);
-  if (req.user.role !== 'admin' && !['pending', 'matching', 'accepted'].includes(job.status)) {
+  if (!req.user.isAdmin && !['pending', 'matching', 'accepted'].includes(job.status)) {
     throw badRequest('Job can no longer be cancelled');
   }
   const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 returning *', [

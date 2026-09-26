@@ -106,11 +106,13 @@ export async function registerDeviceToken({ userId, token, platform = 'web' }) {
 export async function unregisterDeviceToken(token, userId) {
   // Ownership check (spec §10 IDOR): a user may only deactivate their own
   // device tokens — never another user's token they happen to know.
+  // RETURNING + rows check (driver-agnostic; rowCount is unreliable on the
+  // embedded PGlite driver).
   const result = await query(
-    'update user_device_tokens set is_active = false where token = $1 and user_id = $2',
+    'update user_device_tokens set is_active = false where token = $1 and user_id = $2 returning id',
     [token, userId],
   );
-  if (result.rowCount === 0) {
+  if (!result.rows?.length) {
     const err = new Error('Device not found for this user');
     err.status = 404;
     throw err;
