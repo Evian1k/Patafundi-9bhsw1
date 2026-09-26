@@ -63,3 +63,20 @@ Work Log:
 Stage Summary:
 - 6 commits pushed to origin/main; repo is ONE project: backend/ + frontend/ + apps/{customer,fundi}-mobile + packages/shared
 - Money path, RBAC, tenant isolation, notification isolation and error routing all verified with evidence; every failed audit item fixed or explicitly scheduled (B2C payout integration remains manual-offline by design, documented)
+
+---
+Task ID: 2 (duplicate cleanup)
+Agent: Super Z (main agent)
+Task: User reported duplicate folders/files — verify and delete only what is confirmed duplicate/unused (master spec: verify before delete).
+
+Work Log:
+- PHASE 0-style audit: inventoried /home/z/ and /home/z/my-project/ structures, git ls-files top-level map, both git remotes
+- Found /home/z/patafundi-repo/ (17MB stale clone, last commit db123cd) — verified db123cd IS an ancestor of active main, zero uncommitted changes, no references from active repo → fully superseded
+- Verified keepers: apps/customer-mobile + apps/fundi-mobile (Expo apps required by spec §mobile), packages/shared (actively imported by both mobile apps via @patafundi/shared), root package.json/tsconfig.json (active monorepo orchestrator), .zscripts (workspace runtime, not product code)
+- Deleted: /home/z/patafundi-repo (stale duplicate clone), /home/z/node_modules (empty residue), dev.log (gitignored debug log)
+- No tracked files changed → no code commit required
+- Evidence: npm run test:unit → 82/82 pass; npm run typecheck → clean; git status clean
+
+Stage Summary:
+- Workspace now single-source-of-truth: /home/z/my-project only (backend/ + frontend/ + apps/ + packages/)
+- Nothing functional touched; all tests green; repo pushed state unchanged
