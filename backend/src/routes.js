@@ -242,13 +242,24 @@ router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_su
 
 router.get('/staff/audit-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(admin.listTable('audit_logs', 'logs')));
 
-// Error logs — staff with can_view_logs can view system errors
+// Error logs — staff with can_view_logs can view system errors.
+// Supports filtering by reference code (users quote e.g. ERR-7F3K2Q to
+// support), error type, and resolved state.
 router.get('/staff/error-logs', authRequired, requirePermission('can_view_logs'), asyncHandler(async (req, res) => {
   const { query: q } = await import('./db.js');
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const resolved = req.query.resolved === 'true' ? 'true' : (req.query.resolved === 'false' ? 'false' : null);
-  const where = resolved ? `where resolved = ${resolved}` : '';
-  const result = await q(`select * from error_logs ${where} order by created_at desc limit $1`, [limit]);
+  const type = typeof req.query.type === 'string' && req.query.type.trim() ? req.query.type.trim() : null;
+  const reference = typeof req.query.reference === 'string' && req.query.reference.trim() ? req.query.reference.trim().toUpperCase() : null;
+
+  const conditions = [];
+  const params = [];
+  if (resolved) { params.push(resolved); conditions.push(`resolved = $${params.length}`); }
+  if (type) { params.push(type); conditions.push(`error_type = $${params.length}`); }
+  if (reference) { params.push(reference); conditions.push(`upper(reference) = $${params.length}`); }
+  const where = conditions.length ? `where ${conditions.join(' and ')}` : '';
+  params.push(limit);
+  const result = await q(`select * from error_logs ${where} order by created_at desc limit $${params.length}`, params);
   res.json({ success: true, errors: result.rows });
 }));
 
@@ -257,6 +268,47 @@ router.post('/staff/error-logs/:id/resolve', authRequired, requirePermission('ca
   const { query: q } = await import('./db.js');
   await q('update error_logs set resolved = true, resolved_by = $2, resolved_at = now() where id = $1', [req.params.id, req.user.id]);
   res.json({ success: true, message: 'Error marked as resolved' });
+}));
+
+// ── Client error intake (public) ─────────────────────────────────────
+// Frontend ErrorBoundary reports render crashes here. Users never see the
+// technical detail — it lands in error_logs (source='client') and pings the
+// DevOps team. Input is strictly size-limited; no auth required because
+// crashes can happen pre-login.
+router.post('/client-errors', asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const message = typeof body.message === 'string' ? body.message.slice(0, 500) : 'Unknown client error';
+  const stack = typeof body.stack === 'string' ? body.stack.slice(0, 4000) : null;
+  const page = typeof body.page === 'string' ? body.page.slice(0, 300) : null;
+
+  // Reference is generated up-front so the UI can show it immediately —
+  // the user can quote it to support while staff investigate.
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  const reference = `ERR-${code}`;
+
+  // Respond immediately — reporting must never block or break the UI further.
+  setImmediate(() => {
+    import('./services/errorNotificationService.js')
+      .then(({ logErrorAndNotifyStaff }) => logErrorAndNotifyStaff({
+        type: 'client',
+        statusCode: 500,
+        message: `[frontend] ${message}`,
+        stack,
+        reference,
+        path: page,
+        method: 'RENDER',
+        userId: req.user?.id || null,
+        userRole: req.user?.role || null,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        source: 'client',
+      }))
+      .catch(() => {});
+  });
+
+  res.status(202).json({ success: true, message: 'Error report received', reference });
 }));
 
 // Permission-based dashboard access (alternative to /admin/dashboard which requires 'admin' role)

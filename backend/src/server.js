@@ -184,10 +184,27 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
-app.use((error, _req, res, _next) => {
+// ── Error classification → user-safe message mapping ────────────────
+// Users (customers, fundis, company staff) must NEVER see raw technical
+// errors (SQL fragments, stack hints, internal paths, provider details).
+// Every failure gets: a friendly message + a short reference code they can
+// quote to support. The full raw detail is logged server-side and routed
+// to the staff role responsible (see errorNotificationService.js).
+const USER_SAFE_MESSAGES = {
+  database: 'We are having trouble reaching our services right now. Please try again in a moment.',
+  system: 'Something went wrong on our side. Our team has been notified and is on it.',
+  payment: 'We could not complete your payment request. No money has left your account. Please try again or contact support.',
+  security: 'You do not have permission to perform this action.',
+  rate_limit: 'Too many requests. Please wait a moment and try again.',
+  fraud: 'This request could not be completed. If you believe this is a mistake, contact support.',
+  client: 'Something went wrong while displaying this page. Our team has been notified.',
+  general: 'Something went wrong. Please try again.',
+};
+
+function classifyError(error) {
+  const message = error.message || '';
   let status = error.status || 500;
-  let message = error.message || 'Internal server error';
-  let errorType = 'general';
+  let type = 'general';
 
   // Database-related errors → 503 (service unavailable), not 500.
   if (
@@ -198,50 +215,80 @@ app.use((error, _req, res, _next) => {
     || /relation .* does not exist/i.test(message)
   ) {
     status = 503;
-    errorType = 'database';
-    message = config.nodeEnv === 'production'
-      ? 'Database unavailable. Verify DATABASE_URL on Render.'
-      : 'Database unavailable. Start PostgreSQL (docker compose up -d) or set DATABASE_URL to a cloud Postgres. See .env.example for details.';
+    type = 'database';
   } else if (/invalid input syntax for type uuid/i.test(message)) {
     status = 400;
-    message = 'Invalid id format';
+    return { status, type: 'general', userMessage: 'Invalid request. Please check and try again.' };
   } else if (/is not configured/i.test(message)) {
     status = 503;
-    errorType = 'system';
+    type = 'system';
   } else if (/payment|mpesa|stk.push|daraja/i.test(message)) {
-    errorType = 'payment';
+    type = 'payment';
   } else if (/rate limit|too many/i.test(message)) {
-    errorType = 'rate_limit';
+    type = 'rate_limit';
+  } else if (/fraud|suspicious|blocked/i.test(message)) {
+    type = 'fraud';
   } else if (status === 401 || status === 403) {
-    errorType = 'security';
+    type = 'security';
   } else if (status >= 500) {
-    errorType = 'system';
+    type = 'system';
   }
+
+  return { status, type, userMessage: USER_SAFE_MESSAGES[type] || USER_SAFE_MESSAGES.general };
+}
+
+function makeErrorReference() {
+  // Short, human-quotable reference, e.g. ERR-7F3K2Q. Avoids ambiguous chars.
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return `ERR-${code}`;
+}
+
+app.use((error, _req, res, _next) => {
+  const { status, type, userMessage } = classifyError(error);
+  const reference = makeErrorReference();
+  const isClientError = status >= 400 && status < 500;
+
+  // 4xx messages are intentional, human-written validation messages from
+  // controllers (e.g. "Invalid credentials", "Job not found") — safe to show.
+  // 5xx and infrastructure failures always get the sanitized message.
+  const message = isClientError
+    ? (error.userSafeMessage || error.message || userMessage)
+    : userMessage;
 
   if (status >= 500) {
-    console.error('[PataFundi API]', message);
+    console.error(`[PataFundi API] ${reference} (${type})`, error.message);
   }
 
-  // ── Notify staff of significant errors ────────────────────────────
-  // Logs to error_logs table + creates notifications for relevant staff.
+  // ── Route the full technical detail to the responsible staff role ──
+  // Logs to error_logs (with reference) + notifies the right team.
   // Non-blocking — never let this crash the request.
   import('./services/errorNotificationService.js')
     .then(({ logErrorAndNotifyStaff }) => {
       return logErrorAndNotifyStaff({
-        type: errorType,
+        type,
         statusCode: status,
-        message,
+        message: error.message,
         stack: error.stack,
+        reference,
         path: _req.path,
         method: _req.method,
         userId: _req.user?.id || null,
+        userRole: _req.user?.role || null,
         ip: _req.ip,
         userAgent: _req.get('User-Agent'),
       });
     })
-    .catch(swallow('errorHandler.notifyStaff', { path: _req.path, status }));
+    .catch(swallow('errorHandler.notifyStaff', { path: _req.path, status, reference }));
 
-  res.status(status).json({ success: false, message });
+  // In development, include the raw message so the developer console/debug
+  // flows still work. In production this field is NEVER sent.
+  const payload = { success: false, message, reference };
+  if (config.nodeEnv !== 'production' && status >= 500) {
+    payload.debug = { type, rawMessage: error.message };
+  }
+  res.status(status).json(payload);
 });
 
 process.on('unhandledRejection', (reason) => {

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, AlertTriangle, Banknote, DollarSign, Headphones, ScrollText,
-  PackageCheck, Server, ShieldCheck, Users,
+  PackageCheck, Server, ShieldCheck, Users, Bug,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
@@ -240,22 +240,35 @@ function AuditHome() {
 
 // ── DEVOPS ──
 function DevopsHome() {
-  const { data, loading, error } = useData<never>(["/health", "/health/extended"]);
+  const { data, loading, error } = useData<never>(["/health", "/health/extended", "/staff/error-logs?resolved=false&limit=100"]);
   const health = data["/health"] as Record<string, unknown> | undefined;
   const extended = data["/health/extended"] as Record<string, unknown> | undefined;
+  const errorLogs = (data["/staff/error-logs?resolved=false&limit=100"] as { errors?: Record<string, unknown>[] } | undefined)?.errors || [];
   if (loading) return <SkeletonGrid />;
   if (error) return <ErrorBox message={error} />;
   const dbOk = extended?.database ?? health?.database ?? (Object.keys(data).length > 0);
   const integrations = (extended?.integrations || {}) as Record<string, string>;
+  const criticalErrors = errorLogs.filter((e) => Number(e.status_code) >= 500).length;
   return (
     <>
-      <Header title="System health" subtitle="Service status and integrations." />
+      <Header title="System health" subtitle="Service status, integrations and error triage." />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="API" value="Operational" icon={Server} tone="text-emerald-600 bg-emerald-500/10" />
         <StatCard label="Database" value={dbOk ? "Connected" : "Down"} icon={Server} tone={dbOk ? "text-emerald-600 bg-emerald-500/10" : "text-red-600 bg-red-500/10"} />
-        <StatCard label="Build" value={String(health?.build || "local").slice(0, 8)} icon={Server} tone="text-sky-600 bg-sky-500/10" />
+        <StatCard label="Unresolved errors" value={errorLogs.length} icon={Bug} tone={errorLogs.length > 0 ? "text-amber-600 bg-amber-500/10" : "text-emerald-600 bg-emerald-500/10"} sub={`${criticalErrors} critical (5xx)`} />
         <StatCard label="Realtime" value="Socket.io" icon={Activity} tone="text-violet-600 bg-violet-500/10" />
       </div>
+      <Link
+        to="/staff/devops/errors"
+        className="flex items-center justify-between rounded-2xl border bg-card p-4 text-sm hover:bg-muted/40 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Bug className="h-4 w-4 text-emerald-600" />
+          <span className="font-medium">Error Logs</span>
+          <span className="text-muted-foreground">— full technical detail users never see, searchable by reference code</span>
+        </span>
+        <span className="text-muted-foreground">→</span>
+      </Link>
       {Object.keys(integrations).length > 0 && (
         <ListCard title="Integrations" items={Object.entries(integrations).map(([k, v]) => ({ k, v }))} emptyText=""
           render={(row) => (

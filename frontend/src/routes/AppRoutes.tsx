@@ -65,6 +65,7 @@ import TechnicianApp from "@/pages/company/TechnicianApp";
 
 // Staff role-specific dashboards (takeover)
 import StaffRoleHome from "@/pages/staff/StaffRoleHome";
+import ErrorLogs from "@/pages/staff/ErrorLogs";
 
 // Staff dashboards (enterprise RBAC)
 import StaffLayout from "@/components/staff/StaffLayout";
@@ -196,6 +197,7 @@ export default function AppRoutes() {
         <Route path="fraud" element={<StaffRoleHome role="fraud_analyst" />} />
         <Route path="audit" element={<StaffRoleHome role="auditor" />} />
         <Route path="devops" element={<StaffRoleHome role="devops_engineer" />} />
+        <Route path="devops/errors" element={<ErrorLogs />} />
         <Route path="support" element={<StaffRoleHome role="support_agent" />} />
         <Route path="admin" element={<StaffRoleHome role="admin" />} />
         <Route path="admin/fundis" element={

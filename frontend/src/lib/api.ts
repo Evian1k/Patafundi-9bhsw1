@@ -9,15 +9,33 @@ import { clearAuthSession, setAuthSession } from '@/lib/authSession';
 export class ApiError extends Error {
   status: number;
   meta?: unknown;
-  constructor(message: string, status = 0, meta?: unknown) {
+  /** Server-assigned error reference (e.g. ERR-7F3K2Q) the user can quote to support. */
+  reference?: string;
+  constructor(message: string, status = 0, meta?: unknown, reference?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.meta = meta;
+    this.reference = reference;
   }
 }
 
 const UNAVAILABLE_MSG = 'Service temporarily unavailable. Please try again.';
+
+/**
+ * Safety net — the LAST line of defense. The backend already sanitizes 5xx
+ * messages, but if anything unexpected slips through (proxy error page,
+ * misconfigured server, HTML error body), users must still never see raw
+ * technical output. 4xx messages are intentional, human-written validation
+ * strings ("Invalid credentials") and are shown as-is.
+ */
+function userFacingErrorMessage(raw: string | undefined, status: number): string {
+  if (status >= 500) return 'Something went wrong on our side. Our team has been notified and is on it.';
+  if (status === 502 || status === 503 || status === 504) return 'We are having trouble reaching our services right now. Please try again in a moment.';
+  const message = (raw || '').trim();
+  if (!message || message.startsWith('<') || message.length > 300) return UNAVAILABLE_MSG;
+  return message;
+}
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -132,8 +150,13 @@ class ApiClient {
       // haven't changed. Let the caller handle the 403 gracefully.
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-        throw new ApiError(errorBody?.message || response.statusText || 'Request failed', response.status);
+        const errorBody = await response.json().catch(() => ({ message: response.statusText })) as { message?: string; reference?: string };
+        throw new ApiError(
+          userFacingErrorMessage(errorBody?.message || response.statusText, response.status),
+          response.status,
+          undefined,
+          errorBody?.reference,
+        );
       }
 
       return response.json();
