@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Wrench, Package, DollarSign, AlertTriangle, Users, Activity } from "lucide-react";
+import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 
 interface Stats {
@@ -27,32 +28,41 @@ export default function StaffOverview() {
   useEffect(() => {
     (async () => {
       try {
-        const permRes = await fetch("/api/staff/me/permissions", { credentials: "include" });
-        const permData = await permRes.json();
-        setRole(permData.role);
-        setPermissions(new Set(permData.permissions || []));
+        // apiClient everywhere: raw relative fetch("/api/…") breaks in
+        // production (SPA rewrite serves index.html) and skips auth headers.
+        const permData = await apiClient.request("/staff/me/permissions") as {
+          role?: string;
+          permissions?: string[];
+        };
+        setRole(permData.role || "");
+        const perms = new Set(permData.permissions || []);
+        setPermissions(perms);
 
         // Fetch stats based on permissions
         const promises: Promise<void>[] = [];
-        if (permData.role === "super_admin" || permData.permissions?.includes("can_view_metrics")) {
+        if (permData.role === "super_admin" || perms.has("can_view_metrics")) {
           promises.push(
-            fetch("/api/admin/dashboard", { credentials: "include" })
-              .then(r => r.json())
-              .then(d => setStats(s => ({ ...s, fundis: d.stats?.fundis, jobs: d.stats?.jobs, revenue: d.stats?.revenue, users: d.stats?.users })))
+            apiClient.request("/admin/dashboard")
+              .then((d) => {
+                const stats = (d as { stats?: Record<string, number> }).stats;
+                setStats((s) => ({ ...s, fundis: stats?.fundis, jobs: stats?.jobs, revenue: stats?.revenue, users: stats?.users }));
+              })
               .catch(() => {})
           );
         }
-        if (permData.permissions?.includes("can_view_fraud_dashboard")) {
+        if (perms.has("can_view_fraud_dashboard")) {
           promises.push(
-            fetch("/api/staff/fraud/dashboard", { credentials: "include" })
-              .then(r => r.json())
-              .then(d => setStats(s => ({ ...s, fraudAlerts: d.dashboard?.fraudAlerts?.open })))
+            apiClient.request("/staff/fraud/dashboard")
+              .then((d) => {
+                const dashboard = (d as { dashboard?: { fraudAlerts?: { open?: number } } }).dashboard;
+                setStats((s) => ({ ...s, fraudAlerts: dashboard?.fraudAlerts?.open }));
+              })
               .catch(() => {})
           );
         }
         await Promise.all(promises);
       } catch {
-        // ignore
+        // permissions fetch failed — the layout will handle re-auth
       } finally {
         setLoading(false);
       }
@@ -60,7 +70,7 @@ export default function StaffOverview() {
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-slate-400">Loading…</div>;
+    return <div className="p-8 text-muted-foreground">Loading…</div>;
   }
 
   const cards: Array<{ label: string; value: string | number; icon: React.ElementType; href?: string; perm?: string }> = [];
@@ -80,10 +90,10 @@ export default function StaffOverview() {
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       <motion.div initial="hidden" animate="visible" variants={containerVariants}>
-        <motion.h1 variants={itemVariants} className="text-2xl font-bold text-slate-900 mb-1">
+        <motion.h1 variants={itemVariants} className="text-2xl font-bold text-foreground mb-1">
           Staff Dashboard
         </motion.h1>
-        <motion.p variants={itemVariants} className="text-slate-500 mb-8 capitalize">
+        <motion.p variants={itemVariants} className="text-muted-foreground mb-8 capitalize">
           Welcome back. You are signed in as <strong>{role.replace("_", " ")}</strong>.
         </motion.p>
 
@@ -91,14 +101,14 @@ export default function StaffOverview() {
           {cards.map((card) => {
             const Icon = card.icon;
             const content = (
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+              <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/50 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <Icon className="w-5 h-5 text-primary" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900">{card.value}</div>
-                <div className="text-sm text-slate-500 mt-1">{card.label}</div>
+                <div className="text-2xl font-bold text-foreground">{card.value}</div>
+                <div className="text-sm text-muted-foreground mt-1">{card.label}</div>
               </div>
             );
             return card.href ? (
@@ -110,8 +120,8 @@ export default function StaffOverview() {
         </motion.div>
 
         {cards.length === 0 && (
-          <div className="bg-white rounded-2xl p-8 text-center text-slate-500">
-            <Activity className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+          <div className="bg-card rounded-2xl p-8 text-center text-muted-foreground">
+            <Activity className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
             Your role doesn't have dashboard metrics enabled. Use the sidebar to navigate to your assigned areas.
           </div>
         )}

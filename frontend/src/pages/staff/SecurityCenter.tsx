@@ -44,7 +44,7 @@ export default function SecurityCenter() {
       try {
         const me = await apiClient.getCurrentUser();
         const staff = ["super_admin","admin","support_agent","fraud_analyst","finance_team","dispatch_team","devops_engineer","auditor"];
-        if (!staff.includes(me?.user?.role || "")) { navigate("/dashboard"); return; }
+        if (!staff.includes((me as { user?: { role?: string } } | null)?.user?.role || "")) { navigate("/dashboard"); return; }
       } catch { navigate("/auth"); return; }
       fetchData();
     })();

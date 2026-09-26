@@ -34,7 +34,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: Scale, label: "Disputes", path: "/admin/disputes", color: "text-violet-500" },
   { icon: AlertTriangle, label: "Security", path: "/admin/security", color: "text-red-500" },
   { icon: BarChart3, label: "Reports", path: "/admin/reports", color: "text-cyan-500" },
-  { icon: Settings, label: "Settings", path: "/admin/settings", color: "text-gray-500" },
+  { icon: Settings, label: "Settings", path: "/admin/settings", color: "text-muted-foreground" },
   { icon: FileText, label: "Audit Logs", path: "/admin/audit-logs", color: "text-indigo-500" },
 ];
 
@@ -91,11 +91,11 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
         // staff dashboard access. Non-staff (customer/fundi/fundi_pending)
         // are redirected to their own dashboard.
         const staffRoles = ["super_admin", "admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];
-        if (!staffRoles.includes(me?.user?.role)) {
+        const myRole = (me as { user?: { role?: string } } | null)?.user?.role || "";
+        if (!staffRoles.includes(myRole)) {
           // Not staff — redirect to their appropriate dashboard
-          const role = me?.user?.role;
-          if (role === "fundi") navigate("/fundi");
-          else if (role === "fundi_pending") navigate("/fundi/pending");
+          if (myRole === "fundi") navigate("/fundi");
+          else if (myRole === "fundi_pending") navigate("/fundi/pending");
           else navigate("/dashboard");
         }
       } catch {
@@ -118,7 +118,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      <div className={`flex items-center gap-3 px-4 h-14 border-b border-slate-700/50 ${!sidebarOpen ? "justify-center" : ""}`}>
+      <div className={`flex items-center gap-3 px-4 h-14 border-b border-white/10 ${!sidebarOpen ? "justify-center" : ""}`}>
         <BrandLogo size="sm" iconOnly={!sidebarOpen} linkTo={false} />
         {sidebarOpen && (
           <p className="text-slate-400 text-xs leading-none">Admin Panel</p>
@@ -144,7 +144,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
               className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm ${
                 active
                   ? "bg-primary/20 border border-primary/30 text-white"
-                  : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
+                  : "text-emerald-100/80 hover:bg-white/10 hover:text-white"
               } ${!sidebarOpen ? "justify-center" : ""}`}
               title={!sidebarOpen ? item.label : undefined}
             >
@@ -179,7 +179,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
       <div className="px-2 pb-4">
         <button
           onClick={handleLogout}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-700/50 hover:text-white transition-all text-sm ${!sidebarOpen ? "justify-center" : ""}`}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-emerald-100/70 hover:bg-white/10 hover:text-white transition-all text-sm ${!sidebarOpen ? "justify-center" : ""}`}
         >
           <LogOut className="w-4 h-4 shrink-0" />
           {sidebarOpen && <span>Logout</span>}
@@ -189,10 +189,10 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-slate-900 transition-all duration-300 ${sidebarOpen ? "w-56" : "w-16"} shrink-0`}
+        className={`hidden lg:flex flex-col bg-[hsl(168_40%_9%)] transition-all duration-300 ${sidebarOpen ? "w-56" : "w-16"} shrink-0`}
       >
         <SidebarContent />
       </aside>
@@ -200,7 +200,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="w-56 bg-slate-900 flex flex-col">
+          <div className="w-56 bg-[hsl(168_40%_9%)] flex flex-col">
             <SidebarContent />
           </div>
           <div className="flex-1 bg-black/50" onClick={() => setMobileOpen(false)} />
@@ -210,13 +210,13 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-gray-100 flex items-center px-4 gap-3 shrink-0">
+        <header className="h-14 bg-card border-b border-border/50 flex items-center px-4 gap-3 shrink-0">
           <button
             onClick={() => { setSidebarOpen((s) => !s); setMobileOpen((s) => !s); }}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
             aria-label="Toggle sidebar"
           >
-            <Menu className="w-4 h-4 text-gray-500" />
+            <Menu className="w-4 h-4 text-muted-foreground" />
           </button>
           <div className="flex-1">
             <p className="font-semibold text-gray-800 text-sm">
@@ -235,10 +235,10 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
           )}
           <button
             onClick={handleLogout}
-            className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
             aria-label="Logout"
           >
-            <LogOut className="w-4 h-4 text-gray-500" />
+            <LogOut className="w-4 h-4 text-muted-foreground" />
           </button>
         </header>
 

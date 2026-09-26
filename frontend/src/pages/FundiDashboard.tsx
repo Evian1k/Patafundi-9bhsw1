@@ -5,9 +5,11 @@ import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { realtimeService } from "@/services/realtime";
 import { useJobRequest } from "@/hooks/useRealtime";
+import NotificationBell from "@/components/system/NotificationBell";
 import {
   BarChart3, Wallet, AlertCircle, TrendingUp, MapPin, LogOut,
-  Wifi, WifiOff, Star, ChevronRight, RefreshCw, Scale, ArrowUpRight,
+  Wifi, WifiOff, ChevronRight, RefreshCw, Scale, ArrowUpRight,
+  UserCog, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -184,7 +186,7 @@ export function FundiDashboard() {
     <div className="min-h-screen bg-gradient-hero">
       {isOnline && jobRequest && (
         <JobRequestModal
-          request={jobRequest}
+          request={jobRequest as unknown as Record<string, unknown>}
           remainingSec={remaining}
           onAccept={() => acceptJob(jobRequest.jobId as string)}
           onDecline={() => declineJob(jobRequest.jobId as string)}
@@ -202,6 +204,7 @@ export function FundiDashboard() {
             <button onClick={() => fetchDashboard(true)} disabled={refreshing} className="p-2 hover:bg-muted rounded-xl transition-colors">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            <NotificationBell />
             <button onClick={handleLogout} className="p-2 hover:bg-muted rounded-xl transition-colors">
               <LogOut className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -354,6 +357,32 @@ export function FundiDashboard() {
               <span className="text-sm font-bold text-green-700">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</span>
               <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
             </div>
+          </button>
+
+          <button onClick={() => navigate("/fundi/profile/edit")} className="w-full bg-card rounded-2xl p-4 border border-border/50 flex items-center justify-between hover:bg-muted transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                <UserCog className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Edit Profile</p>
+                <p className="text-xs text-muted-foreground">Bio, skills & specialties</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+
+          <button onClick={() => navigate("/fundi/reviews")} className="w-full bg-card rounded-2xl p-4 border border-border/50 flex items-center justify-between hover:bg-muted transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                <Star className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">My Reviews</p>
+                <p className="text-xs text-muted-foreground">See what customers say about your work</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
           <button onClick={() => navigate("/fundi/disputes")} className="w-full bg-card rounded-2xl p-4 border border-border/50 flex items-center justify-between hover:bg-muted transition-colors">

@@ -30,9 +30,9 @@ const STATUS_STYLES: Record<string, string> = {
   assigned: "bg-sky-500/10 text-sky-600",
   on_the_way: "bg-cyan-500/10 text-cyan-600",
   arrived: "bg-cyan-500/10 text-cyan-600",
-  in_progress: "bg-emerald-500/10 text-emerald-600",
+  in_progress: "bg-primary/10 text-primary",
   completion_requested: "bg-orange-500/10 text-orange-600",
-  completed: "bg-emerald-500/10 text-emerald-600",
+  completed: "bg-primary/10 text-primary",
   cancelled: "bg-red-500/10 text-red-500",
   scheduled: "bg-indigo-500/10 text-indigo-500",
   offered: "bg-teal-500/10 text-teal-600",
@@ -87,10 +87,10 @@ export default function PortalDashboard() {
     { label: "Awaiting dispatch", value: s.awaiting_dispatch, icon: UserCheck, tone: "text-violet-600 bg-violet-500/10" },
     { label: "Active jobs", value: s.active, icon: Activity, tone: "text-cyan-600 bg-cyan-500/10" },
     { label: "Awaiting confirmation", value: s.awaiting_confirmation, icon: BadgeCheck, tone: "text-orange-600 bg-orange-500/10" },
-    { label: "Completed", value: s.completed, icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Completed", value: s.completed, icon: CheckCircle2, tone: "text-primary bg-primary/10" },
     { label: "Available technicians", value: s.availableTechnicians, icon: Users, tone: "text-sky-600 bg-sky-500/10" },
     { label: "Rating", value: s.rating ? s.rating.toFixed(1) : "—", icon: Star, tone: "text-amber-600 bg-amber-500/10" },
-    { label: "Pending settlements (KES)", value: (s.pendingSettlements ?? 0).toLocaleString(), icon: Wallet, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Pending settlements (KES)", value: (s.pendingSettlements ?? 0).toLocaleString(), icon: Wallet, tone: "text-primary bg-primary/10" },
   ];
 
   return (
@@ -99,10 +99,15 @@ export default function PortalDashboard() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {ctx.myRole === "owner" ? "owner" : ctx.myRole}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {data.company.companyName} · {ctx.company.verificationStatus === "approved" ? "Verified partner" : ctx.company.verificationStatus}
+            {data.company.companyName}
+            {(() => {
+              const vs = ctx.company.verificationStatus || data.company.verificationStatus;
+              if (!vs) return null;
+              return <> · {vs === "approved" ? "Verified partner" : vs}</>;
+            })()}
           </p>
         </div>
-        <Link to="/company/jobs" className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-emerald-700 w-fit">
+        <Link to="/company/jobs" className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 w-fit">
           Open dispatch board <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -129,7 +134,7 @@ export default function PortalDashboard() {
               <span className="font-medium">{(s.incoming ?? 0) + (s.awaiting_dispatch ?? 0)} job(s)</span> need your attention.
             </p>
           </div>
-          <Link to="/company/jobs?tab=incoming" className="text-sm font-medium text-emerald-600 inline-flex items-center gap-1">
+          <Link to="/company/jobs?tab=incoming" className="text-sm font-medium text-primary inline-flex items-center gap-1">
             Review now <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -138,7 +143,7 @@ export default function PortalDashboard() {
       <section aria-labelledby="recent-h">
         <div className="flex items-center justify-between mb-3">
           <h2 id="recent-h" className="text-lg font-semibold tracking-tight">Recent jobs</h2>
-          <Link to="/company/jobs" className="text-sm text-emerald-600 inline-flex items-center gap-1">All jobs <ArrowRight className="h-3.5 w-3.5" /></Link>
+          <Link to="/company/jobs" className="text-sm text-primary inline-flex items-center gap-1">All jobs <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
         {data.recentJobs.length === 0 ? (
           <div className="rounded-2xl border bg-card p-8 text-center">

@@ -53,7 +53,7 @@ export default function CompanyDirectory() {
               placeholder="Search companies…" aria-label="Search companies"
               className="w-full rounded-xl border bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
           </div>
-          <Link to="/partner-program" className="hidden sm:inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 shrink-0">
+          <Link to="/partner-program" className="hidden sm:inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 shrink-0">
             Partner with us
           </Link>
         </div>
@@ -71,7 +71,7 @@ export default function CompanyDirectory() {
             {CATEGORIES.map((c) => (
               <button key={c} onClick={() => setCategory(c)}
                 className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm capitalize transition-colors ${
-                  category === c ? "bg-emerald-600 text-white border-emerald-600" : "hover:bg-muted"}`}>
+                  category === c ? "bg-primary text-primary-foreground border-emerald-600" : "hover:bg-muted"}`}>
                 {c.replace("_", " ")}
               </button>
             ))}
@@ -99,14 +99,14 @@ export default function CompanyDirectory() {
               <Link key={c.id} to={`/companies/${c.id}`}
                 className="group rounded-3xl border bg-card p-5 hover:shadow-md transition-shadow flex flex-col">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-emerald-600" />
+                  <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-primary" />
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-medium px-2 py-0.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
                     <BadgeCheck className="h-3.5 w-3.5" /> Verified Partner
                   </span>
                 </div>
-                <h2 className="mt-3 font-semibold tracking-tight group-hover:text-emerald-700 transition-colors">{c.companyName}</h2>
+                <h2 className="mt-3 font-semibold tracking-tight group-hover:text-primary transition-colors">{c.companyName}</h2>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
@@ -130,7 +130,7 @@ export default function CompanyDirectory() {
                     <MapPin className="h-3.5 w-3.5" /> {(c.serviceAreas || [])[0] || "Kenya"}
                     {(c.serviceAreas || []).length > 1 && ` +${c.serviceAreas.length - 1}`}
                   </span>
-                  <span className="inline-flex items-center gap-0.5 text-emerald-600 font-medium">
+                  <span className="inline-flex items-center gap-0.5 text-primary font-medium">
                     View <ChevronRight className="h-3.5 w-3.5" />
                   </span>
                 </div>

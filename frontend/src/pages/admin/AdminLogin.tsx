@@ -76,7 +76,7 @@ export default function AdminLogin() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[hsl(168_45%_7%)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <BrandLogo size="md" linkTo={false} />
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -86,18 +86,18 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[hsl(168_45%_7%)] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
-        <Card className="bg-slate-900 border-slate-700 p-8">
+        <Card className="bg-[hsl(168_30%_12%)] border-white/10 p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <BrandLogo size="lg" linkTo={false} className="justify-center mb-4" />
             <h1 className="text-white text-2xl font-display font-bold">Admin Access</h1>
-            <p className="text-slate-400 text-sm mt-1">PataFundi Management Panel</p>
+            <p className="text-emerald-100/70 text-sm mt-1">PataFundi Management Panel</p>
           </div>
 
           {/* Error */}
@@ -111,16 +111,16 @@ export default function AdminLogin() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <Label htmlFor="email" className="text-slate-300 text-sm">Email</Label>
+              <Label htmlFor="email" className="text-emerald-100/80 text-sm">Email</Label>
               <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-100/70" />
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@patafundi.com"
-                  className="pl-10 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary"
+                  className="pl-10 bg-[hsl(168_40%_9%)] border-white/15 text-white placeholder:text-emerald-100/30 focus:border-primary"
                   required
                   disabled={loading}
                   autoComplete="email"
@@ -129,16 +129,16 @@ export default function AdminLogin() {
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-slate-300 text-sm">Password</Label>
+              <Label htmlFor="password" className="text-emerald-100/80 text-sm">Password</Label>
               <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-100/70" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10 pr-10 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus:border-primary"
+                  className="pl-10 pr-10 bg-[hsl(168_40%_9%)] border-white/15 text-white placeholder:text-emerald-100/30 focus:border-primary"
                   required
                   disabled={loading}
                   autoComplete="current-password"
@@ -146,7 +146,7 @@ export default function AdminLogin() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-100/70 hover:text-white transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -168,8 +168,8 @@ export default function AdminLogin() {
           </form>
 
           {/* Security notice */}
-          <div className="mt-6 p-3 bg-slate-800 rounded-xl">
-            <p className="text-slate-400 text-xs text-center">
+          <div className="mt-6 p-3 bg-[hsl(168_40%_9%)] rounded-xl">
+            <p className="text-emerald-100/70 text-xs text-center">
               Restricted area. All access attempts are logged.
             </p>
           </div>

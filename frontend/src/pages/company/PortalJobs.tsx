@@ -97,14 +97,14 @@ export default function PortalJobs() {
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setParams({ tab: t.key })}
             className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-              tab === t.key ? "bg-emerald-600 text-white border-emerald-600 font-medium" : "hover:bg-muted"}`}>
+              tab === t.key ? "bg-primary text-primary-foreground border-emerald-600 font-medium" : "hover:bg-muted"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
       {notice && (
-        <div className="mt-3 rounded-xl border bg-emerald-500/5 text-sm px-3 py-2 text-emerald-700">{notice}</div>
+        <div className="mt-3 rounded-xl border bg-primary/100/5 text-sm px-3 py-2 text-primary">{notice}</div>
       )}
       {error && (
         <div className="mt-3 rounded-xl border bg-red-500/5 text-sm px-3 py-2 text-red-600">{error}</div>
@@ -141,7 +141,7 @@ export default function PortalJobs() {
                     {j.customer_name && <span>Customer: {j.customer_name}</span>}
                     {j.location_name && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{j.property_label || j.location_name}</span>}
                     {j.scheduled_at && <span>Scheduled: {new Date(j.scheduled_at).toLocaleString()}</span>}
-                    {j.technician_name && <span className="inline-flex items-center gap-1 text-emerald-600"><UserCheck className="h-3 w-3" />{j.technician_name}</span>}
+                    {j.technician_name && <span className="inline-flex items-center gap-1 text-primary"><UserCheck className="h-3 w-3" />{j.technician_name}</span>}
                     <span>{new Date(j.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
@@ -160,7 +160,7 @@ export default function PortalJobs() {
                 {(j.status === "pending" || j.status === "matching" || j.status === "scheduled") && (tab === "incoming" || tab === "pool") && (
                   <>
                     <button disabled={busyJob === j.id + "accept"} onClick={() => act(j.id, tab === "pool" ? "claim" : "accept", undefined, "Job accepted")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-3.5 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
                       {busyJob === j.id + "accept" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
                       {tab === "pool" ? "Claim job" : "Accept job"}
                     </button>
@@ -220,7 +220,7 @@ export default function PortalJobs() {
             <div className="mt-4 flex gap-2 justify-end">
               <button onClick={() => setQuoteFor(null)} className="rounded-xl border px-4 py-2 text-sm">Cancel</button>
               <button onClick={sendQuote} disabled={!quoteAmount || Number(quoteAmount) <= 0}
-                className="rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-50 inline-flex items-center gap-1.5">
+                className="rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50 inline-flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5" /> Send quote
               </button>
             </div>
@@ -241,7 +241,7 @@ function SelectTechnician({ team, onAssign, busy }: {
   return (
     <div className="relative">
       <button onClick={() => setOpen((o) => !o)} disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-3.5 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
         Assign technician
       </button>

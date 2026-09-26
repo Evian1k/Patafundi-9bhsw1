@@ -90,13 +90,13 @@ export default function PortalTeam() {
         </div>
         {canEdit && (
           <button onClick={() => setAddOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-emerald-700 w-fit">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 w-fit">
             <UserPlus className="h-4 w-4" /> Add member
           </button>
         )}
       </div>
 
-      {notice && <div className="mt-3 rounded-xl border bg-emerald-500/5 text-sm px-3 py-2 text-emerald-700 break-words">{notice}</div>}
+      {notice && <div className="mt-3 rounded-xl border bg-primary/100/5 text-sm px-3 py-2 text-primary break-words">{notice}</div>}
       {error && <div className="mt-3 rounded-xl border bg-red-500/5 text-sm px-3 py-2 text-red-600">{error}</div>}
 
       {addOpen && (
@@ -115,7 +115,7 @@ export default function PortalTeam() {
           </div>
           <Input label="Skills (comma separated)" value={form.skills} onChange={(v) => setForm({ ...form, skills: v })} placeholder="plumbing, hvac" />
           <button onClick={add} disabled={busy || !form.fullName || !form.email}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />} Add member
           </button>
         </div>
@@ -139,7 +139,7 @@ export default function PortalTeam() {
                   <p className="font-medium truncate">{m.fullName}</p>
                   <p className="text-xs text-muted-foreground truncate">{m.email}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-medium px-2 py-0.5 capitalize">{m.role}</span>
+                    <span className="rounded-full bg-primary/10 text-primary text-[11px] font-medium px-2 py-0.5 capitalize">{m.role}</span>
                     <span className={`rounded-full text-[11px] font-medium px-2 py-0.5 capitalize ${m.status === "active" ? "bg-muted text-foreground" : "bg-red-500/10 text-red-500"}`}>{m.status}</span>
                     {m.role === "technician" && (
                       <span className="rounded-full border text-[11px] px-2 py-0.5">{m.activeJobs} active job{m.activeJobs === 1 ? "" : "s"}</span>

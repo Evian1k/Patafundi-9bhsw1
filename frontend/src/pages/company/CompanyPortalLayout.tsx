@@ -14,6 +14,7 @@ import { apiClient } from "@/lib/api";
 
 export interface PortalCompany {
   id: string; companyName: string; logoUrl?: string; status?: string;
+  verificationStatus?: string;
   businessCategories?: string[];
 }
 export interface PortalMe {
@@ -86,7 +87,7 @@ export default function CompanyPortalLayout() {
           </p>
           <div className="mt-5 flex flex-col sm:flex-row gap-2 justify-center">
             <button onClick={() => navigate(0)} className="rounded-xl border px-4 py-2 text-sm">Retry</button>
-            <NavLink to="/partner-program" className="rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm">Partner with PataFundi</NavLink>
+            <NavLink to="/partner-program" className="rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm">Partner with PataFundi</NavLink>
           </div>
         </div>
       </div>
@@ -98,7 +99,7 @@ export default function CompanyPortalLayout() {
       <div className="px-5 py-5 border-b">
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Company Portal</p>
         <p className="mt-1 font-semibold tracking-tight truncate">{me.company.companyName}</p>
-        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-medium px-2 py-0.5 capitalize">
+        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[11px] font-medium px-2 py-0.5 capitalize">
           {me.myRole}
         </span>
       </div>
@@ -106,7 +107,7 @@ export default function CompanyPortalLayout() {
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end}
             className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
-              isActive ? "bg-emerald-600 text-white font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              isActive ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
             <Icon className="h-4 w-4 shrink-0" /> {label}
           </NavLink>
         ))}
@@ -161,7 +162,7 @@ export default function CompanyPortalLayout() {
             {MOBILE_NAV.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end}
                 className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${
-                  isActive ? "text-emerald-600" : "text-muted-foreground"}`}>
+                  isActive ? "text-primary" : "text-muted-foreground"}`}>
                 <Icon className="h-5 w-5" />
                 {label}
               </NavLink>

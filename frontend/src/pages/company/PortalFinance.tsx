@@ -17,7 +17,7 @@ interface Settlement {
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600",
   processing: "bg-blue-500/10 text-blue-600",
-  paid: "bg-emerald-500/10 text-emerald-600",
+  paid: "bg-primary/10 text-primary",
   failed: "bg-red-500/10 text-red-500",
   cancelled: "bg-muted text-muted-foreground",
 };
@@ -59,9 +59,9 @@ export default function PortalFinance() {
   const cards = [
     { label: "Gross earnings", value: summary?.gross, icon: Banknote, tone: "text-sky-600 bg-sky-500/10" },
     { label: "Platform commission", value: summary?.commission, icon: TrendingUp, tone: "text-amber-600 bg-amber-500/10" },
-    { label: "Net to company", value: summary?.net, icon: Wallet, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Net to company", value: summary?.net, icon: Wallet, tone: "text-primary bg-primary/10" },
     { label: "Pending payout", value: summary?.pending, icon: Wallet, tone: "text-orange-600 bg-orange-500/10" },
-    { label: "Paid out", value: summary?.paid, icon: Banknote, tone: "text-emerald-600 bg-emerald-500/10" },
+    { label: "Paid out", value: summary?.paid, icon: Banknote, tone: "text-primary bg-primary/10" },
   ];
 
   return (

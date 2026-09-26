@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   X, ShieldCheck, Star, Wrench, MessageCircle,
   Smartphone, CheckCircle, Loader2, AlertCircle,
-  Lock, ArrowRight, RefreshCw,
+  Lock, ArrowRight, RefreshCw, FileText, ReceiptText,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
 import { bootstrapAuthSessionFromUser } from "@/lib/authSession";
@@ -38,7 +38,7 @@ interface Coordinates {
 }
 
 type Status =
-  | "searching" | "matching" | "matched" | "accepted"
+  | "searching" | "matching" | "matched" | "accepted" | "offered"
   | "on_the_way" | "arrived" | "in_progress"
   | "completed" | "cancelled" | "failed";
 
@@ -106,6 +106,13 @@ export default function FundiTracker({
   const [completionOtp, setCompletionOtp] = useState("");
   const [confirmingOtp, setConfirmingOtp] = useState(false);
   const [completionConfirmed, setCompletionConfirmed] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
+
+  // Quote decision state (status === 'offered' — awaiting customer approval)
+  const [quoteDecision, setQuoteDecision] = useState<"idle" | "working" | "done">("idle");
+
+  // Receipt state (after payment confirmed)
+  const [receipt, setReceipt] = useState<{ amount?: number; receiptNumber?: string | null; method?: string; paidAt?: string | null } | null>(null);
 
   // Payment state
   const [mpesaNumber, setMpesaNumber] = useState("");
@@ -204,6 +211,7 @@ export default function FundiTracker({
       setPaymentMsg("Payment confirmed! Your fundi will receive their payout shortly.");
       if (paymentPollRef.current) { clearInterval(paymentPollRef.current); paymentPollRef.current = null; }
       toast.success("Payment confirmed via M-Pesa!");
+      loadReceipt();
     };
 
     const onPaymentFailed = (data: Record<string, unknown>) => {
@@ -232,6 +240,7 @@ export default function FundiTracker({
 
     // Initial fetch
     loadJob();
+    loadReceipt();
 
     // Also poll job every 6s
     jobPollRef.current = setInterval(loadJob, 6000);
@@ -254,6 +263,57 @@ export default function FundiTracker({
       jobPollRef.current = null;
     }
     if (jobId) realtimeService.stopWatchingJob(jobId);
+  };
+
+  // ── Receipt: fetched once payment is confirmed (and on mount for paid jobs)
+  const loadReceipt = async () => {
+    if (!jobId || !isValidUuid(jobId)) return;
+    try {
+      const res = await apiClient.getPaymentForJob(jobId) as { payment?: Record<string, unknown> };
+      const p = res?.payment;
+      if (p && (p.status === "completed" || p.status === "held")) {
+        setReceipt({
+          amount: p.amount != null ? Number(p.amount) : undefined,
+          receiptNumber: (p.mpesa_receipt_number ?? p.mpesaReceiptNumber ?? null) as string | null,
+          method: (p.method ?? "M-Pesa") as string,
+          paidAt: (p.updated_at ?? p.paid_at ?? null) as string | null,
+        });
+      }
+    } catch {
+      // Receipt is best-effort — never blocks the flow
+    }
+  };
+
+  // ── Quote decision (spec §4): customer approves/rejects a provider quote
+  const handleQuoteDecision = async (decision: "approve" | "reject") => {
+    if (!jobId || quoteDecision === "working") return;
+    setQuoteDecision("working");
+    try {
+      await apiClient.decideJobQuote(jobId, decision);
+      toast.success(decision === "approve" ? "Quote approved — work can begin!" : "Quote rejected.");
+      setQuoteDecision("done");
+      loadJob();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not submit your decision");
+      setQuoteDecision("idle");
+    }
+  };
+
+  // ── Resend completion code (customer-only endpoint)
+  const handleResendCode = async () => {
+    if (!jobId || resendingCode) return;
+    setResendingCode(true);
+    try {
+      const res = await apiClient.requestCompletionCode(jobId);
+      if (res?.completionOtp) {
+        setCompletionOtp(res.completionOtp);
+        toast.success("New confirmation code issued");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not issue a new code");
+    } finally {
+      setResendingCode(false);
+    }
   };
 
   const loadJob = async () => {
@@ -636,6 +696,42 @@ export default function FundiTracker({
               </div>
             )}
 
+            {status === "offered" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <p className="font-semibold text-sm">New quote to review</p>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  Your provider sent a quote for this job. Approve it to start the work, or reject it to keep matching.
+                </p>
+                {estimatedPrice != null && (
+                  <div className="p-3 bg-primary/10 rounded-xl text-center">
+                    <p className="text-xs text-muted-foreground">Quoted price</p>
+                    <p className="font-bold text-primary text-2xl">KES {estimatedPrice.toFixed(0)}</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 bg-gradient-primary gap-1"
+                    onClick={() => handleQuoteDecision("approve")}
+                    disabled={quoteDecision === "working"}
+                  >
+                    {quoteDecision === "working" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleQuoteDecision("reject")}
+                    disabled={quoteDecision === "working"}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {status === "cancelled" && (
               <p className="text-muted-foreground text-sm">This job has been cancelled.</p>
             )}
@@ -690,7 +786,7 @@ export default function FundiTracker({
                 <p className="text-xs text-muted-foreground">Step 1 of 2 — Verify with OTP</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Enter the OTP provided by your fundi to confirm completion.</p>
+            <p className="text-sm text-muted-foreground">Enter the 6-digit confirmation code from your notifications — it is sent only to you.</p>
             <InputOTP maxLength={6} value={completionOtp} onChange={setCompletionOtp}>
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -704,6 +800,17 @@ export default function FundiTracker({
                 <InputOTPSlot index={5} />
               </InputOTPGroup>
             </InputOTP>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResendCode}
+                disabled={resendingCode}
+                className="text-xs text-muted-foreground"
+              >
+                {resendingCode ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Sending…</> : "Didn\u2019t get the code? Resend"}
+              </Button>
+            </div>
             <Button className="w-full bg-gradient-primary" onClick={handleConfirmCompletion} disabled={completionOtp.length < 4 || confirmingOtp}>
               {confirmingOtp ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : <><ShieldCheck className="w-4 h-4 mr-2" /> Confirm Completion</>}
             </Button>
@@ -805,6 +912,46 @@ export default function FundiTracker({
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Receipt (spec §4): shown once payment is confirmed */}
+        {receipt && paymentStatus === "confirmed" && (
+          <div className="bg-card rounded-2xl p-6 shadow-md border border-border/50 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <ReceiptText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base">Payment Receipt</h3>
+                <p className="text-xs text-muted-foreground">Official PataFundi transaction record</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/60 divide-y divide-border/40 text-sm">
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-muted-foreground">Amount paid</span>
+                <span className="font-bold">KES {(receipt.amount ?? paymentAmount ?? 0).toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-muted-foreground">Method</span>
+                <span>{receipt.method || "M-Pesa"}</span>
+              </div>
+              {receipt.receiptNumber && (
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">M-Pesa code</span>
+                  <span className="font-mono font-medium">{receipt.receiptNumber}</span>
+                </div>
+              )}
+              {receipt.paidAt && (
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Date</span>
+                  <span>{new Date(receipt.paidAt).toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Keep this receipt for your records. Funds are held in escrow until you confirm the completed work.
+            </p>
           </div>
         )}
 

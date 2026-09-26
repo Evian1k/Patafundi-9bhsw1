@@ -88,21 +88,21 @@ export default function StaffLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[hsl(168_45%_7%)] flex items-center justify-center px-4">
       <motion.div
         initial={reduceMotion ? {} : "hidden"}
         animate="visible"
         variants={fadeUp}
         className="w-full max-w-md"
       >
-        <div className="bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 p-8">
+        <div className="bg-[hsl(168_30%_12%)] rounded-2xl shadow-2xl border border-white/10 p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
               <Shield className="w-7 h-7 text-primary" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-1">Staff Portal</h1>
-            <p className="text-slate-400 text-sm">
+            <p className="text-emerald-100/70 text-sm">
               Internal access only. Sign in with your staff account.
             </p>
           </div>
@@ -118,7 +118,7 @@ export default function StaffLogin() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              <label className="block text-xs font-medium text-emerald-100/70 mb-1.5">
                 Staff Email
               </label>
               <input
@@ -129,11 +129,11 @@ export default function StaffLogin() {
                 required
                 disabled={loading}
                 autoComplete="email"
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 text-white rounded-xl placeholder:text-slate-500 focus:border-primary focus:outline-none transition-colors"
+                className="w-full px-4 py-2.5 bg-[hsl(168_40%_9%)] border border-white/15 text-white rounded-xl placeholder:text-emerald-100/30 focus:border-primary focus:outline-none transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              <label className="block text-xs font-medium text-emerald-100/70 mb-1.5">
                 Password
               </label>
               <input
@@ -144,7 +144,7 @@ export default function StaffLogin() {
                 required
                 disabled={loading}
                 autoComplete="current-password"
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 text-white rounded-xl placeholder:text-slate-500 focus:border-primary focus:outline-none transition-colors"
+                className="w-full px-4 py-2.5 bg-[hsl(168_40%_9%)] border border-white/15 text-white rounded-xl placeholder:text-emerald-100/30 focus:border-primary focus:outline-none transition-colors"
               />
             </div>
 
@@ -169,17 +169,18 @@ export default function StaffLogin() {
 
           {/* Demo accounts hint */}
           {import.meta.env.DEV && (
-            <div className="mt-6 pt-6 border-t border-slate-700">
-              <p className="text-xs text-slate-500 mb-2 text-center">Staff demo accounts:</p>
-              <div className="grid grid-cols-2 gap-1.5 text-[10px] text-slate-400">
-                <div>admin@patafundi.com / Admin@2024!</div>
-                <div>support@patafundi.com / Support@2024!</div>
-                <div>fraud@patafundi.com / Fraud@2024!</div>
-                <div>finance@patafundi.com / Finance@2024!</div>
-                <div>dispatch@patafundi.com / Dispatch@2024!</div>
-                <div>devops@patafundi.com / Devops@2024!</div>
-                <div>auditor@patafundi.com / Auditor@2024!</div>
-                <div>ops@patafundi.com / Ops@2024!</div>
+            <div className="mt-6 pt-6 border-t border-white/10">
+              <p className="text-xs text-emerald-100/50 mb-2 text-center">Staff demo accounts:</p>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px] text-emerald-100/70">
+                <div>admin.demo@patafundi.test</div>
+                <div>support.demo@patafundi.test</div>
+                <div>fraud.demo@patafundi.test</div>
+                <div>finance.demo@patafundi.test</div>
+                <div>dispatcher.demo@patafundi.test</div>
+                <div>devops.demo@patafundi.test</div>
+                <div>auditor.demo@patafundi.test</div>
+                <div>operations.demo@patafundi.test</div>
+                <div className="col-span-2 text-center text-emerald-100/50">password: PataFundi#2026</div>
               </div>
               <div className="mt-3 text-center">
                 <Link to="/demo" className="text-xs text-primary hover:underline">
@@ -193,7 +194,7 @@ export default function StaffLogin() {
           <div className="mt-6 text-center">
             <Link
               to="/"
-              className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
+              className="inline-flex items-center gap-1 text-xs text-emerald-100/50 hover:text-white"
             >
               <ArrowLeft className="w-3 h-3" />
               Back to main site
@@ -204,7 +205,7 @@ export default function StaffLogin() {
         {/* Branding */}
         <div className="mt-6 text-center">
           <BrandLogo size="sm" />
-          <p className="mt-2 text-[10px] text-slate-600">
+          <p className="mt-2 text-[10px] text-emerald-100/40">
             PataFundi Staff Portal · Authorized personnel only
           </p>
         </div>

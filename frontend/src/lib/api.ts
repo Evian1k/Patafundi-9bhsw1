@@ -81,7 +81,11 @@ class ApiClient {
 
   async request(
     endpoint: string,
-    options: RequestInit & { includeAuth?: boolean } = {},
+    // Bodies are plain objects (JSON-encoded) or FormData — not raw BodyInit.
+    options: Omit<RequestInit, 'body'> & {
+      body?: unknown;
+      includeAuth?: boolean;
+    } = {},
     retries = 1,
   ): Promise<unknown> {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
@@ -89,14 +93,14 @@ class ApiClient {
     const { includeAuth = true, ...fetchOpts } = options;
     const url = buildApiUrl(endpoint);
 
-    const config: RequestInit = {
+    const config = {
       ...fetchOpts,
       credentials: 'include',
       headers: {
         ...this.getHeaders(includeAuth),
         ...(fetchOpts.headers as Record<string, string> ?? {}),
       },
-    };
+    } as RequestInit;
 
     if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
       config.body = JSON.stringify(config.body);
@@ -534,6 +538,16 @@ class ApiClient {
 
   // ── Payments ─────────────────────────────────────────────────────────────
   async getPaymentForJob(jobId: string) { return this.request(`/payments/job/${jobId}`); }
+
+  /** Customer-only: approve or reject a pending provider quote (job status 'offered'). */
+  async decideJobQuote(jobId: string, decision: 'approve' | 'reject') {
+    return this.request(`/jobs/${jobId}/quote/decision`, { method: 'POST', body: { decision } });
+  }
+
+  /** Customer-only: re-issue the job completion code (returned to the customer). */
+  async requestCompletionCode(jobId: string) {
+    return this.request(`/jobs/${jobId}/completion-code`, { method: 'POST' }) as Promise<{ completionOtp?: string }>;
+  }
 
   async processPayment(jobId: string, mpesaNumber: string, paymentMethod = 'mpesa') {
     return this.request('/payments/stk-push', {

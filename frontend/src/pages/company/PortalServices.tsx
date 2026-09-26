@@ -80,13 +80,13 @@ export default function PortalServices() {
         </div>
         {canEdit && (
           <button onClick={() => setAddOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-emerald-700 w-fit">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 w-fit">
             <Plus className="h-4 w-4" /> Add service
           </button>
         )}
       </div>
 
-      {notice && <div className="mt-3 rounded-xl border bg-emerald-500/5 text-sm px-3 py-2 text-emerald-700">{notice}</div>}
+      {notice && <div className="mt-3 rounded-xl border bg-primary/100/5 text-sm px-3 py-2 text-primary">{notice}</div>}
       {error && <div className="mt-3 rounded-xl border bg-red-500/5 text-sm px-3 py-2 text-red-600">{error}</div>}
 
       {addOpen && (
@@ -123,7 +123,7 @@ export default function PortalServices() {
               className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm" />
           </div>
           <button onClick={add} disabled={busy || !form.name}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Publish service
           </button>
         </div>

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { DEMO_MODE, demoJobs, demoUser } from "@/lib/demo";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
+import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
 import ReferralLoyaltyWidget from "@/components/customer/ReferralLoyaltyWidget";
 
@@ -160,9 +161,12 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1">
             {!DEMO_MODE && (
-              <button onClick={() => fetchUserJobs()} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
-                <RefreshCw className="w-4 h-4 text-muted-foreground" />
-              </button>
+              <>
+                <button onClick={() => fetchUserJobs()} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
+                  <RefreshCw className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <NotificationBell />
+              </>
             )}
             <button onClick={() => navigate("/settings")} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Settings">
               <Settings className="w-4 h-4 text-muted-foreground" />

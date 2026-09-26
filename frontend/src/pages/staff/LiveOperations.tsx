@@ -46,7 +46,7 @@ export default function LiveOperations() {
       try {
         const me = await apiClient.getCurrentUser();
         const staffRoles = ["super_admin", "admin", "dispatch_team", "support_agent"];
-        if (!staffRoles.includes(me?.user?.role)) {
+        if (!staffRoles.includes((me as { user?: { role?: string } } | null)?.user?.role || "")) {
           navigate("/staff");
           return;
         }

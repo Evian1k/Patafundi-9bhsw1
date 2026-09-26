@@ -11,6 +11,8 @@ import FundiPendingApproval from "@/pages/FundiPendingApproval";
 import { FundiDashboard } from "@/pages/FundiDashboard";
 import FundiJob from "@/pages/FundiJob";
 import FundiWallet from "@/pages/FundiWallet";
+import FundiProfileEdit from "@/pages/fundi/FundiProfileEdit";
+import FundiMyReviews from "@/pages/fundi/FundiMyReviews";
 import DisputeCenter from "@/pages/DisputeCenter";
 import Settings from "@/pages/Settings";
 import JobTracking from "@/pages/JobTracking";
@@ -159,6 +161,8 @@ export default function AppRoutes() {
       <Route path="/fundi/job/:jobId" element={<FundiJob />} />
       <Route path="/fundi/job/active" element={<FundiJob />} />
       <Route path="/fundi/wallet" element={<FundiWallet />} />
+      <Route path="/fundi/profile/edit" element={<FundiProfileEdit />} />
+      <Route path="/fundi/reviews" element={<FundiMyReviews />} />
       <Route path="/fundi/disputes" element={<DisputeCenter />} />
       <Route path="/fundi/resources" element={<FundiResources />} />
       <Route path="/fundi/app" element={<FundiApp />} />

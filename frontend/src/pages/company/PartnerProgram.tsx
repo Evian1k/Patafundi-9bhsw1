@@ -71,7 +71,7 @@ export default function PartnerProgram() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center rounded-3xl border bg-card p-8 shadow-sm">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
             <CheckCircle2 className="h-7 w-7 text-emerald-500" />
           </div>
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">Application received</h1>
@@ -110,7 +110,7 @@ export default function PartnerProgram() {
         <div className="grid lg:grid-cols-[1fr_1.6fr] gap-10">
           <aside className="space-y-6">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-emerald-500/5 px-3 py-1 text-xs font-medium text-emerald-600">
+              <div className="inline-flex items-center gap-2 rounded-full border bg-primary/100/5 px-3 py-1 text-xs font-medium text-primary">
                 <Building2 className="h-3.5 w-3.5" /> Company Partner Program
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance">
@@ -130,15 +130,15 @@ export default function PartnerProgram() {
                 { icon: Users, t: "Team management", d: "Roles for dispatchers, finance and technicians." },
               ].map(({ icon: Icon, t, d }) => (
                 <li key={t} className="flex gap-3">
-                  <div className="mt-0.5 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <Icon className="h-4 w-4 text-emerald-600" />
+                  <div className="mt-0.5 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div><p className="font-medium">{t}</p><p className="text-muted-foreground text-xs mt-0.5">{d}</p></div>
                 </li>
               ))}
             </ul>
             <div className="rounded-2xl border bg-card p-4 text-xs text-muted-foreground flex gap-2">
-              <FileCheck2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              <FileCheck2 className="h-4 w-4 shrink-0 text-primary" />
               Lifecycle: submitted → under review → approved. PataFundi staff verify
               your business before you go live — never automatic.
             </div>
@@ -152,8 +152,8 @@ export default function PartnerProgram() {
                     type="button"
                     onClick={() => i < step && setStep(i)}
                     className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap ${
-                      i === step ? "bg-emerald-600 text-white border-emerald-600"
-                      : i < step ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                      i === step ? "bg-primary text-primary-foreground border-emerald-600"
+                      : i < step ? "bg-primary/10 text-primary border-emerald-500/30"
                       : "text-muted-foreground"}`}
                   >
                     {i + 1}. {s}
@@ -188,7 +188,7 @@ export default function PartnerProgram() {
                         <button key={c} type="button" onClick={() => toggleCategory(c)}
                           className={`rounded-full border px-3.5 py-1.5 text-sm capitalize transition-colors ${
                             form.businessCategories.includes(c)
-                              ? "bg-emerald-600 text-white border-emerald-600"
+                              ? "bg-primary text-primary-foreground border-emerald-600"
                               : "hover:bg-muted"}`}>
                           {c.replace("_", " ")}
                         </button>
@@ -239,12 +239,12 @@ export default function PartnerProgram() {
                   className="rounded-xl border px-4 py-2 text-sm font-medium disabled:opacity-40">Back</button>
                 {step < 3 ? (
                   <button type="button" disabled={!canNext} onClick={() => setStep((s) => s + 1)}
-                    className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-medium text-white inline-flex items-center gap-1 disabled:opacity-40 hover:bg-emerald-700">
+                    className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-medium text-white inline-flex items-center gap-1 disabled:opacity-40 hover:bg-primary/90">
                     Continue <ChevronRight className="h-4 w-4" />
                   </button>
                 ) : (
                   <button type="button" disabled={submitting} onClick={submit}
-                    className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-medium text-white inline-flex items-center gap-2 disabled:opacity-40 hover:bg-emerald-700">
+                    className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-medium text-white inline-flex items-center gap-2 disabled:opacity-40 hover:bg-primary/90">
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                     Submit application
                   </button>

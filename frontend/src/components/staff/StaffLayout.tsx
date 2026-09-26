@@ -24,6 +24,8 @@ import {
   Package, Activity, ScrollText, LogOut, Menu, X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { apiClient } from "@/lib/api";
+import NotificationBell from "@/components/system/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
 
 const STAFF_NAV = [
@@ -82,12 +84,17 @@ export default function StaffLayout() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/staff/me/permissions", { credentials: "include" });
-        if (!res.ok) {
+        // apiClient (NOT raw fetch): production serves the SPA from a CDN and
+        // relative /api paths rewrite to index.html — apiClient builds the
+        // absolute API URL and handles auth headers + 401 refresh.
+        const data = await apiClient.request("/staff/me/permissions") as {
+          role?: string;
+          permissions?: string[];
+        };
+        if (!data?.role) {
           navigate("/auth");
           return;
         }
-        const data = await res.json();
         setRole(data.role);
         setPermissions(new Set(data.permissions || []));
       } catch {
@@ -106,18 +113,18 @@ export default function StaffLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-pulse text-slate-400">Loading staff dashboard…</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">Loading staff dashboard…</div>
       </div>
     );
   }
 
   if (role === "customer" || role === "fundi" || role === "fundi_pending") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Access Denied</h1>
-          <p className="text-slate-600 mt-2">This area is for staff members only.</p>
+          <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>
+          <p className="text-muted-foreground mt-2">This area is for staff members only.</p>
           <Link to="/dashboard" className="mt-4 inline-block text-primary hover:underline">
             Go to your dashboard →
           </Link>
@@ -131,17 +138,17 @@ export default function StaffLayout() {
     : { initial: { opacity: 0, x: -20 }, animate: { opacity: 1, x: 0 } };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar — desktop */}
       <motion.aside
         initial={sidebarVariants.initial}
         animate={sidebarVariants.animate}
-        className="hidden md:flex w-64 flex-col bg-slate-900 text-slate-100 fixed inset-y-0 left-0 z-30"
+        className="hidden md:flex w-64 flex-col bg-[hsl(168_40%_9%)] text-emerald-50/90 fixed inset-y-0 left-0 z-30"
       >
-        <div className="p-4 border-b border-slate-800">
+        <div className="p-4 border-b border-white/10">
           <BrandLogo size="sm" />
-          <div className="mt-2 text-xs text-slate-400">
-            Staff Console · <span className="text-slate-300 capitalize">{role.replace("_", " ")}</span>
+          <div className="mt-2 text-xs text-emerald-200/70">
+            Staff Console · <span className="text-emerald-100 capitalize">{role.replace("_", " ")}</span>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-4">
@@ -150,7 +157,7 @@ export default function StaffLayout() {
             if (!visibleItems.length) return null;
             return (
               <div key={section.section} className="mb-6">
-                <div className="px-4 mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <div className="px-4 mb-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-200/50">
                   {section.section}
                 </div>
                 {visibleItems.map((item) => {
@@ -161,7 +168,7 @@ export default function StaffLayout() {
                       key={item.href}
                       to={item.href}
                       className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                        active ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"
+                        active ? "bg-primary text-white shadow-glow" : "text-emerald-100/80 hover:bg-white/10"
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -173,34 +180,38 @@ export default function StaffLayout() {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-white/10 flex items-center justify-between">
           <button
             onClick={() => navigate("/auth")}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-white"
+            className="flex items-center gap-2 text-sm text-emerald-200/70 hover:text-white"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
+          <NotificationBell className="[&_button]:text-emerald-100/80 [&_button:hover]:bg-white/10" />
         </div>
       </motion.aside>
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-slate-900 text-white px-4 h-14 flex items-center justify-between">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-[hsl(168_40%_9%)] text-white px-4 h-14 flex items-center justify-between">
         <BrandLogo size="sm" />
-        <button onClick={() => setMenuOpen(!menuOpen)} className="p-2">
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell className="text-white [&_button]:text-white" />
+          <button onClick={() => setMenuOpen(!menuOpen)} className="p-2">
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile nav drawer */}
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-20 bg-black/50" onClick={() => setMenuOpen(false)}>
-          <div className="absolute right-0 top-14 bottom-0 w-64 bg-slate-900 text-slate-100 p-4 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute right-0 top-14 bottom-0 w-64 bg-[hsl(168_40%_9%)] text-emerald-50/90 p-4 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {STAFF_NAV.map((section) => {
               const visibleItems = section.items.filter(canSee);
               if (!visibleItems.length) return null;
               return (
                 <div key={section.section} className="mb-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-200/50 mb-2">
                     {section.section}
                   </div>
                   {visibleItems.map((item) => {
@@ -210,7 +221,7 @@ export default function StaffLayout() {
                         key={item.href}
                         to={item.href}
                         onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 rounded-lg"
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-emerald-100/80 hover:bg-white/10 rounded-lg"
                       >
                         <Icon className="w-4 h-4" />
                         {item.label}

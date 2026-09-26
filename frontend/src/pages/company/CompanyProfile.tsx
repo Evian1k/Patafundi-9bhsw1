@@ -103,7 +103,7 @@ export default function CompanyProfile() {
         <div className="rounded-3xl border bg-card p-8 text-center max-w-sm">
           <Building2 className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="mt-3 text-sm text-muted-foreground">{error || "Company not found."}</p>
-          <Link to="/companies" className="mt-4 inline-block rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm">Browse companies</Link>
+          <Link to="/companies" className="mt-4 inline-block rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm">Browse companies</Link>
         </div>
       </div>
     );
@@ -122,15 +122,15 @@ export default function CompanyProfile() {
         <div className="space-y-6 min-w-0">
           <section className="rounded-3xl border bg-card p-6">
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+              <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center shrink-0">
                 {company.logoUrl
                   ? <img src={company.logoUrl} alt={company.companyName} className="w-16 h-16 rounded-3xl object-cover" />
-                  : <Building2 className="h-7 w-7 text-emerald-600" />}
+                  : <Building2 className="h-7 w-7 text-primary" />}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">{company.companyName}</h1>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-medium px-2 py-0.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
                     <BadgeCheck className="h-3.5 w-3.5" /> Verified Partner
                   </span>
                 </div>
@@ -169,7 +169,7 @@ export default function CompanyProfile() {
                     </div>
                     {s.description && <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{s.description}</p>}
                     <button onClick={() => book(s)} disabled={booking}
-                      className="mt-3 rounded-xl bg-emerald-600 text-white text-sm font-medium py-2 hover:bg-emerald-700 disabled:opacity-50">
+                      className="mt-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium py-2 hover:bg-primary/90 disabled:opacity-50">
                       Book this service
                     </button>
                   </div>
@@ -211,18 +211,18 @@ export default function CompanyProfile() {
               confirmation and a named technician before work starts.
             </p>
             <button onClick={() => book()} disabled={booking}
-              className="mt-3 w-full rounded-xl bg-emerald-600 text-white py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+              className="mt-3 w-full rounded-xl bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
               {booking ? "Sending…" : "Request service"}
             </button>
-            {bookMsg && <p className="mt-2 text-xs text-emerald-600">{bookMsg}</p>}
+            {bookMsg && <p className="mt-2 text-xs text-primary">{bookMsg}</p>}
           </div>
 
           <div className="rounded-3xl border bg-card p-5 space-y-3 text-sm">
-            <p className="font-medium flex items-center gap-2"><MapPin className="h-4 w-4 text-emerald-600" /> Service areas</p>
+            <p className="font-medium flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Service areas</p>
             <p className="text-muted-foreground text-xs">{(company.serviceAreas || []).join(" · ") || "Kenya"}</p>
             {(company.branches || []).length > 0 && (
               <>
-                <p className="font-medium flex items-center gap-2 pt-1"><Building2 className="h-4 w-4 text-emerald-600" /> Branches</p>
+                <p className="font-medium flex items-center gap-2 pt-1"><Building2 className="h-4 w-4 text-primary" /> Branches</p>
                 {company.branches.map((b, i) => (
                   <div key={i} className="text-xs text-muted-foreground">
                     <p className="text-foreground font-medium">{b.name}</p>
@@ -235,7 +235,7 @@ export default function CompanyProfile() {
 
           {(company.guarantees || []).length > 0 && (
             <div className="rounded-3xl border bg-card p-5 space-y-2 text-sm">
-              <p className="font-medium flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Guarantees & warranties</p>
+              <p className="font-medium flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Guarantees & warranties</p>
               {company.guarantees.map((g, i) => (
                 <div key={i} className="text-xs">
                   <p className="font-medium">{g.name}{g.durationDays ? ` · ${g.durationDays} days` : ""}</p>
@@ -246,15 +246,15 @@ export default function CompanyProfile() {
           )}
 
           <div className="rounded-3xl border bg-card p-5 text-xs text-muted-foreground space-y-1.5">
-            <p className="flex items-center gap-2 text-foreground font-medium"><Calendar className="h-4 w-4 text-emerald-600" /> How it works</p>
+            <p className="flex items-center gap-2 text-foreground font-medium"><Calendar className="h-4 w-4 text-primary" /> How it works</p>
             <p>1. Send a request — describe the job.</p>
             <p>2. The company accepts and dispatches a technician.</p>
             <p>3. Approve the quote, then pay through secure escrow.</p>
             <p>4. Confirm completion with an OTP — funds release only then.</p>
           </div>
 
-          <div className="rounded-3xl border bg-emerald-500/5 p-5 text-xs text-muted-foreground flex gap-2">
-            <Wrench className="h-4 w-4 text-emerald-600 shrink-0" />
+          <div className="rounded-3xl border bg-primary/100/5 p-5 text-xs text-muted-foreground flex gap-2">
+            <Wrench className="h-4 w-4 text-primary shrink-0" />
             Looking for an individual fundi instead? Individual professionals also appear
             in search results and can be booked directly.
           </div>

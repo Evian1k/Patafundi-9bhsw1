@@ -42,7 +42,7 @@ export default function PortalSchedule() {
       <div className="mt-6 grid lg:grid-cols-2 gap-6">
         <section aria-labelledby="sched-h">
           <h2 id="sched-h" className="text-lg font-semibold tracking-tight mb-3 flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-emerald-600" /> Scheduled jobs
+            <CalendarDays className="h-4 w-4 text-primary" /> Scheduled jobs
           </h2>
           {jobs.length === 0 ? (
             <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">No scheduled jobs.</div>
@@ -56,7 +56,7 @@ export default function PortalSchedule() {
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{new Date(j.scheduled_at).toLocaleString()}</span>
-                    {j.technician_name && <span className="text-emerald-600">tech: {j.technician_name}</span>}
+                    {j.technician_name && <span className="text-primary">tech: {j.technician_name}</span>}
                     {j.customer_name && <span>customer: {j.customer_name}</span>}
                   </div>
                 </div>
@@ -80,7 +80,7 @@ export default function PortalSchedule() {
                       {a.skills?.length ? ` · ${a.skills.join(", ")}` : ""}
                     </p>
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${a.isAvailable ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${a.isAvailable ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                     {a.isAvailable ? "Available" : "Off duty"}
                   </span>
                 </div>

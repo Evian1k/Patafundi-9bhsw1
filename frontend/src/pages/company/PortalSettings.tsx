@@ -9,6 +9,7 @@ interface Profile {
   branches: { name?: string; address?: string }[]; availability?: string;
   website?: string; guarantees?: { name: string; terms?: string }[];
   rating?: number; completedJobs?: number;
+  verificationStatus?: string;
 }
 
 export default function PortalSettings() {
@@ -74,7 +75,7 @@ export default function PortalSettings() {
       <h1 className="text-2xl font-semibold tracking-tight">My business</h1>
       <p className="text-sm text-muted-foreground mt-0.5">Customer-facing profile — keep it accurate and complete.</p>
 
-      {notice && <div className="mt-3 rounded-xl border bg-emerald-500/5 text-sm px-3 py-2 text-emerald-700">{notice}</div>}
+      {notice && <div className="mt-3 rounded-xl border bg-primary/100/5 text-sm px-3 py-2 text-primary">{notice}</div>}
 
       <div className="mt-6 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
@@ -105,7 +106,7 @@ export default function PortalSettings() {
         </div>
 
         {profile && (
-          <div className="rounded-2xl border bg-emerald-500/5 p-4 text-xs text-muted-foreground grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border bg-primary/100/5 p-4 text-xs text-muted-foreground grid grid-cols-3 gap-3">
             <div><p className="font-medium text-foreground capitalize">Status</p>{profile.verificationStatus || "—"}</div>
             <div><p className="font-medium text-foreground">Rating</p>{profile.rating?.toFixed(1) || "—"}</div>
             <div><p className="font-medium text-foreground">Completed jobs</p>{(profile.completedJobs || 0).toLocaleString()}</div>
@@ -114,7 +115,7 @@ export default function PortalSettings() {
 
         {canEdit ? (
           <button onClick={save} disabled={saving || !form.companyName}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-5 py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes
           </button>
         ) : (

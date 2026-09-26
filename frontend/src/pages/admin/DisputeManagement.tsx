@@ -233,40 +233,21 @@ export default function AdminDisputeManagement() {
   const openCount = disputes.filter((d) => d.status === "open" || d.status === "escalated").length;
   const suggestions = selected ? getResolutionSuggestions(selected.reason, selected.disputeType) : [];
 
-  // Build a mock timeline if none returned from API
+  // Build the timeline view from REAL dispute data. If the API returned no
+  // event history we show the known facts only — we never fabricate admin
+  // actions that did not happen (spec §33: no mock data in production).
   const getTimeline = (d: Dispute): TimelineEntry[] => {
     if (d.timeline && d.timeline.length > 0) return d.timeline;
-    const entries: TimelineEntry[] = [
+    return [
       {
-        id: "1",
+        id: "opened",
         action: "Dispute opened",
-        actor: d.customerName,
+        actor: d.customerName || "Customer",
         actorRole: "customer",
         timestamp: d.createdAt,
         note: d.reason,
       },
     ];
-    if (d.status === "investigating") {
-      entries.push({
-        id: "2",
-        action: "Under investigation",
-        actor: "Admin",
-        actorRole: "admin",
-        timestamp: d.updatedAt || d.createdAt,
-        note: "Admin assigned for review",
-      });
-    }
-    if (d.resolution) {
-      entries.push({
-        id: "3",
-        action: `Resolved: ${d.status.replace("_", " ")}`,
-        actor: "Admin",
-        actorRole: "admin",
-        timestamp: d.updatedAt || d.createdAt,
-        note: d.resolution,
-      });
-    }
-    return entries;
   };
 
   const timelineIconMap: Record<string, React.ElementType> = {
@@ -512,6 +493,11 @@ export default function AdminDisputeManagement() {
                         <div className="mt-4 space-y-4 relative">
                           {/* Vertical line */}
                           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-100" />
+                          {!selected.timeline?.length && (selected.status === "investigating" || selected.resolution) && (
+                            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              Status shown below is the current dispute state — no event history was recorded by the API yet.
+                            </p>
+                          )}
                           {getTimeline(selected).map((entry, idx) => {
                             const Icon = timelineIconMap[entry.actorRole] || Clock;
                             const iconColor = timelineColorMap[entry.actorRole] || "bg-gray-100 text-gray-400";

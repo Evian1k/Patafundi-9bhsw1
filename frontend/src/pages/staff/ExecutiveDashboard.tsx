@@ -38,6 +38,8 @@ export default function ExecutiveDashboard() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [role, setRole] = useState("");
+  const [statsError, setStatsError] = useState(false);
+  const [health, setHealth] = useState("…");
 
   useEffect(() => {
     (async () => {
@@ -63,20 +65,38 @@ export default function ExecutiveDashboard() {
       };
       setStats(data.stats || {});
       setLastRefresh(new Date());
+      setStatsError(false);
     } catch {
-      // ignore — keep existing stats
+      // Surface the failure honestly instead of silently showing zeros.
+      setStatsError(true);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Real system health from the backend's own health endpoint (never hardcoded).
+  const fetchHealth = useCallback(async () => {
+    try {
+      const data = await apiClient.request('/health') as { status?: string; subsystems?: Record<string, { ok?: boolean; configured?: boolean }> };
+      const dbOk = data?.subsystems?.database?.ok !== false;
+      setHealth(data?.status === 'healthy' && dbOk ? 'Online' : 'Degraded');
+    } catch {
+      setHealth('Offline');
     }
   }, []);
 
   useEffect(() => {
     if (role === "super_admin") {
       fetchStats();
+      fetchHealth();
       const interval = setInterval(fetchStats, 30_000);
-      return () => clearInterval(interval);
+      const healthInterval = setInterval(fetchHealth, 60_000);
+      return () => {
+        clearInterval(interval);
+        clearInterval(healthInterval);
+      };
     }
-  }, [role, fetchStats]);
+  }, [role, fetchStats, fetchHealth]);
 
   if (role !== "super_admin") {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">Verifying access…</div>;
@@ -87,17 +107,17 @@ export default function ExecutiveDashboard() {
 
   const cards = [
     { label: "Total Revenue", value: formatKES(stats.totalRevenue || 0), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Platform Profit", value: formatKES(stats.platformRevenue || 0), icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Escrow Balance", value: formatKES(stats.escrowBalance || 0), icon: Scale, color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Pending Payouts", value: formatKES(stats.pendingPayouts || 0), icon: Clock, color: "text-purple-600", bg: "bg-purple-50" },
-    { label: "Total Users", value: stats.totalUsers || 0, icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
-    { label: "Total Fundis", value: stats.totalFundis || 0, icon: Wrench, color: "text-green-600", bg: "bg-green-50" },
-    { label: "Active Jobs", value: stats.activeJobs || 0, icon: Briefcase, color: "text-orange-600", bg: "bg-orange-50" },
-    { label: "Pending Approvals", value: stats.pendingFundis || 0, icon: Shield, color: "text-cyan-600", bg: "bg-cyan-50" },
-    { label: "Open Disputes", value: stats.openDisputes || 0, icon: Scale, color: "text-red-600", bg: "bg-red-50" },
-    { label: "Fraud Alerts", value: stats.fraudAlerts || 0, icon: AlertTriangle, color: "text-rose-600", bg: "bg-rose-50" },
-    { label: "System Health", value: "Online", icon: Activity, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Total Jobs", value: stats.totalJobs || 0, icon: Briefcase, color: "text-slate-600", bg: "bg-slate-100" },
+    { label: "Platform Profit", value: formatKES(stats.platformRevenue || 0), icon: TrendingUp, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Escrow Balance", value: formatKES(stats.escrowBalance || 0), icon: Scale, color: "text-amber-600", bg: "bg-amber-500/10" },
+    { label: "Pending Payouts", value: formatKES(stats.pendingPayouts || 0), icon: Clock, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Total Users", value: stats.totalUsers || 0, icon: Users, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Total Fundis", value: stats.totalFundis || 0, icon: Wrench, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Active Jobs", value: stats.activeJobs || 0, icon: Briefcase, color: "text-amber-600", bg: "bg-amber-500/10" },
+    { label: "Pending Approvals", value: stats.pendingFundis || 0, icon: Shield, color: "text-primary", bg: "bg-primary/10" },
+    { label: "Open Disputes", value: stats.openDisputes || 0, icon: Scale, color: "text-destructive", bg: "bg-destructive/10" },
+    { label: "Fraud Alerts", value: stats.fraudAlerts || 0, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
+    { label: "System Health", value: health, icon: Activity, color: health === "Online" ? "text-emerald-600" : health === "Degraded" ? "text-amber-600" : "text-red-600", bg: health === "Online" ? "bg-emerald-50" : health === "Degraded" ? "bg-amber-50" : "bg-red-50" },
+    { label: "Total Jobs", value: stats.totalJobs || 0, icon: Briefcase, color: "text-muted-foreground", bg: "bg-muted" },
   ];
 
   const containerVariants = reduceMotion ? {} : stagger;
@@ -118,6 +138,12 @@ export default function ExecutiveDashboard() {
             Refresh
           </Button>
         </motion.div>
+
+        {statsError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            Live metrics could not be loaded just now — the figures below may be stale. Retry with the Refresh button.
+          </div>
+        )}
 
         {/* Stat cards */}
         <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">

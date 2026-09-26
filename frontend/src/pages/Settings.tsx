@@ -65,7 +65,7 @@ export default function Settings() {
           apiClient.getCurrentUser(),
           apiClient.getUserSettings(),
           apiClient.getSavedPlaces(),
-        ]) as [{ user?: MeUser }, { settings?: SettingsRow }, { places?: SavedPlace[] }];
+        ]) as unknown as [{ user?: MeUser }, { settings?: SettingsRow }, { places?: SavedPlace[] }];
         const me = meRes?.user || null;
         setUser(me);
         setFullName(me?.fullName || "");
@@ -86,7 +86,7 @@ export default function Settings() {
       setSavingProfile(true);
       await apiClient.updateMe({ fullName: fullName.trim() || null, phone: phone.trim() || null });
       const meRes = await apiClient.getCurrentUser();
-      setUser(meRes?.user as MeUser || null);
+      setUser((meRes?.user as unknown as MeUser) || null);
       toast.success("Personal info updated");
     } catch (e: unknown) {
       toast.error((e as Error)?.message || "Failed to update");

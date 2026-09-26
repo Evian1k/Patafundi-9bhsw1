@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp } from "@/lib/motion";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,12 +19,12 @@ interface StaffDataTableProps {
 }
 
 const ENDPOINTS: Record<StaffDataTableProps["resource"], string> = {
-  fundis: "/api/staff/fundis",
-  jobs: "/api/staff/jobs",
-  payments: "/api/staff/payments",
-  disputes: "/api/staff/disputes",
-  "audit-logs": "/api/staff/audit-logs",
-  "fraud-alerts": "/api/staff/fraud/alerts",
+  fundis: "/staff/fundis",
+  jobs: "/staff/jobs",
+  payments: "/staff/payments",
+  disputes: "/staff/disputes",
+  "audit-logs": "/staff/audit-logs",
+  "fraud-alerts": "/staff/fraud/alerts",
 };
 
 export default function StaffDataTable({ resource, title, columns }: StaffDataTableProps) {
@@ -37,17 +38,16 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(ENDPOINTS[resource], { credentials: "include" });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.message || `HTTP ${res.status}`);
-          setRows([]);
-        } else {
-          // Different endpoints return different keys — try common ones.
-          setRows(data[resource.replace("-", "_")] || data.fundis || data.jobs || data.payments || data.disputes || data.logs || data.alerts || []);
-        }
+        // apiClient: absolute API URL + auth headers; throws ApiError with a
+        // user-safe message on failure (never leaks raw server errors).
+        const data = await apiClient.request(ENDPOINTS[resource]) as Record<string, unknown>;
+        // Different endpoints return different keys — try common ones.
+        const key = resource.replace("-", "_");
+        const list = (data[key] || data.fundis || data.jobs || data.payments || data.disputes || data.logs || data.alerts || []) as Row[];
+        setRows(Array.isArray(list) ? list : []);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
+        setRows([]);
       } finally {
         setLoading(false);
       }
