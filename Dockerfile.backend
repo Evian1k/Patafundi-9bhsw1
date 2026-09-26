@@ -1,0 +1,21 @@
+# PataFundi backend — Express API (spec §29: Docker-first)
+FROM node:22-alpine AS base
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Install production dependencies only (root manifest holds the backend deps)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+
+# Backend source + migrations + scripts (backend resolves its own deps from /app/node_modules)
+COPY backend ./backend
+COPY scripts ./scripts
+
+EXPOSE 4000
+
+# Readiness probe — cheap DB check (spec §35)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:4000/ready || exit 1
+
+# prestart hook applies migrations before boot (package.json: prestart)
+CMD ["npm", "start"]

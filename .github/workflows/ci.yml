@@ -7,6 +7,22 @@ on:
     branches: [main]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      # Unit + embedded-DB e2e suite (82 tests) — the money path's regression net
+      - run: npm test
+        env:
+          JWT_SECRET: ci-test-secret-at-least-32-chars-long
+          REFRESH_SECRET: ci-test-refresh-secret-32-chars
+          PATAFUNDI_EMBEDDED_DB: '1'
+
   lint-typecheck-build:
     runs-on: ubuntu-latest
     steps:
@@ -18,11 +34,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
         continue-on-error: true
+      # typecheck now targets frontend/tsconfig.app.json (was a no-op before)
       - run: npm run typecheck
       - run: npm run build
         env:
           JWT_SECRET: ci-test-secret-at-least-32-chars-long
-          REFRESH_TOKEN_SECRET: ci-test-refresh-secret-32-chars
+          REFRESH_SECRET: ci-test-refresh-secret-32-chars
           PATAFUNDI_EMBEDDED_DB: '1'
 
   security-audit:
@@ -36,3 +53,22 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
         continue-on-error: true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Prove the Docker-first story stays reproducible (spec §29)
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: false
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: false

@@ -1,16 +1,62 @@
+# PataFundi — one-command reproducible stack (spec §29: Docker first)
+#
+#   docker compose up -d --build
+#   web:    http://localhost:8080   (nginx SPA + same-origin /api proxy)
+#   api:    http://localhost:4000   (direct API access for tooling)
+#
+# The backend auto-applies migrations on start. Configure real credentials via
+# .env (see .env.example) — the defaults below are dev-only placeholders.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: patafundi-postgres
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: patafundi
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-patafundi}
     volumes:
       - patafundi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-patafundi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: patafundi-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # Compose injects POSTGRES_* into the standard postgres image; the app
+      # reads DATABASE_URL. No secrets belong in this file — override via .env.
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-patafundi}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+      REFRESH_SECRET: ${REFRESH_SECRET:-${JWT_SECRET}}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      FRONTEND_ORIGIN: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8080
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: patafundi-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "8080:8080"
 
 volumes:
   patafundi_pgdata:
