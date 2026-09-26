@@ -93,3 +93,21 @@ Work Log:
 
 Stage Summary:
 - Repo protected against AI-editor data pollution; user needs to delete local .kilo manually (Remove-Item -Recurse -Force .kilo)
+
+---
+Task ID: 4 (master implementation prompt — all phases)
+Agent: Super Z (main agent)
+Task: Execute all PHASEs (0–12) of the master implementation prompt: audit → preserve UI → contracts → auth → role worlds → money → security → docker → verification.
+
+Work Log:
+- PHASE 0: 3 parallel audit agents (backend 330-route inventory + IDOR/money/state-machine/notifications/realtime/pricing/auth; frontend routes/contract/design/hardcoded-values; mobile/infra/CI/docker). Verdict matrix produced; strengths preserved, 17 gaps fixed.
+- PHASE 1–2: global RouteErrorBoundary (was 1/~60 routes); dark primary amber→emerald token fix; REFRESH_TOKEN_SECRET name fixed in compose+CI (secret silently fell back to JWT secret); postgres 15→16 dev alignment; .env.example completed (ENCRYPTION_KEY, EXPO_PUBLIC_*, FCM, runtime vars); mobile LAN IP 192.168.0.106 removed (env-var endpoints + per-app .env.example); dead extra.API_URL removed.
+- PHASE 3–9: commission confidentiality (sanitizePaymentForParty — fundi/customer never see platform_commission/rate/type/details); subscription lifecycle fixed (migration 035 metadata + pending/failed statuses; was crashing on insert); server-authoritative plan pricing; webhook activates subscriptions (row-locked, idempotent, replay-protected, fundi-only notifications); job state machine principal matrix (customer can no longer drive provider transitions); super_admin object-level recognition (isAdminRole across 17 sites); production webhook secret fail-fast at boot; socket staff:ops live DB role re-check; device-token IDOR closed (driver-agnostic RETURNING check); geo/enterprise endpoints permission-gated; fraud-report job scoping; chat attachment access aligned with participant policy.
+- PHASE 10: scripts/security-battery.mjs — live evidence: 19/19 PASS (RBAC walls, state-machine principals, commission confidentiality, device IDOR, webhook pipeline, subscription price authority).
+- PHASE 11: compose files validated (postgres:16, service_healthy, env names correct); CI runs tests+typecheck+build+docker-build.
+- PHASE 12: docs/FINAL_VERIFICATION_REPORT.md (§39 format, honest open-items list).
+
+Stage Summary:
+- Evidence: 82/82 unit tests, typecheck clean, production build success, security battery 19/19, migration 035 applied.
+- Commits: 871dd40 (P1-2), 2a15b2a (P3-9), dbbba01 (P10), final report push.
+- Open items documented honestly: refund ledger reversal + Daraja B2C/reversal wiring, EAS submit placeholders, client-estimate fallback (documented decision), CI mobile checks.
