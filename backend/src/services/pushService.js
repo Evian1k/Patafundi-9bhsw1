@@ -103,8 +103,18 @@ export async function registerDeviceToken({ userId, token, platform = 'web' }) {
 /**
  * Unregister a device token (user logged out or device uninstalled app).
  */
-export async function unregisterDeviceToken(token) {
-  await query('update user_device_tokens set is_active = false where token = $1', [token]);
+export async function unregisterDeviceToken(token, userId) {
+  // Ownership check (spec §10 IDOR): a user may only deactivate their own
+  // device tokens — never another user's token they happen to know.
+  const result = await query(
+    'update user_device_tokens set is_active = false where token = $1 and user_id = $2',
+    [token, userId],
+  );
+  if (result.rowCount === 0) {
+    const err = new Error('Device not found for this user');
+    err.status = 404;
+    throw err;
+  }
 }
 
 export function getPushStatus() {

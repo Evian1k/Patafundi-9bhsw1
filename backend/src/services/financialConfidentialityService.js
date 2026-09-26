@@ -108,6 +108,36 @@ export function sanitizeJobForFundi(job) {
 }
 
 /**
+ * Strip internal commission/revenue fields from a payments row before sending
+ * it to a non-staff party (customer or fundi).
+ *
+ * Spec: fundis must NEVER see platform commission (only their own earnings);
+ * customers must not see internal commission either. Admin + staff keep the
+ * full row (they are the authorized finance audience).
+ *
+ * Strips: platform_commission, commission_rate, commission_type,
+ * commission_details — plus any defensively-matching internal fields.
+ */
+export function sanitizePaymentForParty(payment, role) {
+  if (!payment) return payment;
+  const staffRoles = new Set([
+    'admin', 'super_admin', 'support_agent', 'finance_team', 'fraud_analyst',
+    'devops', 'operations_manager', 'marketing',
+  ]);
+  if (staffRoles.has(role)) return payment;
+  const {
+    platform_commission,
+    commission_rate,
+    commission_type,
+    commission_details,
+    platform_fee,
+    fundi_earnings,
+    ...safePayment
+  } = payment;
+  return safePayment;
+}
+
+/**
  * Get the active commission campaign for a fundi (if any).
  * Returns the reduced commission % or null if no active campaign.
  */

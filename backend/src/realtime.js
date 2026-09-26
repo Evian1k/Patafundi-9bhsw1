@@ -74,7 +74,7 @@ function cleanupConnectionCounts() {
 
 export function attachRealtime(io) {
   ioRef = io;
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       // ── Connection rate limit per IP ──────────────────────────────
       const ip = socket.handshake.address || 'unknown';
@@ -99,6 +99,18 @@ export function attachRealtime(io) {
       const payload = jwt.verify(token, config.jwtSecret, { issuer: 'patafundi-api', audience: 'patafundi-web', algorithms: ['HS256'] });
       socket.userId = payload.sub;
       socket.userRole = payload.role;
+      // Stale-role defense: JWT role stays valid up to the token TTL even after
+      // a demotion/suspension. Re-check the live DB role before granting the
+      // staff operations room (the HTTP path already does this in authRequired).
+      try {
+        const { query } = await import('./db.js');
+        const live = await query('select role, status from users where id = $1', [payload.sub]);
+        const u = live.rows[0];
+        if (!u || u.status !== 'active') return next(new Error('Account unavailable'));
+        socket.userRole = u.role;
+      } catch {
+        // DB hiccup: fall back to the verified JWT role rather than locking out realtime
+      }
       next();
     } catch {
       next(new Error('Invalid realtime token'));

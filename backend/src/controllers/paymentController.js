@@ -12,6 +12,7 @@ import { calculateCommission, getPaymentSettings } from '../services/financeServ
 import { config } from '../config.js';
 import { emitEvent } from '../realtime.js';
 import { recordTimelineEvent } from '../services/timelineService.js';
+import { sanitizePaymentForParty } from '../services/financialConfidentialityService.js';
 import {
   markCommissionPaymentReceived,
   isWebhookReplay,
@@ -166,8 +167,52 @@ export async function webhook(req, res) {
       return existing.rows[0] || { status: 'completed' };
     }
     const paymentResult = await client.query('select * from payments where checkout_request_id = $1 for update', [checkoutRequestId]);
-    const row = paymentResult.rows[0];
-    if (!row) throw notFound('Payment not found');
+    let row = paymentResult.rows[0];
+    if (!row) {
+      // Not a job payment — check whether it is a fundi subscription payment
+      // (checkout_request_id stored in subscriptions.metadata by /subscriptions/activate).
+      const subResult = await client.query(
+        `select * from subscriptions
+          where metadata->>'checkout_request_id' = $1
+          for update`,
+        [checkoutRequestId],
+      );
+      const sub = subResult.rows[0];
+      if (!sub) throw notFound('Payment not found');
+
+      if (sub.status === 'active') return { status: 'completed', subscription: true };
+
+      if (resultCode === 0) {
+        const receipt = callbackMetadataValue(callback, 'MpesaReceiptNumber') || callback.MpesaReceiptNumber;
+        if (!receipt) throw badRequest('MpesaReceiptNumber missing');
+        const paidAmount = Number(callbackMetadataValue(callback, 'Amount') ?? callback.Amount ?? sub.amount);
+        if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - Number(sub.amount)) > 0.01) {
+          throw badRequest('Callback amount does not match pending subscription');
+        }
+        // Server-controlled entitlement grant: money confirmed -> subscription active.
+        // Duration is derived from the SERVER-side plan (never client input).
+        const days = sub.plan === 'yearly' ? 365 : 30;
+        const activated = await client.query(
+          `update subscriptions
+             set status = 'active', starts_at = now(),
+                 expires_at = now() + ($2 || ' days')::interval,
+                 metadata = jsonb_set(coalesce(metadata, '{}'::jsonb), '{mpesa_receipt_number}', $3::text),
+                 updated_at = now()
+           where id = $1 and status = 'pending'
+           returning *`,
+          [sub.id, String(days), JSON.stringify(receipt).replace(/^"|"$/g, '')],
+        );
+        if (!activated.rows[0]) return { status: 'completed', subscription: true };
+        await recordWebhookProcessed({ checkoutRequestId, receipt, paymentId: null, rawBody: req.rawBody, client });
+        return { status: 'completed', subscription: true, fundiId: sub.fundi_id, plan: sub.plan, amount: sub.amount, receipt };
+      }
+
+      await client.query(
+        `update subscriptions set status = 'failed', updated_at = now() where id = $1 and status = 'pending'`,
+        [sub.id],
+      );
+      return { status: 'failed', subscription: true, fundiId: sub.fundi_id };
+    }
     if (row.status === 'completed') return row;
     if (row.status !== 'pending') return row;
     if (resultCode === 0) {
@@ -247,6 +292,22 @@ export async function webhook(req, res) {
     return failed.rows[0];
   });
 
+  if (payment.subscription) {
+    // Subscription payments: notify the fundi directly (never the job room —
+    // notification isolation: this is a fundi-billing event, not a job event).
+    if (payment.status === 'completed') {
+      emitEvent('subscription:activated', { plan: payment.plan, amount: payment.amount, receipt: payment.receipt }, `user:${payment.fundiId}`);
+      await query(
+        `insert into notifications (user_id, type, title, body)
+         values ($1, 'subscription_activated', 'Subscription active', $2)`,
+        [payment.fundiId, `Your ${payment.plan || 'monthly'} subscription payment of KES ${payment.amount} was received. Premium features are now active.`],
+      ).catch(() => {});
+    } else {
+      emitEvent('payment:failed', { subscription: true }, `user:${payment.fundiId}`);
+    }
+    return res.json({ success: true });
+  }
+
   if (payment.status === 'completed') {
     emitEvent('payment:confirmed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
     emitEvent('escrow:held', { jobId: payment.job_id, paymentId: payment.id, amount: payment.amount }, `job:${payment.job_id}`);
@@ -269,7 +330,8 @@ export async function paymentForJob(req, res) {
     const job = await query('select id from jobs where id = $1', [jobId]);
     if (!job.rows[0]) throw notFound('Job not found');
   }
-  res.json({ success: true, payment: result.rows[0] || null });
+  // Spec: commission fields are internal — strip them for customer/fundi audiences
+  res.json({ success: true, payment: sanitizePaymentForParty(result.rows[0] || null, req.user.role) });
 }
 
 export async function escrowForJob(req, res) {

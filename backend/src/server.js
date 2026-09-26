@@ -341,6 +341,17 @@ try {
   }
 }
 
+// Webhook authenticity (spec §payments): in production M-Pesa callbacks MUST
+// carry the shared callback secret. Fail fast at boot when it is missing
+// instead of silently relying on signature verification only.
+try {
+  const { requireCallbackSecretInProduction } = await import('./services/mpesaService.js');
+  requireCallbackSecretInProduction();
+} catch (error) {
+  console.error('[PataFundi API] M-Pesa webhook configuration error:', error.message);
+  if (config.nodeEnv === 'production') process.exit(1);
+}
+
 const host = config.host || '0.0.0.0';
 const port = config.port;
 

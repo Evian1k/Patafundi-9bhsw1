@@ -163,11 +163,19 @@ export async function serveLocalFile(req, res) {
   const chatMatch = r2Key.match(/^chat\/([0-9a-f-]{36})\//i);
   if (chatMatch) {
     const jobId = chatMatch[1];
-    const job = await query('select customer_id, fundi_id from jobs where id = $1', [jobId]);
+    const job = await query('select customer_id, fundi_id, technician_user_id, company_id from jobs where id = $1', [jobId]);
     if (!job.rows[0]) throw notFound('Not found');
-    if (req.user.role !== 'admin' && job.rows[0].customer_id !== req.user.id && job.rows[0].fundi_id !== req.user.id) {
-      throw forbidden('Not allowed to access this file');
+    const j = job.rows[0];
+    let chatAllowed = req.user.role === 'admin' || j.customer_id === req.user.id || j.fundi_id === req.user.id
+      || j.technician_user_id === req.user.id;
+    if (!chatAllowed && j.company_id) {
+      const member = await query(
+        'select 1 from company_members where company_id = $1 and user_id = $2 limit 1',
+        [j.company_id, req.user.id],
+      );
+      chatAllowed = Boolean(member.rows[0]);
     }
+    if (!chatAllowed) throw forbidden('Not allowed to access this file');
   }
 
   // Profile photos: caller must be admin, the photo owner, OR an approved fundi whose
@@ -189,14 +197,26 @@ export async function serveLocalFile(req, res) {
 
 export async function getChatAttachmentSignedUrl(req, res) {
   const att = await query(
-    `select ca.*, j.customer_id, j.fundi_id from chat_attachments ca
+    `select ca.*, j.customer_id, j.fundi_id, j.technician_user_id, j.company_id from chat_attachments ca
      join jobs j on j.id = ca.job_id where ca.id = $1 and ca.status = 'active'`,
     [req.params.attachmentId],
   );
   if (!att.rows[0]) throw notFound('Attachment not found');
   const row = att.rows[0];
   if (req.user.role !== 'admin' && req.user.id !== row.customer_id && req.user.id !== row.fundi_id) {
-    throw forbidden('Not allowed');
+    // Align with chat participant policy (chatController.assertJobAccess):
+    // the assigned company technician and active members of the job's company
+    // can read the chat, so they can read its attachments too.
+    let allowed = false;
+    if (row.technician_user_id === req.user.id) allowed = true;
+    if (!allowed && row.company_id) {
+      const member = await query(
+        'select 1 from company_members where company_id = $1 and user_id = $2 limit 1',
+        [row.company_id, req.user.id],
+      );
+      allowed = Boolean(member.rows[0]);
+    }
+    if (!allowed) throw forbidden('Not allowed');
   }
   await logDocumentAccess(req, { documentType: 'chat_attachment', documentId: row.id, action: 'view' });
   res.json({

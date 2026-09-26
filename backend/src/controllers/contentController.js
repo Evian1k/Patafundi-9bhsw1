@@ -75,9 +75,32 @@ export async function fraudReport(req, res) {
   if (!req.user?.id && !req.body?.email) {
     throw badRequest('Authentication or contact email required for fraud reports');
   }
+  // IDOR guard (spec §10): an authenticated reporter may only attach a job to
+  // a fraud report if they are actually a party to it. Anonymous reporters are
+  // still allowed (contact email required) but cannot reference job IDs.
+  const jobId = req.body?.jobId || req.params?.jobId || null;
+  if (jobId && req.user?.id) {
+    const jobCheck = await query('select customer_id, fundi_id, technician_user_id, company_id from jobs where id = $1', [jobId]);
+    const job = jobCheck.rows[0];
+    if (job) {
+      let isParty = [job.customer_id, job.fundi_id, job.technician_user_id].includes(req.user.id);
+      if (!isParty && job.company_id) {
+        const member = await query(
+          'select 1 from company_members where company_id = $1 and user_id = $2 limit 1',
+          [job.company_id, req.user.id],
+        );
+        isParty = Boolean(member.rows[0]);
+      }
+      if (!isParty && req.user.role !== 'admin') {
+        delete req.body.jobId; // strip the unverifiable reference, keep the report
+      }
+    } else {
+      delete req.body.jobId;
+    }
+  }
   if (detection.isBypass && reportedUserId && req.user?.role === 'admin') {
     await recordFraudAlert({
-      jobId: req.body.jobId || req.params?.jobId || null,
+      jobId: jobId && req.user?.id ? jobId : null,
       userId: reportedUserId,
       userRole: req.body.userRole || 'unknown',
       content,
@@ -85,7 +108,7 @@ export async function fraudReport(req, res) {
       source: 'admin_report',
     });
   }
-  if (req.body?.jobId || req.params?.jobId) {
+  if (jobId) {
     await query(
       `insert into support_tickets (name, email, subject, message, status)
        values ($1, $2, $3, $4, 'open')`,

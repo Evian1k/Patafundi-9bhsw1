@@ -417,6 +417,35 @@ const JOB_TRANSITIONS = {
   expired: [],
 };
 
+// Who may drive a transition to each status (spec: backend-enforced principal
+// checks — job access alone is NOT enough to move the state machine).
+//   provider   — assigned fundi only
+//   completion — from completion_requested the CUSTOMER confirms; from
+//                in_progress the assigned fundi may close directly
+//   customer   — customer only (admin passes in helpers)
+//   flex       — depends on source: offered→accepted is the customer accepting
+//                a quote; matching/pending→accepted is the provider accepting
+//   dispatch   — provider side (fundi/company member); customer cannot assign
+//   scheduler  — customer / company member (scheduling is a two-party plan);
+//                the assigned fundi cannot unilaterally reschedule
+//   admin      — administrators only
+const JOB_STATUS_ACTORS = {
+  on_the_way: 'provider',
+  arrived: 'provider',
+  in_progress: 'provider',
+  completion_requested: 'provider',
+  completed: 'completion',
+  cancelled: 'customer',
+  accepted: 'flex',
+  offered: 'dispatch',
+  assigned: 'dispatch',
+  scheduled: 'scheduler',
+  pending: 'scheduler',
+  matching: 'scheduler',
+  failed: 'admin',
+  expired: 'admin',
+};
+
 export async function patchJob(req, res) {
   const { status } = req.body || {};
   if (!status) throw badRequest('Status is required');
@@ -428,8 +457,42 @@ export async function patchJob(req, res) {
     throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
   }
   if (req.user.role !== 'admin') {
-    if (['on_the_way', 'arrived', 'in_progress', 'completed'].includes(status)) requireAssignedFundi(req.user, job);
-    if (['cancelled'].includes(status)) requireCustomer(req.user, job);
+    const actor = JOB_STATUS_ACTORS[status];
+    const isCustomer = job.customer_id === req.user.id;
+    const isAssignedFundi = job.fundi_id === req.user.id;
+    switch (actor) {
+      case 'provider':
+        requireAssignedFundi(req.user, job);
+        break;
+      case 'completion':
+        if (job.status === 'completion_requested') requireCustomer(req.user, job);
+        else requireAssignedFundi(req.user, job);
+        break;
+      case 'customer':
+        requireCustomer(req.user, job);
+        break;
+      case 'flex':
+        // offered→accepted = customer deciding on a quote (fine for any party);
+        // any other source = provider accepting the job — customer cannot self-accept
+        if (job.status !== 'offered' && isCustomer && !isAssignedFundi) {
+          throw forbidden('Only the provider can accept this job');
+        }
+        break;
+      case 'dispatch':
+        if (isCustomer && !isAssignedFundi) {
+          throw forbidden('Only the provider can perform this transition');
+        }
+        break;
+      case 'scheduler':
+        if (isAssignedFundi && !isCustomer) {
+          throw forbidden('Only the customer or company can schedule this job');
+        }
+        break;
+      case 'admin':
+        throw forbidden('Only administrators can set this status');
+      default:
+        break;
+    }
   }
   const result = await query('update jobs set status = $2, updated_at = now() where id = $1 returning *', [req.params.id, status]);
   await recordJobStatusTimeline(result.rows[0], status, req.user.id, req.user.role);

@@ -498,7 +498,7 @@ router.post('/devices/register', authRequired, asyncHandler(async (req, res) => 
 }));
 
 router.delete('/devices/:token', authRequired, asyncHandler(async (req, res) => {
-  await unregisterDeviceToken(req.params.token);
+  await unregisterDeviceToken(req.params.token, req.user.id);
   res.json({ success: true });
 }));
 
@@ -513,20 +513,31 @@ router.get('/notifications/sms/status', authRequired, asyncHandler(async (_req, 
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
+// Spec §pricing: prices are NEVER taken from the client. Plan pricing is
+// server-authoritative; the request body only chooses the plan.
+const SUBSCRIPTION_PLAN_PRICES = Object.freeze({
+  monthly: 500,
+  yearly: 5000,
+});
+
 router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
   if (!req.user || req.user.role !== 'fundi') {
     return res.status(403).json({ success: false, message: 'Only fundis can activate subscriptions' });
   }
-  const { plan = 'monthly', amount = 500, mpesaNumber, idempotencyKey } = req.body || {};
+  const { plan = 'monthly', mpesaNumber } = req.body || {};
+  const amount = SUBSCRIPTION_PLAN_PRICES[plan];
+  if (!amount) {
+    return res.status(400).json({ success: false, message: `Unknown subscription plan. Valid plans: ${Object.keys(SUBSCRIPTION_PLAN_PRICES).join(', ')}` });
+  }
   if (!mpesaNumber) {
     return res.status(400).json({ success: false, message: 'M-Pesa number required for subscription payment' });
   }
   const { query } = await import('./db.js');
   const { assertValidMpesaPhone, initiateStkPush } = await import('./services/mpesaService.js');
   const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
-  const key = idempotencyKey || crypto.randomUUID();
 
-  // Create subscription as 'pending' — not active until payment confirmed
+  // Create subscription as 'pending' — not active until payment confirmed.
+  // expires_at here is a placeholder; it is set from plan duration on activation.
   const subResult = await query(
     `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at)
      values ($1, $2, $3, 'pending', now(), now() + interval '30 days')
@@ -558,7 +569,7 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
     });
   } catch (err) {
     // M-Pesa failed — mark subscription as failed
-    await query(`update subscriptions set status = 'expired' where id = $1`, [subResult.rows[0].id]);
+    await query(`update subscriptions set status = 'failed' where id = $1`, [subResult.rows[0].id]);
     res.status(502).json({
       success: false,
       message: 'M-Pesa STK push failed. Try again or contact support.',
@@ -720,7 +731,7 @@ router.get('/geo/travel-settings', authRequired, asyncHandler(geo.getTravelSetti
 router.put('/geo/travel-settings', authRequired, asyncHandler(geo.updateTravelSettingsHandler));
 
 // CEO geo controls (super_admin)
-router.get('/geo/controls', authRequired, asyncHandler(geo.getGeoControlsHandler));
+router.get('/geo/controls', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.getGeoControlsHandler));
 router.put('/geo/controls', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.updateGeoControlsHandler));
 
 // Blocked regions (super_admin)
@@ -729,7 +740,7 @@ router.post('/geo/blocked-regions', authRequired, requirePerm('can_manage_geo_co
 router.delete('/geo/blocked-regions/:id', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.removeBlockedRegionHandler));
 
 // Service radius rules (super_admin view, staff can read)
-router.get('/geo/service-radius', authRequired, asyncHandler(geo.getServiceRadiusRulesHandler));
+router.get('/geo/service-radius', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.getServiceRadiusRulesHandler));
 router.put('/geo/service-radius', authRequired, requirePerm('can_manage_geo_controls'), asyncHandler(geo.updateServiceRadiusRuleHandler));
 
 // International bookings
@@ -762,7 +773,7 @@ router.get('/enterprise/crm/fundi/:userId', authRequired, requirePerm('can_view_
 router.post('/enterprise/crm/notes', authRequired, requirePerm('can_view_crm'), asyncHandler(p2.addCRMNoteHandler));
 
 // Feature Flags (enhanced)
-router.get('/enterprise/feature-flags', authRequired, asyncHandler(p2.getFeatureFlagsHandler));
+router.get('/enterprise/feature-flags', authRequired, requirePerm('can_manage_feature_flags'), asyncHandler(p2.getFeatureFlagsHandler));
 router.post('/enterprise/feature-flags/toggle', authRequired, requirePerm('can_manage_feature_flags'), asyncHandler(p2.toggleFeatureFlagHandler));
 router.post('/enterprise/feature-flags/override', authRequired, requirePerm('can_manage_feature_flags'), asyncHandler(p2.featureFlagOverrideHandler));
 
