@@ -30,6 +30,17 @@ patafundi/
 > `frontend/`. The Expo mobile apps live in `apps/` and share code through
 > `packages/shared`. Historical audit trail: `docs/archive/`.
 
+## Useful additions in this takeover
+
+- **Notification center** (staff console, customer dashboard, fundi hub) — per-user scoped, role-private (spec §11)
+- **Quote approval** — customers approve/reject provider quotes inside job tracking (status `offered`)
+- **Payment receipt** — amount, M-Pesa code and timestamp after confirmation
+- **Completion code re-issue** — customers can re-issue their confirmation code ("Resend"), the fundi can never see it
+- **Fundi self-service** — Edit Profile (bio/skills) and My Reviews pages
+- **Technician app** — GPS-validated check-ins and work-evidence photo upload
+- **Job expiry** — unanswered offers return to matching after 5 min; unmatched requests expire after 24 h
+- **Docker stack** — `docker compose up -d --build` brings up Postgres + API + web (nginx same-origin proxy)
+
 ## Mobile apps (Expo)
 
 ```bash

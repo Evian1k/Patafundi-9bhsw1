@@ -48,7 +48,26 @@ Date: 2026-09-26 · Scope: full repository at commit `8b9b57f` · Method: two in
 5. Docker-first + CI tests
 6. Full verification matrix + final report
 
-## 4. Verification log
+## 4. Final verification matrix (evidence)
+
+| Check | Result |
+|---|---|
+| Backend unit + embedded-DB e2e suite (`npm test`) | 82 / 82 pass |
+| E2E journey (`node scripts/patafundi-e2e.mjs`) — login → booking → dispatch → work → payment → escrow → settlement → review + isolation checks | 41 / 41 pass |
+| Security probe battery (`node scripts/security-probe.mjs`) — IDOR, tenant isolation, token tampering, missing auth, role walls, completion-code access, commission stripping, payment trust, webhook, rate limiting, chat policy, error intake | 16 / 16 pass |
+| TypeScript (`tsc --noEmit -p frontend/tsconfig.app.json`) | clean (was silently failing before) |
+| Production build (`npm run build`) | pass |
+| Expo customer-mobile: tsc + `expo export --platform android` | clean + bundle produced |
+| Expo fundi-mobile: tsc + `expo export --platform android` | clean + bundle produced |
+| Browser verification (agent-browser) | staff login → console (dark-emerald), company portal dashboard, customer dashboard with notification bell — all rendering correctly at 1440px |
+
+## 5. Implementation log
 
 - `git show 191b20c` inspected before any restore; `apps/` + `packages/` restored from `f3556ee` because they are unique assets (not duplicates); root `src/` deletion kept because it was superseded (root `package.json` scripts reference only `backend/` + `frontend/`).
 - Backend/frontend audits: every claim above has file+line evidence in the working notes; fixes are validated with the existing 82-test suite, typecheck, production build, E2E journey script, and targeted API probes.
+
+- Commit `8b9b57f` — unify: restored Expo apps + shared package, untracked workspace artifacts, README monorepo structure.
+- Commit `7d475d9` — backend hardening: server-authoritative pricing at booking, pricing-engine column fixes (`online`, `fundi_tier`), commission confidentiality on `/pricing/calculate`, MFA challenge at login + TOTP secrets encrypted at rest, state-machine enforcement (check-in/complete), payout double-spend row lock, realtime room authorization (staff ops room, company-member job rooms, no OTP/payout broadcasts), post-job chat policy, job expiry reaper + migration 034, `/ready` probe, quality-score RBAC.
+- Commit `8cc1741` — frontend connect + modernize: production staff-console fetch fix, notification center, quote approval, receipt, resend completion code, fundi profile/reviews, technician GPS check-in + evidence, honest empty/error states, deep-emerald staff/admin chrome + token cleanup across company/customer.
+- Commit `60af272` — mobile verification: monorepo Metro config, AsyncStorage 3.x compatibility, env-driven API base.
+- Commit `6f0a96d` — Docker-first stack + CI (tests + image builds).
