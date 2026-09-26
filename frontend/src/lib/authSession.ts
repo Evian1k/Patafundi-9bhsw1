@@ -38,8 +38,15 @@ export function getAuthUserId(): string | null {
 export function resolveAuthRole(user?: Record<string, unknown> | null): AuthRole {
   if (user?.role) {
     const apiRole = String(user.role).toLowerCase();
-    if (apiRole === 'fundi' || apiRole === 'fundi_pending' || apiRole === 'admin' || apiRole === 'customer') {
-      return apiRole;
+    if (
+      apiRole === 'fundi' ||
+      apiRole === 'fundi_pending' ||
+      apiRole === 'admin' ||
+      // super_admin shares the admin bucket → routes to the admin console
+      apiRole === 'super_admin' ||
+      apiRole === 'customer'
+    ) {
+      return apiRole === 'super_admin' ? 'admin' : apiRole;
     }
   }
   const locked = getAuthRole();

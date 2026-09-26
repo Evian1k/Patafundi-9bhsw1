@@ -1,13 +1,12 @@
 /**
  * Demo Accounts Page — /demo
  *
- * Shows all 11 demo accounts with copy-to-clipboard buttons and one-click
+ * Shows every demo account with copy-to-clipboard buttons and one-click
  * login (dev only). Hidden in production by default — guarded by a
  * VITE_DEV_DEMO flag and NODE_ENV check.
  *
- * Demo accounts:
+ * Core accounts (seeded automatically at dev boot by ensure-dev-db.js):
  *   demo@patafundi.com / Demo@2024!         → customer
- *   company@patafundi.com / Company@2024!   → company_admin
  *   fundi@patafundi.com / Fundi@2024!       → fundi (approved)
  *   admin@patafundi.com / Admin@2024!       → super_admin
  *   ops@patafundi.com / Ops@2024!           → admin (ops manager)
@@ -17,6 +16,15 @@
  *   dispatch@patafundi.com / Dispatch@2024! → dispatch_team
  *   devops@patafundi.com / Devops@2024!     → devops_engineer
  *   auditor@patafundi.com / Auditor@2024!   → auditor
+ *
+ * Takeover ecosystem (seeded automatically at dev boot by seed-takeover.js
+ * — see DEMO_ACCOUNTS.md):
+ *   customer.demo@patafundi.test            → customer
+ *   fundi.demo@patafundi.test               → fundi (John Kamau)
+ *   company.demo@patafundi.test             → company_admin (Apex owner)
+ *   dispatcher.demo@patafundi.test          → company dispatcher
+ *   technician.demo@patafundi.test          → company technician
+ *   admin.demo@patafundi.test               → super_admin
  */
 
 import { useState } from "react";
@@ -30,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
+import { resolvePostLoginPath } from "@/lib/postLoginRoute";
 
 interface DemoAccount {
   email: string;
@@ -220,7 +229,7 @@ export default function DemoPage() {
       const data = await apiClient.login(account.email, account.password) as {
         success?: boolean;
         message?: string;
-        user?: { role?: string };
+        user?: Record<string, unknown>;
         token?: string;
       };
       if (!data.success) {
@@ -229,16 +238,11 @@ export default function DemoPage() {
       }
       toast.success(`Logged in as ${account.label}`);
 
-      // Route based on role
-      const role = data.user?.role;
-      if (role === "customer") navigate("/dashboard");
-      else if (role === "fundi") navigate("/fundi");
-      else if (role === "fundi_pending") navigate("/fundi/pending");
-      else if (["super_admin", "admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"].includes(role)) {
-        navigate("/staff");
-      } else {
-        navigate("/");
-      }
+      // Same role-aware routing as the manual login page — every account
+      // lands in its own world (admin console, fundi app, company portal,
+      // technician app or customer dashboard).
+      const path = await resolvePostLoginPath(data.user ?? null);
+      navigate(path);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Login failed — is the backend running?");
     } finally {
@@ -256,7 +260,8 @@ export default function DemoPage() {
           <motion.div variants={itemVariants} className="text-center mb-10">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Demo Accounts</h1>
             <p className="text-slate-600">
-              PataFundi has 11 demo accounts — one for each role, including a company partnership admin. Click any card to log in instantly,
+              PataFundi has {DEMO_ACCOUNTS.length} demo accounts covering every role — customers, fundis, the
+              company portal (owner, dispatcher, technician) and all staff consoles. Click any card to log in instantly,
               or copy the credentials to use on the login page.
             </p>
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">

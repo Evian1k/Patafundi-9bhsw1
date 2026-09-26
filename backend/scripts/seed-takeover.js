@@ -58,7 +58,7 @@ async function upsertUser(db, { email, fullName, role, phone }, hash) {
   return res.rows[0];
 }
 
-async function main() {
+export async function seedTakeover() {
   if (process.env.NODE_ENV === 'production') {
     console.error('[seed-takeover] refusing to run in production');
     return;
@@ -351,7 +351,7 @@ async function main() {
 
 const isDirectRun = process.argv[1] && process.argv[1].includes('seed-takeover');
 if (isDirectRun) {
-  main()
+  seedTakeover()
     .then(() => process.exit(0))
     .catch((error) => {
       console.error('[seed-takeover]', error);

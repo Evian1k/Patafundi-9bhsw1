@@ -5,7 +5,7 @@ import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 import { apiClient } from "@/lib/api";
-import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
+import { resolvePostLoginPath } from "@/lib/postLoginRoute";
 import { isApiConfigured } from "@/config/env";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -57,31 +57,11 @@ const Auth = () => {
   const routeAfterAuth = useCallback(async () => {
     const meRes = await apiClient.getCurrentUser();
     const me = meRes?.user ?? null;
-    if (!me) return navigate("/dashboard");
-    bootstrapAuthSessionFromUser(me);
-    const role = resolveAuthRole(me);
-    if (role === "admin") return navigate("/admin/dashboard");
-    if (role === "fundi") return navigate("/fundi");
-    if (role === "fundi_pending") {
-      try {
-        const s = await apiClient.getFundiApprovalStatus() as { fundi?: Record<string, unknown> };
-        return navigate(s?.fundi ? "/fundi/pending" : "/register/fundi");
-      } catch {
-        return navigate("/register/fundi");
-      }
-    }
-    // Company ecosystem routing (takeover): company admins → portal;
-    // dispatchers/technicians detect membership server-side.
-    if (me.role === "company_admin") return navigate("/company");
-    try {
-      const portal = await apiClient.request("/company/portal/overview") as { myRole?: string };
-      const next = searchParams.get("next");
-      if (portal?.myRole === "technician") return navigate(next || "/technician");
-      return navigate(next || "/company");
-    } catch {
-      // not a company member — fall through to customer app
-    }
-    return navigate("/dashboard");
+    // resolvePostLoginPath handles every role bucket (admin, fundi,
+    // company_admin, company members, customer) in one shared place —
+    // DemoPage Quick Login uses the exact same logic.
+    const path = await resolvePostLoginPath(me, searchParams.get("next"));
+    navigate(path);
   }, [navigate, searchParams]);
 
   useEffect(() => {

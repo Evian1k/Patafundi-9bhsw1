@@ -341,6 +341,18 @@ try {
   }
 }
 
+// Dev-only: seed the full takeover demo ecosystem (company, jobs, wallets,
+// @patafundi.test accounts) so `npm run dev` works out of the box — Quick
+// Login on /demo needs these accounts. Idempotent upserts; refuses in prod.
+if (config.nodeEnv !== 'production') {
+  try {
+    const { seedTakeover } = await import('../scripts/seed-takeover.js');
+    await seedTakeover();
+  } catch (error) {
+    console.warn('[PataFundi API] Demo ecosystem seed skipped:', error.message);
+  }
+}
+
 // Webhook authenticity (spec §payments): in production M-Pesa callbacks MUST
 // carry the shared callback secret. Fail fast at boot when it is missing
 // instead of silently relying on signature verification only.

@@ -104,6 +104,12 @@ export default function Dashboard() {
       if (role === "admin") { navigate("/admin/dashboard"); return; }
       if (role === "fundi") { navigate("/fundi"); return; }
       if (role === "fundi_pending") { navigate("/fundi/pending"); return; }
+      // Company admins landing here (stale session / manual URL) belong in
+      // the company portal — same routing as the login page.
+      if (String(userData.user?.role || "").toLowerCase() === "company_admin") {
+        navigate("/company");
+        return;
+      }
       await fetchUserJobs();
     } catch (error) {
       console.error("Failed to load user data:", error);
