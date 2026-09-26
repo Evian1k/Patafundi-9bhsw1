@@ -4,8 +4,18 @@ import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
 import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, Referral, Loyalty, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
 
 function resolveBaseUrl(): string {
-  // Hardcoded fallback — the backend URL is stable.
-  // No require('expo-constants') to avoid Metro bundling issues in monorepo.
+  // Spec §32: endpoints are environment-driven — NEVER hardcoded localhost
+  // (physical Android devices cannot reach a laptop's loopback).
+  // 1) EXPO_PUBLIC_API_URL      — full backend origin (inlined by Expo at build time)
+  // 2) EXPO_PUBLIC_HOST         — LAN IP / hostname → http://<host>:4000 (local dev)
+  // 3) fallback                 — the stable production backend (Render)
+  const explicit = process.env.EXPO_PUBLIC_API_URL as string | undefined;
+  if (explicit) return explicit.replace(/\/$/, '');
+  const host = process.env.EXPO_PUBLIC_HOST as string | undefined;
+  if (host) {
+    if (/^https?:\/\//i.test(host)) return host.replace(/\/$/, '');
+    return `http://${host}:4000`;
+  }
   return 'https://patafundi-9bhsw1.onrender.com';
 }
 const DEFAULT_API_URL = resolveBaseUrl();
@@ -30,11 +40,19 @@ class ApiClient {
   }
   private async saveTokens(token: string, refreshToken: string): Promise<void> {
     this.token = token; this.refreshToken = refreshToken;
-    await AsyncStorage.multiSet([[STORAGE_KEYS.TOKEN, token], [STORAGE_KEYS.REFRESH_TOKEN, refreshToken]]);
+    // AsyncStorage 3.x dropped multiSet — write keys individually (v1-compatible).
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token),
+      AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken),
+    ]);
   }
   private async clearTokens(): Promise<void> {
     this.token = null; this.refreshToken = null;
-    await AsyncStorage.multiRemove([STORAGE_KEYS.TOKEN, STORAGE_KEYS.REFRESH_TOKEN, STORAGE_KEYS.USER]);
+    await Promise.all([
+      AsyncStorage.removeItem(STORAGE_KEYS.TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.USER),
+    ]);
   }
   async cacheUser(user: User | null): Promise<void> { if (user) await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)); else await AsyncStorage.removeItem(STORAGE_KEYS.USER); }
   async getCachedUser(): Promise<User | null> { try { const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER); return raw ? (JSON.parse(raw) as User) : null; } catch { return null; } }

@@ -4,13 +4,14 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
       "@patafundi/shared": [
         "../../packages/shared/src"
-      ]
+      ],
+
     }
   },
   "extends": "expo/tsconfig.base",
