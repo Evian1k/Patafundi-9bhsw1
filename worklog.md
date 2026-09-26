@@ -80,3 +80,16 @@ Work Log:
 Stage Summary:
 - Workspace now single-source-of-truth: /home/z/my-project only (backend/ + frontend/ + apps/ + packages/)
 - Nothing functional touched; all tests green; repo pushed state unchanged
+
+---
+Task ID: 3 (.kilo question)
+Agent: Super Z (main agent)
+Task: User asked whether .kilo folder (containing duplicate app/ files) is important and to remove it if not.
+
+Work Log:
+- Audited: .kilo does NOT exist in server workspace nor in git tracked files — it exists only on user's local machine, created by the Kilo Code VS Code extension (AI assistant task/checkpoint data)
+- Verdict: not important, safe to delete locally
+- Added .kilo/ and .kilocode/ to .gitignore (commit 51a2322) so extension-local data can never enter the repo
+
+Stage Summary:
+- Repo protected against AI-editor data pollution; user needs to delete local .kilo manually (Remove-Item -Recurse -Force .kilo)
