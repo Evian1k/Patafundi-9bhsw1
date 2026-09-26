@@ -136,3 +136,24 @@ Stage Summary:
 - Root cause: environment/process lifecycle (stale pre-migration backend + dead frontend), not application code
 - Stack now: supervisor-maintained backend :4000 + frontend :3000, migrations 001–035 applied, all portals verified end-to-end
 - Boot path unchanged: platform runs .zscripts/dev.sh at container boot; supervisor covers mid-session crashes
+
+---
+Task ID: 6 (local dev CORS + demo accounts + post-login routing)
+Agent: Super Z (main agent)
+Task: User ran npm run dev locally — got CORS flood ('Not allowed by CORS: http://localhost:3000'), port 3000 conflict, and demanded every button/demo account work.
+
+Work Log:
+- Diagnosed user's local log: (a) backend CORS allowlist lacked localhost:3000 (had 8080/8081/5173 only) → every local POST rejected; (b) old vite process held port 3000 so new frontend never started; (c) local DB only auto-seeded 10 .com accounts — 6 @patafundi.test accounts needed manual db:push
+- cors.js: added http://localhost:3000 + 127.0.0.1:3000 (+3001) to LOCAL_ORIGINS; verified preflight 204 + login 200 with Origin header
+- seed-takeover.js: exported seedTakeover(); server.js dev boot now calls it (prod-refusing, idempotent) → all 16 demo accounts exist after plain 'npm run dev'
+- authSession.ts: resolveAuthRole now buckets super_admin as admin (was silently routing manual super-admin logins to the CUSTOMER dashboard)
+- NEW lib/postLoginRoute.ts: single post-login routing source of truth shared by Auth.tsx + DemoPage Quick Login + Dashboard; staff console roles (support/fraud/finance/dispatch/devops/auditor) → /staff (verified they get 403 on /admin/dashboard-stats), super_admin/admin → /admin/dashboard, company_admin → /company, company members detected via portal overview → /technician or /company
+- DemoPage: count text dynamic (16, was hardcoded 11); header copy fixed
+- Dashboard.tsx: company_admin stale-session landing → /company
+- Process lesson: pkill pattern must match absolute spawn path; debug scripts must set PATAFUNDI_PGDATA_DIR BEFORE import (first attempt touched live DB — read-only impact, no damage)
+- Evidence: real-browser Quick Login click-through — 8/8 distinct routing paths correct (admin→/admin/dashboard, ops→/admin/dashboard, support→/staff, auditor→/staff, company→/company, dispatcher→/company, technician→/technician, fundi→/fundi, customer→/dashboard); 16/16 API logins with localhost Origin; 82/82 unit; 41/41 E2E; 19/19 security battery; tsc clean
+- Commit fb94b30 pushed
+
+Stage Summary:
+- Local dev now works out of the box: git pull → npm run dev → every demo account + button functional
+- User still needs to free port 3000 locally (stale vite process) — documented for handoff
