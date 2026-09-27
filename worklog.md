@@ -341,3 +341,19 @@ Work Log:
 
 Stage Summary:
 - Owner password can no longer be created from public repo values on any production path. All critical master-prompt items (Sections 2, 39, 57 + security hardening) complete, tested, pushed. Logo/brand untouched throughout.
+
+---
+Task ID: 16 (OWNER ACCOUNT: boot-time bootstrap with user-chosen password)
+Agent: Super Z (main agent)
+Task: User directive — owner account emmanuelevian@gmail.com must use a password they chose (shared in chat, to be changed later). Make production login work without any shell access to Render.
+
+Work Log:
+- Created backend/src/ownerBootstrap.js: shared ensureOwnerAccount (create-if-missing, idempotent, role-heal to super_admin, never overwrites existing password) + maybeBootstrapOwnerFromEnv (env-gated, swallows errors so DB boot never fails)
+- Hooked into ensure-dev-db.js bootstrapPostgresDatabase + embedded path — runs after migrations+seed on every boot (covers Render prestart AND server boot; no shell needed)
+- Refactored bootstrap-owner.js CLI onto the shared module, preserved CLI behavior
+- render.yaml: OWNER_PASSWORD sync:false; .env.example documented the boot-time behavior
+- Password NEVER committed to repo — lives only in the user's Render env
+- 7 new unit tests; npm test 117/117 pass; pushed commit e88f8b3
+
+Stage Summary:
+- User flow: add OWNER_PASSWORD=<their password> in Render Environment (alongside DATABASE_URL + JWT/REFRESH/ENCRYPTION secrets), redeploy, log in as emmanuelevian@gmail.com. Idempotent — later in-app password changes survive reboots even if the env var stays.
