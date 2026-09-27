@@ -305,3 +305,23 @@ Work Log:
 
 Stage Summary:
 - All code defaults now match real production endpoints; user still needs DATABASE_URL + secrets in Render env vars, then redeploy
+
+---
+Task ID: 14 (MASTER PROMPT: remove referrals + loyalty; Super Admin allowlist)
+Agent: Super Z (main agent)
+Task: Execute FUNDIConnect 68-section master prompt on existing PataFundi codebase. Hard requirements: (2) delete referrals + loyalty completely, not just hide; (39) server-side admin allowlist emmanuelevian@gmail.com, no public admin login; user directive: DO NOT change the logo/brand.
+
+Work Log:
+- Full audit first: mapped 65+ files, identified live vs archive references; brand kept as PataFundi per explicit user instruction (master prompt name "FundiConnect" NOT applied — user previously reverted a rebrand)
+- Deleted 7 files: referralController, referralService, ReferralLoyaltyWidget, ReferEarnScreen, ReferralProgramScreen, LoyaltyProgramScreen, referral_audit.mjs
+- Edited backend: routes.js (11 route removals), authController (registration referral hook + user_loyalty insert), jobController (voucher apply/confirm/issue blocks + metadata), enterpriseService (referral + loyalty engines), enterpriseService2 (GDPR export list, disable_referrals control), enterpriseService3 (CRM queries/fields), fraudPreventionService (referral activity factor + behavioral_risk_scores column write)
+- Edited frontend/shared/mobile: Dashboard widget usage, shared types (Referral, Loyalty) + apiClient methods + register signature, MainNavigator (3 screens), HomeScreen referral card, WalletScreen referral/loyalty cards, TrustCenter menu, ProfileScreen menu, RegisterScreen field, authStore
+- Migration 037: drop referrals, referral_rewards, referral_redemptions, referral_fraud_events, referral_campaigns, user_referral_codes, user_loyalty; drop behavioral_risk_scores.referral_activity_30d; delete 6 permission keys (incl. can_enable_disable_referrals, can_view_loyalty_campaigns found via live DB check)
+- Super Admin allowlist: backend/src/adminAllowlist.js (SUPER_ADMIN_EMAILS env, default owner + demo owner); fail-closed demotion in authRequired with audit + session revocation; render.yaml + .env.example updated; DemoPage labels fixed (dev-only, gated by import.meta.env.DEV)
+- Live verification: demotion fired for admin@patafundi.com (super_admin -> admin) on first authenticated request; emmanuelevian@gmail.com and admin.demo@patafundi.test retained super_admin
+- Gauntlet: 110/110 tests, 16/16 probe, 19/19 battery, typecheck clean, build clean (11.4s), removed endpoints 404, DB zero tables/columns/permissions remain, zero live code references repo-wide
+- Infra note: sandbox watchdog respawns backend on :4000; EADDRINUSE confusion resolved by testing against the respawned fresh-code process
+
+Stage Summary:
+- Commit 7714d83 pushed. Referral + loyalty: GONE (code, tables, permissions, UI, nav, mobile). Allowlist: enforced server-side, fail-closed. Logo/brand untouched.
+- Flagged to user: emmanuelevian@gmail.com owner password PataFundiOwner@2026 is public in dev seed script — must be changed for production (OWNER_PASSWORD env / DB update)
