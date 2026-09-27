@@ -42,7 +42,7 @@ const SECTIONS: InfoSection[] = [
   {
     icon: 'people',
     title: 'Dispute Resolution',
-    body: 'File a dispute if something goes wrong — we mediate fairly and quickly.',
+    body: 'File a dispute if something goes wrong - we mediate fairly and quickly.',
     color: '#F59E0B',
   },
   {

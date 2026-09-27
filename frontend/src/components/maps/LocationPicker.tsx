@@ -483,7 +483,7 @@ export default function LocationPicker({
 
       {env.USE_GOOGLE_MAPS && !hasApiKey && (
         <p className="text-xs text-amber-700">
-          Google Maps key not configured — using server search. You can still type and confirm an address manually.
+          Google Maps key not configured - using server search. You can still type and confirm an address manually.
         </p>
       )}
 

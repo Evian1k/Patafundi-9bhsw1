@@ -54,7 +54,7 @@ export default function AdminRefunds() {
     setActing(id);
     try {
       await apiClient.adminDecideRefundRequest(id, action, { notes: notes[id] || undefined });
-      toast.success(action === "approve" ? "Refund approved — reversal executed." : "Refund request declined.");
+      toast.success(action === "approve" ? "Refund approved - reversal executed." : "Refund request declined.");
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Decision failed");
@@ -70,7 +70,7 @@ export default function AdminRefunds() {
           <div>
             <h1 className="text-2xl font-display font-bold">Refund Requests</h1>
             <p className="text-sm text-muted-foreground">
-              Customer refund requests. Approval executes the atomic ledger reversal — money movement is always real and audited.
+              Customer refund requests. Approval executes the atomic ledger reversal - money movement is always real and audited.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>

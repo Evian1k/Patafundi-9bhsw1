@@ -154,7 +154,7 @@ export async function notifyCompanyPayoutCompleted(companyId, payout) {
      values ($1, 'payout_completed', 'Payout Completed', $2, $3::jsonb)`,
     [
       owner.rows[0].owner_user_id,
-      `KES ${Number(payout.amount).toLocaleString()} payout has been completed. Reference: ${payout.provider_reference || '—'}.`,
+      `KES ${Number(payout.amount).toLocaleString()} payout has been completed.${payout.provider_reference ? ` Reference: ${payout.provider_reference}.` : ''}`,
       JSON.stringify({ payoutId: payout.id, companyId, amount: payout.amount }),
     ],
   );

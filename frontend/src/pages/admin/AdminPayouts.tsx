@@ -68,7 +68,7 @@ export default function AdminPayouts() {
         method: "POST",
         body: { providerReference: referenceDraft || undefined },
       });
-      toast.success("Payout marked completed — provider notified.");
+      toast.success("Payout marked completed - provider notified.");
       setCompletingId(null);
       setReferenceDraft("");
       await load();
@@ -89,7 +89,7 @@ export default function AdminPayouts() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-display font-bold">Payouts</h1>
-            <p className="text-sm text-muted-foreground">Provider payout ledger — fundi withdrawals and company settlement payouts.</p>
+            <p className="text-sm text-muted-foreground">Provider payout ledger - fundi withdrawals and company settlement payouts.</p>
           </div>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
         </div>

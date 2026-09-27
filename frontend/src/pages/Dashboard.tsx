@@ -69,7 +69,7 @@ function LocationOnboarding() {
           </p>
           {state === "denied" && (
             <p className="text-xs text-amber-600 mt-2">
-              No problem — you can set your location manually in Settings at any time.
+              No problem - you can set your location manually in Settings at any time.
             </p>
           )}
           {state === "granted" ? (
@@ -282,7 +282,7 @@ export default function Dashboard() {
         </div>
 
         {/* Service categories (spec §11 grid, §22/§28 catalog): every click
-            goes DIRECTLY into the booking flow — no informational page. */}
+            goes DIRECTLY into the booking flow - no informational page. */}
         <div id="home-categories">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Services</h2>
           <div className="relative mb-3">

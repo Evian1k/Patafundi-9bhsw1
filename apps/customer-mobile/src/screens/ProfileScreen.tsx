@@ -55,7 +55,7 @@ export function ProfileScreen({ navigation }: any): JSX.Element {
         .then((res) => {
           if (!cancelled && res?.user) useAuthStore.setState({ user: res.user });
         })
-        .catch(() => { /* offline — keep cached profile */ });
+        .catch(() => { /* offline - keep cached profile */ });
       return () => { cancelled = true; };
     }, []),
   );

@@ -137,7 +137,7 @@ export default function SecurityCenter() {
 
           {recoveryCodes && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-sm font-semibold text-amber-800 mb-2">⚠️ Save these recovery codes — you won't see them again:</p>
+              <p className="text-sm font-semibold text-amber-800 mb-2">⚠️ Save these recovery codes - you won't see them again:</p>
               <div className="grid grid-cols-2 gap-2">
                 {recoveryCodes.map((code, i) => (
                   <code key={i} className="bg-white px-2 py-1 rounded text-sm font-mono">{code}</code>

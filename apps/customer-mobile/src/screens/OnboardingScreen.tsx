@@ -41,7 +41,7 @@ const SLIDES: Slide[] = [
     icon: 'grid-outline',
     title: '500+ Services',
     subtitle:
-      'From plumbing to cleaning, electrical to carpentry — we\u2019ve got you covered',
+      'From plumbing to cleaning, electrical to carpentry - we\u2019ve got you covered',
   },
   {
     icon: 'shield-checkmark',

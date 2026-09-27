@@ -45,7 +45,7 @@ export default function NetworkReconnectBanner() {
           {offline ? (
             <>
               <WifiOff className="w-4 h-4" />
-              No internet connection — some features may be unavailable
+              No internet connection - some features may be unavailable
             </>
           ) : (
             <>

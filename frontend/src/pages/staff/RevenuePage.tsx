@@ -59,7 +59,7 @@ export default function RevenuePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="font-display font-bold text-2xl">Revenue</h1>
-            <p className="text-sm text-muted-foreground">All figures come from the revenue ledger — nothing is estimated.</p>
+            <p className="text-sm text-muted-foreground">All figures come from the revenue ledger - nothing is estimated.</p>
           </div>
           <button
             onClick={load}

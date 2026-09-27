@@ -33,13 +33,13 @@ const STATIC_SECTIONS: InfoSection[] = [
   {
     icon: 'shield-checkmark',
     title: 'Your money is held safely',
-    body: 'From the moment you pay until the moment you confirm completion, your money sits in a secure escrow account — never in the fundi\'s hands until the work is done.',
+    body: 'From the moment you pay until the moment you confirm completion, your money sits in a secure escrow account - never in the fundi\'s hands until the work is done.',
     color: colors.success,
   },
   {
     icon: 'refresh',
     title: 'Refund process',
-    body: 'If a job is cancelled or a dispute is resolved in your favor, the held amount is refunded to your original payment method within 3–5 business days.',
+    body: 'If a job is cancelled or a dispute is resolved in your favor, the held amount is refunded to your original payment method within 3-5 business days.',
     color: colors.accent,
   },
   {
@@ -57,13 +57,13 @@ const STATIC_SECTIONS: InfoSection[] = [
   {
     icon: 'receipt',
     title: 'Receipts',
-    body: 'Every transaction generates an instant receipt with the M-Pesa reference code, amount, and job details — sent to your app and email.',
+    body: 'Every transaction generates an instant receipt with the M-Pesa reference code, amount, and job details - sent to your app and email.',
     color: colors.primary,
   },
   {
     icon: 'time',
     title: 'Transaction history',
-    body: 'A complete record of every payment, refund, and payout lives in your Wallet — searchable and exportable anytime.',
+    body: 'A complete record of every payment, refund, and payout lives in your Wallet - searchable and exportable anytime.',
     color: colors.info,
   },
 ];

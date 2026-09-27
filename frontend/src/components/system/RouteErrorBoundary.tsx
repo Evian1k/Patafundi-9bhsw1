@@ -84,7 +84,7 @@ export default class RouteErrorBoundary extends Component<Props, State> {
         <p className="max-w-md text-sm text-muted-foreground">{this.state.message}</p>
         {this.state.reference && (
           <p className="max-w-md text-xs text-muted-foreground">
-            Reference: <span className="font-mono font-medium">{this.state.reference}</span> — quote this if you contact support.
+            Reference: <span className="font-mono font-medium">{this.state.reference}</span> - quote this if you contact support.
           </p>
         )}
         <Button onClick={() => this.setState({ hasError: false, message: '', reference: null })}>Try again</Button>

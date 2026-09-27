@@ -78,7 +78,7 @@ export function PricingExplainedScreen({ navigation }: any): JSX.Element {
       <InfoHero
         heroIcon="calculator"
         heroTitle="How Pricing Works"
-        heroSubtitle="One fair, transparent price — every time."
+        heroSubtitle="One fair, transparent price - every time."
         heroGradient="primary"
       />
 

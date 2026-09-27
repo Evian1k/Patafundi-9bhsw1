@@ -139,7 +139,7 @@ export default function CompanyProfile() {
           <section aria-labelledby="services-h">
             <h2 id="services-h" className="text-lg font-semibold tracking-tight mb-3">Services</h2>
             {services.length === 0 ? (
-              <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">No published services yet — request a general booking.</div>
+              <div className="rounded-2xl border bg-card p-6 text-sm text-muted-foreground">No published services yet - request a general booking.</div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {services.map((s) => (
@@ -231,10 +231,10 @@ export default function CompanyProfile() {
 
           <div className="rounded-3xl border bg-card p-5 text-xs text-muted-foreground space-y-1.5">
             <p className="flex items-center gap-2 text-foreground font-medium"><Calendar className="h-4 w-4 text-primary" /> How it works</p>
-            <p>1. Send a request — describe the job.</p>
+            <p>1. Send a request - describe the job.</p>
             <p>2. The company accepts and dispatches a technician.</p>
             <p>3. Approve the quote, then pay through secure escrow.</p>
-            <p>4. Confirm completion with an OTP — funds release only then.</p>
+            <p>4. Confirm completion with an OTP - funds release only then.</p>
           </div>
 
           <div className="rounded-3xl border bg-primary/100/5 p-5 text-xs text-muted-foreground flex gap-2">

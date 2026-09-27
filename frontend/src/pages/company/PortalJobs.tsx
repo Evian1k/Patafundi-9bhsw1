@@ -238,7 +238,7 @@ function SelectTechnician({ team, onAssign, busy }: {
 }) {
   const [open, setOpen] = useState(false);
   if (team.length === 0) {
-    return <span className="text-xs text-muted-foreground self-center">No active technicians — add them in Team.</span>;
+    return <span className="text-xs text-muted-foreground self-center">No active technicians - add them in Team.</span>;
   }
   return (
     <div className="relative">

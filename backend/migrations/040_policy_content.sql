@@ -61,7 +61,7 @@ To keep the marketplace safe, Fundi identity verification compares your governme
 
 ## 4. Payment data
 
-Payments are processed by licensed payment partners (e.g. M-Pesa/Daraja, card acquirers). PataFundi stores transaction records, amounts, and statuses — not full card numbers. Payout destinations (e.g. Paybill/till, bank) are stored to send you your earnings.
+Payments are processed by licensed payment partners (e.g. M-Pesa/Daraja, card acquirers). PataFundi stores transaction records, amounts, and statuses - not full card numbers. Payout destinations (e.g. Paybill/till, bank) are stored to send you your earnings.
 
 ## 5. Communications
 
@@ -126,15 +126,15 @@ where slug = 'refund-policy';
 update policies set title = 'Safety Guidelines', version = 2, updated_at = now(),
 body = $policy$## 1. Provider verification
 
-Every Fundi on PataFundi passes email/phone verification, a government-ID check with selfie liveness matching, and manual approval before receiving jobs. Companies verify business registration and team structure. Trust levels and reviews are built from real completed jobs only — never buy or sell reviews.
+Every Fundi on PataFundi passes email/phone verification, a government-ID check with selfie liveness matching, and manual approval before receiving jobs. Companies verify business registration and team structure. Trust levels and reviews are built from real completed jobs only - never buy or sell reviews.
 
 ## 2. Customer safety
 
-Let someone know when a provider is coming; the live-tracking map shows exactly that. Keep communication in the app — chat and calls through PataFundi are logged and protect you. Never pay outside the platform: escrow exists so that money only moves when work is confirmed. If something feels unsafe, use the SOS button (Fundi app) or leave, then report the incident.
+Let someone know when a provider is coming; the live-tracking map shows exactly that. Keep communication in the app - chat and calls through PataFundi are logged and protect you. Never pay outside the platform: escrow exists so that money only moves when work is confirmed. If something feels unsafe, use the SOS button (Fundi app) or leave, then report the incident.
 
 ## 3. Provider safety
 
-Confirm job details before traveling. Check in and out on the job to timestamp your work. If a customer requests off-platform payment, refuse — it voids your protections and voids the customer's escrow protection. Report abusive customers through the job page; repeated abuse removes them from the platform.
+Confirm job details before traveling. Check in and out on the job to timestamp your work. If a customer requests off-platform payment, refuse - it voids your protections and voids the customer's escrow protection. Report abusive customers through the job page; repeated abuse removes them from the platform.
 
 ## 4. Reporting and suspicious behavior
 
@@ -172,7 +172,7 @@ where slug = 'platform-rules';
 update policies set title = 'Enforcement Policy', version = 2, updated_at = now(),
 body = $policy$## 1. How enforcement works
 
-Violations are handled proportionately using a strike system: 1) Warning with an explanation of the rule; 2) Temporary suspension of the relevant capability (e.g. receiving jobs, booking); 3) Extended suspension pending review; 4) Permanent ban. Serious violations — fraud, threats, identity theft, safety endangerment — skip straight to a permanent ban.
+Violations are handled proportionately using a strike system: 1) Warning with an explanation of the rule; 2) Temporary suspension of the relevant capability (e.g. receiving jobs, booking); 3) Extended suspension pending review; 4) Permanent ban. Serious violations - fraud, threats, identity theft, safety endangerment - skip straight to a permanent ban.
 
 ## 2. What triggers enforcement
 

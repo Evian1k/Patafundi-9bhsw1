@@ -88,7 +88,7 @@ const STATIC_SECTIONS: InfoSection[] = [
       'Confirm customer details match the app before arriving',
       'Share job details with a friend or family member',
       'Carry your ID and a charged phone at all times',
-      'Trust your instincts — decline a job if something feels off',
+      'Trust your instincts - decline a job if something feels off',
       'Keep SOS accessible during the job',
     ],
   },
@@ -132,7 +132,7 @@ export function FundiEmergencySosScreen({ navigation }: any): JSX.Element {
       Alert.alert('SOS alert sent', 'Our safety team has been alerted and will follow up immediately. If you are in immediate danger, also call 999.');
     } catch {
       setSosState('idle');
-      Alert.alert('Could not send the alert', 'Please call the emergency number directly — your call takes priority.');
+      Alert.alert('Could not send the alert', 'Please call the emergency number directly - your call takes priority.');
     }
   };
 

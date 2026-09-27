@@ -103,7 +103,7 @@ export default function AICommandCenter() {
     setRunning(true);
     try {
       const result = await apiClient.request("/ai/run", { method: "POST", includeAuth: true }) as { totalRecommendations: number };
-      toast.success(`AI analysis complete — ${result.totalRecommendations} recommendations generated`);
+      toast.success(`AI analysis complete - ${result.totalRecommendations} recommendations generated`);
       fetchData();
     } catch {
       toast.error("AI analysis failed");
@@ -143,7 +143,7 @@ export default function AICommandCenter() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">AI Command Center</h1>
-              <p className="text-slate-500 text-sm">Advisory only — AI recommends, super_admin decides</p>
+              <p className="text-slate-500 text-sm">Advisory only - AI recommends, super_admin decides</p>
             </div>
           </div>
           <Button onClick={runAnalysis} disabled={running}>

@@ -39,7 +39,7 @@ async function getDb() {
       console.log('[seed-takeover] using PostgreSQL from DATABASE_URL');
       return pool;
     } catch {
-      console.warn('[seed-takeover] DATABASE_URL unreachable — falling back to embedded PostgreSQL (PGlite)');
+      console.warn('[seed-takeover] DATABASE_URL unreachable - falling back to embedded PostgreSQL (PGlite)');
     }
   }
   process.env.PATAFUNDI_EMBEDDED_DB = '1';
@@ -87,14 +87,14 @@ export async function seedTakeover() {
     `insert into fundis (user_id, skills, experience, bio, mpesa_number, approval_status, online, rating, verification_badge)
      values ($1, $2, $3, $4, $5, 'approved', true, 4.9, true)
      on conflict (user_id) do update set approval_status = 'approved', online = true, rating = 4.9, verification_badge = true`,
-    [ids.fundi, ['plumbing'], '8 years experience', 'DEMO Fundi — licensed plumber serving Nairobi.', '254730000002'],
+    [ids.fundi, ['plumbing'], '8 years experience', 'DEMO Fundi - licensed plumber serving Nairobi.', '254730000002'],
   ).catch(async (e) => {
     console.warn('[seed-takeover] fundis insert fallback:', e.message);
     await db.query(
       `insert into fundis (user_id, skills, experience, bio, mpesa_number, approval_status, online)
        values ($1, $2, $3, $4, $5, 'approved', true)
        on conflict (user_id) do update set approval_status = 'approved', online = true`,
-      [ids.fundi, ['plumbing'], '8 years experience', 'DEMO Fundi — licensed plumber serving Nairobi.', '254730000002'],
+      [ids.fundi, ['plumbing'], '8 years experience', 'DEMO Fundi - licensed plumber serving Nairobi.', '254730000002'],
     );
   });
 
@@ -123,7 +123,7 @@ export async function seedTakeover() {
     await db.query(
       `insert into customer_properties (customer_id, label, property_type, address_line, location_name, latitude, longitude)
        values ($1, 'Office', 'office', 'Upper Hill Chambers, 4th Floor', 'Upper Hill, Nairobi', -1.3001, 36.8085),
-              ($1, 'Rental — Kileleshwa', 'rental', '22 Oloitokitok Road', 'Kileleshwa, Nairobi', -1.2795, 36.7787)`,
+              ($1, 'Rental - Kileleshwa', 'rental', '22 Oloitokitok Road', 'Kileleshwa, Nairobi', -1.2795, 36.7787)`,
       [ids.customer],
     );
   }
@@ -147,7 +147,7 @@ export async function seedTakeover() {
        ['plumbing', 'electrical', 'hvac', 'appliance_repair'],
        ['Nairobi', 'Kiambu', 'Westlands', 'Karen'],
        JSON.stringify([
-         { name: 'HQ — Westlands', address: 'Waiyaki Way, Westlands, Nairobi', phone: '254730000003' },
+         { name: 'HQ - Westlands', address: 'Waiyaki Way, Westlands, Nairobi', phone: '254730000003' },
          { name: 'Karen Branch', address: 'Karen Road, Nairobi', phone: '254730000004' },
        ]),
        'DEMO partner company delivering verified home services: plumbing, electrical, HVAC and appliance repair across Nairobi.'],
@@ -166,7 +166,7 @@ export async function seedTakeover() {
        ['plumbing', 'electrical', 'hvac', 'appliance_repair'],
        ['Nairobi', 'Kiambu', 'Westlands', 'Karen'],
        JSON.stringify([
-         { name: 'HQ — Westlands', address: 'Waiyaki Way, Westlands, Nairobi', phone: '254730000003' },
+         { name: 'HQ - Westlands', address: 'Waiyaki Way, Westlands, Nairobi', phone: '254730000003' },
          { name: 'Karen Branch', address: 'Karen Road, Nairobi', phone: '254730000004' },
        ]),
        'DEMO partner company delivering verified home services: plumbing, electrical, HVAC and appliance repair across Nairobi.',
@@ -224,14 +224,14 @@ export async function seedTakeover() {
   // 7. Jobs across the lifecycle ───────────────────────────────────────────
   const jobSeed = [
     // [status, category, urgency, days offset, price, description, technicianIdx, withPayment, withReview]
-    ['pending', 'plumbing', 'normal', 0, 3500, 'Kitchen sink is leaking from underneath the cabinet — DEMO incoming job.', null, false, false],
-    ['accepted', 'electrical', 'normal', -0.2, 5000, 'Two power sockets in the living room stopped working — DEMO job awaiting dispatch.', null, false, false],
-    ['assigned', 'hvac', 'normal', -0.3, 6500, 'AC not cooling; needs service and regas — DEMO job assigned to technician.', 0, false, false],
-    ['on_the_way', 'appliance_repair', 'normal', -0.5, 3000, 'Washing machine drum not spinning — DEMO job, technician en route.', 1, false, false],
-    ['in_progress', 'plumbing', 'emergency', -0.6, 5500, 'Burst pipe flooding the corridor — DEMO emergency job in progress.', 2, false, false],
-    ['completed', 'electrical', 'normal', -3, 5000, 'Full wiring check and two new sockets installed — DEMO completed job.', 1, true, true],
-    ['completed', 'plumbing', 'normal', -10, 4000, 'Bathroom drain unblocked and sealed — DEMO completed + paid + settled job.', 0, true, true],
-    ['cancelled', 'hvac', 'normal', -6, 6500, 'AC regas request cancelled by customer — DEMO cancelled job.', null, false, false],
+    ['pending', 'plumbing', 'normal', 0, 3500, 'Kitchen sink is leaking from underneath the cabinet - DEMO incoming job.', null, false, false],
+    ['accepted', 'electrical', 'normal', -0.2, 5000, 'Two power sockets in the living room stopped working - DEMO job awaiting dispatch.', null, false, false],
+    ['assigned', 'hvac', 'normal', -0.3, 6500, 'AC not cooling; needs service and regas - DEMO job assigned to technician.', 0, false, false],
+    ['on_the_way', 'appliance_repair', 'normal', -0.5, 3000, 'Washing machine drum not spinning - DEMO job, technician en route.', 1, false, false],
+    ['in_progress', 'plumbing', 'emergency', -0.6, 5500, 'Burst pipe flooding the corridor - DEMO emergency job in progress.', 2, false, false],
+    ['completed', 'electrical', 'normal', -3, 5000, 'Full wiring check and two new sockets installed - DEMO completed job.', 1, true, true],
+    ['completed', 'plumbing', 'normal', -10, 4000, 'Bathroom drain unblocked and sealed - DEMO completed + paid + settled job.', 0, true, true],
+    ['cancelled', 'hvac', 'normal', -6, 6500, 'AC regas request cancelled by customer - DEMO cancelled job.', null, false, false],
   ];
   const techMembers = await db.query(
     `select cm.user_id, u.full_name from company_members cm join users u on u.id = cm.user_id
@@ -308,14 +308,14 @@ export async function seedTakeover() {
       ).catch(() => {});
       await db.query(
         `insert into revenue_ledger (job_id, transaction_type, amount, currency, customer_paid, commission_amount, net_revenue, notes)
-         values ($1, 'commission_earned', $2, 'KES', $3, $2, $2, 'DEMO seed — platform commission')`,
+         values ($1, 'commission_earned', $2, 'KES', $3, $2, $2, 'DEMO seed - platform commission')`,
         [jobId, commission, price],
       ).catch(() => {});
     }
     if (withReview) {
       await db.query(
         `insert into reviews (job_id, reviewer_id, rating, comment)
-         select $1, $2, 5, 'Excellent, professional work — arrived on time. (DEMO review)'
+         select $1, $2, 5, 'Excellent, professional work - arrived on time. (DEMO review)'
          where not exists (select 1 from reviews where job_id = $1)`,
         [jobId, ids.customer],
       );
@@ -354,7 +354,7 @@ export async function seedTakeover() {
     [companyId],
   );
 
-  console.log('[seed-takeover] DEMO ecosystem ready — see DEMO_ACCOUNTS.md for credentials');
+  console.log('[seed-takeover] DEMO ecosystem ready - see DEMO_ACCOUNTS.md for credentials');
 }
 
 const isDirectRun = process.argv[1] && process.argv[1].includes('seed-takeover');

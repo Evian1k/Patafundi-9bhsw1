@@ -97,7 +97,7 @@ export default function FundiProfileEdit() {
             <div className="bg-card rounded-2xl p-5 border border-border/50 space-y-3">
               <div>
                 <label className="text-sm font-medium">Your skills</label>
-                <p className="text-xs text-muted-foreground">Pick every category you can handle — this drives your job matches.</p>
+                <p className="text-xs text-muted-foreground">Pick every category you can handle - this drives your job matches.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {SUGGESTED_SKILLS.map((skill) => {

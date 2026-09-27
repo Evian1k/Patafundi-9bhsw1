@@ -42,9 +42,9 @@ interface BadgeInfo {
 }
 
 const BADGES: BadgeInfo[] = [
-  { icon: 'checkmark-circle', name: 'Verified', description: 'Blue checkmark — passed identity, document, and selfie verification.', color: colors.info },
-  { icon: 'star', name: 'Top-Rated', description: 'Gold star — maintains a 4.7+ rating over 25+ completed jobs.', color: '#F59E0B' },
-  { icon: 'diamond', name: 'Elite', description: 'Platinum — top performers with 4.9+ rating and 100+ jobs completed.', color: '#7C3AED' },
+  { icon: 'checkmark-circle', name: 'Verified', description: 'Blue checkmark - passed identity, document, and selfie verification.', color: colors.info },
+  { icon: 'star', name: 'Top-Rated', description: 'Gold star - maintains a 4.7+ rating over 25+ completed jobs.', color: '#F59E0B' },
+  { icon: 'diamond', name: 'Elite', description: 'Platinum - top performers with 4.9+ rating and 100+ jobs completed.', color: '#7C3AED' },
 ];
 
 const STATIC_SECTIONS: InfoSection[] = [

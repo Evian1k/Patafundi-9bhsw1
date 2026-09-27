@@ -55,7 +55,7 @@ export default function HelpCenter() {
             <Badge key={c.id} variant={category === c.slug ? "default" : "outline"} className="cursor-pointer" onClick={() => setParams((p) => { p.set("category", c.slug); return p; })}>{c.title}</Badge>
           ))}
         </div>
-        <h2 className="font-semibold text-lg mb-4 flex gap-2">{catTitle} {q ? <span className="text-muted-foreground text-base font-normal">— "{q}"</span> : null}</h2>
+        <h2 className="font-semibold text-lg mb-4 flex gap-2">{catTitle} {q ? <span className="text-muted-foreground text-base font-normal">results for "{q}"</span> : null}</h2>
         {loading ? (
           <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 bg-muted rounded-xl animate-shimmer" />)}</div>
         ) : error ? (

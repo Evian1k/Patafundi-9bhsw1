@@ -81,7 +81,7 @@ export default function StaffLogin() {
       toast.success("Welcome to the staff portal");
       navigate(STAFF_ROUTES[role] || "/staff");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed — is the backend running?");
+      setError(err instanceof Error ? err.message : "Login failed - is the backend running?");
     } finally {
       setLoading(false);
     }

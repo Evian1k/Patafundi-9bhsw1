@@ -48,7 +48,7 @@ const SECTIONS: InfoSection[] = [
   {
     icon: 'warning',
     title: 'Emergency Support',
-    body: 'SOS button connects you to support instantly during any active job — for you or the customer.',
+    body: 'SOS button connects you to support instantly during any active job - for you or the customer.',
     color: '#EF4444',
   },
   {
@@ -67,7 +67,7 @@ export function FundiSafetyPromiseScreen({ navigation }: any): JSX.Element {
       <InfoPageScreen
         heroIcon="shield-checkmark"
         heroTitle="Our Safety Promise"
-        heroSubtitle="Nine layers of protection on every PataFundi job — for you and your customers."
+        heroSubtitle="Nine layers of protection on every PataFundi job - for you and your customers."
         heroGradient="primary"
         sections={SECTIONS}
       />

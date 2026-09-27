@@ -77,7 +77,7 @@ export default function PortalTeam() {
         },
       }) as { temporaryPassword?: string };
       setNotice(res.temporaryPassword
-        ? `Member added. Temporary password: ${res.temporaryPassword} — share it securely.`
+        ? `Member added. Temporary password: ${res.temporaryPassword} - share it securely.`
         : "Member added.");
       setAddOpen(false);
       setForm({ fullName: "", email: "", phone: "", role: "technician", skills: "" });
@@ -126,7 +126,7 @@ export default function PortalTeam() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Technicians, dispatchers and staff — with per-person permissions.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Technicians, dispatchers and staff - with per-person permissions.</p>
         </div>
         {canEdit && (
           <button onClick={() => setAddOpen((o) => !o)}
@@ -152,7 +152,7 @@ export default function PortalTeam() {
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
               <p className="mt-1 text-xs text-muted-foreground">
-                Default permissions: {(ROLE_DEFAULTS[form.role] || []).length} — you can fine-tune after adding.
+                Default permissions: {(ROLE_DEFAULTS[form.role] || []).length} - you can fine-tune after adding.
               </p>
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function PortalTeam() {
                   <select
                     aria-label={`Change role for ${m.fullName}`}
                     value={m.role}
-                    onChange={(e) => update(m, { role: e.target.value }, "Role updated — review their permissions.")}
+                    onChange={(e) => update(m, { role: e.target.value }, "Role updated - review their permissions.")}
                     className="rounded-lg border bg-background px-2 py-1.5 text-xs capitalize">
                     {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>

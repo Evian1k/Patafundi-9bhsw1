@@ -502,7 +502,7 @@ export function FundiRegisterScreen({ navigation }: any): JSX.Element {
               ) : (
                 <View style={styles.uploadPlaceholder}>
                   <Ionicons name="card-outline" size={32} color={colors.primary} />
-                  <Text style={styles.uploadTitle}>National ID — Front</Text>
+                  <Text style={styles.uploadTitle}>National ID - Front</Text>
                   <Text style={styles.uploadRequired}>Required</Text>
                 </View>
               )}
@@ -529,7 +529,7 @@ export function FundiRegisterScreen({ navigation }: any): JSX.Element {
               ) : (
                 <View style={styles.uploadPlaceholder}>
                   <Ionicons name="card-outline" size={32} color={colors.textSecondary} />
-                  <Text style={styles.uploadTitle}>National ID — Back</Text>
+                  <Text style={styles.uploadTitle}>National ID - Back</Text>
                   <Text style={styles.uploadOptional}>Optional</Text>
                 </View>
               )}

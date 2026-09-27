@@ -173,7 +173,7 @@ export default function FundiProfile() {
           </div>
           {reviews.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No reviews yet — be the first to leave one after booking.
+              No reviews yet - be the first to leave one after booking.
             </p>
           ) : (
             <div className="space-y-3">

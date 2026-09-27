@@ -295,7 +295,7 @@ export default function FundiTracker({
     setQuoteDecision("working");
     try {
       await apiClient.decideJobQuote(jobId, decision);
-      toast.success(decision === "approve" ? "Quote approved — work can begin!" : "Quote rejected.");
+      toast.success(decision === "approve" ? "Quote approved - work can begin!" : "Quote rejected.");
       setQuoteDecision("done");
       loadJob();
     } catch (e) {
@@ -580,7 +580,7 @@ export default function FundiTracker({
     setRefundLoading(true);
     try {
       await apiClient.requestRefund(jobId, { reason: refundReason.trim(), details: refundDetails.trim() || undefined });
-      toast.success("Refund request submitted — our team will review it and notify you.");
+      toast.success("Refund request submitted - our team will review it and notify you.");
       setRefundOpen(false);
       setRefundReason("");
       setRefundDetails("");
@@ -628,7 +628,7 @@ export default function FundiTracker({
                       <div className="text-right">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remaining</p>
                         <p className="text-2xl font-bold text-slate-900">
-                          {routeDistanceKm != null ? `${routeDistanceKm.toFixed(1)} km` : "--"}
+                          {routeDistanceKm != null ? `${routeDistanceKm.toFixed(1)} km` : "Waiting for GPS"}
                         </p>
                       </div>
                     </div>
@@ -703,7 +703,7 @@ export default function FundiTracker({
                     <p className="font-display font-bold text-green-800">You're all set!</p>
                   </div>
                   <p className="text-sm text-green-700 mt-1">
-                    Your request is in. We're matching you with a verified fundi nearby — tracking starts automatically below.
+                    Your request is in. We're matching you with a verified fundi nearby - tracking starts automatically below.
                   </p>
                 </div>
                 <p className="text-muted-foreground text-sm">{progressMsg}</p>
@@ -823,10 +823,10 @@ export default function FundiTracker({
               </div>
               <div>
                 <h3 className="font-semibold text-base">Confirm Job Completion</h3>
-                <p className="text-xs text-muted-foreground">Step 1 of 2 — Verify with OTP</p>
+                <p className="text-xs text-muted-foreground">Step 1 of 2 - Verify with OTP</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Enter the 6-digit confirmation code from your notifications — it is sent only to you.</p>
+            <p className="text-sm text-muted-foreground">Enter the 6-digit confirmation code from your notifications - it is sent only to you.</p>
             <InputOTP maxLength={6} value={completionOtp} onChange={setCompletionOtp}>
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -867,7 +867,7 @@ export default function FundiTracker({
                 </div>
                 <div>
                   <h3 className="font-semibold text-base text-green-900">Pay via M-Pesa</h3>
-                  <p className="text-xs text-green-700">Step 2 of 2 — Secure escrow payment</p>
+                  <p className="text-xs text-green-700">Step 2 of 2 - Secure escrow payment</p>
                 </div>
               </div>
               {(paymentAmount ?? estimatedPrice) != null && (
@@ -1024,7 +1024,7 @@ export default function FundiTracker({
                   </Button>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  A PataFundi administrator reviews every request — approval triggers a real, audited reversal to your original payment method.
+                  A PataFundi administrator reviews every request - approval triggers a real, audited reversal to your original payment method.
                 </p>
               </div>
             )}

@@ -8,7 +8,7 @@ export default function About() {
       <div className="container mx-auto px-4 py-16 max-w-3xl">
         <h1 className="text-4xl font-display font-bold mb-4">About PataFundi</h1>
         <p className="text-muted-foreground text-lg mb-8">
-          PataFundi is built to make local services safer, faster, and more reliable — for customers and for professionals.
+          PataFundi is built to make local services safer, faster, and more reliable - for customers and for professionals.
         </p>
 
         <div className="space-y-8">
@@ -22,7 +22,7 @@ export default function About() {
           <div className="p-6 bg-card rounded-2xl border border-border/50">
             <h2 className="text-xl font-semibold mb-3">Vision</h2>
             <p className="text-muted-foreground">
-              A trusted marketplace where quality work is rewarded and customers get peace of mind — every time.
+              A trusted marketplace where quality work is rewarded and customers get peace of mind - every time.
             </p>
           </div>
 

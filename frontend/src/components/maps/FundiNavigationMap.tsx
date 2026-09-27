@@ -47,7 +47,7 @@ export default function FundiNavigationMap({
               <div className="text-right">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Distance</p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {directions ? `${directions.distanceKm.toFixed(1)} km` : '--'}
+                  {directions ? `${directions.distanceKm.toFixed(1)} km` : 'Calculating...'}
                 </p>
               </div>
             </div>

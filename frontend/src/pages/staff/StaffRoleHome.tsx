@@ -265,7 +265,7 @@ function DevopsHome() {
         <span className="flex items-center gap-2">
           <Bug className="h-4 w-4 text-emerald-600" />
           <span className="font-medium">Error Logs</span>
-          <span className="text-muted-foreground">— full technical detail users never see, searchable by reference code</span>
+          <span className="text-muted-foreground">- full technical detail users never see, searchable by reference code</span>
         </span>
         <span className="text-muted-foreground">→</span>
       </Link>

@@ -240,7 +240,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       />
 
       <Text style={styles.label}>Complexity</Text>
-      <Text style={styles.hint}>Affects the base price — be honest for accurate quotes</Text>
+      <Text style={styles.hint}>Affects the base price - be honest for accurate quotes</Text>
       <View style={styles.complexityGrid}>
         {COMPLEXITY_OPTIONS.map((opt) => {
           const selected = complexity === opt.value;
@@ -348,7 +348,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
           </View>
 
           <Text style={styles.priceTrust}>
-            Final price — no hidden fees, no surprises.
+            Final price - no hidden fees, no surprises.
           </Text>
         </View>
       ) : null}
@@ -400,7 +400,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
         <View>
           <View style={styles.acceptedBanner}>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-            <Text style={styles.acceptedText}>Price accepted — KES {priceQuote.total.toLocaleString()}</Text>
+            <Text style={styles.acceptedText}>Price accepted - KES {priceQuote.total.toLocaleString()}</Text>
           </View>
           <TouchableOpacity onPress={handleSubmit} disabled={submitting} activeOpacity={0.85}>
             <LinearGradient

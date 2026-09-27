@@ -53,7 +53,7 @@ export default function PortalSettings() {
               ? `${fin.payoutAccount.bankName || "bank"} ${fin.payoutAccount.bankAccount ?? ""}`
               : `M-Pesa ${fin.payoutAccount.mpesaNumber ?? "not set"}`);
           }
-        } catch { /* finance roles only — ignore */ }
+        } catch { /* finance roles only - ignore */ }
       } finally {
         setLoading(false);
       }
@@ -117,7 +117,7 @@ export default function PortalSettings() {
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-semibold tracking-tight">My business</h1>
-      <p className="text-sm text-muted-foreground mt-0.5">Customer-facing profile — keep it accurate and complete.</p>
+      <p className="text-sm text-muted-foreground mt-0.5">Customer-facing profile - keep it accurate and complete.</p>
 
       {notice && <div className="mt-3 rounded-xl border bg-primary/100/5 text-sm px-3 py-2 text-primary">{notice}</div>}
 

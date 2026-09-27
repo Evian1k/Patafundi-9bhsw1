@@ -64,7 +64,7 @@ export default function CompanyDirectory() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Verified service companies</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Professional companies — vetted by PataFundi, rated by real customers.
+              Professional companies - vetted by PataFundi, rated by real customers.
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">

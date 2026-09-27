@@ -54,7 +54,7 @@ export default function AdminLogin() {
       const response = await apiClient.login(email, password) as { user?: { role?: string } };
 
       if (!response.user) {
-        throw new Error("Login failed — no user returned.");
+        throw new Error("Login failed - no user returned.");
       }
 
       const staffRoles = ["admin", "super_admin", "support_agent", "fraud_analyst", "finance_team", "dispatch_team", "devops_engineer", "auditor"];

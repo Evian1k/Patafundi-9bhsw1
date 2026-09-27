@@ -74,7 +74,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     password: "Admin@2024!",
     role: "admin",
     label: "Admin (demo)",
-    description: "Admin tools — super_admin is reserved for the allowlisted owner",
+    description: "Admin tools - super_admin is reserved for the allowlisted owner",
     icon: Shield,
     color: "#1E293B",
   },
@@ -155,7 +155,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     email: "fundi.demo@patafundi.test",
     password: "PataFundi#2026",
     role: "fundi",
-    label: "Fundi — John Kamau (Takeover Demo)",
+    label: "Fundi - John Kamau (Takeover Demo)",
     description: "Verified individual fundi with wallet",
     icon: Wrench,
     color: "#10B981",
@@ -244,7 +244,7 @@ export default function DemoPage() {
       const path = await resolvePostLoginPath(data.user ?? null);
       navigate(path);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Login failed — is the backend running?");
+      toast.error(e instanceof Error ? e.message : "Login failed - is the backend running?");
     } finally {
       setLoggingIn(null);
     }
@@ -260,13 +260,13 @@ export default function DemoPage() {
           <motion.div variants={itemVariants} className="text-center mb-10">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Demo Accounts</h1>
             <p className="text-slate-600">
-              PataFundi has {DEMO_ACCOUNTS.length} demo accounts covering every role — customers, fundis, the
+              PataFundi has {DEMO_ACCOUNTS.length} demo accounts covering every role - customers, fundis, the
               company portal (owner, dispatcher, technician) and all staff consoles. Click any card to log in instantly,
               or copy the credentials to use on the login page.
             </p>
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
               <AlertTriangle className="w-3 h-3" />
-              Dev only — these accounts are seeded by the dev database. Do not use in production.
+              Dev only - these accounts are seeded by the dev database. Do not use in production.
             </div>
           </motion.div>
 

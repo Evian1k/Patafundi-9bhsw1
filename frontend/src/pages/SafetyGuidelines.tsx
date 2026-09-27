@@ -9,7 +9,7 @@ export default function SafetyGuidelines() {
         <p className="text-muted-foreground text-lg mb-8">Simple steps to stay safe before, during, and after a job.</p>
         <div className="space-y-6">
           {[
-            { title: "Before the job", items: ["Keep communication on-platform whenever possible.", "Never share passwords or one-time codes with anyone.", "Avoid off-platform payments — they remove protections."] },
+            { title: "Before the job", items: ["Keep communication on-platform whenever possible.", "Never share passwords or one-time codes with anyone.", "Avoid off-platform payments - they remove protections."] },
             { title: "During the job", items: ["Meet in a well-lit area when possible and keep someone informed.", "Confirm the service details and expected cost before work begins.", "Report any suspicious behavior immediately."] },
             { title: "After the job", items: ["Confirm completion honestly (OTP where applicable).", "Leave a rating and review to help the community."] },
           ].map(({ title, items }) => (

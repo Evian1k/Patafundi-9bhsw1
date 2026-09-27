@@ -85,7 +85,7 @@ const providerChoices = [
     id: "company" as const,
     title: "Service Company",
     subtitle: "Team & equipment jobs",
-    description: "Book a verified company with teams, tools and dispatchers — ideal for bigger or scheduled jobs.",
+    description: "Book a verified company with teams, tools and dispatchers - ideal for bigger or scheduled jobs.",
     icon: CheckCircle,
   },
 ];
@@ -155,7 +155,7 @@ function CompanyPickerInline({ service, onPick }: { service: string; onPick: (id
         <div className="p-4 rounded-xl border border-border bg-card">
           <p className="text-sm font-medium">No approved companies available for this service right now.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Submit anyway and your job goes to the company open pool — the first eligible company claims it.
+            Submit anyway and your job goes to the company open pool - the first eligible company claims it.
           </p>
         </div>
       ) : (
@@ -256,7 +256,7 @@ const CreateJob = () => {
         }
       }
     } catch {
-      toast.error("AI assistant is unavailable right now — you can continue without it.");
+      toast.error("AI assistant is unavailable right now - you can continue without it.");
     } finally {
       setAiAnalyzing(false);
     }
@@ -459,7 +459,7 @@ const CreateJob = () => {
               <p className="text-muted-foreground text-sm mb-5">
                 {companyInfo
                   ? `Pick one of the services ${companyInfo.companyName} offers, or search.`
-                  : "Select the category that best matches your needs — or type what you're looking for."}
+                  : "Select the category that best matches your needs - or type what you're looking for."}
               </p>
 
               {/* Company's own services first (spec §16) — only what the company
@@ -604,7 +604,7 @@ const CreateJob = () => {
                       )}
                       {aiAnalysis.questions && aiAnalysis.questions.length > 0 && (
                         <div className="text-sm">
-                          <p className="text-muted-foreground text-xs mb-2">Quick questions (optional — answers help your pro prepare):</p>
+                          <p className="text-muted-foreground text-xs mb-2">Quick questions (optional - answers help your pro prepare):</p>
                           <div className="space-y-2">
                             {aiAnalysis.questions.map((q, i) => (
                               <div key={i}>
@@ -642,7 +642,7 @@ const CreateJob = () => {
                       {aiAnalysis.estimateRange && (
                         <p className="text-sm">
                           <span className="text-muted-foreground text-xs">Typical range: </span>
-                          <span className="font-semibold">KES {aiAnalysis.estimateRange.min.toLocaleString()} – {aiAnalysis.estimateRange.max.toLocaleString()}</span>
+                          <span className="font-semibold">KES {aiAnalysis.estimateRange.min.toLocaleString()} - {aiAnalysis.estimateRange.max.toLocaleString()}</span>
                           <span className="text-xs text-muted-foreground"> (estimate, not a quote)</span>
                         </p>
                       )}
@@ -695,7 +695,7 @@ const CreateJob = () => {
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">Who should handle it?</h2>
-              <p className="text-muted-foreground text-sm mb-6">You choose — an individual professional, a verified company, or let PataFundi match you.</p>
+              <p className="text-muted-foreground text-sm mb-6">You choose - an individual professional, a verified company, or let PataFundi match you.</p>
               <div className="grid gap-3">
                 {providerChoices.map((choice) => (
                   <button
@@ -736,7 +736,7 @@ const CreateJob = () => {
                 <div className="mt-4 p-4 rounded-xl border border-border bg-card">
                   <p className="text-sm font-medium">No fundi selected yet</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Submit and PataFundi will broadcast your job to qualified fundis near you — the first verified professional to accept gets it. You can also open a fundi's profile and book them directly from there.
+                    Submit and PataFundi will broadcast your job to qualified fundis near you - the first verified professional to accept gets it. You can also open a fundi's profile and book them directly from there.
                   </p>
                 </div>
               )}
@@ -746,7 +746,7 @@ const CreateJob = () => {
                   onPick={(id, name) => {
                     setJobData((prev) => ({ ...prev, companyId: id }));
                     setCompanyInfo({ id, companyName: name });
-                    toast.success(`${name} selected — they stay with you to the confirmation step.`);
+                    toast.success(`${name} selected - they stay with you to the confirmation step.`);
                   }}
                 />
               )}
@@ -809,7 +809,7 @@ const CreateJob = () => {
                 <div>
                   <label className="block text-sm font-medium mb-2">Service location *</label>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Search for your street, building, or area — or use GPS. Fundis will see this exact address.
+                    Search for your street, building, or area - or use GPS. Fundis will see this exact address.
                   </p>
                   <LocationPicker
                     value={locationSelection}

@@ -141,7 +141,7 @@ export default function ExecutiveDashboard() {
 
         {statsError && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            Live metrics could not be loaded just now — the figures below may be stale. Retry with the Refresh button.
+            Live metrics could not be loaded just now - the figures below may be stale. Retry with the Refresh button.
           </div>
         )}
 

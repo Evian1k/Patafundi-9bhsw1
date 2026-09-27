@@ -124,7 +124,7 @@ export default function FundiMyReviews() {
 
             {reviews.length === 0 ? (
               <div className="bg-card rounded-2xl p-8 border border-border/50 text-center text-muted-foreground text-sm">
-                No reviews yet — complete jobs to start building your reputation.
+                No reviews yet - complete jobs to start building your reputation.
               </div>
             ) : (
               reviews.map((r, i) => (

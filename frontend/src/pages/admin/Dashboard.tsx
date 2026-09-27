@@ -232,7 +232,9 @@ export default function AdminDashboard() {
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="text-center p-3 rounded-2xl bg-gray-50">
                 <Icon className={`w-6 h-6 ${color} mx-auto mb-1`} />
-                <p className="text-2xl font-bold text-gray-900">{loading ? '—' : value}</p>
+                <p className="text-2xl font-bold text-gray-900">{loading
+                  ? <span className="inline-block h-7 w-10 rounded bg-gray-200 animate-pulse align-middle" aria-label="Loading" />
+                  : value}</p>
                 <p className="text-xs text-gray-500">{label}</p>
               </div>
             ))}

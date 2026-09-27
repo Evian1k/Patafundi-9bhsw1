@@ -140,7 +140,7 @@ export default function PartnerProgram() {
             <div className="rounded-2xl border bg-card p-4 text-xs text-muted-foreground flex gap-2">
               <FileCheck2 className="h-4 w-4 shrink-0 text-primary" />
               Lifecycle: submitted → under review → approved. PataFundi staff verify
-              your business before you go live — never automatic.
+              your business before you go live - never automatic.
             </div>
           </aside>
 
@@ -200,7 +200,7 @@ export default function PartnerProgram() {
                     <label className="text-sm font-medium">Branches (one per line)</label>
                     <textarea rows={3} value={form.branches} onChange={(e) => set("branches", e.target.value)}
                       className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                      placeholder={"HQ — Westlands\nKaren Branch"} />
+                      placeholder={"HQ - Westlands\nKaren Branch"} />
                   </div>
                   <Field label="License / certification details" value={form.licenseDetails} onChange={(v) => set("licenseDetails", v)} placeholder="EPRA, NEMA licenses…" />
                 </>

@@ -60,12 +60,12 @@ export function JobRequestModal({
           <div className="p-3 bg-secondary rounded-xl text-center">
             <MapPin className="w-5 h-5 mx-auto mb-1 text-accent" />
             <p className="text-xs text-muted-foreground">Distance</p>
-            <p className="font-bold">{distanceKm != null ? `${distanceKm.toFixed(1)} km` : '—'}</p>
+            <p className="font-bold">{distanceKm != null ? `${distanceKm.toFixed(1)} km` : 'N/A'}</p>
           </div>
           <div className="p-3 bg-secondary rounded-xl text-center">
             <p className="text-xs text-muted-foreground mt-5">Est. pay</p>
             <p className="font-bold text-sm">
-              {Number.isFinite(estimatedPrice) ? `KES ${estimatedPrice!.toFixed(0)}` : '—'}
+              {Number.isFinite(estimatedPrice) ? `KES ${estimatedPrice!.toFixed(0)}` : 'To be quoted'}
             </p>
           </div>
         </div>

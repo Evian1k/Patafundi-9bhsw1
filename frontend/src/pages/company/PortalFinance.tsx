@@ -77,7 +77,7 @@ export default function PortalFinance() {
         method: "POST",
         body: { amount: Number(amount), mpesaNumber: mpesaNumber || undefined },
       });
-      setNotice("Payout requested. Platform staff will complete the transfer — you'll get a notification with the reference.");
+      setNotice("Payout requested. Platform staff will complete the transfer - you'll get a notification with the reference.");
       setAmount(""); setMpesaNumber("");
       await load();
     } catch (e: unknown) {
@@ -136,8 +136,8 @@ export default function PortalFinance() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Withdraw settlements</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Available now: <span className="font-semibold text-foreground tabular-nums">{formatMoney(available)}</span>
-              {" "}— oldest settlements are paid out first.
+              Available now: <span className="font-semibold text-foreground tabular-nums">{formatMoney(available)}</span>.
+              {" "}Oldest settlements are paid out first.
             </p>
             {payoutAccount && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -161,7 +161,7 @@ export default function PortalFinance() {
               <label htmlFor="withdraw-mpesa" className="text-sm font-medium">M-Pesa number <span className="text-muted-foreground font-normal">(optional)</span></label>
               <input id="withdraw-mpesa" inputMode="tel" value={mpesaNumber}
                 onChange={(e) => setMpesaNumber(e.target.value)}
-                placeholder="07XX or 2547XX — defaults to saved account"
+                placeholder="07XX or 2547XX - defaults to saved account"
                 className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             </div>
             <button onClick={requestPayout} disabled={busy || !amount || Number(amount) <= 0 || Number(amount) > available}
@@ -170,7 +170,7 @@ export default function PortalFinance() {
             </button>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">Nothing available to withdraw yet — pending settlements appear here as customers confirm completed jobs.</p>
+          <p className="mt-3 text-sm text-muted-foreground">Nothing available to withdraw yet - pending settlements appear here as customers confirm completed jobs.</p>
         )}
       </div>
 
@@ -209,7 +209,7 @@ export default function PortalFinance() {
 
       <h2 className="mt-8 text-lg font-semibold tracking-tight">Monthly breakdown</h2>
       {monthly.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No monthly history yet — it builds up as jobs settle.</p>
+        <p className="mt-2 text-sm text-muted-foreground">No monthly history yet - it builds up as jobs settle.</p>
       ) : (
         <div className="mt-3 rounded-2xl border bg-card overflow-hidden overflow-x-auto">
           <table className="w-full text-sm min-w-[480px]">

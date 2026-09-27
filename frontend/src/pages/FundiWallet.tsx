@@ -244,7 +244,7 @@ export default function FundiWallet() {
 
               <div className="p-3 bg-muted/50 rounded-xl">
                 <p className="text-xs text-muted-foreground">
-                  Withdrawals are processed within 1–3 business days. A small M-Pesa transaction fee may apply.
+                  Withdrawals are processed within 1-3 business days. A small M-Pesa transaction fee may apply.
                 </p>
               </div>
 

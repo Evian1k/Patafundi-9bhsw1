@@ -30,8 +30,8 @@ interface Dispute {
 const STATUS_CONFIG: Record<DisputeStatus, { label: string; color: string; icon: React.ReactNode }> = {
   open: { label: 'Open', color: 'bg-yellow-100 text-yellow-800', icon: <Clock className="w-3.5 h-3.5" /> },
   investigating: { label: 'Investigating', color: 'bg-blue-100 text-blue-800', icon: <AlertOctagon className="w-3.5 h-3.5" /> },
-  customer_won: { label: 'Resolved — Customer', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  fundi_won: { label: 'Resolved — Fundi', color: 'bg-purple-100 text-purple-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
+  customer_won: { label: 'Resolved - Customer', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
+  fundi_won: { label: 'Resolved - Fundi', color: 'bg-purple-100 text-purple-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
   resolved: { label: 'Resolved', color: 'bg-gray-100 text-gray-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
   escalated: { label: 'Escalated', color: 'bg-red-100 text-red-800', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 };

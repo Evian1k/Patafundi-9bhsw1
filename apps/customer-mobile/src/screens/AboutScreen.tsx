@@ -61,7 +61,7 @@ export function AboutScreen({ navigation }: any): JSX.Element {
   const handleShare = async (): Promise<void> => {
     try {
       await Share.share({
-        message: `Check out PataFundi — East Africa's premier on-demand services marketplace. ${WEBSITE_URL}`,
+        message: `Check out PataFundi - East Africa's premier on-demand services marketplace. ${WEBSITE_URL}`,
         title: 'PataFundi',
       });
     } catch {

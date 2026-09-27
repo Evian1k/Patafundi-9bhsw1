@@ -129,7 +129,7 @@ export function FundiDashboard() {
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
           );
           setIsOnline(true);
-          toast.success("You are now online — visible to customers!");
+          toast.success("You are now online - visible to customers!");
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "Failed to go online");
         }
@@ -250,7 +250,7 @@ export function FundiDashboard() {
             <div className="mt-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-xl px-3 py-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <MapPin className="w-3 h-3" />
-              <span>Online — visible to nearby customers</span>
+              <span>Online - visible to nearby customers</span>
             </div>
           )}
         </motion.div>

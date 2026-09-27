@@ -173,7 +173,7 @@ export default function Bookings() {
             <CalendarDays className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-semibold mb-1">No {TABS.find((t) => t.id === tab)?.label.toLowerCase()} bookings</p>
             <p className="text-sm text-muted-foreground mb-4">
-              {tab === "active" ? "When you book a service, it will show up here." : "Nothing here yet — this fills up as you use PataFundi."}
+              {tab === "active" ? "When you book a service, it will show up here." : "Nothing here yet - this fills up as you use PataFundi."}
             </p>
             <Link to="/create-job"><Button className="bg-gradient-primary">Book a service</Button></Link>
           </div>

@@ -198,7 +198,7 @@ export default function PaymentsManagement() {
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">Job completed {item.hoursElapsed}h ago • {formatCurrency(item.amount)}</p>
                       {item.flagged && (
-                        <p className="text-xs text-red-600 font-medium mt-1">⚠ Payment overdue — potential bypass detected</p>
+                        <p className="text-xs text-red-600 font-medium mt-1">⚠ Payment overdue - potential bypass detected</p>
                       )}
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${item.flagged ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>

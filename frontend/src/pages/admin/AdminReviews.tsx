@@ -42,7 +42,7 @@ export default function AdminReviews() {
     setActing(r.id);
     try {
       await apiClient.adminHideReview(r.id, !r.hidden);
-      toast.success(!r.hidden ? "Review hidden — it no longer counts towards ratings." : "Review restored.");
+      toast.success(!r.hidden ? "Review hidden - it no longer counts towards ratings." : "Review restored.");
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Moderation failed");

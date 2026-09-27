@@ -45,7 +45,7 @@ export default function AdminSubscriptions() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-display font-bold">Subscriptions</h1>
-            <p className="text-sm text-muted-foreground">Platform subscription revenue — kept strictly separate from job commissions in finance reports.</p>
+            <p className="text-sm text-muted-foreground">Platform subscription revenue - kept strictly separate from job commissions in finance reports.</p>
           </div>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
         </div>

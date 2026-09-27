@@ -78,7 +78,7 @@ function getResolutionSuggestions(reason: string, disputeType?: string): string[
   const lower = (reason + " " + (disputeType ?? "")).toLowerCase();
   if (lower.includes("incomplete") || lower.includes("not finish")) {
     return [
-      "Issue partial refund (50%) to customer — work was started but not completed.",
+      "Issue partial refund (50%) to customer - work was started but not completed.",
       "Ask fundi to return and complete the job within 24 hours or full refund applies.",
       "Mark as customer_won and release escrow back to customer.",
     ];
@@ -87,12 +87,12 @@ function getResolutionSuggestions(reason: string, disputeType?: string): string[
     return [
       "Request photographic evidence from both parties before ruling.",
       "Issue partial refund (25%) as goodwill and mark resolved.",
-      "Assign a platform inspector to verify work quality — escalate if needed.",
+      "Assign a platform inspector to verify work quality - escalate if needed.",
     ];
   }
   if (lower.includes("no show") || lower.includes("didn't arrive") || lower.includes("late")) {
     return [
-      "Full refund to customer — fundi did not fulfil service obligation.",
+      "Full refund to customer - fundi did not fulfil service obligation.",
       "Strike against fundi profile for reliability failure.",
       "Mark as customer_won and block fundi from accepting for 48 hours.",
     ];
@@ -106,7 +106,7 @@ function getResolutionSuggestions(reason: string, disputeType?: string): string[
   }
   if (lower.includes("damage") || lower.includes("broke") || lower.includes("property")) {
     return [
-      "Escalate for full admin review — property damage claims require evidence.",
+      "Escalate for full admin review - property damage claims require evidence.",
       "Freeze fundi earnings pending investigation.",
       "Issue full refund + compensation depending on documented damage.",
     ];
@@ -115,7 +115,7 @@ function getResolutionSuggestions(reason: string, disputeType?: string): string[
     return [
       "Apply platform bypass penalty to both parties.",
       "Warn customer and reduce fundi trust score.",
-      "Issue formal strike — second offense triggers suspension.",
+      "Issue formal strike - second offense triggers suspension.",
     ];
   }
   return [
@@ -516,7 +516,7 @@ export default function AdminDisputeManagement() {
                           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-100" />
                           {!selected.timeline?.length && (selected.status === "investigating" || selected.resolution) && (
                             <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                              Status shown below is the current dispute state — no event history was recorded by the API yet.
+                              Status shown below is the current dispute state - no event history was recorded by the API yet.
                             </p>
                           )}
                           {getTimeline(selected).map((entry, idx) => {
@@ -650,7 +650,7 @@ export default function AdminDisputeManagement() {
                       <p className="text-sm text-violet-900 mt-3 whitespace-pre-wrap">{aiSummary}</p>
                     )}
                     <p className="text-[11px] text-violet-600/70 mt-2">
-                      Advisory only — generated from the dispute, job timeline and chat history. You make the final call.
+                      Advisory only - generated from the dispute, job timeline and chat history. You make the final call.
                     </p>
                   </Card>
                 )}

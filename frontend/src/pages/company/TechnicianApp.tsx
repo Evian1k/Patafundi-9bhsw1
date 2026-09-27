@@ -138,7 +138,7 @@ export default function TechnicianApp() {
           <div className="rounded-3xl border bg-card p-10 text-center">
             <Briefcase className="h-8 w-8 mx-auto text-muted-foreground" />
             <p className="mt-3 text-sm text-muted-foreground">No assigned jobs right now.</p>
-            <p className="mt-1 text-xs text-muted-foreground">Your dispatcher will assign work — it appears here instantly.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Your dispatcher will assign work - it appears here instantly.</p>
           </div>
         ) : jobs.map((j) => {
           const action = NEXT_ACTION[j.status];
