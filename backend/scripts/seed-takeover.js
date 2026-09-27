@@ -156,11 +156,12 @@ export async function seedTakeover() {
       `insert into company_profiles
          (application_id, owner_user_id, company_name, legal_name, contact_name, contact_email,
           contact_phone, registration_number, business_categories, service_areas, branches,
-          technician_count, license_details, description, status, rating, completed_jobs,
-          availability, guarantees, team_size)
+          technician_count, license_details, description, status, verification_status,
+          documents_status, rating, completed_jobs, availability, guarantees, team_size)
        values ($1, $2, 'Apex Home Services Ltd', 'Apex Home Services Limited', 'Grace Owner',
          'company.demo@patafundi.test', '254730000003', 'PVT-XYZ890', $3, $4, $5, 4,
-         'NEMA & EPRA licensed (DEMO)', $6, 'approved', 4.8, 1284, 'available', $7, 4)
+         'NEMA & EPRA licensed (DEMO)', $6, 'approved', 'under_review', 'pending', 4.8, 1284,
+         'available', $7, 4)
        returning id`,
       [appRes.rows[0].id, ids.company,
        ['plumbing', 'electrical', 'hvac', 'appliance_repair'],

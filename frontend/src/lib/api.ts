@@ -200,6 +200,11 @@ class ApiClient {
     });
   }
 
+  /** Multipart upload helper: FormData with auth, JSON response. */
+  async upload(endpoint: string, formData: FormData, method = 'POST') {
+    return this.request(endpoint, { method, body: formData });
+  }
+
   async registerFundiAccount(formData: FormData) {
     if (!isApiConfigured()) throw new ApiError(UNAVAILABLE_MSG, 0);
     const url = buildApiUrl('/auth/register/fundi');

@@ -1,6 +1,6 @@
 /** Company Settings (spec §8 MY BUSINESS) — profile, areas, branches, availability, payout destination. */
 import { useEffect, useState } from "react";
-import { Banknote, Loader2, Save } from "lucide-react";
+import { Banknote, Loader2, Save, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 interface Profile {
@@ -25,6 +25,80 @@ export default function PortalSettings() {
   const [payout, setPayout] = useState({ method: "mpesa", mpesaNumber: "", bankName: "", bankAccount: "", accountName: "" });
   const [payoutMasked, setPayoutMasked] = useState<string | null>(null);
   const [payoutSaving, setPayoutSaving] = useState(false);
+  // Verification & documents (spec sections 19-21) + branding (section 20)
+  const [docs, setDocs] = useState<{
+    documents: { id: string; documentType: string; status: string; originalName?: string; rejectionReason?: string | null }[];
+    requiredDocuments: string[];
+    missingDocuments: string[];
+    verificationStatus: string;
+  } | null>(null);
+  const [docBusy, setDocBusy] = useState(false);
+  const [brandingBusy, setBrandingBusy] = useState(false);
+
+  const loadDocs = async () => {
+    try {
+      const res = await apiClient.request("/company/documents") as {
+        documents?: { id: string; documentType: string; status: string; originalName?: string; rejectionReason?: string | null }[];
+        requiredDocuments?: string[];
+        missingDocuments?: string[];
+        verificationStatus?: string;
+      };
+      setDocs({
+        documents: res.documents || [],
+        requiredDocuments: res.requiredDocuments || [],
+        missingDocuments: res.missingDocuments || [],
+        verificationStatus: res.verificationStatus || "unverified",
+      });
+    } catch {
+      setDocs(null);
+    }
+  };
+
+  useEffect(() => { loadDocs(); }, []);
+
+  const uploadDocument = async (documentType: string, file: File) => {
+    setDocBusy(true); setNotice(null);
+    try {
+      const fd = new FormData();
+      fd.append("document", file);
+      fd.append("documentType", documentType);
+      await apiClient.upload("/company/documents", fd);
+      await loadDocs();
+      setNotice(`${documentType.replace(/_/g, " ")} uploaded for review.`);
+    } catch (e: unknown) {
+      setNotice(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
+  const submitVerification = async () => {
+    setDocBusy(true); setNotice(null);
+    try {
+      await apiClient.request("/company/verification/submit", { method: "POST" });
+      await loadDocs();
+      setNotice("Submitted for verification. Our team will review your documents and notify you.");
+    } catch (e: unknown) {
+      setNotice(e instanceof Error ? e.message : "Submission failed");
+    } finally {
+      setDocBusy(false);
+    }
+  };
+
+  const uploadBranding = async (field: "logo" | "cover", file: File) => {
+    setBrandingBusy(true); setNotice(null);
+    try {
+      const fd = new FormData();
+      fd.append(field, file);
+      const res = await apiClient.upload("/company/branding", fd) as { branding?: { logoUrl?: string } };
+      if (res?.branding?.logoUrl) setProfile((p) => (p ? { ...p, logoUrl: res.branding!.logoUrl } : p));
+      setNotice(field === "logo" ? "Logo updated." : "Profile image updated.");
+    } catch (e: unknown) {
+      setNotice(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBrandingBusy(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -154,6 +228,79 @@ export default function PortalSettings() {
             <div><p className="font-medium text-foreground capitalize">Status</p>{profile.verificationStatus || "Not set"}</div>
             <div><p className="font-medium text-foreground">Rating</p>{profile.rating?.toFixed(1) || "Not set"}</div>
             <div><p className="font-medium text-foreground">Completed jobs</p>{(profile.completedJobs || 0).toLocaleString()}</div>
+          </div>
+        )}
+
+        {/* ── Branding: logo + profile image (spec section 20) ── */}
+        {canEdit && (
+          <div className="rounded-2xl border p-4">
+            <p className="text-sm font-medium">Company images</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Upload your logo and a profile image. These appear on your public profile and booking cards.
+            </p>
+            <div className="mt-3 grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium">Logo</label>
+                <input type="file" accept="image/*" disabled={brandingBusy}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBranding("logo", f); }}
+                  className="mt-1 block w-full text-xs" />
+              </div>
+              <div>
+                <label className="text-xs font-medium">Profile / cover image</label>
+                <input type="file" accept="image/*" disabled={brandingBusy}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBranding("cover", f); }}
+                  className="mt-1 block w-full text-xs" />
+              </div>
+            </div>
+            {brandingBusy && <Loader2 className="mt-2 h-4 w-4 animate-spin text-primary" />}
+          </div>
+        )}
+
+        {/* ── Verification & documents (spec sections 19-21) ── */}
+        {canEdit && docs && (
+          <div className="rounded-2xl border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium">Verification documents</p>
+                <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+                  Verification status: {docs.verificationStatus.replace(/_/g, " ")}
+                </p>
+              </div>
+              <button onClick={submitVerification} disabled={docBusy || docs.missingDocuments.length > 0}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
+                {docBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                Submit for verification
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {docs.requiredDocuments.map((type) => {
+                const existing = docs.documents.find((d) => d.documentType === type);
+                return (
+                  <div key={type} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm capitalize">{type.replace(/_/g, " ")}</p>
+                      <p className={`text-xs ${existing?.status === "verified" ? "text-emerald-600" : existing?.status === "rejected" ? "text-red-500" : "text-muted-foreground"}`}>
+                        {existing
+                          ? existing.status === "verified" ? "Verified"
+                            : existing.status === "rejected" ? `Rejected${existing.rejectionReason ? `: ${existing.rejectionReason}` : ""}`
+                            : existing.status.replace(/_/g, " ")
+                          : "Not uploaded"}
+                      </p>
+                    </div>
+                    {(!existing || ["rejected", "reupload_requested"].includes(existing.status)) && (
+                      <input type="file" accept="image/*,application/pdf" disabled={docBusy}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDocument(type, f); }}
+                        className="text-xs" />
+                    )}
+                  </div>
+                );
+              })}
+              {docs.missingDocuments.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Upload every required document to enable submission. Missing: {docs.missingDocuments.map((t) => t.replace(/_/g, " ")).join(", ")}.
+                </p>
+              )}
+            </div>
           </div>
         )}
 

@@ -1,9 +1,37 @@
 export type UserRole = 'customer' | 'fundi' | 'admin' | 'staff';
 export type UserStatus = 'active' | 'pending' | 'suspended' | 'banned';
 export interface User { id: string; email: string; fullName: string; phone: string | null; role: UserRole; status: UserStatus; trustScore: number; avatarUrl?: string | null; createdAt?: string; }
-export type JobStatus = 'matching' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'failed' | 'disputed';
+export type JobStatus =
+  | 'pending' | 'matching' | 'quote_requested' | 'offered' | 'accepted'
+  | 'booking_confirmed' | 'assigned' | 'scheduled'
+  | 'on_the_way' | 'arrived' | 'in_progress' | 'completion_requested'
+  | 'customer_confirmed_completion' | 'payment_pending' | 'payment_processing'
+  | 'payment_confirmed' | 'completed' | 'closed'
+  | 'cancelled' | 'failed' | 'expired' | 'disputed' | 'refund_requested' | 'refunded';
 export type Urgency = 'normal' | 'emergency';
-export interface Job { id: string; customerId: string; fundiId: string | null; serviceCategory: string; description: string; estimatedPrice: number | null; finalPrice: number | null; status: JobStatus; urgency: Urgency; customerLatitude: number | null; customerLongitude: number | null; customerAddress: string | null; fundiName?: string | null; customerName?: string | null; customer_completion_confirmed?: boolean; hasReview?: boolean; createdAt: string; acceptedAt?: string | null; completedAt?: string | null; }
+export interface Job { id: string; customerId: string; fundiId: string | null; bookingNumber?: string | null; serviceCategory: string; description: string; estimatedPrice: number | null; finalPrice: number | null; status: JobStatus; urgency: Urgency; customerLatitude: number | null; customerLongitude: number | null; customerAddress: string | null; fundiName?: string | null; customerName?: string | null; customer_completion_confirmed?: boolean; hasReview?: boolean; createdAt: string; acceptedAt?: string | null; completedAt?: string | null; }
+export interface Quote {
+  id: string;
+  jobId: string;
+  companyId: string | null;
+  fundiId: string | null;
+  serviceCategory?: string | null;
+  description?: string | null;
+  amount: number;
+  currency: string;
+  laborAmount: number | null;
+  materialsAmount: number | null;
+  additionalCharges: Array<{ label: string; amount: number }>;
+  estimatedDurationHours: number | null;
+  notes: string | null;
+  expiresAt: string | null;
+  status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+  companyName?: string | null;
+  bookingNumber?: string | null;
+  questionThread: Array<{ from: string; text: string; at: string }>;
+  createdAt: string;
+}
+
 export interface JobLocation { jobId: string; latitude: number; longitude: number; accuracy?: number; recordedAt: string; }
 export interface Message { id: string; jobId: string; senderId: string; senderName?: string; text: string; type: 'text' | 'image' | 'system'; readAt?: string | null; createdAt: string; }
 export interface SavedPlace { id: string; label: string; address: string; latitude: number; longitude: number; }

@@ -20,6 +20,12 @@ export function notFound(message = 'Not found') {
   return error;
 }
 
+export function conflict(message = 'Conflict') {
+  const error = new Error(message);
+  error.status = 409;
+  return error;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function parseUuid(value, label = 'id') {

@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api";
 import { MapPin, Briefcase, BriefcaseBusiness, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import BackBar from "@/components/layout/BackBar";
 
 interface CareerJob {
   id: string;
@@ -86,6 +87,7 @@ export default function Careers() {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-4xl">
+        <BackBar to="/" fallback="/" label="Home" className="mb-4" />
         <div className="mb-10">
           <h1 className="text-4xl font-display font-bold mb-3">Careers at PataFundi</h1>
           <p className="text-muted-foreground text-lg">

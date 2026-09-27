@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import Markdown from "@/components/content/Markdown";
 import { apiClient } from "@/lib/api";
+import BackBar from "@/components/layout/BackBar";
 
 type PolicySection = { id: string; title: string; content: string; order: number };
 type Policy = { slug: string; title: string; version: string; updated_at?: string; sections: PolicySection[] };
@@ -33,6 +34,7 @@ export default function PolicyPage({ slug: slugProp }: { slug?: string }) {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-3xl">
+        <BackBar to="/" fallback="/" label="Home" className="mb-4" />
         {loading ? (
           <div className="space-y-4">
             {[1,2,3].map(i => <div key={i} className="h-8 bg-muted rounded animate-shimmer" />)}

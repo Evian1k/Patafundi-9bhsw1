@@ -6,6 +6,7 @@ import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 import { emitEvent } from '../realtime.js';
+import { createQuote, listQuotesForJob } from '../services/quoteService.js';
 import {
   requireCompanyMember,
   getMembership,
@@ -309,7 +310,10 @@ export async function publicCompanyDirectory(req, res) {
   // (when the platform requires it) subscription-paid. Uneligible companies
   // never appear as available.
   const requireSub = String(process.env.REQUIRE_COMPANY_SUBSCRIPTION || '').toLowerCase() === 'true';
-  let where = `where cp.status = 'approved'`;
+  // Spec section 47: a company must not appear bookable merely because it
+  // exists. Bookability = approved + document-verified + (subscription when
+  // required) + not suspended. Verification comes from the document workflow.
+  let where = `where cp.status = 'approved' and cp.verification_status = 'verified'`;
   if (category) {
     params.push(category);
     where += ` and $${params.length} = any(cp.business_categories)`;
@@ -462,11 +466,12 @@ export async function portalOverview(req, res) {
   const companyId = req.company.id;
   const stats = await query(
     `select
-       count(*) filter (where status in ('pending','matching','scheduled')) as incoming,
+       count(*) filter (where status in ('pending','matching','quote_requested','scheduled','booking_confirmed')) as incoming,
        count(*) filter (where status in ('accepted','assigned','offered')) as awaiting_dispatch,
+       count(*) filter (where status = 'offered') as pending_quotes,
        count(*) filter (where status in ('on_the_way','arrived','in_progress')) as active,
        count(*) filter (where status = 'completion_requested') as awaiting_confirmation,
-       count(*) filter (where status = 'completed') as completed,
+       count(*) filter (where status in ('completed','closed')) as completed,
        count(*) filter (where status = 'cancelled') as cancelled
      from jobs where company_id = $1`,
     [companyId],
@@ -727,7 +732,7 @@ export async function portalRemoveMember(req, res) {
 }
 
 // ── Jobs: scoped lists + dispatch ──
-const JOB_LIST_FIELDS = `j.id, j.status, j.provider_type, j.service_category, j.description, j.urgency,
+const JOB_LIST_FIELDS = `j.id, j.booking_number, j.status, j.provider_type, j.service_category, j.description, j.urgency,
   j.location_name, j.customer_latitude, j.customer_longitude, j.estimated_price, j.final_price,
   j.scheduled_at, j.payment_status, j.escrow_status, j.company_job_ref, j.created_at, j.updated_at,
   u.full_name as customer_name, u.phone as customer_phone,
@@ -756,21 +761,73 @@ export async function portalJobs(req, res) {
   res.json({ success: true, jobs: result.rows });
 }
 
-// Open pool: company jobs not yet claimed by any company (marketplace-wide)
+// Open pool: company jobs not yet claimed by any company (marketplace-wide).
+// Root-cause fix (spec section 28): the old category filter used an UNTYPED
+// array parameter (`any($2)`); when a company had no business categories the
+// driver sent an empty array whose type PostgreSQL could not infer, failing
+// with "could not determine data type of parameter $1/$2". The filter is now
+// built conditionally with an explicit ::text[] cast. Eligibility is enforced
+// server-side: only approved+verified companies reach this handler (portal
+// access middleware), the pool only contains unclaimed provider_type='company'
+// jobs, and declared service areas narrow the result when both sides have
+// location data.
 export async function portalOpenPool(req, res) {
   const company = req.company;
+  if (!company?.id) throw forbidden('Company context is required');
+  const categories = (company.business_categories || []).map((c) => String(c));
+  const areas = (company.service_areas || []).map((a) => String(a));
+  // ROOT CAUSE (verified by regression test): the pool query passed
+  // company.id as $1 but never referenced it in the SQL. PGlite must infer
+  // every supplied parameter's type from the query; an unused parameter has
+  // no context, so prepare failed with "could not determine data type of
+  // parameter $1". Only parameters that are actually referenced are bound now,
+  // each with an explicit ::text[] cast so empty arrays infer cleanly.
+  const params = [];
+  let categoryFilter = '';
+  if (categories.length) {
+    params.push(categories);
+    categoryFilter = ` and j.service_category = any($${params.length}::text[])`;
+  }
+  let areaFilter = '';
+  if (areas.length) {
+    params.push(areas);
+    const n = params.length;
+    // Jobs with a known location must fall inside a declared service area;
+    // jobs without location data cannot be area-filtered (honest inclusion).
+    areaFilter = ` and (j.location_name is null or j.location_name = ''
+      or j.location_name ilike any($${n}::text[])
+      or exists (select 1 from unnest($${n}::text[]) as a where j.location_name ilike '%' || a || '%'))`;
+  }
   const result = await query(
-    `select j.id, j.status, j.provider_type, j.service_category, j.description, j.urgency,
+    `select j.id, j.booking_number, j.status, j.provider_type, j.service_category, j.description, j.urgency,
        j.location_name, j.estimated_price, j.scheduled_at, j.created_at,
        u.full_name as customer_name
      from jobs j left join users u on u.id = j.customer_id
      where j.provider_type = 'company' and j.company_id is null
-       and j.status in ('pending','matching')
-       and (j.service_category = any($2) or cardinality($2) = 0)
+       and j.status in ('pending','matching','quote_requested')
+       ${categoryFilter}
+       ${areaFilter}
      order by j.urgency = 'emergency' desc, j.created_at asc limit 50`,
-    [company.id, company.business_categories?.length ? company.business_categories : []],
+    params,
   );
   res.json({ success: true, jobs: result.rows });
+}
+
+// Company quote list (spec section 2): every quote this company has sent.
+export async function portalQuotes(req, res) {
+  const company = req.company;
+  if (!company?.id) throw forbidden('Company context is required');
+  const rows = await query(
+    `select q.*, j.booking_number, j.service_category as job_service_category, j.status as job_status,
+            u.full_name as customer_name
+     from quotes q
+     left join jobs j on j.id = q.job_id
+     left join users u on u.id = q.customer_id
+     where q.company_id = $1
+     order by q.created_at desc limit 100`,
+    [company.id],
+  );
+  res.json({ success: true, quotes: rows.rows });
 }
 
 export async function claimPoolJob(req, res) {
@@ -803,8 +860,8 @@ export async function acceptCompanyJob(req, res) {
   await query(
     `insert into notifications (user_id, type, title, body, data)
      values ($1, 'job_accepted', 'Job Accepted', $2, $3::jsonb)`,
-    [job.customer_id, `${req.company.company_name} has accepted your ${job.service_category} request.`,
-     JSON.stringify({ jobId: job.id })],
+    [job.customer_id, `${req.company.company_name} has accepted your ${job.service_category} request (${job.booking_number}).`,
+     JSON.stringify({ jobId: job.id, bookingNumber: job.booking_number })],
   );
   emitEvent('job:accepted', { jobId: job.id, companyName: req.company.company_name }, `job:${job.id}`);
   await recordJobTimeline(job.id, 'company_accepted', req.user.id, req.user.role);
@@ -828,28 +885,39 @@ export async function rejectCompanyJob(req, res) {
   res.json({ success: true });
 }
 
-// Company quote for inspection/complex jobs (spec §22): sets price + status offered
+// Company quote for inspection/complex jobs (spec §22 + quote spec §2): creates
+// a real Quote entity (itemized charges, duration, notes, expiry) and moves the
+// booking into the quote-review phase. A quote NEVER completes a job - the
+// customer must accept it first (backend-enforced by the state machine).
 export async function quoteCompanyJob(req, res) {
   if (!COMPANY_DISPATCH_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
-  const amount = Number(req.body?.amount);
-  if (!Number.isFinite(amount) || amount <= 0) throw badRequest('A valid quote amount is required');
-  const result = await query(
-    `update jobs set estimated_price = $2, status = 'offered', updated_at = now()
-     where id = $1 and company_id = $3 and status in ('pending','accepted','matching','scheduled')
-     returning *`,
-    [req.params.jobId, amount, req.company.id],
+  const own = await query(
+    `select id from jobs where id = $1 and company_id = $2`,
+    [req.params.jobId, req.company.id],
   );
-  if (!result.rows[0]) throw badRequest('Job cannot be quoted in its current state');
-  const job = result.rows[0];
-  await query(
-    `insert into notifications (user_id, type, title, body, data)
-     values ($1, 'job_quote', 'New Quote Received', $2, $3::jsonb)`,
-    [job.customer_id, `${req.company.company_name} quoted KES ${amount.toLocaleString()} for your ${job.service_category} job. Review it to approve work.`,
-     JSON.stringify({ jobId: job.id, amount })],
-  );
-  emitEvent('job:quote', { jobId: job.id, amount }, `job:${job.id}`);
-  await recordJobTimeline(job.id, 'quote_sent', req.user.id, req.user.role, { amount });
-  res.json({ success: true, job });
+  if (!own.rows[0]) throw badRequest('Job cannot be quoted in its current state');
+  const b = req.body || {};
+  const additionalCharges = Array.isArray(b.additionalCharges)
+    ? b.additionalCharges
+      .map((c) => ({ label: String(c?.label || 'Charge').slice(0, 120), amount: Number(c?.amount) || 0 }))
+      .filter((c) => c.amount > 0)
+    : [];
+  const actor = { ...req.user, companyRoles: [req.companyMembership.role] };
+  const quote = await createQuote({
+    jobId: req.params.jobId,
+    actor,
+    companyId: req.company.id,
+    amount: b.amount,
+    currency: b.currency || 'KES',
+    laborAmount: b.laborAmount != null ? Number(b.laborAmount) : null,
+    materialsAmount: b.materialsAmount != null ? Number(b.materialsAmount) : null,
+    additionalCharges,
+    estimatedDurationHours: b.estimatedDurationHours != null ? Number(b.estimatedDurationHours) : null,
+    notes: b.notes ? String(b.notes).slice(0, 2000) : null,
+    attachments: Array.isArray(b.attachments) ? b.attachments.slice(0, 10) : [],
+    expiresInHours: b.expiresInHours != null ? Number(b.expiresInHours) : 72,
+  });
+  res.json({ success: true, quote, job: (await query('select * from jobs where id = $1', [req.params.jobId])).rows[0] });
 }
 
 // DISPATCH (spec §10): assign a technician belonging to THIS company only
@@ -871,7 +939,7 @@ export async function assignTechnician(req, res) {
     `update jobs set
        fundi_id = $2, technician_user_id = $2, assigned_by = $3,
        status = 'assigned', updated_at = now()
-     where id = $1 and company_id = $4 and status in ('accepted','offered','scheduled','matching','pending')
+     where id = $1 and company_id = $4 and status in ('accepted','booking_confirmed','offered','scheduled','matching','pending')
      returning *`,
     [req.params.jobId, tech.user_id, req.user.id, req.company.id],
   );
@@ -881,13 +949,13 @@ export async function assignTechnician(req, res) {
     `insert into notifications (user_id, type, title, body, data)
      values ($1, 'job_assignment', 'New Job Assignment', $2, $3::jsonb)`,
     [tech.user_id, `You have been assigned a ${job.service_category} job at ${job.location_name}.`,
-     JSON.stringify({ jobId: job.id })],
+     JSON.stringify({ jobId: job.id, bookingNumber: job.booking_number })],
   );
   await query(
     `insert into notifications (user_id, type, title, body, data)
      values ($1, 'job_assigned', 'Technician Assigned', $2, $3::jsonb)`,
-    [job.customer_id, `${tech.full_name} from ${req.company.company_name} will handle your ${job.service_category} job.`,
-     JSON.stringify({ jobId: job.id, technicianName: tech.full_name })],
+    [job.customer_id, `${tech.full_name} from ${req.company.company_name} will handle your ${job.service_category} job (${job.booking_number}).`,
+     JSON.stringify({ jobId: job.id, technicianName: tech.full_name, bookingNumber: job.booking_number })],
   );
   emitEvent('job:assigned', { jobId: job.id, technicianName: tech.full_name }, `job:${job.id}`);
   emitEvent('job:assigned', { jobId: job.id }, `user:${tech.user_id}`);

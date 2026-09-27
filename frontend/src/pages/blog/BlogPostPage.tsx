@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import BackBar from "@/components/layout/BackBar";
 import SiteLayout from "@/components/layout/SiteLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
@@ -93,6 +94,7 @@ export default function BlogPostPage() {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-3xl">
+          <BackBar to="/blog" fallback="/blog" label="Blog" className="mb-4" />
         <Link
           to="/blog"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"

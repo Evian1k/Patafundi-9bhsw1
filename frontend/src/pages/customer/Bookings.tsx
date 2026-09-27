@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarDays, ChevronRight, RefreshCw, Wrench } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, RefreshCw, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import BackBar from "@/components/layout/BackBar";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
+import { classifyCustomerBooking, isQuotePhase, statusLabel } from "@/lib/bookingStatus";
 
 type JobRow = {
   id: string;
@@ -13,6 +14,9 @@ type JobRow = {
   description?: string | null;
   service_category?: string | null;
   status?: string | null;
+  statusLabel?: string | null;
+  booking_number?: string | null;
+  bookingNumber?: string | null;
   estimated_price?: number | string | null;
   location_name?: string | null;
   created_at?: string | null;
@@ -29,25 +33,13 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "disputed", label: "Disputed" },
 ];
 
-const ACTIVE_STATUSES = [
-  "pending", "matching", "searching", "matched", "accepted",
-  "on_the_way", "arrived", "in_progress", "awaiting_confirmation",
-];
-
-function classify(job: JobRow): TabId {
-  const s = String(job.status || "").toLowerCase();
-  if (s === "disputed" || s === "dispute_open") return "disputed";
-  if (s === "completed") return "completed";
-  if (s === "cancelled" || s === "failed" || s === "expired") return "cancelled";
-  if (s === "scheduled" || (!ACTIVE_STATUSES.includes(s) && job.scheduled_at)) return "scheduled";
-  if (ACTIVE_STATUSES.includes(s)) return "active";
-  return "completed";
-}
-
-const statusLabel = (s?: string | null) =>
-  String(s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// Status classification comes from the shared taxonomy (lib/bookingStatus).
+// A quoted booking (status 'offered') is ACTIVE with a quote to review - it
+// must never silently land in the Completed tab.
+const bookingNumber = (job: JobRow) => job.booking_number || job.bookingNumber || null;
 
 function JobCard({ job }: { job: JobRow }) {
+  const quoted = isQuotePhase(job.status);
   return (
     <Link
       to={`/job/${job.id}/tracking`}
@@ -62,6 +54,9 @@ function JobCard({ job }: { job: JobRow }) {
             <p className="font-semibold text-sm truncate">
               {job.title || job.service_category || "Service job"}
             </p>
+            {bookingNumber(job) && (
+              <p className="text-[11px] font-mono text-muted-foreground">{bookingNumber(job)}</p>
+            )}
             <p className="text-xs text-muted-foreground truncate">
               {job.description || job.location_name || "No details provided"}
             </p>
@@ -72,6 +67,11 @@ function JobCard({ job }: { job: JobRow }) {
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <span className="text-xs font-semibold px-2 py-1 rounded-full bg-muted">{statusLabel(job.status)}</span>
+          {quoted && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+              <FileText className="w-3 h-3" /> Quote to review
+            </span>
+          )}
           {job.estimated_price != null && (
             <span className="text-xs text-muted-foreground">KES {Number(job.estimated_price).toLocaleString()}</span>
           )}
@@ -125,7 +125,7 @@ export default function Bookings() {
 
   const grouped = useMemo(() => {
     const map: Record<TabId, JobRow[]> = { active: [], scheduled: [], completed: [], cancelled: [], disputed: [] };
-    (jobs || []).forEach((j) => map[classify(j)].push(j));
+    (jobs || []).forEach((j) => map[classifyCustomerBooking(j.status, j.scheduled_at)].push(j));
     return map;
   }, [jobs]);
 

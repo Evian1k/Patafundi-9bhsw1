@@ -298,21 +298,62 @@ export async function help(_req, res) {
   res.json({
     success: true,
     categories: [
-      { id: 'customers', title: 'Customers' },
-      { id: 'fundis', title: 'Fundis' },
-      { id: 'payments', title: 'Payments and escrow' },
+      { id: 'bookings', title: 'Bookings' },
+      { id: 'quotes', title: 'Quotes' },
+      { id: 'payments', title: 'Payments' },
+      { id: 'refunds', title: 'Refunds' },
+      { id: 'cancellations', title: 'Cancellations' },
       { id: 'safety', title: 'Safety' },
-      { id: 'account', title: 'Account' },
+      { id: 'accounts', title: 'Accounts' },
+      { id: 'fundis', title: 'Fundis' },
+      { id: 'companies', title: 'Companies' },
+      { id: 'reviews', title: 'Reviews' },
+      { id: 'disputes', title: 'Disputes' },
+      { id: 'location', title: 'Location' },
+      { id: 'notifications', title: 'Notifications' },
     ],
     faqs: [
-      { id: 'faq-1', question: 'How is payment protected?', answer: 'Customer payments are held in escrow until completion is confirmed. The fundi only gets paid after you confirm the job is done.', category: 'payments' },
-      { id: 'faq-2', question: 'Can I pay outside PataFundi?', answer: 'No. Off-platform payments are blocked to protect both sides. Sharing phone numbers or M-Pesa details in chat triggers fraud alerts.', category: 'payments' },
-      { id: 'faq-3', question: 'How do I hire a fundi?', answer: 'Create a job with your service category, location, and description. Nearby approved fundis will be matched automatically.', category: 'customers' },
-      { id: 'faq-4', question: 'How do I become a fundi?', answer: 'Register at /register/fundi, upload your ID and selfie, verify your email with OTP, and wait for admin approval.', category: 'fundis' },
-      { id: 'faq-5', question: 'How long does fundi approval take?', answer: 'Usually within 24 hours. You will receive an email notification once your application is reviewed.', category: 'fundis' },
-      { id: 'faq-6', question: 'Is my data safe?', answer: 'Yes. Your ID documents are stored in a private bucket with signed URLs. Only admin staff can view them. All access is logged.', category: 'safety' },
-      { id: 'faq-7', question: 'How do I reset my password?', answer: 'Click "Forgot password" on the login page. You will receive a 6-digit code via email to reset your password.', category: 'account' },
-      { id: 'faq-8', question: 'What if I have a dispute with a fundi?', answer: 'File a dispute from your job page. Our support team will review it and the escrow will be frozen until resolution.', category: 'customers' },
+      // Bookings
+      { id: 'faq-booking-1', question: 'How do I book a service?', answer: 'Pick a service, describe your problem, add photos, choose your location and time, then confirm. You can book an individual fundi or a company - both are verified through the platform.', category: 'bookings' },
+      { id: 'faq-booking-2', question: 'What is a booking number?', answer: 'Every booking gets a permanent number like PF-2026-000001 when it is created. Quote it when contacting support, reference it in receipts, disputes and payments - it identifies your booking across the whole platform.', category: 'bookings' },
+      { id: 'faq-booking-3', question: 'How do I track my booking?', answer: 'Open the booking from My Bookings. You see live status: quote review, booking confirmed, professional on the way, checked in, work in progress, completion confirmation and payment.', category: 'bookings' },
+      { id: 'faq-booking-4', question: 'When is a booking actually completed?', answer: 'Only after the real work: the professional finishes, requests completion, you verify the work and confirm with the one-time code, and payment is finalized. A price quote is never a completed job.', category: 'bookings' },
+      // Quotes
+      { id: 'faq-quote-1', question: 'I received a quote - what do I do?', answer: 'Open the booking from your notification or My Bookings. You will see the quote from the company or professional: total price, breakdown, estimated duration, notes and expiry. You can accept it, decline it, or ask a question before deciding.', category: 'quotes' },
+      { id: 'faq-quote-2', question: 'Does receiving a quote mean the job is done?', answer: 'No. A quote is only a proposed price. The booking only moves forward when you accept the quote, and the job is only completed after the work is performed and you confirm it.', category: 'quotes' },
+      { id: 'faq-quote-3', question: 'What happens if I decline a quote?', answer: 'The quote is marked declined and your booking stays open - you can receive another quote, cancel the booking, or ask support to step in. Nothing is charged for declining.', category: 'quotes' },
+      { id: 'faq-quote-4', question: 'Do quotes expire?', answer: 'Yes. Every quote carries an expiry time set by the provider (72 hours by default). Expired quotes are marked expired automatically and the booking stays available.', category: 'quotes' },
+      // Payments
+      { id: 'faq-pay-1', question: 'How is payment protected?', answer: 'Customer payments are held in escrow until completion is confirmed. The fundi or company is only paid after you confirm the job is done with your one-time confirmation code.', category: 'payments' },
+      { id: 'faq-pay-2', question: 'Can I pay outside PataFundi?', answer: 'No. Off-platform payments are blocked to protect both sides. Sharing phone numbers or M-Pesa details in chat triggers fraud alerts and can lead to suspension.', category: 'payments' },
+      { id: 'faq-pay-3', question: 'Which payment methods are supported?', answer: 'M-Pesa is supported in Kenya, with Stripe for card payments where configured. Your available methods are shown at checkout.', category: 'payments' },
+      // Refunds
+      { id: 'faq-refund-1', question: 'How do I request a refund?', answer: 'Open the completed booking and use the refund request option, or contact support. Requests are reviewed by our team: REQUESTED, UNDER_REVIEW, APPROVED or REJECTED, then PROCESSING and REFUNDED.', category: 'refunds' },
+      { id: 'faq-refund-2', question: 'When do refunds apply?', answer: 'Refunds apply when work was not performed as agreed, was incomplete, or the charge was incorrect. Each case is investigated with the evidence you provide.', category: 'refunds' },
+      // Cancellations
+      { id: 'faq-cancel-1', question: 'How do I cancel a booking?', answer: 'Open the booking and use Cancel. Bookings can be cancelled while they are still pending, in matching or in the quote phase. Once work has started, use support or a dispute instead.', category: 'cancellations' },
+      { id: 'faq-cancel-2', question: 'What happens if the professional cancels?', answer: 'The booking returns to matching and other professionals can accept it. Repeated cancellations by a provider lower their standing on the platform.', category: 'cancellations' },
+      // Safety
+      { id: 'faq-safety-1', question: 'Is my data safe?', answer: 'Yes. Your ID documents are stored privately with signed-URL access. Only authorized verification staff can view them, every access is logged, and OCR never auto-approves a document.', category: 'safety' },
+      { id: 'faq-safety-2', question: 'What should I do in an emergency?', answer: 'Contact your local emergency service first. PataFundi is not an emergency-response organization. Then notify support so we can act on the account involved.', category: 'safety' },
+      // Accounts
+      { id: 'faq-account-1', question: 'How do I reset my password?', answer: 'Click "Forgot password" on the login page. You will receive a 6-digit code to reset your password.', category: 'accounts' },
+      { id: 'faq-account-2', question: 'How do I delete my account or export my data?', answer: 'Contact support with an account-data request. You can request a copy of your data or deletion of your account, subject to legal record-keeping obligations.', category: 'accounts' },
+      // Fundis
+      { id: 'faq-fundi-1', question: 'How do I become a fundi?', answer: 'Register as a fundi, upload your ID and a selfie for verification, pick your skills and service area, and wait for admin review. Your profile shows Pending until verification completes.', category: 'fundis' },
+      { id: 'faq-fundi-2', question: 'What do verification badges mean?', answer: 'ID Verified means your government ID passed document verification. Skill Verified means your trade qualifications were checked. Badges only appear after real checks - never just for uploading a photo.', category: 'fundis' },
+      // Companies
+      { id: 'faq-company-1', question: 'How does a company join PataFundi?', answer: 'Submit a partner application with your business details, upload your business registration and owner identification documents, then submit for verification. An admin reviews the documents before your company is verified and listed.', category: 'companies' },
+      { id: 'faq-company-2', question: 'Why is a company not bookable?', answer: 'A company only appears bookable when it is approved, document-verified, active and (where required) has a valid subscription. Anything else and it will not appear in the marketplace.', category: 'companies' },
+      // Reviews
+      { id: 'faq-review-1', question: 'Who can leave a review?', answer: 'Only customers with a completed, confirmed booking can review the provider. Fake, duplicate or self-reviews are blocked, and providers can post one public reply to each review.', category: 'reviews' },
+      // Disputes
+      { id: 'faq-dispute-1', question: 'What if I have a dispute?', answer: 'File a dispute from your booking page with evidence. Our team investigates, escrow can be frozen while a case is open, and outcomes include refunds, partial refunds or dismissal.', category: 'disputes' },
+      { id: 'faq-dispute-2', question: 'Can professionals open disputes?', answer: 'Yes. Fundis and companies can report false complaints, payment issues, customer misconduct and cancellation issues through the same dispute system.', category: 'disputes' },
+      // Location
+      { id: 'faq-location-1', question: 'Why do you need my location?', answer: 'Location powers nearby matching and accurate arrival tracking. You can grant permission, search manually instead, or continue without it - matching still works, just without distance ranking.', category: 'location' },
+      // Notifications
+      { id: 'faq-notif-1', question: 'What notifications will I get?', answer: 'Booking updates (quote received, accepted, on the way, started, completion requested, payment confirmed), replies to your messages, dispute and verification updates, and security alerts. You can read them all in the notifications page.', category: 'notifications' },
     ],
   });
 }

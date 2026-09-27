@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BadgeCheck, Briefcase, CheckCircle2, Clock,
-  Star, TrendingUp, UserCheck, Users, Wallet,
+  FileText, Star, TrendingUp, UserCheck, Users, Wallet,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useOutletContext } from "react-router-dom";
@@ -85,6 +85,7 @@ export default function PortalDashboard() {
   const cards = [
     { label: "Incoming", value: s.incoming, icon: Clock, tone: "text-amber-600 bg-amber-500/10" },
     { label: "Awaiting dispatch", value: s.awaiting_dispatch, icon: UserCheck, tone: "text-violet-600 bg-violet-500/10" },
+    { label: "Quotes pending", value: s.pending_quotes, icon: FileText, tone: "text-sky-600 bg-sky-500/10" },
     { label: "Active jobs", value: s.active, icon: Activity, tone: "text-cyan-600 bg-cyan-500/10" },
     { label: "Awaiting confirmation", value: s.awaiting_confirmation, icon: BadgeCheck, tone: "text-orange-600 bg-orange-500/10" },
     { label: "Completed", value: s.completed, icon: CheckCircle2, tone: "text-primary bg-primary/10" },

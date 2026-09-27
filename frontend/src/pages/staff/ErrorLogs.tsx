@@ -51,7 +51,13 @@ export default function ErrorLogs() {
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [resolvedFilter, setResolvedFilter] = useState<string>("false");
-  const [referenceQuery, setReferenceQuery] = useState("");
+  const [referenceQuery, setReferenceQuery] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("ref") || "";
+    } catch {
+      return "";
+    }
+  });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolving, setResolving] = useState<string | null>(null);
 

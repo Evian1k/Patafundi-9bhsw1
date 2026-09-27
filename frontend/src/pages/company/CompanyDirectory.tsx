@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeCheck, Building2, ChevronRight, MapPin, Search, Star, Users } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import BackBar from "@/components/layout/BackBar";
 
 interface DirectoryCompany {
   id: string; companyName: string; description?: string; logoUrl?: string;
@@ -52,6 +53,7 @@ export default function CompanyDirectory() {
 
   return (
     <div className="min-h-screen bg-background">
+      <BackBar to="/" fallback="/" label="Home" className="mx-4 mt-3 max-w-6xl md:mx-auto" />
       <header className="border-b sticky top-0 z-30 bg-background/80 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="font-semibold tracking-tight shrink-0">PataFundi <span className="text-emerald-500">Companies</span></Link>

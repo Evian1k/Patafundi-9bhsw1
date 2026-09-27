@@ -21,14 +21,16 @@ import {
 } from '@patafundi/shared';
 import type { Job } from '@patafundi/shared';
 
-type FilterKey = 'all' | 'matching' | 'accepted' | 'in_progress' | 'completed';
+import { CUSTOMER_ACTIVE_JOB_STATUSES, CUSTOMER_COMPLETED_JOB_STATUSES, isQuotePhaseStatus, jobStatusLabel } from '@patafundi/shared';
+
+type FilterKey = 'all' | 'active' | 'quote' | 'completed' | 'cancelled';
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All' },
-  { key: 'matching', label: 'Matching' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'in_progress', label: 'In Progress' },
+  { key: 'active', label: 'Active' },
+  { key: 'quote', label: 'Quotes' },
   { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 export function JobsScreen({ navigation }: any): JSX.Element {
@@ -59,10 +61,20 @@ export function JobsScreen({ navigation }: any): JSX.Element {
     loadJobs();
   }, [loadJobs]);
 
-  const filtered = jobs.filter((j) => (filter === 'all' ? true : j.status === filter));
+  // Shared taxonomy: quoted bookings are ACTIVE (never completed), and the
+  // Quotes filter surfaces every booking with a pending quote to review.
+  const filtered = jobs.filter((j) => {
+    const s = String(j.status);
+    if (filter === 'all') return true;
+    if (filter === 'quote') return isQuotePhaseStatus(s);
+    if (filter === 'active') return CUSTOMER_ACTIVE_JOB_STATUSES.includes(s);
+    if (filter === 'completed') return CUSTOMER_COMPLETED_JOB_STATUSES.includes(s);
+    return ['cancelled', 'failed', 'expired'].includes(s);
+  });
 
   const renderItem = ({ item }: { item: Job }): JSX.Element => {
     const statusColor = JOB_STATUS_COLORS[item.status] ?? colors.textSecondary;
+    const statusText = jobStatusLabel(item.status);
     return (
       <TouchableOpacity
         style={styles.jobCard}
@@ -74,15 +86,21 @@ export function JobsScreen({ navigation }: any): JSX.Element {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.jobCategory}>{item.serviceCategory}</Text>
+            {item.bookingNumber ? (
+              <Text style={styles.jobBookingNumber}>{item.bookingNumber}</Text>
+            ) : null}
             <Text style={styles.jobDesc} numberOfLines={1}>
               {item.description}
             </Text>
+            {isQuotePhaseStatus(String(item.status)) ? (
+              <Text style={styles.quoteBadge}>Quote to review</Text>
+            ) : null}
             {item.estimatedPrice ? (
               <Text style={styles.jobPrice}>KES {item.estimatedPrice}</Text>
             ) : null}
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-            <Text style={styles.statusText}>{JOB_STATUS_LABELS[item.status] ?? item.status}</Text>
+            <Text style={styles.statusText}>{statusText}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -209,6 +227,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
+  },
+  jobBookingNumber: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontFamily: 'monospace' as const,
+  },
+  quoteBadge: {
+    marginTop: 4,
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: '600' as const,
   },
   statusText: {
     fontFamily: fonts.sans,

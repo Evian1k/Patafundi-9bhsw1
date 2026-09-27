@@ -166,7 +166,7 @@ export default function PartnerProgram() {
             <div className="p-6 space-y-4">
               {step === 0 && (
                 <>
-                  <Field label="Company / business name *" value={form.companyName} onChange={(v) => set("companyName", v)} placeholder="Apex Home Services Ltd" />
+                  <Field label="Company / business name *" value={form.companyName} onChange={(v) => set("companyName", v)} placeholder="Your registered business name" />
                   <div className="grid sm:grid-cols-2 gap-4">
                     <Field label="Legal name" value={form.legalName} onChange={(v) => set("legalName", v)} placeholder="Registered legal entity" />
                     <Field label="Registration number" value={form.registrationNumber} onChange={(v) => set("registrationNumber", v)} placeholder="PVT-XYZ890" />

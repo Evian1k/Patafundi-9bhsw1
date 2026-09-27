@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import BackBar from "@/components/layout/BackBar";
 import {
   BadgeCheck, Building2, Calendar, MapPin, Phone, ShieldCheck,
   Star, Users, Wrench,
@@ -75,6 +76,7 @@ export default function CompanyProfile() {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-10">
+          <BackBar to="/companies" fallback="/" label="Companies" className="mb-4" />
           <div className="h-40 rounded-3xl border bg-card animate-pulse" />
           <div className="mt-6 h-6 w-1/3 rounded bg-muted animate-pulse" />
         </div>

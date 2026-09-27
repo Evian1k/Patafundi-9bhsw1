@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,7 @@ import {
   JOB_STATUS_COLORS,
   ScreenHeader,
 } from '@patafundi/shared';
-import type { Job, Payment } from '@patafundi/shared';
+import type { Job, Payment, Quote } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -43,12 +44,26 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   const [fundiLoc, setFundiLoc] = useState<FundiLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [question, setQuestion] = useState('');
+  // Server-verified completion OTP (spec section 6): the customer must type
+  // the one-time code from their private notification to confirm completion.
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadJob = useCallback(async (): Promise<void> => {
     try {
       const data = await apiClient.getJob(jobId);
       setJob(data.job);
+      if (data.job && (data.job.status === 'offered' || data.job.status === 'quote_requested')) {
+        try {
+          const q = await apiClient.getJobQuote(jobId);
+          setQuote(q?.quote ?? null);
+        } catch {
+          setQuote(null);
+        }
+      }
       if (data.job && (data.job.status === 'accepted' || data.job.status === 'in_progress')) {
         try {
           const loc = await apiClient.getJobLocation(jobId);
@@ -114,34 +129,24 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   }, [jobId, loadJob]);
 
   const handleConfirmCompletion = async (): Promise<void> => {
-    // Use a simple Alert with two buttons — works on both iOS AND Android.
-    // Alert.prompt is iOS-only and crashes on Android.
-    Alert.alert(
-      'Confirm Completion',
-      'Enter the 6-digit code your fundi gave you to confirm completion and release payment.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            // For now, confirm without OTP — the backend will validate.
-            // In production, this would use a TextInput modal for the OTP.
-            setActionLoading(true);
-            try {
-              await apiClient.confirmCompletion(jobId);
-              Alert.alert('Confirmed', 'You have confirmed completion. Payment has been released to your fundi.');
-              loadJob();
-              navigation.navigate('Review', { jobId });
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : 'Failed to confirm';
-              Alert.alert('Failed', msg);
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
-    );
+    if (!otp.trim()) {
+      setOtpError('Enter the 6-digit code from your notifications to confirm.');
+      return;
+    }
+    setActionLoading(true);
+    setOtpError(null);
+    try {
+      await apiClient.confirmCompletion(jobId, otp.trim());
+      Alert.alert('Confirmed', 'You have confirmed completion. Payment is being finalized.');
+      setOtp('');
+      loadJob();
+      navigation.navigate('Review', { jobId });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to confirm';
+      setOtpError(msg);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleCancel = async (): Promise<void> => {
@@ -165,6 +170,43 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
         },
       },
     ]);
+  };
+
+  // ── Quote decision (spec section 3): Accept / Decline / Ask a Question ──
+  const handleQuoteDecision = async (decision: 'accept' | 'decline'): Promise<void> => {
+    setActionLoading(true);
+    try {
+      await apiClient.decideJobQuote(jobId, decision);
+      Alert.alert(
+        decision === 'accept' ? 'Quote accepted' : 'Quote declined',
+        decision === 'accept'
+          ? 'Your booking is confirmed. The professional can proceed with the work.'
+          : 'Your booking stays open for other quotes.',
+      );
+      setQuote(null);
+      loadJob();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not submit your decision';
+      Alert.alert('Failed', msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAskQuestion = async (): Promise<void> => {
+    if (!question.trim()) return;
+    setActionLoading(true);
+    try {
+      const res = await apiClient.askQuoteQuestion(jobId, question.trim());
+      setQuote(res?.quote ?? quote);
+      setQuestion('');
+      Alert.alert('Sent', 'Your question was sent to the provider.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not send your question';
+      Alert.alert('Failed', msg);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handlePayNow = async (phone: string): Promise<void> => {
@@ -220,7 +262,9 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
       }
     : undefined;
 
-  const showConfirm = job.status === 'completed' && !job.customer_completion_confirmed;
+  const showConfirm =
+    (job.status === 'completed' || job.status === 'completion_requested') &&
+    !job.customer_completion_confirmed;
   const showReview = job.status === 'completed' && !job.hasReview;
   const showCancel = job.status === 'matching';
   // Report a Problem (spec §37): any live job can be disputed from right here
@@ -290,6 +334,109 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
         ) : null}
       </View>
 
+      {/* Quote review card (spec section 3) - a quote NEVER completes the job */}
+      {job.status === 'offered' ? (
+        <View style={styles.card}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.statusText}>Quote to review</Text>
+            </View>
+            {quote?.bookingNumber ? (
+              <Text style={styles.bookingNumber}>{quote.bookingNumber}</Text>
+            ) : null}
+          </View>
+          <Text style={styles.jobCategory}>
+            {quote?.companyName ? `Quote from ${quote.companyName}` : 'New quote received'}
+          </Text>
+          <Text style={styles.jobDesc}>
+            Accepting this quote confirms your booking. The work itself is only completed after the
+            professional finishes and you verify the result. Declining keeps your request open.
+          </Text>
+          {quote ? (
+            <>
+              <View style={styles.detailRow}>
+                <Ionicons name="cash-outline" size={18} color={colors.textSecondary} />
+                <Text style={styles.detailText}>
+                  Total: {quote.currency} {Number(quote.amount).toLocaleString()}
+                </Text>
+              </View>
+              {quote.laborAmount ? (
+                <View style={styles.detailRow}>
+                  <Ionicons name="hammer-outline" size={18} color={colors.textSecondary} />
+                  <Text style={styles.detailText}>Labor: {quote.currency} {Number(quote.laborAmount).toLocaleString()}</Text>
+                </View>
+              ) : null}
+              {quote.materialsAmount ? (
+                <View style={styles.detailRow}>
+                  <Ionicons name="cube-outline" size={18} color={colors.textSecondary} />
+                  <Text style={styles.detailText}>Materials: {quote.currency} {Number(quote.materialsAmount).toLocaleString()}</Text>
+                </View>
+              ) : null}
+              {quote.estimatedDurationHours ? (
+                <View style={styles.detailRow}>
+                  <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
+                  <Text style={styles.detailText}>Estimated duration: {quote.estimatedDurationHours} hour(s)</Text>
+                </View>
+              ) : null}
+              {quote.notes ? (
+                <Text style={styles.quoteNotes}>{quote.notes}</Text>
+              ) : null}
+              {quote.expiresAt ? (
+                <Text style={styles.quoteExpiry}>
+                  Expires: {new Date(quote.expiresAt).toLocaleString()}
+                </Text>
+              ) : null}
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.outlineBtn}
+                  onPress={() => handleQuoteDecision('decline')}
+                  disabled={actionLoading}
+                  activeOpacity={0.85}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color={colors.accent} />
+                  ) : (
+                    <Text style={[styles.outlineBtnText, { color: colors.accent }]}>Decline</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleQuoteDecision('accept')} disabled={actionLoading} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryDark || colors.primary]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.gradientBtn}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator color={colors.primaryForeground} />
+                    ) : (
+                      <Text style={styles.btnText}>Accept Quote</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+              <View style={{ marginTop: spacing.sm }}>
+                <Text style={styles.quoteNotes}>Ask a question about this quote:</Text>
+                <TextInput
+                  value={question}
+                  onChangeText={setQuestion}
+                  placeholder="e.g. Does this include materials?"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.questionInput}
+                />
+                <TouchableOpacity
+                  style={styles.outlineBtn}
+                  onPress={handleAskQuestion}
+                  disabled={actionLoading || !question.trim()}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.outlineBtnText, { color: colors.accent }]}>Send question</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+
       <Text style={styles.sectionTitle}>Timeline</Text>
       <View style={styles.card}>
         {buildTimeline(job).map((t, i) => (
@@ -312,20 +459,35 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
         </TouchableOpacity>
 
         {showConfirm ? (
-          <TouchableOpacity onPress={handleConfirmCompletion} disabled={actionLoading} activeOpacity={0.85}>
-            <LinearGradient
-              colors={[colors.success, '#1F7A47']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gradientBtn}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text style={styles.btnText}>Confirm Completion</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={{ width: '100%' }}>
+            <Text style={styles.otpHint}>
+              Enter the 6-digit code sent only to you to verify the finished work.
+            </Text>
+            <TextInput
+              value={otp}
+              onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, '').slice(0, 6))}
+              placeholder="6-digit code"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              maxLength={6}
+              style={styles.otpInput}
+            />
+            {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+            <TouchableOpacity onPress={handleConfirmCompletion} disabled={actionLoading || otp.length < 6} activeOpacity={0.85}>
+              <LinearGradient
+                colors={[colors.success, '#1F7A47']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradientBtn}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color={colors.primaryForeground} />
+                ) : (
+                  <Text style={styles.btnText}>Confirm Completion</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         ) : null}
 
         {showReview ? (
@@ -453,6 +615,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
+  },
+  otpHint: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    width: '100%',
+  },
+  otpInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.text,
+    fontSize: fontSize.md,
+    letterSpacing: 8,
+    textAlign: 'center',
+    width: '100%',
+    marginBottom: spacing.xs,
+  },
+  otpError: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.error,
+    marginBottom: spacing.xs,
+    width: '100%',
+  },
+  bookingNumber: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontFamily: 'monospace',
+  },
+  quoteNotes: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
+  quoteExpiry: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  questionInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.text,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    fontSize: fontSize.sm,
   },
   statusText: {
     fontFamily: fonts.sans,

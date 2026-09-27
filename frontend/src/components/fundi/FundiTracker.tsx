@@ -47,15 +47,19 @@ type PaymentStatus = "idle" | "processing" | "initiated" | "polling" | "confirme
 
 function normalizeJobStatus(raw?: string): Status {
   const s = String(raw || "").toLowerCase().trim();
-  if (!s || ["requested", "pending", "matching", "searching"].includes(s)) return "searching";
+  if (!s || ["requested", "pending", "matching", "searching", "quote_requested"].includes(s)) return "searching";
   if (s === "matched") return "matched";
-  if (s === "accepted") return "accepted";
+  if (s === "accepted" || s === "booking_confirmed" || s === "assigned" || s === "scheduled") return "accepted";
   if (s === "on_the_way") return "on_the_way";
   if (s === "arrived") return "arrived";
   if (s === "in_progress") return "in_progress";
+  // completion_requested = work done, customer must verify (OTP). The legacy
+  // 'completed'-unconfirmed state behaves the same way.
+  if (s === "completion_requested" || s === "customer_confirmed_completion" || s === "payment_pending" || s === "payment_processing") return "completed";
   if (s === "completed") return "completed";
   if (s === "cancelled" || s === "canceled") return "cancelled";
   if (s === "failed") return "failed";
+  // Unknown statuses degrade to searching (honest: still in flight), never completed.
   return "searching";
 }
 
@@ -111,6 +115,11 @@ export default function FundiTracker({
 
   // Quote decision state (status === 'offered' — awaiting customer approval)
   const [quoteDecision, setQuoteDecision] = useState<"idle" | "working" | "done">("idle");
+  const [bookingNumber, setBookingNumber] = useState<string | null>(null);
+  // Full Quote entity (itemized charges, duration, notes, expiry, booking no.)
+  const [quote, setQuote] = useState<Record<string, unknown> | null>(null);
+  const [quoteQuestion, setQuoteQuestion] = useState("");
+  const [askingQuestion, setAskingQuestion] = useState(false);
 
   // Receipt state (after payment confirmed)
   const [receipt, setReceipt] = useState<{ amount?: number; receiptNumber?: string | null; method?: string; paidAt?: string | null } | null>(null);
@@ -295,12 +304,41 @@ export default function FundiTracker({
     setQuoteDecision("working");
     try {
       await apiClient.decideJobQuote(jobId, decision);
-      toast.success(decision === "approve" ? "Quote approved - work can begin!" : "Quote rejected.");
+      toast.success(decision === "approve" ? "Quote accepted - booking confirmed!" : "Quote declined.");
       setQuoteDecision("done");
       loadJob();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not submit your decision");
       setQuoteDecision("idle");
+    }
+  };
+
+  // ── Fetch the live Quote entity for this booking
+  const loadQuote = async () => {
+    if (!jobId || !isValidUuid(jobId)) return;
+    try {
+      const res = await apiClient.request(`/jobs/${jobId}/quote`) as { quote?: Record<string, unknown> };
+      setQuote(res?.quote || null);
+    } catch {
+      setQuote(null);
+    }
+  };
+
+  const handleAskQuestion = async () => {
+    if (!jobId || !quoteQuestion.trim() || askingQuestion) return;
+    setAskingQuestion(true);
+    try {
+      const res = await apiClient.request(`/jobs/${jobId}/quote/question`, {
+        method: "POST",
+        body: { question: quoteQuestion.trim() },
+      }) as { quote?: Record<string, unknown> };
+      setQuote(res?.quote || quote);
+      setQuoteQuestion("");
+      toast.success("Question sent to the provider");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not send your question");
+    } finally {
+      setAskingQuestion(false);
     }
   };
 
@@ -332,6 +370,8 @@ export default function FundiTracker({
       if (res?.job) {
         const job = res.job;
         setJobStatusRaw((job.status as string) || "searching");
+        const bn = (job.booking_number ?? job.bookingNumber) as string | undefined;
+        if (bn) setBookingNumber(bn);
         const est = job.estimated_price ?? job.estimatedPrice;
         if (est != null) {
           const p = Number(est);
@@ -360,13 +400,20 @@ export default function FundiTracker({
         if (liveFundiCoords) setFundiLocation(liveFundiCoords);
         
         const status = (job.status as string || "").toLowerCase();
+        if (status === "offered") loadQuote();
         const msgMap: Record<string, string> = {
           pending: "Searching for nearby fundis...",
           matching: "Matching with available fundis...",
+          quote_requested: "Waiting for a quote from the provider...",
+          offered: "A quote is waiting for your review.",
           accepted: "Fundi accepted your request!",
+          booking_confirmed: "Booking confirmed!",
+          assigned: "A technician has been assigned to you.",
           on_the_way: "Your fundi is on the way!",
           arrived: "Your fundi has arrived!",
           in_progress: "Work in progress...",
+          completion_requested: "Work done - please verify and confirm.",
+          customer_confirmed_completion: "Completion confirmed - finalizing payment...",
           completed: "Job completed! Please confirm.",
         };
         if (msgMap[status]) setProgressMsg(msgMap[status]);
@@ -659,6 +706,9 @@ export default function FundiTracker({
           <div className={`px-6 pt-6 pb-4 ${statusBg[status] || "bg-card"}`}>
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-display font-bold text-xl">Job Tracking</h2>
+              {bookingNumber && (
+                <p className="text-[11px] font-mono text-muted-foreground">Booking {bookingNumber}</p>
+              )}
               {onComplete && (
                 <button onClick={onComplete} className="p-2 hover:bg-black/10 rounded-full transition-colors">
                   <X className="w-5 h-5" />
@@ -734,16 +784,44 @@ export default function FundiTracker({
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-primary" />
-                  <p className="font-semibold text-sm">New quote to review</p>
+                  <p className="font-semibold text-sm">
+                    {quote?.companyName ? `Quote from ${quote.companyName}` : "New quote to review"}
+                  </p>
                 </div>
+                {quote?.bookingNumber && (
+                  <p className="text-[11px] font-mono text-muted-foreground">{String(quote.bookingNumber)}</p>
+                )}
                 <p className="text-muted-foreground text-sm">
-                  Your provider sent a quote for this job. Approve it to start the work, or reject it to keep matching.
+                  Review the quote below. Accepting it confirms your booking - the work itself is only completed after
+                  the professional finishes and you verify the result. Declining keeps your request open for other quotes.
                 </p>
-                {estimatedPrice != null && (
+                {quote && Number(quote.amount) > 0 && (
                   <div className="p-3 bg-primary/10 rounded-xl text-center">
-                    <p className="text-xs text-muted-foreground">Quoted price</p>
-                    <p className="font-bold text-primary text-2xl">KES {estimatedPrice.toFixed(0)}</p>
+                    <p className="text-xs text-muted-foreground">Quoted total</p>
+                    <p className="font-bold text-primary text-2xl">
+                      {String(quote.currency || "KES")} {Number(quote.amount).toLocaleString()}
+                    </p>
+                    {(Number(quote.laborAmount) > 0 || Number(quote.materialsAmount) > 0) && (
+                      <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                        {Number(quote.laborAmount) > 0 && <p>Labor: {String(quote.currency || "KES")} {Number(quote.laborAmount).toLocaleString()}</p>}
+                        {Number(quote.materialsAmount) > 0 && <p>Materials: {String(quote.currency || "KES")} {Number(quote.materialsAmount).toLocaleString()}</p>}
+                      </div>
+                    )}
                   </div>
+                )}
+                {quote?.estimatedDurationHours != null && (
+                  <p className="text-xs text-muted-foreground">Estimated duration: {Number(quote.estimatedDurationHours)} hour(s)</p>
+                )}
+                {quote?.notes ? (
+                  <div className="p-3 bg-muted rounded-xl">
+                    <p className="text-xs font-medium mb-1">Provider notes</p>
+                    <p className="text-sm text-muted-foreground">{String(quote.notes)}</p>
+                  </div>
+                ) : null}
+                {quote?.expiresAt && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Quote expires: {new Date(String(quote.expiresAt)).toLocaleString()}
+                  </p>
                 )}
                 <div className="flex gap-2">
                   <Button
@@ -752,7 +830,7 @@ export default function FundiTracker({
                     disabled={quoteDecision === "working"}
                   >
                     {quoteDecision === "working" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                    Approve
+                    Accept Quote
                   </Button>
                   <Button
                     variant="outline"
@@ -760,8 +838,23 @@ export default function FundiTracker({
                     onClick={() => handleQuoteDecision("reject")}
                     disabled={quoteDecision === "working"}
                   >
-                    Reject
+                    Decline
                   </Button>
+                </div>
+                <div className="pt-2 border-t border-border/50">
+                  <label htmlFor="quote-question" className="text-xs font-medium">Ask a question</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      id="quote-question"
+                      value={quoteQuestion}
+                      onChange={(e) => setQuoteQuestion(e.target.value)}
+                      placeholder="Ask the provider about this quote"
+                      className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background"
+                    />
+                    <Button variant="outline" size="sm" onClick={handleAskQuestion} disabled={askingQuestion || !quoteQuestion.trim()}>
+                      {askingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

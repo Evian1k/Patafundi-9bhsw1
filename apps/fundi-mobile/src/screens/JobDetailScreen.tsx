@@ -308,6 +308,9 @@ export function JobDetailScreen({ navigation, route }: any): JSX.Element {
         </View>
 
         <Text style={styles.jobCategory}>{job.serviceCategory}</Text>
+        {job.bookingNumber ? (
+          <Text style={styles.bookingNumber}>{job.bookingNumber}</Text>
+        ) : null}
         <Text style={styles.jobDesc}>{job.description}</Text>
 
         {job.estimatedPrice ? (
@@ -482,6 +485,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.primaryForeground,
     fontWeight: '700',
+  },
+  bookingNumber: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontFamily: 'monospace',
   },
   jobCategory: {
     fontFamily: fonts.display,

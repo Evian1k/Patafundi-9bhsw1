@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import { apiClient } from "@/lib/api";
 import { CalendarDays, ArrowRight, Newspaper } from "lucide-react";
+import BackBar from "@/components/layout/BackBar";
 
 interface BlogPostSummary {
   slug: string;
@@ -45,6 +46,7 @@ export default function BlogIndex() {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-4xl">
+        <BackBar to="/" fallback="/" label="Home" className="mb-4" />
         <div className="mb-10">
           <h1 className="text-4xl font-display font-bold mb-3">PataFundi Blog</h1>
           <p className="text-muted-foreground text-lg">

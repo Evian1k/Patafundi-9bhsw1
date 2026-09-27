@@ -85,6 +85,14 @@ async function tick() {
   if (processing) return;
   processing = true;
   try {
+    // Expire stale quotes (sent/viewed past their expiry): the quote flips to
+    // 'expired' and the booking re-opens for other quotes (spec section 5).
+    try {
+      const { expireStaleQuotes } = await import('./services/quoteService.js');
+      await expireStaleQuotes();
+    } catch {
+      // quote expiry is best-effort; the lazy read path also expires quotes
+    }
     // Process up to 10 jobs per tick to avoid hogging the event loop
     for (let i = 0; i < 10; i++) {
       const hadJob = await processOne();

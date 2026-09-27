@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
-import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
+import type { AuthResponse, User, Job, Quote, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
 
 function resolveBaseUrl(): string {
   // Spec §32: endpoints are environment-driven — NEVER hardcoded localhost
@@ -181,6 +181,14 @@ class ApiClient {
   patchJob(id: string, data: Partial<Job>): Promise<{ job: Job }> { return this.request(`/jobs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
   updateJobStatus(id: string, status: string, notes?: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, notes }) }); }
   getJobStatus(id: string): Promise<{ status: string }> { return this.request(`/jobs/${id}/status`); }
+  // Quote entity (spec sections 1-6): a quote never completes a job.
+  getJobQuote(jobId: string): Promise<{ quote: Quote | null }> { return this.request(`/jobs/${jobId}/quote`); }
+  decideJobQuote(jobId: string, decision: 'accept' | 'decline', note?: string): Promise<{ quote: Quote; job: Job }> {
+    return this.request(`/jobs/${jobId}/quote/decision`, { method: 'POST', body: JSON.stringify({ decision, note }) });
+  }
+  askQuoteQuestion(jobId: string, question: string): Promise<{ quote: Quote }> {
+    return this.request(`/jobs/${jobId}/quote/question`, { method: 'POST', body: JSON.stringify({ question }) });
+  }
   getJobLocation(id: string): Promise<JobLocation & { latitude: number; longitude: number }> { return this.request(`/jobs/${id}/location`); }
   uploadJobPhotos(id: string, photos: { uri: string; type?: string; name?: string }[]): Promise<{ photos: any[] }> { const fd = new FormData(); photos.forEach(p => fd.append('photos', { uri: p.uri, type: p.type || 'image/jpeg', name: p.name || `photo-${Date.now()}.jpg` } as any)); return this.upload(`/jobs/${id}/photos`, fd); }
   acceptJob(id: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}/accept`, { method: 'POST' }); }

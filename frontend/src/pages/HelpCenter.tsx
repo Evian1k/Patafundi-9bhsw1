@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import BackBar from "@/components/layout/BackBar";
 
 type Category = { id: string; slug: string; title: string; description?: string | null; category_order: number };
 type Faq = { id: string; question: string; answer: string; faq_order: number; category_slug: string; category_title: string };
@@ -60,6 +61,7 @@ export default function HelpCenter() {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-3xl">
+        <BackBar to="/" fallback="/" label="Home" className="mb-4" />
         <h1 className="text-4xl font-display font-bold mb-4">Help Center</h1>
         <p className="text-muted-foreground mb-6">Search FAQs or contact support if you can't find an answer.</p>
         <div className="flex gap-3 mb-6">

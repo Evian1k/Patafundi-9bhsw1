@@ -5,6 +5,8 @@ import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
 import { logNonFatal } from '../utils/logError.js';
 import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
+import { transitionJob, assertTransitionAllowed, JOB_TRANSITIONS, ACTIVE_JOB_STATES, COMPLETED_JOB_STATES, STATUS_LABELS } from '../services/jobStateMachine.js';
+import { createQuote, decideQuote as decideQuoteEntity, getLiveQuoteForJob, addQuoteQuestion } from '../services/quoteService.js';
 import {
   createExpectedCommission,
   markCommissionCustomerConfirmed,
@@ -143,6 +145,9 @@ function publicJob(job) {
     final_price: job.final_price == null ? undefined : Number(job.final_price),
     title: job.title || `${job.service_category || 'Service'} job`,
     category: job.service_category,
+    bookingNumber: job.booking_number,
+    booking_number: job.booking_number,
+    statusLabel: STATUS_LABELS[job.status] || job.status,
     providerType: job.provider_type || 'fundi',
     provider_type: job.provider_type || 'fundi',
     companyId: job.company_id,
@@ -228,10 +233,12 @@ export async function createJob(req, res) {
   let companyId = body.companyId || body.company_id || null;
   if (companyId) {
     const companyRes = await query(
-      `select id, company_name, status from company_profiles where id = $1`,
+      `select id, company_name, status, verification_status from company_profiles where id = $1`,
       [companyId],
     );
-    if (!companyRes.rows[0] || companyRes.rows[0].status !== 'approved') {
+    const co = companyRes.rows[0];
+    // Spec section 47: bookable = approved + verified + not suspended.
+    if (!co || co.status !== 'approved' || co.verification_status !== 'verified') {
       throw badRequest('Company is not available for booking');
     }
     providerType = 'company';
@@ -514,117 +521,23 @@ export async function getJobStatus(req, res) {
   res.json({ success: true, status: job.status, updatedAt: job.updated_at, job: publicJob(job) });
 }
 
-// ── Job lifecycle state machine (spec §21) — no arbitrary status jumps ──
-const JOB_TRANSITIONS = {
-  pending: ['matching', 'accepted', 'assigned', 'scheduled', 'offered', 'cancelled'],
-  matching: ['pending', 'accepted', 'assigned', 'scheduled', 'offered', 'cancelled'],
-  offered: ['accepted', 'matching', 'cancelled'],
-  scheduled: ['accepted', 'assigned', 'on_the_way', 'cancelled'],
-  accepted: ['assigned', 'on_the_way', 'cancelled'],
-  assigned: ['on_the_way', 'arrived', 'accepted', 'cancelled'],
-  on_the_way: ['arrived', 'cancelled'],
-  arrived: ['in_progress', 'on_the_way', 'cancelled'],
-  in_progress: ['completed', 'completion_requested', 'cancelled'],
-  completion_requested: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-  failed: [],
-  expired: [],
-};
-
-// Who may drive a transition to each status (spec: backend-enforced principal
-// checks — job access alone is NOT enough to move the state machine).
-//   provider   — assigned fundi only
-//   completion — from completion_requested the CUSTOMER confirms; from
-//                in_progress the assigned fundi may close directly
-//   customer   — customer only (admin passes in helpers)
-//   flex       — depends on source: offered→accepted is the customer accepting
-//                a quote; matching/pending→accepted is the provider accepting
-//   dispatch   — provider side (fundi/company member); customer cannot assign
-//   scheduler  — customer / company member (scheduling is a two-party plan);
-//                the assigned fundi cannot unilaterally reschedule
-//   admin      — administrators only
-const JOB_STATUS_ACTORS = {
-  on_the_way: 'provider',
-  arrived: 'provider',
-  in_progress: 'provider',
-  completion_requested: 'provider',
-  completed: 'completion',
-  cancelled: 'customer',
-  accepted: 'flex',
-  offered: 'dispatch',
-  assigned: 'dispatch',
-  scheduled: 'scheduler',
-  pending: 'scheduler',
-  matching: 'scheduler',
-  failed: 'admin',
-  expired: 'admin',
-};
-
 export async function patchJob(req, res) {
   const { status } = req.body || {};
   if (!status) throw badRequest('Status is required');
-  const allowedStatuses = Object.keys(JOB_TRANSITIONS);
-  if (!allowedStatuses.includes(status)) throw badRequest('Invalid job status');
   const job = await loadJob(req.params.id);
   await requireJobAccess(req.user, job);
-  if (!JOB_TRANSITIONS[job.status]?.includes(status)) {
-    throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
-  }
-  if (!req.user.isAdmin) {
-    const actor = JOB_STATUS_ACTORS[status];
-    const isCustomer = job.customer_id === req.user.id;
-    const isAssignedFundi = job.fundi_id === req.user.id;
-    switch (actor) {
-      case 'provider':
-        requireAssignedFundi(req.user, job);
-        break;
-      case 'completion':
-        if (job.status === 'completion_requested') requireCustomer(req.user, job);
-        else requireAssignedFundi(req.user, job);
-        break;
-      case 'customer':
-        requireCustomer(req.user, job);
-        break;
-      case 'flex':
-        // offered→accepted = customer deciding on a quote (fine for any party);
-        // any other source = provider accepting the job — customer cannot self-accept
-        if (job.status !== 'offered' && isCustomer && !isAssignedFundi) {
-          throw forbidden('Only the provider can accept this job');
-        }
-        break;
-      case 'dispatch':
-        if (isCustomer && !isAssignedFundi) {
-          throw forbidden('Only the provider can perform this transition');
-        }
-        break;
-      case 'scheduler':
-        if (isAssignedFundi && !isCustomer) {
-          throw forbidden('Only the customer or company can schedule this job');
-        }
-        break;
-      case 'admin':
-        throw forbidden('Only administrators can set this status');
-      default:
-        break;
-    }
-  }
-  // Race protection (spec §15): the UPDATE only succeeds when the status is
-  // still the value we validated. Two concurrent transitions cannot both win —
-  // the loser gets a 409 instead of silently overwriting the winner.
-  const result = await query(
-    'update jobs set status = $2, updated_at = now() where id = $1 and status = $3 returning *',
-    [req.params.id, status, job.status],
-  );
-  if (!result.rows[0]) {
-    const current = await query('select status from jobs where id = $1', [req.params.id]);
-    throw Object.assign(new Error(`Job status changed concurrently (now ${current.rows[0]?.status || 'unknown'}) — reload and try again`), { statusCode: 409 });
-  }
-  await recordJobStatusTimeline(result.rows[0], status, req.user.id, req.user.role);
-  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  if (status === 'cancelled') emitEvent('job:cancelled', { jobId: req.params.id, status }, `job:${req.params.id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]) });
+  // Central state machine (spec section 50): validates the edge + actor,
+  // performs the update race-safely, records the timeline event and emits
+  // realtime events. A quote-phase state has no edge to completion/payment.
+  const updated = await transitionJob({
+    jobId: job.id,
+    toStatus: status,
+    actor: req.user,
+    job,
+  });
+  if (status === 'in_progress') emitEvent('job:started', { jobId: job.id, status, job: publicJob(updated) }, `job:${job.id}`);
+  if (status === 'cancelled') emitEvent('job:cancelled', { jobId: job.id, status }, `job:${job.id}`);
+  res.json({ success: true, job: publicJob(updated) });
 }
 
 export async function updateStatus(req, res) {
@@ -669,8 +582,9 @@ export async function acceptJob(req, res) {
   const job = result.rows[0];
 
   // ── Quote revision (spec §4/§22): if the fundi's quote differs materially
-  // from the customer's request, park the job as 'offered' until the customer
-  // approves the revised price. Server stores the quote — client cannot bypass.
+  // from the customer's request, park the job in the quote phase until the
+  // customer approves the revised price. The quote is a real entity the
+  // customer reviews - never a completion, client cannot bypass.
   const quoted = Number(req.body?.estimatedPrice);
   if (
     result.rows[0].status === 'accepted' &&
@@ -678,19 +592,14 @@ export async function acceptJob(req, res) {
     job.estimated_price != null &&
     Math.abs(quoted - Number(job.estimated_price)) > Math.max(50, Number(job.estimated_price) * 0.25)
   ) {
-    const revised = await query(
-      `update jobs set estimated_price = $2, status = 'offered', updated_at = now() where id = $1 returning *`,
-      [req.params.id, quoted],
-    );
-    await query(
-      `insert into notifications (user_id, type, title, body, data)
-       values ($1, 'job_quote', 'Price Quote Update', $2, $3::jsonb)`,
-      [job.customer_id,
-       `The fundi quoted KES ${quoted.toLocaleString()} for your ${job.service_category} job (original estimate KES ${Number(job.estimated_price).toLocaleString()}). Approve the quote to start work.`,
-       JSON.stringify({ jobId: job.id, quoted })],
-    );
-    emitEvent('job:quote', { jobId: job.id, amount: quoted }, `job:${job.id}`);
-    return res.json({ success: true, job: publicJob(revised.rows[0]), quotePending: true });
+    const quote = await createQuote({
+      jobId: job.id,
+      actor: req.user,
+      fundiId: req.user.id,
+      amount: quoted,
+      description: `Revised quote for ${job.service_category} (original estimate KES ${Number(job.estimated_price).toLocaleString()})`,
+    });
+    return res.json({ success: true, job: publicJob(await loadJob(job.id)), quotePending: true, quote });
   }
 
   const amount = Number(job.final_price || job.estimated_price || 0);
@@ -732,14 +641,23 @@ export async function acceptJob(req, res) {
 export async function cancelJob(req, res) {
   const job = await loadJob(req.params.id);
   await requireJobAccess(req.user, job);
-  if (!req.user.isAdmin && !['pending', 'matching', 'accepted'].includes(job.status)) {
+  // Quote-phase bookings are cancellable too (spec: quote states are still
+  // pending work). Terminal states are not.
+  if (!req.user.isAdmin && !['pending', 'matching', 'quote_requested', 'offered', 'accepted', 'booking_confirmed', 'scheduled'].includes(job.status)) {
     throw badRequest('Job can no longer be cancelled');
   }
-  const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 returning *', [
+  const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 and status = $4 returning *', [
     req.params.id,
     'cancelled',
     req.body?.reason || null,
+    job.status,
   ]);
+  if (!result.rows[0]) throw badRequest('Job status changed, reload and try again');
+  // Any live quote dies with the booking.
+  await query(
+    "update quotes set status = 'cancelled', decided_at = now(), updated_at = now() where job_id = $1 and status in ('draft','sent','viewed')",
+    [job.id],
+  );
   emitEvent('job:request:declined', { jobId: req.params.id, reason: req.body?.reason || null }, `job:${req.params.id}`);
   emitEvent('job:cancelled', { jobId: req.params.id, status: 'cancelled', reason: req.body?.reason || null }, `job:${req.params.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]) });
@@ -770,9 +688,9 @@ export async function checkIn(req, res) {
   // ── State-machine enforcement (spec §17): check-in may only advance the
   // lifecycle forward — never skip backwards or resurrect a finished job.
   const CHECKIN_TRANSITIONS = {
-    on_the_way: ['accepted', 'assigned', 'scheduled'],
-    arrived: ['on_the_way', 'accepted', 'assigned'],
-    in_progress: ['arrived', 'on_the_way', 'accepted', 'assigned'],
+    on_the_way: ['accepted', 'booking_confirmed', 'assigned', 'scheduled'],
+    arrived: ['on_the_way', 'accepted', 'booking_confirmed', 'assigned'],
+    in_progress: ['arrived', 'on_the_way', 'accepted', 'booking_confirmed', 'assigned'],
   };
   if (!CHECKIN_TRANSITIONS[status].includes(job.status)) {
     throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
@@ -840,11 +758,23 @@ export async function checkIn(req, res) {
 
 export async function completeJob(req, res) {
   const job = await loadJob(req.params.id);
-  requireAssignedFundi(req.user, job);
-  // State-machine enforcement: completion is only valid while work is in
-  // progress (arrived → complete skips the started-work step).
+  // The assigned fundi - or, for company jobs, any active member of the
+  // owning company - may request completion (spec section 6).
+  if (job.company_id) {
+    const { getMembership } = await import('../middleware/companyAccess.js');
+    const membership = await getMembership(job.company_id, req.user.id);
+    if (!(req.user.isAdmin && (req.user.role === 'super_admin' || req.user.role === 'admin')) &&
+        !(membership && membership.status === 'active') && job.fundi_id !== req.user.id) {
+      throw forbidden('Only the assigned professional or the owning company can request completion');
+    }
+  } else {
+    requireAssignedFundi(req.user, job);
+  }
+  // State-machine enforcement (spec section 6): the provider marks completion
+  // REQUESTED. The customer verifies the work with the OTP; only then does
+  // payment finalize and the job complete. A provider can never self-complete.
   if (job.status !== 'in_progress') {
-    throw badRequest('Job must be in progress before completion — start work first');
+    throw badRequest('Job must be in progress before completion - start work first');
   }
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = await bcrypt.hash(otp, 10);
@@ -860,31 +790,33 @@ export async function completeJob(req, res) {
     if (finalPrice < minAllowed) finalPrice = minAllowed;
   }
   const result = await query(
-    `update jobs set status = 'completed', completion_otp_hash = $2,
+    `update jobs set status = 'completion_requested', completion_otp_hash = $2,
       final_price = coalesce($3, final_price, estimated_price), updated_at = now()
-     where id = $1 returning *`,
+     where id = $1 and status = 'in_progress' returning *`,
     [req.params.id, otpHash, finalPrice],
   );
+  if (!result.rows[0]) throw badRequest('Job status changed concurrently - reload and try again');
   await recordTimelineEvent({
     jobId: req.params.id,
     eventType: 'work_completed',
     actorId: req.user.id,
     actorRole: req.user.role,
+    metadata: { status: 'completion_requested' },
   });
   // Deliver the OTP to the customer ONLY on their private user room +
-  // notification. Never broadcast the completion OTP to the job room —
+  // notification. Never broadcast the completion OTP to the job room -
   // the fundi is in that room and must not see the confirmation code.
   await query(
-    `insert into notifications (user_id, type, title, body, data)
-     values ($1, 'job_completion_otp', 'Job Complete — Confirm with Code', $2, $3::jsonb)`,
+    `insert into notifications (user_id, type, title, body, data, category)
+     values ($1, 'job_completion_otp', 'Confirm the completed work', $2, $3::jsonb, 'customers')`,
     [
       job.customer_id,
-      `Your fundi has completed the job. Use code ${otp} to confirm completion.`,
-      JSON.stringify({ jobId: job.id, otp }),
+      `Your professional finished booking ${job.booking_number}. Verify the work and enter code ${otp} to confirm.`,
+      JSON.stringify({ jobId: job.id, otp, bookingNumber: job.booking_number }),
     ],
   );
-  emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  emitEvent('job:completion:requested', { jobId: req.params.id }, `job:${req.params.id}`);
+  emitEvent('job:status', { jobId: req.params.id, status: 'completion_requested', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
   res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
 }
@@ -896,7 +828,8 @@ export async function resendCompletionCode(req, res) {
   const job = existing.rows[0];
   if (!job) throw notFound('Job not found');
   requireCustomer(req.user, job);
-  if (job.status !== 'completed' || job.customer_completion_confirmed) {
+  const pendingStates = ['completed', 'completion_requested', 'customer_confirmed_completion'];
+  if (!pendingStates.includes(job.status) || job.customer_completion_confirmed) {
     throw badRequest('No pending completion confirmation for this job');
   }
   const otp = String(crypto.randomInt(100000, 999999));
@@ -936,14 +869,18 @@ export async function confirmCompletion(req, res) {
     verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
   });
   if (!otpResult.ok) throw forbidden(otpResult.error);
-  // Clear the OTP hash so it can't be reused (one-time use)
+  // Clear the OTP hash so it can't be reused (one-time use). The customer
+  // verified the work: completion_requested (or legacy completed) ->
+  // customer_confirmed_completion via the central machine.
   const result = await query(
     `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
-      escrow_status = 'completion_requested', completion_otp_hash = null, updated_at = now()
-     where id = $1 and customer_completion_confirmed = false returning *`,
+      escrow_status = 'completion_requested', completion_otp_hash = null,
+      status = 'customer_confirmed_completion', updated_at = now()
+     where id = $1 and customer_completion_confirmed = false
+       and status in ('completion_requested', 'completed') returning *`,
     [req.params.id],
   );
-  // If no rows updated, another request confirmed it concurrently — return idempotent success
+  // If no rows updated, another request confirmed it concurrently - return idempotent success
   if (!result.rows[0]) {
     const current = await query('select * from jobs where id = $1', [req.params.id]);
     return res.json({ success: true, job: publicJob(current.rows[0]), alreadyConfirmed: true });
@@ -956,18 +893,42 @@ export async function confirmCompletion(req, res) {
     actorRole: req.user.role,
   });
   emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  emitEvent('job:status', { jobId: req.params.id, status: 'customer_confirmed_completion', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
 
   // ── Auto-release escrow via the shared settlement service ─────────
   // Server-authoritative split, fundi wallet credit OR company settlement,
   // revenue ledger, notifications and audit are all handled atomically.
+  // On success the payment is confirmed and the booking completes (spec
+  // section 6: payment finalized -> COMPLETED). A settlement failure leaves
+  // the booking honestly at customer_confirmed_completion - never silently
+  // completed without payment.
+  let paymentFinalized = false;
   try {
     const { releaseJobEscrow } = await import('../services/settlementService.js');
     await releaseJobEscrow({ jobId: req.params.id, actorId: req.user.id, actorRole: req.user.role, source: 'customer_confirmation' });
+    paymentFinalized = true;
   } catch (err) {
     console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
   }
+  let finalJob = result.rows[0];
+  if (paymentFinalized) {
+    const done = await query(
+      `update jobs set status = 'completed', payment_status = 'payout_completed', updated_at = now()
+       where id = $1 and status = 'customer_confirmed_completion' returning *`,
+      [req.params.id],
+    );
+    if (done.rows[0]) {
+      finalJob = done.rows[0];
+      emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(finalJob) }, `job:${req.params.id}`);
+      emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
+      await recordTimelineEvent({
+        jobId: req.params.id, eventType: 'status_completed', actorId: req.user.id,
+        actorRole: req.user.role, metadata: { from: 'customer_confirmed_completion', to: 'completed' },
+      });
+    }
+  }
 
-  res.json({ success: true, job: publicJob(result.rows[0]) });
+  res.json({ success: true, job: publicJob(finalJob), paymentFinalized });
 }
 
 export async function activeFundiJob(req, res) {
@@ -1047,59 +1008,116 @@ export async function submitReview(req, res) {
   res.status(201).json({ success: true, review: result.rows[0] });
 }
 
-// ── Customer quote decision (spec §22): approve or reject a revised quote ──
-// Only the job's customer can decide. Approve resumes the normal workflow;
-// reject releases the provider and re-opens matching.
+// ── Customer quote decision (spec §22): accept or decline the live quote ──
+// The Quote entity carries its own lifecycle; acceptance confirms the booking
+// (booking_confirmed) - it never completes the job. Decline re-opens matching
+// while keeping the booking available for another quote.
 export async function decideQuote(req, res) {
-  const { decision } = req.body || {};
-  if (!['approve', 'reject'].includes(decision)) throw badRequest('decision must be approve or reject');
-  const job = await loadJob(req.params.id);
-  requireCustomer(req.user, job);
-  if (job.status !== 'offered') throw badRequest('This job has no pending quote to decide');
-  if (decision === 'approve') {
-    const result = await query(
-      `update jobs set status = case when company_id is null then 'accepted' else 'accepted' end,
-        updated_at = now() where id = $1 returning *`,
-      [req.params.id],
-    );
-    const updated = result.rows[0];
-    await recordTimelineEvent({
-      jobId: req.params.id, eventType: 'quote_approved', actorId: req.user.id, actorRole: req.user.role,
-      metadata: { amount: updated.estimated_price },
-    });
-    // Notify whoever sent the quote
-    if (updated.company_id) {
-      const ownerRes = await query('select owner_user_id from company_profiles where id = $1', [updated.company_id]);
-      if (ownerRes.rows[0]) {
-        await query(
-          `insert into notifications (user_id, type, title, body, data)
-           values ($1, 'quote_approved', 'Quote Approved', $2, $3::jsonb)`,
-          [ownerRes.rows[0].owner_user_id, 'The customer approved your quote. Assign a technician to proceed.',
-           JSON.stringify({ jobId: updated.id })],
-        );
-      }
-    } else if (updated.fundi_id) {
-      await query(
-        `insert into notifications (user_id, type, title, body, data)
-         values ($1, 'quote_approved', 'Quote Approved', $2, $3::jsonb)`,
-        [updated.fundi_id, 'The customer approved your quote. You can now proceed with the job.',
-         JSON.stringify({ jobId: updated.id })],
-      );
-    }
-    emitEvent('job:status', { jobId: updated.id, status: 'accepted' }, `job:${updated.id}`);
-    return res.json({ success: true, job: publicJob(updated) });
+  const { decision, note } = req.body || {};
+  if (!['approve', 'reject', 'accept', 'decline'].includes(decision)) {
+    throw badRequest('decision must be accept or decline');
   }
-  const result = await query(
-    `update jobs set status = case when company_id is null then 'matching' else 'matching' end,
-      fundi_id = case when company_id is null then null else fundi_id end,
-      technician_user_id = null, updated_at = now() where id = $1 returning *`,
-    [req.params.id],
-  );
-  await recordTimelineEvent({
-    jobId: req.params.id, eventType: 'quote_rejected', actorId: req.user.id, actorRole: req.user.role,
+  const normalized = decision === 'approve' ? 'accept' : decision === 'reject' ? 'decline' : decision;
+  const result = await decideQuoteEntity({
+    jobId: req.params.id,
+    decision: normalized,
+    customer: req.user,
+    note: note || null,
   });
-  emitEvent('job:status', { jobId: req.params.id, status: 'matching' }, `job:${req.params.id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]) });
+  res.json({ success: true, quote: result.quote, job: publicJob(result.job) });
+}
+
+// ── Quote details for a booking (customer + participants) ──
+export async function getJobQuote(req, res) {
+  const job = await loadJob(req.params.id);
+  await requireJobAccess(req.user, job);
+  const quote = await getLiveQuoteForJob(job.id);
+  if (quote && quote.status === 'sent' && req.user.id === job.customer_id) {
+    const { markQuoteViewed, getLiveQuoteForJob: reload } = await import('../services/quoteService.js');
+    const viewed = await markQuoteViewed(quote.id, req.user);
+    // Reload the joined row so companyName/bookingNumber stay populated.
+    if (viewed) {
+      const fresh = await reload(job.id);
+      res.json({ success: true, quote: fresh || quote });
+      return;
+    }
+  }
+  res.json({ success: true, quote });
+}
+
+// ── Customer asks a question on the live quote (spec §3 Ask a Question) ──
+export async function askQuoteQuestion(req, res) {
+  const job = await loadJob(req.params.id);
+  await requireJobAccess(req.user, job);
+  const quote = await addQuoteQuestion({
+    jobId: job.id,
+    customer: req.user,
+    question: req.body?.question,
+  });
+  res.json({ success: true, quote });
+}
+
+// ── Job stats from the DATABASE (spec §7/§8) - dashboards never compute
+// counts from UI state. Role-aware definitions:
+//   customer: active = pending..completion_requested + payment phases;
+//             completed = payment_confirmed/completed/closed
+//   provider: active = accepted..completion_requested; completed = completed/closed
+export async function getJobStats(req, res) {
+  const userId = req.user.id;
+  const isCustomerView = !['fundi'].includes(req.user.role) || req.query.view === 'customer';
+  if (req.user.role === 'fundi' && req.query.view !== 'customer') {
+    const res1 = await query(
+      `select
+         count(*) filter (where status in ('accepted','offered','booking_confirmed','scheduled','on_the_way','arrived','in_progress','completion_requested')) as active_jobs,
+         count(*) filter (where status in ('completed','closed')) as completed_jobs,
+         count(*) filter (where status = 'cancelled') as cancelled_jobs,
+         count(*) filter (where status = 'disputed') as disputed_jobs,
+         count(*) filter (where status = 'offered') as pending_quotes,
+         count(*) as total
+       from jobs where fundi_id = $1`,
+      [userId],
+    );
+    const row = res1.rows[0] || {};
+    return res.json({
+      success: true,
+      stats: {
+        totalBookings: Number(row.total || 0),
+        activeJobs: Number(row.active_jobs || 0),
+        completedJobs: Number(row.completed_jobs || 0),
+        cancelledJobs: Number(row.cancelled_jobs || 0),
+        disputedJobs: Number(row.disputed_jobs || 0),
+        pendingQuotes: Number(row.pending_quotes || 0),
+        pendingCustomerActions: 0,
+      },
+    });
+  }
+  const res2 = await query(
+    `select
+       count(*) as total_bookings,
+       count(*) filter (where status in ('pending','matching','quote_requested','offered','accepted','booking_confirmed','assigned','scheduled','on_the_way','arrived','in_progress','completion_requested','customer_confirmed_completion','payment_pending','payment_processing')) as active_bookings,
+       count(*) filter (where status in ('pending','matching','quote_requested','offered','accepted','booking_confirmed','assigned','scheduled','on_the_way','arrived','in_progress','completion_requested')) as active_jobs,
+       count(*) filter (where status in ('payment_confirmed','completed','closed')) as completed_jobs,
+       count(*) filter (where status = 'offered') as pending_quotes,
+       count(*) filter (where status in ('offered','completion_requested')) as pending_customer_actions,
+       count(*) filter (where status = 'cancelled') as cancelled_jobs,
+       count(*) filter (where status = 'disputed') as disputed_jobs
+     from jobs where customer_id = $1`,
+    [userId],
+  );
+  const row = res2.rows[0] || {};
+  res.json({
+    success: true,
+    stats: {
+      totalBookings: Number(row.total_bookings || 0),
+      activeBookings: Number(row.active_bookings || 0),
+      activeJobs: Number(row.active_jobs || 0),
+      completedJobs: Number(row.completed_jobs || 0),
+      pendingQuotes: Number(row.pending_quotes || 0),
+      pendingCustomerActions: Number(row.pending_customer_actions || 0),
+      cancelledJobs: Number(row.cancelled_jobs || 0),
+      disputedJobs: Number(row.disputed_jobs || 0),
+    },
+  });
 }
 
 // ── Multi-property (spec §25): customer property book CRUD ──

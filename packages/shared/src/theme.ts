@@ -261,14 +261,77 @@ export const JOB_STATUS_LABELS: Record<string, string> = {
 } as const;
 
 export const JOB_STATUS_COLORS: Record<string, string> = {
+  pending: '#F59E0B',
   matching: '#F59E0B',
+  quote_requested: '#0EA5E9',
+  offered: '#0EA5E9',
   accepted: '#3B82F6',
+  booking_confirmed: '#3B82F6',
+  assigned: '#3B82F6',
+  scheduled: '#3B82F6',
+  on_the_way: '#8B5CF6',
+  arrived: '#8B5CF6',
   in_progress: '#8B5CF6',
+  completion_requested: '#F59E0B',
+  customer_confirmed_completion: '#27A35F',
+  payment_pending: '#F59E0B',
+  payment_processing: '#F59E0B',
+  payment_confirmed: '#27A35F',
   completed: '#27A35F',
+  closed: '#6B7280',
   cancelled: '#EF4444',
   failed: '#EF4444',
+  expired: '#6B7280',
   disputed: '#F59E0B',
+  refund_requested: '#F59E0B',
+  refunded: '#6B7280',
 } as const;
+
+export const JOB_STATUS_LABELS: Record<string, string> = {
+  pending: 'Requested',
+  matching: 'Finding a professional',
+  quote_requested: 'Quote requested',
+  offered: 'Quote received',
+  accepted: 'Quote accepted',
+  booking_confirmed: 'Booking confirmed',
+  assigned: 'Technician assigned',
+  scheduled: 'Scheduled',
+  on_the_way: 'Professional arriving',
+  arrived: 'Checked in',
+  in_progress: 'Work in progress',
+  completion_requested: 'Confirm completion',
+  customer_confirmed_completion: 'Completion confirmed',
+  payment_pending: 'Payment pending',
+  payment_processing: 'Payment processing',
+  payment_confirmed: 'Payment confirmed',
+  completed: 'Completed',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+  failed: 'Failed',
+  expired: 'Expired',
+  disputed: 'Under dispute',
+  refund_requested: 'Refund requested',
+  refunded: 'Refunded',
+};
+
+// Shared booking taxonomy (mirrors the backend state machine). Quote-phase
+// bookings are ACTIVE - they can never be presented as completed.
+export const CUSTOMER_ACTIVE_JOB_STATUSES = [
+  'pending', 'matching', 'quote_requested', 'offered', 'accepted',
+  'booking_confirmed', 'assigned', 'scheduled', 'on_the_way', 'arrived',
+  'in_progress', 'completion_requested', 'customer_confirmed_completion',
+  'payment_pending', 'payment_processing',
+];
+
+export const CUSTOMER_COMPLETED_JOB_STATUSES = ['payment_confirmed', 'completed', 'closed'];
+
+export function jobStatusLabel(status: string): string {
+  return JOB_STATUS_LABELS[status] || String(status).replace(/_/g, ' ');
+}
+
+export function isQuotePhaseStatus(status: string): boolean {
+  return status === 'quote_requested' || status === 'offered';
+}
 
 export const JOB_STATUS_ICONS: Record<string, string> = {
   matching: 'search',

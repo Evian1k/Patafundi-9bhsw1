@@ -27,7 +27,9 @@
     "audit:e2e": "node backend/scripts/e2e-production-audit.js",
     "setup:logo": "node scripts/process-brand-logo.mjs",
     "db:push": "node backend/scripts/ensure-dev-db.js && node backend/scripts/seed-takeover.js",
-    "db:seed:takeover": "node backend/scripts/seed-takeover.js"
+    "db:seed:takeover": "node backend/scripts/seed-takeover.js",
+    "db": "node backend/scripts/db-reset.js",
+    "db:purge": "node backend/scripts/db-reset.js --purge"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.750.0",

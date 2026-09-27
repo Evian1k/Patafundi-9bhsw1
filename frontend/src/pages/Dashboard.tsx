@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Plus, Clock, CheckCircle, MapPin, LogOut, Settings,
   Wrench, ChevronRight, AlertCircle, Trash2, RefreshCw,
-  Wallet, Scale, CalendarDays, Heart, LifeBuoy, Search,
+  Wallet, Scale, CalendarDays, Heart, LifeBuoy, Search, FileText,
   MessageSquareText, Flag, TrendingUp,
 } from "lucide-react";
 import { ReportProblemModal } from "@/components/support/ReportProblemModal";
@@ -130,7 +130,7 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: "bg-primary/10 text-primary border-primary/20",
 };
 
-const ACTIVE_STATUSES = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress'];
+import { CUSTOMER_ACTIVE_STATUSES } from '@/lib/bookingStatus';
 
 function openJobTracking(navigate: ReturnType<typeof useNavigate>, jobId: string) {
   navigate(`/job/${jobId}/tracking`);
@@ -146,6 +146,8 @@ export default function Dashboard() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [showAllServices, setShowAllServices] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
+  // Counts come from the database (spec section 7) - never from UI state.
+  const [dbStats, setDbStats] = useState<{ activeJobs?: number; completedJobs?: number; pendingQuotes?: number; totalBookings?: number } | null>(null);
   // Report-a-problem opens INLINE on this dashboard - the user never leaves.
   const [reportJob, setReportJob] = useState<JobData | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -161,8 +163,10 @@ export default function Dashboard() {
     try {
       const response = await apiClient.getUserJobs() as { success?: boolean; jobs?: JobData[] };
       const jobs = response.jobs || [];
-      setActiveJobs(jobs.filter((j) => ACTIVE_STATUSES.includes(j.status)));
-      setRecentJobs(jobs.filter((j) => j.status === 'completed').slice(0, 10));
+      // Classification uses the shared taxonomy: a quoted booking is active,
+      // never silently completed.
+      setActiveJobs(jobs.filter((j) => CUSTOMER_ACTIVE_STATUSES.includes(j.status)));
+      setRecentJobs(jobs.filter((j) => ['payment_confirmed', 'completed', 'closed'].includes(j.status)).slice(0, 10));
     } catch (error) {
       console.error("Error fetching jobs:", error);
       setJobsError("Unable to load your jobs. Please try again.");
@@ -201,6 +205,13 @@ export default function Dashboard() {
     if (!token) { navigate("/auth"); return; }
     loadUserData();
   }, [navigate, loadUserData]);
+
+  // Booking stats are fetched from the DB (spec section 7).
+  useEffect(() => {
+    apiClient.request('/jobs/stats')
+      .then((res) => setDbStats((res as { stats?: Record<string, number> })?.stats || null))
+      .catch(() => setDbStats(null));
+  }, []);
 
   const cancelJob = async (jobId: string) => {
     if (!confirm("Are you sure you want to cancel this job?")) return;
@@ -271,14 +282,15 @@ export default function Dashboard() {
         {/* Branded location onboarding (spec §8) */}
         <LocationOnboarding />
 
-        {/* ClickUp-style stat strip - honest counts from the user's real jobs */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ClickUp-style stat strip - counts come from the DATABASE via
+            /jobs/stats (spec section 7). UI state never invents numbers. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-card rounded-2xl border border-border/50 p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="font-bold text-xl leading-none">{activeJobs.length}</p>
+              <p className="font-bold text-xl leading-none">{dbStats?.activeJobs ?? activeJobs.length}</p>
               <p className="text-xs text-muted-foreground mt-1">Active jobs</p>
             </div>
           </div>
@@ -287,8 +299,26 @@ export default function Dashboard() {
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="font-bold text-xl leading-none">{recentJobs.length}</p>
+              <p className="font-bold text-xl leading-none">{dbStats?.completedJobs ?? recentJobs.length}</p>
               <p className="text-xs text-muted-foreground mt-1">Completed</p>
+            </div>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-bold text-xl leading-none">{dbStats?.pendingQuotes ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">Quotes to review</p>
+            </div>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+              <CalendarDays className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-bold text-xl leading-none">{dbStats?.totalBookings ?? '-'}</p>
+              <p className="text-xs text-muted-foreground mt-1">Total bookings</p>
             </div>
           </div>
         </div>

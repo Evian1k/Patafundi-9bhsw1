@@ -20,6 +20,7 @@ import * as fraud from './controllers/fraudController.js';
 import * as storage from './controllers/storageController.js';
 import * as verification from './controllers/verificationController.js';
 import * as company from './controllers/companyController.js';
+import * as companyVerification from './controllers/companyVerificationController.js';
 import * as aiAssistant from './controllers/aiAssistantController.js';
 import * as refunds from './controllers/refundController.js';
 import {
@@ -119,6 +120,17 @@ router.post('/company/jobs/:jobId/claim', authRequired, company.portalAccess, as
 router.post('/company/jobs/:jobId/accept', authRequired, company.portalAccess, asyncHandler(company.acceptCompanyJob));
 router.post('/company/jobs/:jobId/reject', authRequired, company.portalAccess, asyncHandler(company.rejectCompanyJob));
 router.post('/company/jobs/:jobId/quote', authRequired, company.portalAccess, asyncHandler(company.quoteCompanyJob));
+router.get('/company/portal/quotes', authRequired, company.portalAccess, asyncHandler(company.portalQuotes));
+// Company document verification (spec sections 19-22, 26, 48)
+router.get('/company/documents', authRequired, company.portalAccess, asyncHandler(companyVerification.listCompanyDocuments));
+router.post('/company/documents', authRequired, company.portalAccess, imageUpload.single('document'), asyncHandler(companyVerification.uploadCompanyDocument));
+router.post('/company/verification/submit', authRequired, company.portalAccess, asyncHandler(companyVerification.submitForVerification));
+// Company logo + profile/cover image upload (spec section 20)
+router.post('/company/branding', authRequired, company.portalAccess, imageUpload.fields([{ name: 'logo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), asyncHandler(companyVerification.uploadCompanyBranding));
+router.get('/admin/verification/companies', authRequired, requireRole('admin'), asyncHandler(companyVerification.adminVerificationQueue));
+router.get('/admin/verification/companies/:id', authRequired, requireRole('admin'), asyncHandler(companyVerification.adminCompanyVerificationDetail));
+router.post('/admin/verification/documents/:id/review', authRequired, requireRole('admin'), asyncHandler(companyVerification.adminReviewDocument));
+router.post('/admin/verification/companies/:id/verify', authRequired, requireRole('admin'), asyncHandler(companyVerification.adminVerifyCompany));
 router.post('/company/jobs/:jobId/assign-technician', authRequired, company.portalAccess, asyncHandler(company.assignTechnician));
 router.post('/company/jobs/:jobId/unassign-technician', authRequired, company.portalAccess, asyncHandler(company.unassignTechnician));
 router.get('/company/portal/schedule', authRequired, company.portalAccess, asyncHandler(company.portalSchedule));
@@ -140,6 +152,11 @@ router.post('/properties', authRequired, asyncHandler(jobs.createProperty));
 router.patch('/properties/:id', authRequired, asyncHandler(jobs.updateProperty));
 router.delete('/properties/:id', authRequired, asyncHandler(jobs.deleteProperty));
 router.get('/jobs', authRequired, asyncHandler(jobs.listJobs));
+// DB-computed booking stats (spec: dashboards never count from UI state).
+router.get('/jobs/stats', authRequired, asyncHandler(jobs.getJobStats));
+// Quote endpoints (a quote is a real entity - never a completion).
+router.get('/jobs/:id/quote', authRequired, asyncHandler(jobs.getJobQuote));
+router.post('/jobs/:id/quote/question', authRequired, asyncHandler(jobs.askQuoteQuestion));
 router.get('/jobs/fundi/active', authRequired, requireApprovedFundi, asyncHandler(jobs.activeFundiJob));
 router.get('/jobs/:id', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/photos', authRequired, imageUpload.array('photos', 10), asyncHandler(jobs.uploadJobPhotos));

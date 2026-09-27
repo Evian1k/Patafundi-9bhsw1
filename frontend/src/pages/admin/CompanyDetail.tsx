@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, FileText, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
 
@@ -72,10 +72,71 @@ export default function CompanyDetail() {
     try {
       await apiClient.request(`/admin/companies/${id}/action`, { method: "POST", body: { action: act } });
       await load();
+      await loadVerification();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  // ── Document verification workflow (spec sections 21, 22, 26) ──
+  const [verification, setVerification] = useState<{
+    documents: Array<{ id: string; documentType: string; status: string; originalName?: string; rejectionReason?: string | null; reviewedAt?: string | null; reviewerName?: string | null }>;
+    requiredDocuments: string[];
+  } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const loadVerification = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await apiClient.request(`/admin/verification/companies/${id}`) as unknown as {
+        documents?: Array<{ id: string; documentType: string; status: string; originalName?: string; rejectionReason?: string | null; reviewedAt?: string | null; reviewerName?: string | null }>;
+        requiredDocuments?: string[];
+      };
+      setVerification({ documents: res.documents || [], requiredDocuments: res.requiredDocuments || [] });
+    } catch {
+      setVerification(null);
+    }
+  }, [id]);
+
+  useEffect(() => { loadVerification(); }, [loadVerification]);
+
+  const reviewDocument = async (docId: string, decision: "verify" | "reject" | "request_info") => {
+    const reason = decision === "verify" ? null : window.prompt(decision === "reject" ? "Rejection reason (required):" : "What should the company provide?");
+    if (decision !== "verify" && !reason) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      await apiClient.request(`/admin/verification/documents/${docId}/review`, {
+        method: "POST",
+        body: { decision, reason },
+      });
+      await loadVerification();
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e.message : "Review failed");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const decideCompanyVerification = async (decision: "verify" | "reject") => {
+    const reason = decision === "verify" ? null : window.prompt("Reason for rejecting verification:");
+    if (decision === "reject" && !reason) return;
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      await apiClient.request(`/admin/verification/companies/${id}/verify`, {
+        method: "POST",
+        body: { decision, reason },
+      });
+      await load();
+      await loadVerification();
+    } catch (e) {
+      setVerifyError(e instanceof Error ? e.message : "Decision failed");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -140,6 +201,108 @@ export default function CompanyDetail() {
           {(c.businessCategories || []).map((cat) => <span key={cat} className="rounded-full border px-2 py-0.5 capitalize">{cat.replace("_", " ")}</span>)}
           {(c.serviceAreas || []).map((a) => <span key={a} className="rounded-full bg-muted px-2 py-0.5">{a}</span>)}
         </div>
+      </div>
+
+      {/* ── Verification & documents (spec sections 21, 22, 26) ── */}
+      <div className="rounded-2xl border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Verification &amp; documents</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              A company is verified only after every required document has been reviewed and verified. OCR extraction
+              never auto-approves a document.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={verifying}
+              onClick={() => decideCompanyVerification("verify")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Verify company
+            </button>
+            <button
+              disabled={verifying}
+              onClick={() => decideCompanyVerification("reject")}
+              className="inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm text-red-600 hover:bg-red-500/5 disabled:opacity-50"
+            >
+              <ShieldAlert className="h-4 w-4" /> Reject
+            </button>
+          </div>
+        </div>
+        {verifyError && (
+          <div className="mt-3 rounded-xl border bg-red-500/5 px-3 py-2 text-sm text-red-600">{verifyError}</div>
+        )}
+        {!verification ? (
+          <p className="mt-3 text-sm text-muted-foreground">Document checklist unavailable for this company.</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+              {verification.requiredDocuments.map((t) => {
+                const doc = verification.documents.find((d) => d.documentType === t);
+                const done = doc && ["verified", "approved"].includes(doc.status);
+                return (
+                  <span key={t} className={`rounded-full px-2 py-0.5 capitalize ${done ? "bg-emerald-500/10 text-emerald-600" : doc ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+                    {t.replace(/_/g, " ")} · {done ? "verified" : doc ? doc.status : "missing"}
+                  </span>
+                );
+              })}
+            </div>
+            {verification.documents.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No documents uploaded yet. The company must upload its required documents before verification.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {verification.documents.map((d) => (
+                  <div key={d.id} className="rounded-xl border p-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium capitalize">{d.documentType.replace(/_/g, " ")}</p>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                          ["verified", "approved"].includes(d.status) ? "bg-emerald-500/10 text-emerald-600"
+                          : d.status === "rejected" ? "bg-red-500/10 text-red-500"
+                          : "bg-amber-500/10 text-amber-600"}`}>{d.status.replace(/_/g, " ")}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {d.originalName || "Document"}
+                        {d.reviewedAt ? ` · reviewed ${new Date(d.reviewedAt).toLocaleString()}${d.reviewerName ? ` by ${d.reviewerName}` : ""}` : " · not reviewed yet"}
+                      </p>
+                      {d.rejectionReason && <p className="text-xs text-red-500 mt-0.5">Reason: {d.rejectionReason}</p>}
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <a
+                        href={`/api/storage/verification/${d.id}/signed-url`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          try {
+                            const res = await apiClient.request(`/storage/verification/${d.id}/signed-url`) as { url?: string; signedUrl?: string };
+                            const url = res?.url || res?.signedUrl;
+                            if (url) window.open(url, "_blank", "noopener");
+                          } catch {
+                            window.alert("Could not open the document");
+                          }
+                        }}
+                      >
+                        View
+                      </a>
+                      <button disabled={verifying} onClick={() => reviewDocument(d.id, "verify")}
+                        className="rounded-lg bg-emerald-600 text-white px-2.5 py-1.5 text-xs disabled:opacity-50">Verify</button>
+                      <button disabled={verifying} onClick={() => reviewDocument(d.id, "reject")}
+                        className="rounded-lg border px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-500/5 disabled:opacity-50">Reject</button>
+                      <button disabled={verifying} onClick={() => reviewDocument(d.id, "request_info")}
+                        className="rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50">More info</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* ── Finance summary ── */}

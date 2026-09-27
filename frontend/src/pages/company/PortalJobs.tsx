@@ -12,7 +12,7 @@ import { useModalA11y } from "@/lib/a11y";
 import { StatusChip } from "./PortalDashboard";
 
 interface PortalJob {
-  id: string; status: string; provider_type: string; service_category: string;
+  id: string; booking_number?: string; status: string; provider_type: string; service_category: string;
   description?: string; urgency: string; location_name?: string;
   estimated_price?: string | number; final_price?: string | number;
   scheduled_at?: string; created_at: string;
@@ -41,6 +41,11 @@ export default function PortalJobs() {
   const [notice, setNotice] = useState<string | null>(null);
   const [quoteFor, setQuoteFor] = useState<PortalJob | null>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteLabor, setQuoteLabor] = useState("");
+  const [quoteMaterials, setQuoteMaterials] = useState("");
+  const [quoteDuration, setQuoteDuration] = useState("");
+  const [quoteNotes, setQuoteNotes] = useState("");
+  const [quoteExpiry, setQuoteExpiry] = useState("72");
   const quoteDialogRef = useModalA11y(Boolean(quoteFor), () => setQuoteFor(null));
 
   const load = useCallback(async () => {
@@ -79,8 +84,20 @@ export default function PortalJobs() {
 
   const sendQuote = async () => {
     if (!quoteFor) return;
-    await act(quoteFor.id, "quote", { amount: Number(quoteAmount) }, "Quote sent to customer");
-    setQuoteFor(null); setQuoteAmount("");
+    await act(
+      quoteFor.id,
+      "quote",
+      {
+        amount: Number(quoteAmount),
+        laborAmount: quoteLabor ? Number(quoteLabor) : null,
+        materialsAmount: quoteMaterials ? Number(quoteMaterials) : null,
+        estimatedDurationHours: quoteDuration ? Number(quoteDuration) : null,
+        notes: quoteNotes.trim() || null,
+        expiresInHours: quoteExpiry ? Number(quoteExpiry) : 72,
+      },
+      "Quote sent to customer",
+    );
+    setQuoteFor(null); setQuoteAmount(""); setQuoteLabor(""); setQuoteMaterials(""); setQuoteDuration(""); setQuoteNotes("");
   };
 
   return (
@@ -207,17 +224,49 @@ export default function PortalJobs() {
         </div>
       )}
 
-      {/* Quote dialog */}
+      {/* Quote dialog - itemized quote (spec section 2) */}
       {quoteFor && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40" role="dialog" aria-modal="true">
-          <div ref={quoteDialogRef} tabIndex={-1} className="w-full max-w-sm rounded-3xl border bg-card p-5 shadow-xl focus:outline-none">
+          <div ref={quoteDialogRef} tabIndex={-1} className="w-full max-w-md rounded-3xl border bg-card p-5 shadow-xl focus:outline-none max-h-[90vh] overflow-y-auto">
             <h3 className="font-semibold">Send quote</h3>
-            <p className="mt-1 text-xs text-muted-foreground capitalize">{quoteFor.service_category?.replace("_", " ")} · {quoteFor.customer_name}</p>
-            <label className="block mt-4 text-sm font-medium" htmlFor="quote-amount">Amount (KES)</label>
+            <p className="mt-1 text-xs text-muted-foreground capitalize">
+              {quoteFor.service_category?.replace("_", " ")} · {quoteFor.customer_name}
+              {quoteFor.booking_number ? ` · ${quoteFor.booking_number}` : ""}
+            </p>
+            <label className="block mt-4 text-sm font-medium" htmlFor="quote-amount">Total amount (KES)</label>
             <input id="quote-amount" type="number" min={1} value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)}
               className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium" htmlFor="quote-labor">Labor (KES)</label>
+                <input id="quote-labor" type="number" min={0} value={quoteLabor} onChange={(e) => setQuoteLabor(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium" htmlFor="quote-materials">Materials (KES)</label>
+                <input id="quote-materials" type="number" min={0} value={quoteMaterials} onChange={(e) => setQuoteMaterials(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium" htmlFor="quote-duration">Duration (hours)</label>
+                <input id="quote-duration" type="number" min={0.5} step={0.5} value={quoteDuration} onChange={(e) => setQuoteDuration(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium" htmlFor="quote-expiry">Expires in (hours)</label>
+                <input id="quote-expiry" type="number" min={1} value={quoteExpiry} onChange={(e) => setQuoteExpiry(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
+              </div>
+            </div>
+            <label className="block mt-3 text-sm font-medium" htmlFor="quote-notes">Notes for the customer</label>
+            <textarea id="quote-notes" rows={3} value={quoteNotes} onChange={(e) => setQuoteNotes(e.target.value)}
+              placeholder="What does this quote include? Any assumptions?"
+              className="mt-1.5 w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             <p className="mt-2 text-[11px] text-muted-foreground">
-              The customer must approve this quote before work starts.
+              The customer must accept this quote before work starts. Sending a quote never completes the booking -
+              completion is confirmed by the customer after the work is done.
             </p>
             <div className="mt-4 flex gap-2 justify-end">
               <button onClick={() => setQuoteFor(null)} className="rounded-xl border px-4 py-2 text-sm">Cancel</button>
