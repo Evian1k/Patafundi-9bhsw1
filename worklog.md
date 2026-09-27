@@ -289,3 +289,19 @@ Work Log:
 
 Stage Summary:
 - User-side actions pending: Render Postgres creation + env vars + redeploy; expect banner "PataFundi API" and green /health after deploy
+
+---
+Task ID: 13 (Wire real production URLs into code)
+Agent: Super Z (main agent)
+Task: User provided real deployed URLs — API https://patafundi-9bhsw1.onrender.com, frontend patafundi-9bhsw1.vercel.app, DB host dpg-dasc34jbc2fs73918gkg-a — update code accordingly.
+
+Work Log:
+- Audited repo for URL references: frontend/src/api/config.ts, packages/shared apiClient.ts, mobile apps, backend cors.js, e2e-production-audit.js already pointed at the correct onrender.com / vercel.app URLs
+- Updated stale https://patafundi.vercel.app placeholder -> https://patafundi-9bhsw1.vercel.app in: backend/src/config.js (production FRONTEND_ORIGIN default), referralService.js share-link fallback, render.yaml FRONTEND_ORIGIN, .env.example comment, docs (launch-checklist x2, README, fundi-verification, fraud-response)
+- cors.js legacy patafundi.vercel.app allowlist entry + comment intentionally retained (valid origin, zero risk)
+- DATABASE_URL/dpg host deliberately NOT committed — secrets live only in Render Environment tab
+- Verification: npm test 110/110 pass
+- Pushed commit bff0af3 to origin/main (Render auto-deploy will pick it up)
+
+Stage Summary:
+- All code defaults now match real production endpoints; user still needs DATABASE_URL + secrets in Render env vars, then redeploy
