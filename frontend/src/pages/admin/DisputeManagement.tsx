@@ -5,7 +5,7 @@ import {
   Loader2, RefreshCw, AlertTriangle, DollarSign,
   Upload, X, Image, ChevronDown, ChevronUp,
   Lightbulb, MessageSquare, Calendar, User,
-  ShieldAlert, Gavel, BadgeCheck,
+  ShieldAlert, Gavel, BadgeCheck, Sparkles,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -232,6 +232,27 @@ export default function AdminDisputeManagement() {
 
   const openCount = disputes.filter((d) => d.status === "open" || d.status === "escalated").length;
   const suggestions = selected ? getResolutionSuggestions(selected.reason, selected.disputeType) : [];
+
+  // AI dispute summary (spec §41): grounded on real dispute/job/timeline/chat
+  // data server-side. Advisory only — the admin decides.
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const loadAiSummary = async () => {
+    if (!selected) return;
+    setAiLoading(true);
+    setAiSummary(null);
+    try {
+      const res = await apiClient.request("/ai/dispute-summary", {
+        method: "POST",
+        body: JSON.stringify({ disputeId: selected.id }),
+      }) as { summary?: string; error?: string };
+      setAiSummary(res?.summary || res?.error || "No summary available.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI summary unavailable");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Build the timeline view from REAL dispute data. If the API returned no
   // event history we show the known facts only — we never fabricate admin
@@ -613,6 +634,26 @@ export default function AdminDisputeManagement() {
                 </Card>
 
                 {/* AI Suggestions */}
+                {/* AI summary (spec §41) — real LLM over real case data */}
+                {selected && (
+                  <Card className="p-5 border-violet-200 bg-violet-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-violet-600" />
+                        <h4 className="font-semibold text-sm text-violet-800">AI Case Summary</h4>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={loadAiSummary} disabled={aiLoading}>
+                        {aiLoading ? "Analyzing..." : aiSummary ? "Refresh" : "Generate"}
+                      </Button>
+                    </div>
+                    {aiSummary && (
+                      <p className="text-sm text-violet-900 mt-3 whitespace-pre-wrap">{aiSummary}</p>
+                    )}
+                    <p className="text-[11px] text-violet-600/70 mt-2">
+                      Advisory only — generated from the dispute, job timeline and chat history. You make the final call.
+                    </p>
+                  </Card>
+                )}
                 {suggestions.length > 0 && (
                   <Card className="p-5 border-amber-200 bg-amber-50">
                     <button

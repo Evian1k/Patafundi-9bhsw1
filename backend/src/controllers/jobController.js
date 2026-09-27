@@ -434,7 +434,14 @@ export async function createJob(req, res) {
   // Privacy (spec §24): providers that have NOT been accepted yet receive a
   // coarse, area-level view — never the customer's exact address/coordinates.
   const publishedJob = providerJobView(job);
+  // Persistent offers (migration 038): makes "new requests", decline and
+  // response-rate metrics real database values instead of hardcoded zeros.
   for (const candidate of candidates) {
+    await query(
+      `insert into fundi_job_offers (job_id, fundi_id) values ($1, $2)
+       on conflict (job_id, fundi_id) do nothing`,
+      [job.id, candidate.user_id],
+    );
     emitEvent(
       'job:created',
       { jobId: job.id, job: publishedJob, distanceKm: candidate.distanceKm, status: 'matching' },
@@ -644,6 +651,14 @@ export async function acceptJob(req, res) {
      returning *`,
     [req.params.id, req.user.id, req.body?.estimatedPrice || null, req.user.id],
   );
+  if (result.rows[0]) {
+    // Record the acceptance against this fundi's outstanding offer(s), if any.
+    await query(
+      `update fundi_job_offers set response = 'accepted', responded_at = now()
+       where job_id = $1 and fundi_id = $2 and response = 'pending'`,
+      [req.params.id, req.user.id],
+    );
+  }
   if (!result.rows[0]) {
     // Distinguish "already taken" from "reserved for another fundi" (direct booking)
     const current = await query('select match_metadata, status from jobs where id = $1', [req.params.id]);
@@ -728,6 +743,21 @@ export async function cancelJob(req, res) {
   emitEvent('job:request:declined', { jobId: req.params.id, reason: req.body?.reason || null }, `job:${req.params.id}`);
   emitEvent('job:cancelled', { jobId: req.params.id, status: 'cancelled', reason: req.body?.reason || null }, `job:${req.params.id}`);
   res.json({ success: true, job: publicJob(result.rows[0]) });
+}
+
+/**
+ * Fundi declines an offered broadcast job (spec §23).
+ * The job itself stays open for other fundis — only the offer record flips
+ * to 'declined', which feeds real response-rate metrics (spec §26).
+ */
+export async function declineJob(req, res) {
+  const updated = await query(
+    `update fundi_job_offers set response = 'declined', responded_at = now()
+     where job_id = $1 and fundi_id = $2 and response = 'pending'
+     returning id`,
+    [req.params.id, req.user.id],
+  );
+  res.json({ success: true, declined: updated.rows.length > 0 });
 }
 
 export async function checkIn(req, res) {

@@ -13,14 +13,14 @@ import {
 import { useNavigate } from "react-router-dom";
 
 const services = [
-  { icon: Droplets, name: "Plumbing", description: "Leaks, pipes, installations", color: "from-blue-500 to-cyan-500", jobs: "15K+ jobs", slug: "plumbing" },
-  { icon: Zap, name: "Electrical", description: "Wiring, repairs, installations", color: "from-yellow-500 to-orange-500", jobs: "12K+ jobs", slug: "electrical" },
-  { icon: Wind, name: "AC & HVAC", description: "Cooling, heating, maintenance", color: "from-sky-500 to-blue-500", jobs: "8K+ jobs", slug: "hvac" },
-  { icon: Sparkles, name: "Cleaning", description: "Home, office, deep cleaning", color: "from-emerald-500 to-teal-500", jobs: "25K+ jobs", slug: "cleaning" },
-  { icon: Hammer, name: "Carpentry", description: "Furniture, repairs, custom work", color: "from-amber-500 to-yellow-600", jobs: "6K+ jobs", slug: "carpentry" },
-  { icon: Car, name: "Auto Repair", description: "Mechanics, diagnostics, service", color: "from-red-500 to-rose-500", jobs: "10K+ jobs", slug: "auto" },
-  { icon: PaintBucket, name: "Painting", description: "Interior, exterior, finishing", color: "from-purple-500 to-pink-500", jobs: "7K+ jobs", slug: "painting" },
-  { icon: Wrench, name: "General Repair", description: "Handyman, misc repairs", color: "from-gray-500 to-slate-500", jobs: "20K+ jobs", slug: "general" },
+  { icon: Droplets, name: "Plumbing", description: "Leaks, pipes, installations", color: "from-blue-500 to-cyan-500", slug: "plumbing" },
+  { icon: Zap, name: "Electrical", description: "Wiring, repairs, installations", color: "from-yellow-500 to-orange-500", slug: "electrical" },
+  { icon: Wind, name: "AC & HVAC", description: "Cooling, heating, maintenance", color: "from-sky-500 to-blue-500", slug: "hvac" },
+  { icon: Sparkles, name: "Cleaning", description: "Home, office, deep cleaning", color: "from-emerald-500 to-teal-500", slug: "cleaning" },
+  { icon: Hammer, name: "Carpentry", description: "Furniture, repairs, custom work", color: "from-amber-500 to-yellow-600", slug: "carpentry" },
+  { icon: Car, name: "Auto Repair", description: "Mechanics, diagnostics, service", color: "from-red-500 to-rose-500", slug: "auto" },
+  { icon: PaintBucket, name: "Painting", description: "Interior, exterior, finishing", color: "from-purple-500 to-pink-500", slug: "painting" },
+  { icon: Wrench, name: "General Repair", description: "Handyman, misc repairs", color: "from-gray-500 to-slate-500", slug: "general" },
 ];
 
 const ServicesSection = () => {
@@ -61,7 +61,7 @@ const ServicesSection = () => {
                 <h3 className="font-semibold text-sm mb-1">{service.name}</h3>
                 <p className="text-xs text-muted-foreground mb-2">{service.description}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-primary">{service.jobs}</span>
+                  <span className="text-xs font-medium text-primary">Find a professional</span>
                   <ArrowRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               </div>

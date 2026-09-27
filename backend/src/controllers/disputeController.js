@@ -1,6 +1,7 @@
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
+import { auditLog } from '../services/auditService.js';
 import { uploadPrivateFile, getSignedAccessUrl } from '../services/storageService.js';
 import { mapMulterFiles } from '../middleware/upload.js';
 
@@ -131,5 +132,13 @@ export async function resolveDispute(req, res) {
     return d.rows[0];
   });
   emitEvent('dispute:resolved', { jobId: dispute.job_id, disputeId: req.params.id }, `job:${dispute.job_id}`);
+  // Auditability (spec §56): dispute resolution is a significant action.
+  await auditLog({
+    userId: req.user.id,
+    action: 'dispute.resolved',
+    entityType: 'dispute',
+    entityId: req.params.id,
+    metadata: { jobId: dispute.job_id, refundAmount: Number(refundAmount || 0), resolution: String(resolution).slice(0, 500) },
+  });
   res.json({ success: true });
 }

@@ -264,22 +264,16 @@ export default function FundiJob() {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setShowChat(true)}
-            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
-          >
-            <MessageCircle className="w-5 h-5 text-blue-500" />
-            <span className="text-xs font-medium">Chat</span>
-          </button>
-          <button
-            onClick={() => toast.info('Call feature via customer phone — coming soon')}
-            className="flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
-          >
-            <Phone className="w-5 h-5 text-green-500" />
-            <span className="text-xs font-medium">Call</span>
-          </button>
-        </div>
+        {/* Job chat — the only contact channel. Customer phone is deliberately
+            never exposed to providers (privacy, spec §55); off-platform contact
+            is blocked and reported by the chat fraud filter. */}
+        <button
+          onClick={() => setShowChat(true)}
+          className="w-full flex flex-col items-center gap-1.5 p-3 bg-card rounded-2xl border border-border/50 hover:bg-primary/5 transition-colors"
+        >
+          <MessageCircle className="w-5 h-5 text-blue-500" />
+          <span className="text-xs font-medium">Chat with customer</span>
+        </button>
 
         {status !== 'completed' && (
           <div className="bg-card rounded-2xl p-5 border border-border/50 space-y-4">

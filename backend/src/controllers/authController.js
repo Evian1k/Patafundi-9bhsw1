@@ -262,6 +262,17 @@ export async function login(req, res) {
 
   const session = await issueSession(res, user);
   await auditLog({ userId: user.id, action: 'auth.login', entityType: 'user', entityId: user.id, metadata: { ip } });
+  // staff_login_history (spec §56): the Security Center login-history panel
+  // reads this table — record every successful login.
+  try {
+    await query(
+      `insert into staff_login_history (user_id, ip_address, user_agent, device_fingerprint, success)
+       values ($1, $2, $3, $4, true)`,
+      [user.id, ip || null, String(req.headers['user-agent'] || '').slice(0, 300) || null, deviceId || null],
+    );
+  } catch (loginHistoryErr) {
+    console.warn('[auth] staff_login_history insert failed (non-blocking):', loginHistoryErr.message);
+  }
   // Return BOTH access token and refresh token in JSON body.
   // The refresh token is also set as an httpOnly cookie for same-origin use,
   // but cross-origin deployments (Vercel frontend → Render backend) cannot

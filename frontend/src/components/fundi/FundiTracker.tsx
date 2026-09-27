@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   X, ShieldCheck, Star, Wrench, MessageCircle,
-  Smartphone, CheckCircle, Loader2, AlertCircle,
+  Smartphone, CheckCircle, CheckCircle2, Loader2, AlertCircle,
   Lock, ArrowRight, RefreshCw, FileText, ReceiptText,
 } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api";
@@ -27,7 +27,8 @@ interface FundiInfo {
   name: string;
   skill: string;
   distanceKm: number;
-  rating: number;
+  // null = no ratings yet — UI shows "New" instead of a fabricated score.
+  rating: number | null;
   avatarUrl?: string;
   trustScore?: number;
 }
@@ -398,7 +399,7 @@ export default function FundiTracker({
           name: displayName,
           skill: skills[0] || "Fundi",
           distanceKm: Number(f.distance_km ?? f.distanceKm ?? 0) || 0,
-          rating: Number.isFinite(rating) ? rating : 4.5,
+          rating: Number.isFinite(rating) && rating > 0 ? rating : null,
           avatarUrl: (f.avatar_url ?? f.avatarUrl) as string | undefined,
           trustScore: Number.isFinite(trust) ? trust : undefined,
         });
@@ -695,6 +696,16 @@ export default function FundiTracker({
           <div className="px-6 pb-6 pt-4 space-y-4">
             {["searching", "matching"].includes(status) && (
               <div className="space-y-3">
+                {/* You're all set confirmation (spec §16) */}
+                <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <p className="font-display font-bold text-green-800">You're all set!</p>
+                  </div>
+                  <p className="text-sm text-green-700 mt-1">
+                    Your request is in. We're matching you with a verified fundi nearby — tracking starts automatically below.
+                  </p>
+                </div>
                 <p className="text-muted-foreground text-sm">{progressMsg}</p>
                 <div className="flex gap-1.5 mt-2">
                   {[0, 1, 2].map((i) => (
@@ -776,8 +787,14 @@ export default function FundiTracker({
                     </div>
                     <p className="text-sm text-muted-foreground">{fundi.skill}</p>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span>{Number(fundi.rating || 0).toFixed(1)}</span>
+                      {fundi.rating != null ? (
+                        <>
+                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          <span>{Number(fundi.rating).toFixed(1)}</span>
+                        </>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] font-semibold uppercase tracking-wide">New fundi</span>
+                      )}
                     </div>
                   </div>
                   {jobId && currentUser && (

@@ -8,7 +8,8 @@ import {
   Banknote,
   Undo2,
   Repeat,
-  Star
+  Star,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import NotificationBell from "@/components/system/NotificationBell";
@@ -33,6 +34,7 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard", color: "text-blue-500" },
   { icon: Shield, label: "Fundi Verification", path: "/admin/fundis", color: "text-green-500" },
+  { icon: Building2, label: "Companies", path: "/admin/companies", color: "text-orange-600" },
   { icon: Users, label: "Customers", path: "/admin/customers", color: "text-purple-500" },
   { icon: Briefcase, label: "Jobs", path: "/admin/jobs", color: "text-orange-500" },
   { icon: CreditCard, label: "Payments", path: "/admin/payments", color: "text-emerald-500" },

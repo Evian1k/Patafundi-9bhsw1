@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Shield, UserPlus, Ban, Check, Key, LogOut, RefreshCw } from "lucide-react";
+import { Users, Shield, Ban, Check, LogOut, RefreshCw } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,6 @@ export default function StaffManagement() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<StaffMember | null>(null);
   const [newRole, setNewRole] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
 
   const fetchStaff = useCallback(async () => {
     setLoading(true);

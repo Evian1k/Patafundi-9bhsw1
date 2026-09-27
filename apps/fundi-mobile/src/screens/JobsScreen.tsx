@@ -96,8 +96,8 @@ export function JobsScreen({ navigation }: any): JSX.Element {
             </Text>
             {item.estimatedPrice ? (
               <View style={styles.earningsWrap}>
-                <Text style={styles.earningsLabel}>You earn</Text>
-                <Text style={styles.jobPrice}>KES {Math.round(Number(item.estimatedPrice) * 0.85).toLocaleString()}</Text>
+                <Text style={styles.earningsLabel}>Est. price</Text>
+                <Text style={styles.jobPrice}>KES {Math.round(Number(item.estimatedPrice)).toLocaleString()}</Text>
               </View>
             ) : null}
             {!isAvailable ? (

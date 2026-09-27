@@ -18,10 +18,12 @@ import {
   fontSize,
   spacing,
   borderRadius,
-  gradients,
-  type WalletBalance,
-  type WalletTransaction,
+    gradients,
+    type WalletTransaction,
 } from '@patafundi/shared';
+
+// Real backend shape from GET /payments/wallet/balance (never fabricated).
+interface WalletBalanceResponse { balance: number; escrowPending: number; totalEarnings: number; }
 
 interface AnalyticsData {
   weekly?: Array<{ label?: string; amount?: number }>;
@@ -33,7 +35,7 @@ interface AnalyticsData {
 }
 
 export function WalletScreen({ navigation }: any): JSX.Element {
-  const [balance, setBalance] = useState<WalletBalance | null>(null);
+  const [balance, setBalance] = useState<WalletBalanceResponse | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,14 @@ export function WalletScreen({ navigation }: any): JSX.Element {
         apiClient.getWalletTransactions(),
         apiClient.getEarningsAnalytics(),
       ]);
-      if (results[0].status === 'fulfilled') setBalance(results[0].value.balance);
+      if (results[0].status === 'fulfilled') {
+        const raw = results[0].value as unknown as WalletBalanceResponse;
+        setBalance({
+          balance: Number(raw?.balance ?? 0),
+          escrowPending: Number(raw?.escrowPending ?? 0),
+          totalEarnings: Number(raw?.totalEarnings ?? 0),
+        });
+      }
       if (results[1].status === 'fulfilled') setTransactions(results[1].value.transactions || []);
       if (results[2].status === 'fulfilled') setAnalytics(results[2].value.analytics as AnalyticsData);
     } catch {
@@ -102,8 +111,8 @@ export function WalletScreen({ navigation }: any): JSX.Element {
         style={styles.balanceCard}
       >
         <Text style={styles.balanceLabel}>Available Balance</Text>
-        <Text style={styles.balanceValue}>KES {balance?.available ?? 0}</Text>
-        <Text style={styles.pendingText}>Pending: KES {balance?.pending ?? 0}</Text>
+        <Text style={styles.balanceValue}>KES {(balance?.balance ?? 0).toLocaleString()}</Text>
+        <Text style={styles.pendingText}>In escrow: KES {(balance?.escrowPending ?? 0).toLocaleString()}</Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('RequestPayout')}
           activeOpacity={0.85}

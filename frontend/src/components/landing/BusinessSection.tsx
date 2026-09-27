@@ -68,8 +68,8 @@ export default function BusinessSection() {
           <Link to="/companies">
             <Button className="bg-gradient-primary">Explore the company portal</Button>
           </Link>
-          <Link to="/demo/company">
-            <Button variant="outline">View company demo screen</Button>
+          <Link to="/partner-program">
+            <Button variant="outline">Register your company</Button>
           </Link>
         </div>
       </div>

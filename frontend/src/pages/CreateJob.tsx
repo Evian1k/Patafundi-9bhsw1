@@ -95,8 +95,10 @@ const providerChoices = [
 ];
 
 const urgencyOptions = [
-  { id: "asap", label: "ASAP", description: "Within 2 hours", price: "+20%" },
-  { id: "today", label: "Today", description: "Within 6 hours", price: "+10%" },
+  // Honest pricing copy (spec §58): the backend pricing engine applies
+  // night/weekend/rush multipliers — never show made-up percentages here.
+  { id: "asap", label: "ASAP", description: "Within 2 hours · rush pricing may apply", price: "Rush" },
+  { id: "today", label: "Today", description: "Within 6 hours", price: "Standard" },
   { id: "scheduled", label: "Schedule", description: "Pick a date & time", price: "Standard" },
 ];
 
@@ -126,6 +128,8 @@ const CreateJob = () => {
   });
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+  // Answers to the AI's follow-up questions (spec §12: intelligent intake).
+  const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
 
   const runAiAnalysis = async () => {
     if (jobData.description.trim().length < 10) {
@@ -137,6 +141,7 @@ const CreateJob = () => {
       const res = await apiClient.analyzeJobDescription(jobData.description) as { analysis?: AiAnalysis; disclaimer?: string };
       if (res?.analysis) {
         setAiAnalysis(res.analysis);
+        setAiAnswers({});
         // Auto-suggest the category when the AI recognized a known one.
         const cat = (res.analysis.category || "").toLowerCase();
         const known = services.find((s) => s.id === cat || s.name.toLowerCase().includes(cat));
@@ -361,10 +366,39 @@ const CreateJob = () => {
                       )}
                       {aiAnalysis.questions && aiAnalysis.questions.length > 0 && (
                         <div className="text-sm">
-                          <p className="text-muted-foreground text-xs mb-1">A pro will likely ask:</p>
-                          <ul className="list-disc pl-4 space-y-0.5">
-                            {aiAnalysis.questions.map((q, i) => <li key={i}>{q}</li>)}
-                          </ul>
+                          <p className="text-muted-foreground text-xs mb-2">Quick questions (optional — answers help your pro prepare):</p>
+                          <div className="space-y-2">
+                            {aiAnalysis.questions.map((q, i) => (
+                              <div key={i}>
+                                <label className="text-xs font-medium block mb-1">{q}</label>
+                                <input
+                                  type="text"
+                                  value={aiAnswers[i] || ""}
+                                  onChange={(e) => setAiAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+                                  placeholder="Your answer..."
+                                  className="w-full h-9 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          {Object.values(aiAnswers).some((v) => v && v.trim()) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const answered = aiAnalysis.questions!
+                                  .map((q, i) => ({ q, a: (aiAnswers[i] || "").trim() }))
+                                  .filter(({ a }) => a)
+                                  .map(({ q, a }) => `${q}: ${a}`)
+                                  .join("\n");
+                                setJobData((prev) => ({ ...prev, description: `${prev.description}\n\n${answered}`.trim() }));
+                                setAiAnalysis((prev) => (prev ? { ...prev, questions: [] } : prev));
+                                toast.success("Answers added to your job description");
+                              }}
+                              className="text-xs font-medium text-emerald-600 hover:underline mt-2"
+                            >
+                              Add answers to description
+                            </button>
+                          )}
                         </div>
                       )}
                       {aiAnalysis.estimateRange && (
@@ -464,7 +498,17 @@ const CreateJob = () => {
                 <div className="mt-4 p-4 rounded-xl border border-border bg-card">
                   <p className="text-sm font-medium">No fundi selected yet</p>
                   <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified professionals and pick one, or submit and PataFundi will broadcast your job to qualified fundis.</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => navigate("/services/plumbing")}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const svc = services.find(
+                        (s) => s.id === jobData.service || s.name.toLowerCase() === jobData.service.toLowerCase(),
+                      );
+                      navigate(svc ? `/services/${svc.id}` : "/companies");
+                    }}
+                  >
                     Browse fundis
                   </Button>
                 </div>

@@ -8,6 +8,7 @@ import { Banknote, TrendingUp, Wallet } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 interface Summary { gross: number; commission: number; net: number; pending: number; paid: number }
+interface MonthlyRow { month: string; gross: string; commission: string; net: string }
 interface Settlement {
   id: string; job_id?: string; gross_amount: string; commission_amount: string;
   net_amount: string; status: string; paid_at?: string; created_at: string;
@@ -25,15 +26,17 @@ const STATUS_STYLES: Record<string, string> = {
 export default function PortalFinance() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiClient.request("/company/portal/finance") as { summary?: Summary; settlements?: Settlement[] };
+        const res = await apiClient.request("/company/portal/finance") as { summary?: Summary; settlements?: Settlement[]; monthly?: MonthlyRow[] };
         setSummary(res.summary || null);
         setSettlements(res.settlements || []);
+        setMonthly(res.monthly || []);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "";
         setError(msg.includes("owners/finance") || msg.includes("403")
@@ -84,6 +87,36 @@ export default function PortalFinance() {
           </div>
         ))}
       </div>
+
+      <h2 className="mt-8 text-lg font-semibold tracking-tight">Monthly breakdown</h2>
+      {monthly.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">No monthly history yet — it builds up as jobs settle.</p>
+      ) : (
+        <div className="mt-3 rounded-2xl border bg-card overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Month</th>
+                <th className="px-4 py-3 font-medium text-right">Gross</th>
+                <th className="px-4 py-3 font-medium text-right">Commission</th>
+                <th className="px-4 py-3 font-medium text-right">Net</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {monthly.map((m) => (
+                <tr key={m.month} className="hover:bg-muted/40">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {new Date(m.month).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">{Number(m.gross).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">−{Number(m.commission).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-semibold">{Number(m.net).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <h2 className="mt-8 text-lg font-semibold tracking-tight">Settlement history</h2>
       {settlements.length === 0 ? (

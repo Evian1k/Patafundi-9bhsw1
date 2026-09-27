@@ -1,12 +1,39 @@
 import { motion } from "framer-motion";
-import { ArrowRight, MapPin, Zap, Shield, Star, Wrench } from "lucide-react";
+import { ArrowRight, MapPin, Zap, Shield, CheckCircle2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiClient } from "@/lib/api";
+
+interface PlatformStats {
+  verifiedFundis: number;
+  jobsCompleted: number;
+  averageRating: number;
+}
 
 const HeroSection = () => {
   const [problemText, setProblemText] = useState("");
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const navigate = useNavigate();
+
+  // Real platform statistics (spec §58: never fabricate numbers). Young
+  // platforms honestly show small numbers — the UI degrades to qualitative
+  // trust copy until real data exists.
+  useEffect(() => {
+    let active = true;
+    apiClient
+      .request("/platform/stats", { includeAuth: false })
+      .then((res) => {
+        const stats = (res as { stats?: PlatformStats })?.stats;
+        if (active) setStats(stats ?? null);
+      })
+      .catch(() => {
+        /* stats are decorative-if-real; silently fall back to qualitative copy */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,11 +44,22 @@ const HeroSection = () => {
     }
   };
 
-  const stats = [
-    { value: "50K+", label: "Verified Fundis" },
-    { value: "200K+", label: "Jobs Completed" },
-    { value: "4.9★", label: "Average Rating" },
-  ];
+  const hasRealStats = stats && (stats.verifiedFundis > 0 || stats.jobsCompleted > 0);
+
+  const statItems = hasRealStats
+    ? [
+        { value: `${stats!.verifiedFundis.toLocaleString()}`, label: "Verified Fundis" },
+        { value: `${stats!.jobsCompleted.toLocaleString()}`, label: "Jobs Completed" },
+        {
+          value: stats!.averageRating > 0 ? `${stats!.averageRating.toFixed(1)}★` : "New",
+          label: "Average Rating",
+        },
+      ]
+    : [
+        { value: "Verified", label: "Every Fundi" },
+        { value: "Escrow", label: "Protected Payments" },
+        { value: "Live", label: "Job Tracking" },
+      ];
 
   return (
     <section className="relative overflow-hidden bg-gradient-hero min-h-[90vh] flex items-center">
@@ -42,7 +80,7 @@ const HeroSection = () => {
               className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6"
             >
               <Shield className="w-4 h-4" />
-              Trusted by 200,000+ customers across East Africa
+              Verified professionals you can trust
             </motion.div>
 
             {/* Heading */}
@@ -52,10 +90,10 @@ const HeroSection = () => {
               transition={{ delay: 0.1 }}
               className="text-5xl sm:text-6xl font-display font-extrabold leading-tight mb-6"
             >
-              Get it{" "}
-              <span className="text-gradient-primary">fixed</span>
+              Real problems.{" "}
+              <span className="text-gradient-primary">Real professionals.</span>
               <br />
-              in minutes
+              One place.
             </motion.h1>
 
             <motion.p
@@ -64,8 +102,8 @@ const HeroSection = () => {
               transition={{ delay: 0.15 }}
               className="text-muted-foreground text-lg leading-relaxed mb-8"
             >
-              Connect with verified local professionals for plumbing, electrical, cleaning, repairs and more.
-              Fast, reliable, and secure.
+              Find a trusted professional or service company near you — for plumbing, electrical, cleaning,
+              repairs and more. Book, track and pay securely in one app.
             </motion.p>
 
             {/* Problem input */}
@@ -102,14 +140,14 @@ const HeroSection = () => {
               We'll find the best professionals near you
             </motion.p>
 
-            {/* Stats */}
+            {/* Stats — real values only */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="flex gap-8 mt-10"
             >
-              {stats.map((stat) => (
+              {statItems.map((stat) => (
                 <div key={stat.label}>
                   <p className="text-2xl font-display font-extrabold text-gradient-primary">{stat.value}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
@@ -118,41 +156,45 @@ const HeroSection = () => {
             </motion.div>
           </div>
 
-          {/* Right — decorative cards */}
+          {/* Right — illustrative product flow (no fabricated metrics) */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
             className="relative hidden md:flex items-center justify-center"
           >
-            {/* Main card */}
             <div className="w-full max-w-sm bg-card rounded-3xl shadow-xl border border-border/50 p-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-primary flex items-center justify-center">
                   <Zap className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold">Fundi Found!</p>
-                  <p className="text-xs text-muted-foreground">2.1 km away • 8 min ETA</p>
+                  <p className="font-semibold">From problem to done</p>
+                  <p className="text-xs text-muted-foreground">Track every step in real time</p>
                 </div>
               </div>
 
-              <div className="space-y-3 mb-5">
+              <ol className="space-y-3 mb-5">
                 {[
-                  { label: "Service", value: "Electrical Repair" },
-                  { label: "Estimated", value: "KES 1,500" },
-                  { label: "Fundi rating", value: "4.9 ⭐" },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
-                    <span className="text-xs text-muted-foreground">{label}</span>
-                    <span className="text-sm font-semibold">{value}</span>
-                  </div>
+                  { label: "Describe your problem", done: true },
+                  { label: "Match with a verified professional", done: true },
+                  { label: "Track them arriving on the map", done: false },
+                  { label: "Pay securely when the work is done", done: false },
+                ].map(({ label, done }) => (
+                  <li key={label} className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                    {done ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full border-2 border-border shrink-0" />
+                    )}
+                    <span className={done ? "text-sm font-medium" : "text-sm text-muted-foreground"}>{label}</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
 
               <div className="flex gap-2">
                 <div className="flex-1 h-10 rounded-xl bg-primary flex items-center justify-center text-sm text-white font-medium">
-                  Accept Fundi
+                  Get started
                 </div>
                 <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -160,11 +202,10 @@ const HeroSection = () => {
               </div>
             </div>
 
-            {/* Floating rating badge */}
+            {/* Floating escrow badge */}
             <div className="absolute -top-4 -right-4 bg-card rounded-2xl shadow-lg border border-border/50 px-3 py-2 flex items-center gap-2">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-bold text-sm">4.9</span>
-              <span className="text-xs text-muted-foreground">Top rated</span>
+              <Shield className="w-4 h-4 text-primary" />
+              <span className="text-xs font-medium">Escrow protected</span>
             </div>
 
             {/* Floating verified badge */}

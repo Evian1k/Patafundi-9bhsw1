@@ -423,6 +423,19 @@ class ApiClient {
 
   async getFundi(fundiId: string) { return this.request(`/fundi/${fundiId}`, { includeAuth: false }); }
 
+  // ── Saved providers (spec §20: favorites) ────────────────────────────────
+  async listFavoriteFundis() {
+    return this.request('/favorites/fundis');
+  }
+
+  async addFavoriteFundi(fundiId: string) {
+    return this.request('/favorites/fundis', { method: 'POST', body: JSON.stringify({ fundiId }) });
+  }
+
+  async removeFavoriteFundi(fundiId: string) {
+    return this.request(`/favorites/fundis/${fundiId}`, { method: 'DELETE' });
+  }
+
   async searchFundis(latitude: number, longitude: number, skill: string | null = null) {
     let endpoint = `/fundi/search?latitude=${latitude}&longitude=${longitude}`;
     if (skill) endpoint += `&skill=${encodeURIComponent(skill)}`;
@@ -531,6 +544,11 @@ class ApiClient {
     return this.request(`/jobs/${jobId}/accept`, {
       method: 'POST', body: JSON.stringify({ estimatedPrice }),
     });
+  }
+
+  async declineJobOffer(jobId: string) {
+    // Records the decline server-side (migration 038) — job stays open for others.
+    return this.request(`/jobs/${jobId}/decline`, { method: 'POST', body: JSON.stringify({}) });
   }
 
   async checkInToJob(jobId: string, latitude: number, longitude: number, status = 'on_the_way') {
@@ -755,6 +773,13 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ body, imageUrl }),
     });
+  }
+
+  async sendJobAttachment(jobId: string, file: File) {
+    // Multipart upload — backend stores privately and returns a signed URL.
+    const form = new FormData();
+    form.append('attachment', file);
+    return this.request(`/jobs/${jobId}/messages`, { method: 'POST', body: form });
   }
 
   async markJobMessagesRead(jobId: string) {

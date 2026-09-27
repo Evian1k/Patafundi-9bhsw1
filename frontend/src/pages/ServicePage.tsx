@@ -4,7 +4,7 @@ import SiteLayout from "@/components/layout/SiteLayout";
 import { apiClient } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin } from "lucide-react";
+import { Star, MapPin, BadgeCheck } from "lucide-react";
 
 type Fundi = { id: string; name: string; location?: string | null; skills: string[]; experienceYears: number; rating: number; reviewCount: number };
 
@@ -61,7 +61,12 @@ export default function ServicePage() {
                   <div key={f.id} className="p-5 bg-card rounded-2xl border border-border/50">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="font-semibold">{f.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">{f.name}</p>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
+                            <BadgeCheck className="w-3 h-3" /> Verified
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <MapPin className="w-3 h-3" />
                           <span>{f.location || "Nearby"}</span>
@@ -80,9 +85,12 @@ export default function ServicePage() {
                     <div className="flex flex-wrap gap-1">
                       {(f.skills || []).slice(0, 6).map((s) => <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>)}
                     </div>
-                    <div className="mt-4">
-                      <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/create-job?fundi=${f.id}&service=${encodeURIComponent(f.skills?.[0] || slug || "")}`)}>
+                    <div className="mt-4 flex gap-2">
+                      <Button size="sm" onClick={() => navigate(`/create-job?fundi=${f.id}&service=${encodeURIComponent(f.skills?.[0] || slug || "")}`)}>
                         Book this fundi
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/fundis/${f.id}`)}>
+                        View profile
                       </Button>
                     </div>
                   </div>

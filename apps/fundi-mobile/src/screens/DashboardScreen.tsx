@@ -54,7 +54,12 @@ export function DashboardScreen({ navigation }: any): JSX.Element {
         apiClient.getActiveJob(),
         apiClient.getFundiStatus(),
       ]);
-      if (results[0].status === 'fulfilled') setDashboard(results[0].value);
+      if (results[0].status === 'fulfilled') {
+        // GET /fundi/dashboard wraps the payload in { success, dashboard } —
+        // unwrap so the flat FundiDashboard fields actually render.
+        const raw = results[0].value as unknown as { dashboard?: FundiDashboard };
+        setDashboard(raw?.dashboard ?? (results[0].value as unknown as FundiDashboard));
+      }
       if (results[1].status === 'fulfilled') setActiveJob(results[1].value.job ?? null);
       if (results[2].status === 'fulfilled') setOnline(!!results[2].value.online);
     } catch {

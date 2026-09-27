@@ -15,6 +15,7 @@
 import { query, transaction } from '../db.js';
 import { badRequest, notFound, forbidden } from '../utils/http.js';
 import { notify } from '../services/notificationService.js';
+import { auditLog } from '../services/auditService.js';
 
 const OPEN_STATUSES = ['requested', 'approved', 'processing'];
 
@@ -177,6 +178,16 @@ export async function decideRefundRequest(req, res) {
       ? `Your refund of KES ${Number(decision.request.amount).toLocaleString()} for this job has been approved and is being processed back to your original payment method.`
       : `Your refund request was declined. ${notes ? `Reason: ${notes}` : 'Open a dispute if you disagree with this outcome.'}`,
     data: { jobId: decision.request.job_id, refundRequestId: decision.request.id },
+  });
+
+  // Auditability (spec §56): both refund decisions are significant actions
+  // (approvals are additionally audited inside the atomic reversal path).
+  await auditLog({
+    userId: req.user.id,
+    action: approved ? 'refund.approved' : 'refund.rejected',
+    entityType: 'refund_request',
+    entityId: decision.request.id,
+    metadata: { jobId: decision.request.job_id, amount: Number(decision.request.amount || 0), notes: String(notes || '').slice(0, 300) || null },
   });
 
   res.json({ success: true, refundRequest: decision.request, refund: decision.refundResult });

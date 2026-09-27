@@ -10,6 +10,7 @@ import { Activity, Wrench, Briefcase, RefreshCw, MapPin } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
+import { realtimeService } from "@/services/realtime";
 
 export default function LiveOperations() {
   const navigate = useNavigate();
@@ -68,6 +69,16 @@ export default function LiveOperations() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fundis.length, jobs.length]);
+
+  // Realtime refresh (spec §34): live metric updates on job and payment
+  // events instead of waiting for the next poll tick.
+  useEffect(() => {
+    const events = ["job:created", "job:accepted", "job:completed", "payment:confirmed", "payment:failed"];
+    const handler = () => fetchData();
+    events.forEach((e) => realtimeService.on(e, handler));
+    return () => events.forEach((e) => realtimeService.off(e, handler));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchData, fundis.length, jobs.length]);
 
   const onlineFundis = fundis.filter((f) => f.latitude && f.longitude);
   const activeJobs = jobs.filter((j) => !["completed", "cancelled", "failed"].includes(j.status));

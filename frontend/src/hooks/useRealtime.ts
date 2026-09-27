@@ -116,8 +116,15 @@ export function useJobRequest(): UseJobRequestReturn {
     }
   }, []);
 
-  const declineJob = useCallback(async (_jobId: string) => {
-    // Dismiss only — job stays open for other fundis (must not cancel customer request).
+  const declineJob = useCallback(async (jobId: string) => {
+    // Record the decline server-side (spec §23/§26: response-rate metrics are
+    // real). The job itself stays open for other fundis — decline never
+    // cancels the customer's request.
+    try {
+      await apiClient.declineJobOffer(jobId);
+    } catch (e) {
+      console.error('[useJobRequest] declineJob error:', e);
+    }
     setJobRequest(null);
     clearTimer();
   }, []);

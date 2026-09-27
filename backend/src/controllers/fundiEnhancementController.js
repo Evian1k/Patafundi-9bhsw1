@@ -150,7 +150,7 @@ export async function updateAvailability(req, res) {
 // EARNINGS ANALYTICS
 // ============================================================
 export async function earningsAnalytics(req, res) {
-  const [daily, weekly, monthly, byCategory, recentPayouts] = await Promise.all([
+  const [daily, weekly, monthly, yearly, byCategory, weeklyBuckets, recentPayouts] = await Promise.all([
     query(
       `select coalesce(sum(et.amount), 0)::numeric as total,
               count(*)::int as count
@@ -179,6 +179,14 @@ export async function earningsAnalytics(req, res) {
       [req.user.id],
     ),
     query(
+      `select coalesce(sum(et.amount), 0)::numeric as total
+       from escrow_transactions et
+       join jobs j on j.id = et.job_id
+       where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'
+         and et.created_at > now() - interval '365 days'`,
+      [req.user.id],
+    ),
+    query(
       `select j.service_category,
               count(*)::int as jobs,
               coalesce(sum(et.amount), 0)::numeric as earnings
@@ -187,6 +195,18 @@ export async function earningsAnalytics(req, res) {
        where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'
          and et.created_at > now() - interval '90 days'
        group by j.service_category order by earnings desc`,
+      [req.user.id],
+    ),
+    // Daily buckets for the mobile weekly chart ({label, amount} points).
+    query(
+      `select to_char(date_trunc('day', et.created_at), 'Dy') as label,
+              date_trunc('day', et.created_at) as day,
+              coalesce(sum(et.amount), 0)::numeric as amount
+       from escrow_transactions et
+       join jobs j on j.id = et.job_id
+       where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'
+         and et.created_at > now() - interval '7 days'
+       group by day order by day`,
       [req.user.id],
     ),
     query(
@@ -203,6 +223,12 @@ export async function earningsAnalytics(req, res) {
       today: { earnings: Number(daily.rows[0]?.total || 0), jobs: daily.rows[0]?.count || 0 },
       thisWeek: { earnings: Number(weekly.rows[0]?.total || 0), jobs: weekly.rows[0]?.count || 0 },
       thisMonth: { earnings: Number(monthly.rows[0]?.total || 0), jobs: monthly.rows[0]?.count || 0 },
+      // Flat totals consumed by the mobile EarningsScreen.
+      weeklyTotal: Number(weekly.rows[0]?.total || 0),
+      monthlyTotal: Number(monthly.rows[0]?.total || 0),
+      yearlyTotal: Number(yearly.rows[0]?.total || 0),
+      // {label, amount} points consumed by the mobile WalletScreen chart.
+      weekly: weeklyBuckets.rows.map((r) => ({ label: String(r.label || '').trim(), amount: Number(r.amount || 0) })),
       byCategory: byCategory.rows.map((r) => ({ category: r.service_category, jobs: r.jobs, earnings: Number(r.earnings) })),
       recentPayouts: recentPayouts.rows,
     },

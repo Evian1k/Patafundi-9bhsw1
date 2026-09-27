@@ -39,6 +39,30 @@ router.get('/health', (_req, res) => res.json({
   deployId: process.env.RENDER_DEPLOY_ID || null,
 }));
 
+// Public, honest platform statistics (spec §58: landing page shows REAL
+// numbers — which are genuinely zero/small on a young platform).
+router.get('/platform/stats', asyncHandler(async (_req, res) => {
+  const result = await query(`
+    select
+      (select count(*)::int from users) as users,
+      (select count(*)::int from fundis where approval_status = 'approved') as verified_fundis,
+      (select count(*)::int from company_profiles where status = 'approved') as companies,
+      (select count(*)::int from jobs where status = 'completed') as jobs_completed,
+      (select coalesce(avg(rating), 0) from reviews) as average_rating
+  `);
+  const s = result.rows[0] || {};
+  res.json({
+    success: true,
+    stats: {
+      users: Number(s.users || 0),
+      verifiedFundis: Number(s.verified_fundis || 0),
+      companies: Number(s.companies || 0),
+      jobsCompleted: Number(s.jobs_completed || 0),
+      averageRating: Number(s.average_rating || 0),
+    },
+  });
+}));
+
 router.post('/auth/register', asyncHandler(auth.register));
 router.post('/auth/register/fundi', imageUpload.any(), asyncHandler(auth.registerFundi));
 router.post('/auth/login', asyncHandler(auth.login));
@@ -117,6 +141,7 @@ router.patch('/jobs/:id/status', authRequired, asyncHandler(jobs.updateStatus));
 router.get('/jobs/:id/status', authRequired, asyncHandler(jobs.getJobStatus));
 router.get('/jobs/:id/location', authRequired, asyncHandler(jobs.getJob));
 router.post('/jobs/:id/accept', authRequired, requireApprovedFundi, asyncHandler(jobs.acceptJob));
+router.post('/jobs/:id/decline', authRequired, requireApprovedFundi, asyncHandler(jobs.declineJob));
 router.post('/jobs/:id/cancel', authRequired, asyncHandler(jobs.cancelJob));
 router.post('/jobs/:id/check-in', authRequired, requireApprovedWorker, asyncHandler(jobs.checkIn));
 router.post('/jobs/:id/complete', authRequired, requireApprovedWorker, imageUpload.array('photos', 8), asyncHandler(jobs.completeJob));
@@ -258,6 +283,23 @@ router.post('/staff/escrow/:jobId/release', authRequired, requirePermission('can
 router.post('/staff/payouts/:id/complete', authRequired, requirePermission('can_complete_payouts'), asyncHandler(payouts.completePayout));
 
 router.get('/staff/jobs', authRequired, requirePermission('can_view_all_jobs'), asyncHandler(admin.listJobs));
+
+// Extended health for the DevOps staff console (previously a dead 404 call).
+router.get('/health/extended', authRequired, requirePermission('can_view_health'), asyncHandler(async (_req, res) => {
+  const db = await query('select now() as db_time');
+  const mem = process.memoryUsage();
+  res.json({
+    success: true,
+    db: { ok: true, time: db.rows[0]?.db_time || null },
+    node: {
+      uptimeSeconds: Math.round(process.uptime()),
+      memoryRssMb: Math.round(mem.rss / 1048576),
+      heapUsedMb: Math.round(mem.heapUsed / 1048576),
+      nodeVersion: process.version,
+      env: process.env.NODE_ENV || 'development',
+    },
+  });
+}));
 router.get('/staff/fundis', authRequired, requirePermission('can_view_fundis'), asyncHandler(admin.listTable('fundis', 'fundis')));
 router.post('/staff/fundis/:id/approve', authRequired, requirePermission('can_approve_fundis'), asyncHandler(admin.approveFundi));
 router.post('/staff/fundis/:id/suspend', authRequired, requirePermission('can_suspend_fundis'), asyncHandler(admin.suspendFundi));

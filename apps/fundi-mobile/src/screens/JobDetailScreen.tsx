@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Linking,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -171,7 +172,7 @@ export function JobDetailScreen({ navigation, route }: any): JSX.Element {
           'Job Completed! 🎉',
           `Give this code to the customer:\n\n  ${otp}\n\nThey'll enter it to confirm completion and release your payment.`,
           [
-            { text: 'Copy Code', onPress: () => { /* could use Clipboard */ } },
+            { text: 'Share Code', onPress: () => Share.share({ message: `My PataFundi job completion code: ${otp}` }).catch(() => {}) },
             { text: 'Done', onPress: () => navigation.goBack() },
           ],
         );

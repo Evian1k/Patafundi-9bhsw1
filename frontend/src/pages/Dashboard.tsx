@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import {
   Plus, Clock, CheckCircle, MapPin, LogOut, Settings,
   Wrench, ChevronRight, AlertCircle, Trash2, RefreshCw,
-  Wallet, Scale,
+  Wallet, Scale, CalendarDays, Heart, LifeBuoy, Search,
+  MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -15,6 +16,93 @@ import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
+
+const HOME_CATEGORIES = [
+  { slug: "plumbing", name: "Plumbing" },
+  { slug: "electrical", name: "Electrical" },
+  { slug: "cleaning", name: "Cleaning" },
+  { slug: "hvac", name: "AC & HVAC" },
+  { slug: "auto", name: "Auto Repair" },
+  { slug: "carpentry", name: "Carpentry" },
+  { slug: "painting", name: "Painting" },
+  { slug: "general", name: "General Repair" },
+];
+
+const LOCATION_ONBOARDING_KEY = "pf_location_onboarding";
+
+/** Branded location-permission explainer (spec §8): context FIRST, then the
+ * browser prompt. Denial never blocks the app — manual location stays
+ * available in Settings. */
+function LocationOnboarding() {
+  const navigate = useNavigate();
+  const [visible, setVisible] = useState(false);
+  const [state, setState] = useState<"idle" | "asking" | "denied" | "granted">("idle");
+
+  useEffect(() => {
+    setVisible(!localStorage.getItem(LOCATION_ONBOARDING_KEY));
+  }, []);
+
+  const dismiss = (value: string) => {
+    localStorage.setItem(LOCATION_ONBOARDING_KEY, value);
+    setVisible(false);
+  };
+
+  const allowLocation = () => {
+    setState("asking");
+    if (!navigator.geolocation) {
+      setState("denied");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        localStorage.setItem("pf_location_label", "Current location");
+        setState("granted");
+        setTimeout(() => dismiss("granted"), 900);
+      },
+      () => setState("denied"),
+      { timeout: 10000 },
+    );
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div className="bg-card rounded-3xl border border-border/50 p-5 relative overflow-hidden">
+      <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="flex items-start gap-4 relative">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+          <MapPin className="w-6 h-6 text-primary animate-bounce" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-bold">Find help near you</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            We use your location to show nearby professionals and calculate accurate arrival times.
+          </p>
+          {state === "denied" && (
+            <p className="text-xs text-amber-600 mt-2">
+              No problem — you can set your location manually in Settings at any time.
+            </p>
+          )}
+          {state === "granted" ? (
+            <p className="text-xs text-green-600 mt-2 font-medium">Location saved ✓</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Button size="sm" className="bg-gradient-primary" onClick={allowLocation} disabled={state === "asking"}>
+                {state === "asking" ? "Checking..." : "Allow Location"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { dismiss("manual"); navigate("/settings"); }}>
+                Choose Location Manually
+              </Button>
+              <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => dismiss("skipped")}>
+                Not now
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface JobData {
   id: string;
@@ -189,38 +277,86 @@ export default function Dashboard() {
           <h1 className="text-2xl md:text-4xl font-display font-bold">
             Hello, {String(user?.fullName ?? '').split(" ")[0] || "there"}!
           </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">What needs fixing today?</p>
+          <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5" />
+            {localStorage.getItem("pf_location_label") || "Set your location for nearby results"}
+          </p>
         </div>
 
-        {/* Quick actions */}
-        <div className="grid gap-3 md:grid-cols-2">
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate("/create-job")}
-            className="flex flex-col items-start gap-2 p-4 bg-gradient-primary rounded-2xl text-white shadow-glow"
-          >
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-              <Plus className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">New Job</p>
-              <p className="text-white/70 text-xs">Get matched fast</p>
-            </div>
-          </motion.button>
+        {/* Branded location onboarding (spec §8) */}
+        <LocationOnboarding />
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate("/disputes")}
-            className="flex flex-col items-start gap-2 p-4 bg-card rounded-2xl border border-border/50"
-          >
+        {/* What do you need help with? (spec §11 hero card) */}
+        <div className="bg-gradient-primary rounded-3xl p-6 text-white shadow-glow relative overflow-hidden">
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+          <h2 className="font-display font-bold text-xl md:text-2xl mb-1">What do you need help with?</h2>
+          <p className="text-white/80 text-sm mb-4">Describe a problem and get matched with a verified professional.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => navigate("/create-job")}
+              className="bg-white text-primary hover:bg-white/90 font-semibold"
+            >
+              <MessageSquareText className="w-4 h-4 mr-2" />
+              Describe a problem
+            </Button>
+            <Button
+              variant="outline"
+              className="bg-white/10 border-white/40 text-white hover:bg-white/20 font-semibold"
+              onClick={() => document.getElementById("home-categories")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Search services
+            </Button>
+          </div>
+        </div>
+
+        {/* Service categories (spec §11 grid) */}
+        <div id="home-categories">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Services</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {HOME_CATEGORIES.map((c) => (
+              <Link
+                key={c.slug}
+                to={`/services/${c.slug}`}
+                className="bg-card rounded-2xl border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all"
+              >
+                <Wrench className="w-5 h-5 text-primary mb-2" />
+                <p className="text-sm font-semibold">{c.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Find a professional</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick links (spec §20 customer IA) */}
+        <div className="grid grid-cols-3 gap-3">
+          <Link to="/bookings" className="bg-card rounded-2xl border border-border/50 p-4 flex flex-col items-start gap-2 hover:border-primary/40 transition-all">
             <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
-              <Scale className="w-5 h-5 text-muted-foreground" />
+              <CalendarDays className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-bold text-sm">Disputes</p>
-              <p className="text-muted-foreground text-xs">Report issues</p>
+              <p className="font-bold text-sm">Bookings</p>
+              <p className="text-muted-foreground text-xs">All your jobs</p>
             </div>
-          </motion.button>
+          </Link>
+          <Link to="/favorites" className="bg-card rounded-2xl border border-border/50 p-4 flex flex-col items-start gap-2 hover:border-primary/40 transition-all">
+            <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+              <Heart className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Saved</p>
+              <p className="text-muted-foreground text-xs">Favorite providers</p>
+            </div>
+          </Link>
+          <Link to="/disputes" className="bg-card rounded-2xl border border-border/50 p-4 flex flex-col items-start gap-2 hover:border-primary/40 transition-all">
+            <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+              <LifeBuoy className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Support</p>
+              <p className="text-muted-foreground text-xs">Disputes & help</p>
+            </div>
+          </Link>
         </div>
 
         {/* Active Jobs */}

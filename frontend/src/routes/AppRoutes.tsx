@@ -5,6 +5,9 @@ import { ProtectedAdminRoute } from "@/routes/guards";
 import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
+import Bookings from "@/pages/customer/Bookings";
+import Favorites from "@/pages/customer/Favorites";
+import FundiProfile from "@/pages/customer/FundiProfile";
 import CreateJob from "@/pages/CreateJob";
 import FundiRegister from "@/pages/FundiRegister";
 import FundiPendingApproval from "@/pages/FundiPendingApproval";
@@ -18,7 +21,6 @@ import Settings from "@/pages/Settings";
 import JobTracking from "@/pages/JobTracking";
 import NotFound from "@/pages/NotFound";
 import ServicePage from "@/pages/ServicePage";
-import CompanyPage from "@/pages/CompanyPage";
 import About from "@/pages/About";
 import Careers from "@/pages/Careers";
 import Blog from "@/pages/Blog";
@@ -79,6 +81,7 @@ import StaffOverview from "@/pages/staff/StaffOverview";
 import StaffDataTable from "@/pages/staff/StaffDataTable";
 import StaffLogin from "@/pages/staff/StaffLogin";
 import ExecutiveDashboard from "@/pages/staff/ExecutiveDashboard";
+import RevenuePage from "@/pages/staff/RevenuePage";
 import AICommandCenter from "@/pages/staff/AICommandCenter";
 import StaffManagement from "@/pages/staff/StaffManagement";
 import CommissionControl from "@/pages/staff/CommissionControl";
@@ -115,6 +118,9 @@ export default function AppRoutes() {
       <Route path="/profile" element={<Navigate to="/settings" replace />} />
 
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/bookings" element={<Bookings />} />
+      <Route path="/favorites" element={<Favorites />} />
+      <Route path="/fundis/:fundiId" element={<FundiProfile />} />
       <Route path="/create-job" element={<CreateJob />} />
       <Route path="/job/:jobId/tracking" element={<JobTracking />} />
       <Route path="/settings" element={<Settings />} />
@@ -181,10 +187,10 @@ export default function AppRoutes() {
       <Route path="/admin/security" element={<ProtectedAdminRoute element={<SecurityManagement />} />} />
       <Route path="/admin/reports" element={<ProtectedAdminRoute element={<ReportsAnalytics />} />} />
       <Route path="/admin/settings" element={<ProtectedAdminRoute element={<AdminSettings />} />} />
-      <Route path="/admin/payouts" element={<AdminPayouts />} />
-      <Route path="/admin/refunds" element={<AdminRefunds />} />
-      <Route path="/admin/subscriptions" element={<AdminSubscriptions />} />
-      <Route path="/admin/reviews" element={<AdminReviews />} />
+      <Route path="/admin/payouts" element={<ProtectedAdminRoute element={<AdminPayouts />} />} />
+      <Route path="/admin/refunds" element={<ProtectedAdminRoute element={<AdminRefunds />} />} />
+      <Route path="/admin/subscriptions" element={<ProtectedAdminRoute element={<AdminSubscriptions />} />} />
+      <Route path="/admin/reviews" element={<ProtectedAdminRoute element={<AdminReviews />} />} />
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
       <Route path="/admin/companies" element={<ProtectedAdminRoute element={<CompanyApplications />} />} />
@@ -205,7 +211,7 @@ export default function AppRoutes() {
         {/* Role-specific dashboards (takeover: real data per role) */}
         <Route path="dispatch" element={<StaffRoleHome role="dispatch_team" />} />
         <Route path="finance" element={<StaffRoleHome role="finance_team" />} />
-        <Route path="finance/revenue" element={<StaffRoleHome role="finance_team" />} />
+        <Route path="finance/revenue" element={<RevenuePage />} />
         <Route path="fraud" element={<StaffRoleHome role="fraud_analyst" />} />
         <Route path="audit" element={<StaffRoleHome role="auditor" />} />
         <Route path="devops" element={<StaffRoleHome role="devops_engineer" />} />

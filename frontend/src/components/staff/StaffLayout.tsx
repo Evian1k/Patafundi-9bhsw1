@@ -21,7 +21,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Shield, Users, Wrench, DollarSign, AlertTriangle, Headphones,
-  Package, Activity, ScrollText, LogOut, Menu, X,
+  Package, Activity, ScrollText, LogOut, Menu, X, TrendingUp,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { apiClient } from "@/lib/api";
@@ -36,7 +36,8 @@ const STAFF_NAV = [
       { label: "Live Operations", href: "/staff/operations", icon: Activity, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Fundis", href: "/staff/admin/fundis", icon: Wrench, permission: "can_view_fundis", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Jobs", href: "/staff/admin/jobs", icon: Package, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
-      { label: "Users", href: "/staff/admin/users", icon: Users, permission: "can_view_users", roles: ["super_admin", "admin", "support_agent"] },
+      { label: "User Activity", href: "/staff/admin/users", icon: Users, permission: "can_view_users", roles: ["super_admin", "admin", "support_agent"] },
+      { label: "Executive Dashboard", href: "/staff/executive", icon: TrendingUp, permission: "can_view_executive_dashboard", roles: ["super_admin"] },
     ],
   },
   {

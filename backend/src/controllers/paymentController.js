@@ -355,15 +355,22 @@ export async function walletBalance(req, res) {
          select sum(p.amount)
          from payouts p
          where p.fundi_id = $1 and p.status in ('requested', 'processing', 'completed')
-       ), 0) as paid_or_pending`,
+       ), 0) as paid_or_pending,
+       coalesce((
+         select sum(et.amount)
+         from escrow_transactions et
+         join jobs j on j.id = et.job_id
+         where j.fundi_id = $1 and et.type = 'hold' and et.status in ('held', 'frozen')
+       ), 0) as escrow_pending`,
     [req.user.id],
   );
   const totalEarnings = Number(result.rows[0]?.total_earnings || 0);
   const paidOrPending = Number(result.rows[0]?.paid_or_pending || 0);
+  const escrowPending = Number(result.rows[0]?.escrow_pending || 0);
   res.json({
     success: true,
     balance: Math.max(0, totalEarnings - paidOrPending),
-    escrowPending: 0,
+    escrowPending,
     totalEarnings,
   });
 }

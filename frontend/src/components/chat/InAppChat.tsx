@@ -4,7 +4,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, MessageCircle } from 'lucide-react';
+import { X, Send, MessageCircle, ImageIcon, CheckCheck, Check } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { realtimeService } from '@/services/realtime';
 
@@ -20,6 +20,10 @@ interface ChatMessage {
   created_at?: string;
   createdAt?: string;
   timestamp?: string;
+  image_url?: string | null;
+  imageUrl?: string | null;
+  read_at?: string | null;
+  readAt?: string | null;
 }
 
 interface Props {
@@ -42,6 +46,8 @@ function normalizeMessage(msg: ChatMessage, currentUserId?: string) {
   const senderId = msg.sender_id || msg.senderId;
   const content = msg.body || msg.content || msg.text || '';
   const timestamp = msg.created_at || msg.createdAt || msg.timestamp;
+  const imageUrl = msg.image_url || msg.imageUrl || null;
+  const readAt = msg.read_at || msg.readAt || null;
   // Fallback ID: if no id from server, generate one from sender+content+timestamp
   // so dedup works even when socket payload and API response have different shapes
   const id = msg.id || `${senderId}-${content.slice(0, 20)}-${timestamp}`;
@@ -51,6 +57,8 @@ function normalizeMessage(msg: ChatMessage, currentUserId?: string) {
     senderName: msg.sender_name || msg.senderName,
     content,
     timestamp,
+    imageUrl,
+    readAt,
     isOwn: senderId === currentUserId,
   };
 }
@@ -110,6 +118,40 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // ── Photo upload (spec §18): photos ride the SAME job-scoped, logged,
+  // fraud-filtered channel as text — never a side channel.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handlePhotoPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: 'error', message: 'Only image files can be sent here.' } }));
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: 'error', message: 'Image is too large (max 8 MB).' } }));
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const res = await apiClient.sendJobAttachment(jobId, file) as { message?: ChatMessage };
+      if (res.message) {
+        const normalized = normalizeMessage(res.message, currentUserId);
+        setMessages((prev) => {
+          if (normalized.id && prev.some((p) => p.id === normalized.id)) return prev;
+          return [...prev, normalized];
+        });
+      }
+    } catch {
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: 'error', message: 'Could not send the photo. Please try again.' } }));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleSend = async () => {
     const text = input.trim();
@@ -214,12 +256,30 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
                   {!m.isOwn && m.senderName && (
                     <p className="text-xs font-medium mb-0.5 opacity-70">{m.senderName}</p>
                   )}
-                  <p className="text-sm leading-relaxed">{m.content}</p>
-                  {m.timestamp && (
-                    <p className={`text-xs mt-1 ${m.isOwn ? 'text-white/60' : 'text-muted-foreground'}`}>
-                      {formatTime(m.timestamp)}
-                    </p>
+                  {m.imageUrl && (
+                    <img
+                      src={m.imageUrl}
+                      alt="Shared photo"
+                      className="rounded-xl mb-1.5 max-h-56 w-auto object-cover"
+                      loading="lazy"
+                    />
                   )}
+                  {m.content && m.content !== '[image]' && (
+                    <p className="text-sm leading-relaxed">{m.content}</p>
+                  )}
+                  <div className={`flex items-center gap-1 ${m.isOwn ? 'justify-end' : ''}`}>
+                    {m.timestamp && (
+                      <p className={`text-xs ${m.isOwn ? 'text-white/60' : 'text-muted-foreground'}`}>
+                        {formatTime(m.timestamp)}
+                      </p>
+                    )}
+                    {m.isOwn && m.readAt && (
+                      <CheckCheck className="w-3.5 h-3.5 text-white/80" aria-label="Read" />
+                    )}
+                    {m.isOwn && !m.readAt && (
+                      <Check className="w-3.5 h-3.5 text-white/50" aria-label="Sent" />
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -229,6 +289,21 @@ export default function InAppChat({ jobId, onClose, currentUserId, currentUserRo
 
         <div className="px-4 py-3 border-t border-border bg-background/95 backdrop-blur-xl shrink-0">
           <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoPicked}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="w-11 h-11 rounded-2xl bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-95 transition-all disabled:opacity-40"
+              aria-label="Send photo"
+            >
+              <ImageIcon className={`w-4 h-4 text-muted-foreground ${uploadingPhoto ? 'animate-pulse' : ''}`} />
+            </button>
             <input
               ref={inputRef}
               type="text"

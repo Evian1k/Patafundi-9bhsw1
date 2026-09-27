@@ -85,6 +85,13 @@ function publicFundiShape(row, photoUrls = {}) {
     profile_photo_url: photoUrls.profilePhotoUrl || null,
     verified: Boolean(row.verification_badge) || row.approval_status === 'approved',
     verificationBadge: Boolean(row.verification_badge),
+    // Public profile depth (spec §15): about, experience, track record.
+    bio: row.bio || null,
+    experience: row.experience || null,
+    completedJobs: Number(row.completed_jobs || 0),
+    completed_jobs: Number(row.completed_jobs || 0),
+    reviewCount: Number(row.review_count || 0),
+    review_count: Number(row.review_count || 0),
   };
 }
 
@@ -98,11 +105,15 @@ async function resolveProfilePhotoUrls(row) {
 export async function publicFundi(req, res) {
   const result = await query(
     `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score, f.approval_status,
-            f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge
+            f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge,
+            f.bio, f.experience,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'completed') as completed_jobs,
+            (select count(*)::int from reviews r join jobs j2 on j2.id = r.job_id where j2.fundi_id = f.user_id) as review_count
      from fundis f join users u on u.id = f.user_id where f.id = $1 or f.user_id = $1`,
     [req.params.id],
   );
   const row = result.rows[0];
+  if (!row) return res.status(404).json({ success: false, error: 'Fundi not found' });
   const photoUrls = await resolveProfilePhotoUrls(row);
   res.json({ success: true, fundi: publicFundiShape(row, photoUrls) });
 }
@@ -185,7 +196,7 @@ export async function searchFundis(req, res) {
 }
 
 export async function dashboard(req, res) {
-  const [jobs, fundi, wallet, ratings] = await Promise.all([
+  const [jobs, fundi, wallet, ratings, offers, earnings] = await Promise.all([
     query(`select * from jobs where fundi_id = $1 order by updated_at desc limit 10`, [req.user.id]),
     query(`select * from fundis where user_id = $1`, [req.user.id]),
     query(
@@ -198,19 +209,51 @@ export async function dashboard(req, res) {
        from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1`,
       [req.user.id],
     ),
+    // Real pending-offer count (migration 038) — offers made in the last
+    // 15 minutes that this fundi has not responded to yet.
+    query(
+      `select count(*)::int as n from fundi_job_offers
+       where fundi_id = $1 and response = 'pending' and offered_at > now() - interval '15 minutes'`,
+      [req.user.id],
+    ),
+    // Real earnings from released escrow (never hardcoded — spec §58).
+    query(
+      `select
+         coalesce(sum(case when et.created_at >= date_trunc('day', now()) then et.amount else 0 end), 0) as today,
+         coalesce(sum(case when et.created_at >= now() - interval '7 days' then et.amount else 0 end), 0) as week,
+         coalesce(sum(case when et.created_at >= now() - interval '30 days' then et.amount else 0 end), 0) as month
+       from escrow_transactions et
+       join jobs j on j.id = et.job_id
+       where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'`,
+      [req.user.id],
+    ),
   ]);
   const profile = fundi.rows[0] || null;
+  // Real profile completion from actual profile fields (spec §58: no fake 85%).
+  const completionFields = profile
+    ? [
+        Array.isArray(profile.skills) && profile.skills.length > 0,
+        Boolean(profile.experience && profile.experience.trim()),
+        Boolean(profile.bio && profile.bio.trim()),
+        Boolean(profile.mpesa_number),
+        profile.latitude != null && profile.longitude != null,
+      ]
+    : [];
+  const profileCompletion = completionFields.length
+    ? Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100)
+    : 0;
+  const earningsRow = earnings.rows[0] || {};
   res.json({
     success: true,
     dashboard: {
       jobs: jobs.rows,
       fundi: profile,
       verificationStatus: profile?.approval_status || 'not_registered',
-      profileCompletion: profile ? 85 : 0,
+      profileCompletion,
       online: Boolean(profile?.online),
       walletBalance: Number(wallet.rows[0]?.balance || 0),
       jobStats: {
-        newRequests: 0,
+        newRequests: Number(offers.rows[0]?.n || 0),
         activeJobs: jobs.rows.filter((job) => !['completed', 'cancelled', 'failed'].includes(job.status)).length,
         completedJobs: jobs.rows.filter((job) => job.status === 'completed').length,
       },
@@ -218,6 +261,16 @@ export async function dashboard(req, res) {
         average: Number(ratings.rows[0]?.average || 0),
         total: Number(ratings.rows[0]?.total || 0),
       },
+      // Earnings in both shapes: flat keys (mobile DashboardScreen) and the
+      // nested today/week/month object (web + mobile EarningsScreen).
+      earnings: {
+        today: Number(earningsRow.today || 0),
+        week: Number(earningsRow.week || 0),
+        month: Number(earningsRow.month || 0),
+      },
+      earningsToday: Number(earningsRow.today || 0),
+      earningsWeek: Number(earningsRow.week || 0),
+      earningsMonth: Number(earningsRow.month || 0),
     },
   });
 }

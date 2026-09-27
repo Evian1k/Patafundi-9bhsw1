@@ -23,16 +23,22 @@ export interface PortalMe {
   stats?: Record<string, number>;
 }
 
-const NAV = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; financeOnly?: boolean };
+
+const NAV: NavItem[] = [
   { to: "/company", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/company/jobs", label: "Jobs", icon: Briefcase },
   { to: "/company/team", label: "Team", icon: Users },
   { to: "/company/services", label: "Services", icon: Wrench },
   { to: "/company/schedule", label: "Schedule", icon: CalendarDays },
   { to: "/company/quality", label: "Quality", icon: Star },
-  { to: "/company/finance", label: "Finance", icon: BarChart3 },
+  { to: "/company/finance", label: "Finance", icon: BarChart3, financeOnly: true },
   { to: "/company/settings", label: "Settings", icon: Settings },
 ];
+
+// Finance nav is hidden for roles the server would 403 anyway (spec §29:
+// dispatchers/technicians must not see sensitive financial navigation).
+const FINANCE_ROLES = ["owner", "finance", "admin", "manager"];
 
 const MOBILE_NAV = [NAV[0], NAV[1], NAV[2], NAV[3], NAV[7]];
 
@@ -105,7 +111,8 @@ export default function CompanyPortalLayout() {
         </span>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
+        {NAV.filter(({ financeOnly }) => !financeOnly || FINANCE_ROLES.includes(String(me?.myRole || "")))
+          .map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end}
             className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
               isActive ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
