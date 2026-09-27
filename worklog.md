@@ -433,3 +433,20 @@ Stage Summary:
 - Booking UX matches master prompt §15/§16: service click → wizard, company never lost, verified companies surfaced by real review counts.
 - UI is honest: zero fake stats/pages/dashes; policies are real product policies.
 - Command center live on real data. Mobile configs store-shaped. All pushed (849e005).
+
+---
+Task ID: 20 (dash sign still visible in some places)
+Agent: Super Z (main agent)
+Task: User reported still seeing the dash sign in some places after the task-19 honest-UI pass.
+
+Work Log:
+- Full audit of every dash character that can render: 5 data placeholders survived task 19 (admin Dashboard loading state, JobRequestModal distance/pay, FundiNavigationMap + FundiTracker distance) plus ~70 rendered copy occurrences (toasts, headings, empty states, input placeholders, landing copy) and 1 backend notification fallback
+- Hand-fixed the 7 spots needing honest text: admin fundi-status cards now render a pulse skeleton while loading; JobRequestModal shows N/A / To be quoted; maps show Calculating... / Waiting for GPS; payout notification omits Reference line when absent; PortalFinance and HelpCenter reworded
+- scripts/fix_emdash_web.py swept remaining rendered dashes to plain hyphens across web (frontend/src + index.html title/meta), seed-takeover.js demo data, 040 policy content, en-dash spots (FundiWallet 1-3 days, CreateJob estimate range) and both mobile apps; comments skipped
+- New migration 041_remove_dash_placeholders.sql: idempotent replace of em/en dashes in already-persisted rows (fundis.bio, customer_properties.label, company_profiles branches+description, jobs.description, reviews.comment, revenue_ledger.notes, notifications title/body, policies.body) — repairs dev PGlite AND Render production on next boot
+- Stack was down (sandbox reaped processes): ran ensure-dev-db (041 applied), seed-takeover, restarted .zscripts/stack-supervisor.py; :4000 and :3000 healthy
+- Verified through the live API as the browser does: 10 job descriptions 0 dashes, /api/policies/terms 0 dashes, /api/fundis 0 dashes; typecheck clean, 124/124 unit tests, vite build ok
+- Commit 8ab9834 pushed to origin/main (Vercel frontend + Render backend auto-deploy; Render boot applies 041 to production data)
+
+Stage Summary:
+- The dash sign is gone from every user-visible surface: code, copy, seeds, existing database rows (web + mobile). Loading states use skeletons or honest words instead of placeholder characters.
