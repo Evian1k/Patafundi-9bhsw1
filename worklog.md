@@ -221,3 +221,20 @@ Work Log:
 Stage Summary:
 - Commit ef31fc6 pushed to origin/main (96 files)
 - Honest open items: M-Pesa reversal API call remains a documented manual step (money ledger is real); Stripe not integrated; Render service rename + DNS is an ops task; PostGIS geo indexes deferred (bounding-box + haversine adequate at current scale); refresh-token-in-localStorage redesign deferred (documented tradeoff)
+
+---
+Task ID: 10 (Vercel frontend deploy fix)
+Agent: Super Z (main agent)
+Task: User's first Vercel deployment of the frontend failed/hung mid-build; build log showed the legacy `builds` warning. Diagnose and fix.
+
+Work Log:
+- Synced sandbox to deployed commit f74d750 (origin/main) via git reset --hard; confirmed origin contains Task 7-9 work (backend/package.json present, FUNDIHUB ef31fc6 in history)
+- Reproduced the frontend build locally on the EXACT deployed commit: `npm run build` in frontend/ passes (2909 modules, built in 19.9s) — code is NOT the problem
+- Root cause: legacy `builds` config in vercel.json overrides ALL dashboard Build & Development Settings; with Root Directory unset the root vercel.json points @vercel/static-build at distDir "dist" while the root build script outputs to frontend/dist -> "No Output Directory named dist" class failure
+- Fixed frontend/vercel.json: removed legacy `builds` block entirely (keeps SPA rewrites + cache headers) so the Vite preset settings (Root=frontend, build `npm run build`, output `dist`) apply from the dashboard
+- Fixed root vercel.json: distDir corrected to "frontend/dist" so even a Root=./ configuration deploys correctly (fallback path)
+- Committed and pushed to origin/main -> triggers Vercel auto-deploy
+
+Stage Summary:
+- Frontend now deploys under EITHER Vercel configuration (Root=frontend with modern config, or Root=./ with corrected legacy config)
+- Build verified passing on f74d750; user action: Redeploy on Vercel
