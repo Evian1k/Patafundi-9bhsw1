@@ -375,3 +375,29 @@ Work Log:
 
 Stage Summary:
 - All 68-section master prompt requirements that are achievable without external credentials are now implemented and verified. Remaining real issues documented in final report: company settlement payout execution flow, per-permission staff matrix UI, phone-OTP/social auth, globalization UI surfacing, company detail depth in admin.
+
+---
+Task ID: 18 (MASTER PROMPT: close every remaining gap — "build everything")
+Agent: Super Z (main agent)
+Task: User demanded "build everything". Two parallel deep-audit agents mapped the exact remaining master-prompt gaps (settlement payout dead-end, no per-permission company staff matrix, globalization data layer unused, no admin company drill-down, a11y holes, mobile SOS info-only). Implemented all of them plus fixed a pre-existing fundi-registration regression.
+
+Work Log:
+- Migration 039_company_payouts_permissions_global.sql: payouts.company_id + provider-check constraint + currency; company_profiles payout destination fields (mpesa/bank); company_members.permissions jsonb; indexes
+- companyPayoutService: race-safe companyAvailableBalance (pending settlements − outstanding requests), idempotent requestCompanyWithdrawal (row locks, min-amount, approval gates), markSettlementsPaid FIFO, notifyCompanyPayoutCompleted
+- companyAccess: 8 company capability keys + role defaults mirroring historical gates + effectiveCapabilities/hasCapability + requireCompanyMember({capability}); portal services/profile/team handlers now capability-gated
+- companyController: portalFinance adds availableForWithdrawal + payoutAccount (masked) + payout requests; portalUpdatePayoutDestination; portalWithdraw; team endpoints accept permissions + role; adminCompanyDetail aggregator (members/services/jobs/ledger/payouts/application/owner)
+- payoutController.completePayout: company branch marks settlements paid FIFO + notification + realtime; adminController.listPayouts returns fundi AND company payouts with normalized provider identity
+- settlementService + paymentController: currency from payment/job records (KES only as fallback); settlement notifications currency-correct
+- userController.updateMe: persists country_code/preferred_language (validated against countries/languages tables)
+- Frontend: lib/money.ts (single Intl-based formatter); lib/country.tsx CountryProvider (detect + localStorage + server persist); PortalTeam permission-matrix UI (per-member capability checkboxes, role change, reset-to-defaults); PortalFinance withdraw card + payout requests + destination display; PortalSettings payout destination editor; AdminPayouts Complete action + company type column; new /admin/companies/:id CompanyDetail page (members, services, jobs, settlement ledger, payout requests, application) + table links + pending-KES column; Settings region section (country + language)
+- A11y: MotionConfig reducedMotion="user" app-wide; SkipToContent on Site/Admin/Staff/Company layouts; useModalA11y (Escape + focus trap + restore) on StaffManagement role modal, PortalJobs quote dialog, FundiVerificationModal; label htmlFor fixes
+- Mobile: customer + fundi SOS screens wire apiClient.triggerSOS with expo-location (dialer fallback kept, accessibility labels); ProfileScreen refreshes user on focus
+- REGRESSION FOUND + FIXED: fundis INSERT had 17 values for 16 columns ("INSERT has more expressions than target columns") — public fundi registration was completely broken at HEAD; fixed to true,$11,now(),$12,$13 mapping; journeys script updated (allowlist demotion expectation, on_the_way→arrived→in_progress lifecycle sequence)
+- Infra: db.js per-query SQL debug hook (DEBUG_DB_SQL); pglite-instance closeEmbeddedDb for graceful seed exits; recovered from PGlite multi-process corruption by wiping dev .pgdata + full re-boot (39 migrations + seeds)
+- Live verification chain: patafundi-e2e (creates real pending settlement) → verify-company-payout probe 21/21 (withdraw → idempotency → overdraft reject → admin ledger provider_type=company → complete → settlements paid FIFO → owner notified)
+- Gauntlet: npm test 124/124, security-probe 16/16, security-battery 19/19, patafundi-e2e 41/41, e2e_journeys 57/57, frontend typecheck + build clean
+- Pushed commit a987d27 (42 files, +2071) after stripping a stray PGlite ":memory:" artifact from the commit
+
+Stage Summary:
+- Master prompt remaining gaps CLOSED: company payout execution is real end-to-end, per-permission staff matrix enforced server-side + editable in UI, globalization surfaced (currency formatting + country/language persistence), admin company drill-down complete, a11y baseline (reduced motion, skip links, dialog semantics), mobile SOS is real. Logo/brand untouched; all communication English.
+- Probe ordering note: run patafundi-e2e before verify-company-payout (probe consumes the pending settlement the e2e creates). Never import backend/src/db.js while the server holds the PGlite data dir.
