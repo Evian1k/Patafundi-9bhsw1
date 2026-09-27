@@ -354,8 +354,14 @@ if (config.nodeEnv !== 'production') {
 }
 
 // Webhook authenticity (spec §payments): in production M-Pesa callbacks MUST
-// carry the shared callback secret. Fail fast at boot when it is missing
-// instead of silently relying on signature verification only.
+// carry the shared callback secret. Fail fast at boot when M-Pesa is enabled
+// but the secret is missing, instead of silently relying on signature
+// verification only. When M-Pesa is not configured at all, boot normally —
+// /health reports mpesa.configured=false and STK push routes return a clear
+// configuration error until the MPESA_* vars are set.
+if (config.nodeEnv === 'production' && !config.mpesa.consumerKey) {
+  console.warn('[PataFundi API] M-Pesa not configured — STK push payments disabled until MPESA_* env vars are set.');
+}
 try {
   const { requireCallbackSecretInProduction } = await import('./services/mpesaService.js');
   requireCallbackSecretInProduction();

@@ -259,3 +259,18 @@ Stage Summary:
 - Verification: frontend build passes (17.3s, original logo); DB reseeded (12 accounts, PataFundi#2026); 110/110 unit+E2E; 16/16 security probe; 19/19 security battery
 - Brand is PataFundi everywhere user-facing; all functional FUNDIHUB improvements (three-way booking, AI, refunds, admin pages, security fixes) preserved
 - Note for user: demo logins are the ORIGINAL accounts again (e.g. customer.demo@patafundi.test / PataFundi#2026 — see DEMO_ACCOUNTS.md); @fundihub.* aliases may linger in old local DBs but are no longer seeded
+
+---
+Task ID: 12 (Render backend deploy blocked by M-Pesa boot guard)
+Agent: Super Z (main agent)
+Task: User's Render backend deploy exited 1: MPESA_CALLBACK_SECRET required in production even though M-Pesa was never configured; also no env vars set on the service.
+
+Work Log:
+- Traced crash to requireCallbackSecretInProduction() throwing unconditionally in production; boot guard in server.js exits(1) on throw
+- Fixed semantics: guard now enforces the callback secret ONLY when M-Pesa is actually configured (consumerKey+secret+shortcode+passkey+callbackUrl present). Unconfigured M-Pesa -> boot continues with warn line; /health still reports mpesa.configured=false; STK routes fail per-request via requireMpesaConfig(). Live M-Pesa WITHOUT the secret still fails fast (security posture intact, spec §payments)
+- Verified: 110/110 tests; local NODE_ENV=production boot without MPESA_* reaches "listening" with clear warning
+- Note: user's Render deploy was on 0dc4498 (pre-brand-revert) — new push delivers both fix and PataFundi banner
+- Render uses Bun runtime (bun.lock present) — bun install/run worked; left as-is
+
+Stage Summary:
+- Commit pushed: M-Pesa guard fix; user needs Render env vars (DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET, ENCRYPTION_KEY, FRONTEND_ORIGIN, CORS_ORIGINS, COOKIE_SECURE) + Render Postgres before real data

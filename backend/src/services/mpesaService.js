@@ -100,7 +100,18 @@ export function verifyCallbackSecret(req) {
 }
 
 export function requireCallbackSecretInProduction() {
-  if (config.nodeEnv === 'production' && !config.mpesa.callbackSecret) {
-    throw new Error('MPESA_CALLBACK_SECRET is required in production');
+  // Only enforce when M-Pesa is actually configured — an operator who has not
+  // enabled Daraja yet must still be able to boot the API. Once MPESA_* env
+  // vars are present, the shared callback secret becomes mandatory: webhook
+  // authenticity (spec §payments) is not optional for live payments.
+  const mpesaConfigured = Boolean(
+    config.mpesa.consumerKey
+    && config.mpesa.consumerSecret
+    && config.mpesa.shortcode
+    && config.mpesa.passkey
+    && config.mpesa.callbackUrl,
+  );
+  if (config.nodeEnv === 'production' && mpesaConfigured && !config.mpesa.callbackSecret) {
+    throw new Error('MPESA_CALLBACK_SECRET is required in production when M-Pesa is configured');
   }
 }
