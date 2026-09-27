@@ -178,13 +178,18 @@ export async function completePayout(req, res) {
   const result = await transaction(async (client) => {
     const payout = await client.query('select * from payouts where id = $1 for update', [req.params.id]);
     if (!payout.rows[0]) throw badRequest('Payout not found');
-    if (payout.rows[0].status === 'completed') return payout.rows[0];
+    const row = payout.rows[0];
+    if (row.status === 'completed') return row;
     const updated = await client.query(
       `update payouts set status = 'completed', provider_reference = coalesce($2, provider_reference), updated_at = now()
        where id = $1 returning *`,
       [req.params.id, providerReference],
     );
-    if (updated.rows[0].job_id) {
+    if (updated.rows[0].company_id) {
+      // ── Company settlement payout: mark pending settlements paid FIFO ──
+      const { markSettlementsPaid } = await import('../services/companyPayoutService.js');
+      await markSettlementsPaid(client, updated.rows[0].company_id, Number(updated.rows[0].amount), providerReference);
+    } else if (updated.rows[0].job_id) {
       await client.query(`update jobs set payment_status = 'payout_completed', updated_at = now() where id = $1`, [updated.rows[0].job_id]);
       await client.query(`update escrow_accounts set status = 'payout_completed', updated_at = now() where job_id = $1`, [updated.rows[0].job_id]);
     }
@@ -195,10 +200,18 @@ export async function completePayout(req, res) {
     eventType: 'payout_completed',
     actorId: req.user.id,
     actorRole: 'admin',
-    metadata: { payoutId: req.params.id },
+    metadata: { payoutId: req.params.id, companyId: result.company_id || null },
   });
-  await auditLog({ userId: req.user.id, action: 'payout.complete', entityType: 'payout', entityId: req.params.id });
-  emitEvent('payout:completed', { payoutId: req.params.id, payout: result }, result.fundi_id ? `user:${result.fundi_id}` : null);
+  await auditLog({
+    userId: req.user.id, action: 'payout.complete', entityType: 'payout', entityId: req.params.id,
+    metadata: result.company_id ? { companyId: result.company_id, type: 'company_settlement' } : { type: 'fundi' },
+  });
+  if (result.company_id) {
+    const { notifyCompanyPayoutCompleted } = await import('../services/companyPayoutService.js');
+    await notifyCompanyPayoutCompleted(result.company_id, result);
+  } else {
+    emitEvent('payout:completed', { payoutId: req.params.id, payout: result }, result.fundi_id ? `user:${result.fundi_id}` : null);
+  }
   res.json({ success: true, payout: result });
 }
 

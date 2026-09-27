@@ -281,7 +281,7 @@ class ApiClient {
   }
 
   // ── User / Settings ──────────────────────────────────────────────────────
-  async updateMe(payload: { fullName?: string | null; phone?: string | null } = {}) {
+  async updateMe(payload: { fullName?: string | null; phone?: string | null; countryCode?: string; preferredLanguage?: string } = {}) {
     return this.request('/users/me', { method: 'PUT', body: JSON.stringify(payload) });
   }
 

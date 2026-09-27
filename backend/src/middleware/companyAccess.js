@@ -12,6 +12,52 @@ export const COMPANY_DISPATCH_ROLES = ['owner', 'manager', 'admin', 'dispatcher'
 // roles allowed to see finance (earnings/settlements)
 export const COMPANY_FINANCE_ROLES = ['owner', 'finance'];
 
+// ── Granular company capabilities (spec §8 TEAM: per-permission matrix) ──
+// Every portal capability the backend understands. Members may carry an
+// explicit override list (company_members.permissions jsonb); when absent the
+// role defaults below apply. The defaults mirror the historical role gates
+// (COMPANY_ADMIN/DISPATCH/FINANCE_ROLES) so nothing regresses when the
+// override column is empty.
+export const COMPANY_CAPABILITIES = [
+  'view_overview',   // dashboard + schedule + reviews visibility
+  'manage_team',     // add/suspend/remove members, edit roles & capabilities
+  'manage_services', // service catalog CRUD
+  'manage_settings', // company profile/settings
+  'dispatch_jobs',   // assign/unassign technicians, open pool
+  'handle_jobs',     // accept/reject/quote/claim assigned work
+  'view_finance',    // settlements & earnings visibility
+  'request_payout',  // request settlement withdrawal
+];
+
+const CAPS_ALL = [...COMPANY_CAPABILITIES];
+const CAPS_MANAGER = ['view_overview', 'manage_team', 'manage_services', 'manage_settings', 'dispatch_jobs', 'handle_jobs'];
+const CAPS_DISPATCHER = ['view_overview', 'dispatch_jobs', 'handle_jobs'];
+const CAPS_FINANCE = ['view_overview', 'view_finance', 'request_payout'];
+const CAPS_TECHNICIAN = ['view_overview', 'handle_jobs'];
+
+export const COMPANY_ROLE_CAPABILITIES = {
+  owner: CAPS_ALL,
+  manager: CAPS_MANAGER,
+  admin: CAPS_MANAGER,
+  dispatcher: CAPS_DISPATCHER,
+  finance: CAPS_FINANCE,
+  technician: CAPS_TECHNICIAN,
+};
+
+/** Effective capability list for a membership row (explicit overrides win). */
+export function effectiveCapabilities(membership) {
+  if (!membership) return [];
+  if (Array.isArray(membership.permissions) && membership.permissions.length > 0) {
+    return membership.permissions.filter((p) => COMPANY_CAPABILITIES.includes(p));
+  }
+  return COMPANY_ROLE_CAPABILITIES[membership.role] || [];
+}
+
+/** Non-throwing capability check for a membership row. */
+export function hasCapability(membership, capability) {
+  return effectiveCapabilities(membership).includes(capability);
+}
+
 function isPlatformStaff(user) {
   return user && ['super_admin', 'admin'].includes(user.role);
 }
@@ -38,7 +84,7 @@ export async function getCompany(companyId) {
  * Expects :companyId param OR resolves the caller's primary company when `primary: true`.
  */
 export function requireCompanyMember(options = {}) {
-  const { roles = null, primary = false } = options;
+  const { roles = null, capability = null, primary = false } = options;
   return async (req, _res, next) => {
     try {
       const companyId = primary ? null : (req.params.companyId || req.body?.companyId || req.query?.companyId);
@@ -71,6 +117,9 @@ export function requireCompanyMember(options = {}) {
       if (membership.status !== 'active') throw forbidden('Your company membership is suspended');
       if (roles && !roles.includes(membership.role)) {
         throw forbidden('Your company role is not authorized for this action');
+      }
+      if (capability && !hasCapability(membership, capability)) {
+        throw forbidden('You do not have the required company permission for this action');
       }
       req.company = company;
       req.companyMembership = membership;

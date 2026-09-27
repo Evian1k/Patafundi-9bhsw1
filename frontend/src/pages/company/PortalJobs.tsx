@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Inbox, Layers, Loader2, MapPin, RefreshCw, Send, UserCheck, XCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { useModalA11y } from "@/lib/a11y";
 import { StatusChip } from "./PortalDashboard";
 
 interface PortalJob {
@@ -40,6 +41,7 @@ export default function PortalJobs() {
   const [notice, setNotice] = useState<string | null>(null);
   const [quoteFor, setQuoteFor] = useState<PortalJob | null>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
+  const quoteDialogRef = useModalA11y(Boolean(quoteFor), () => setQuoteFor(null));
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -208,7 +210,7 @@ export default function PortalJobs() {
       {/* Quote dialog */}
       {quoteFor && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-3xl border bg-card p-5 shadow-xl">
+          <div ref={quoteDialogRef} tabIndex={-1} className="w-full max-w-sm rounded-3xl border bg-card p-5 shadow-xl focus:outline-none">
             <h3 className="font-semibold">Send quote</h3>
             <p className="mt-1 text-xs text-muted-foreground capitalize">{quoteFor.service_category?.replace("_", " ")} · {quoteFor.customer_name}</p>
             <label className="block mt-4 text-sm font-medium" htmlFor="quote-amount">Amount (KES)</label>

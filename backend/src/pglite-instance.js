@@ -116,3 +116,17 @@ export function setEmbeddedDb(instance) {
   initError = null;
   initPromise = null;
 }
+
+/** Gracefully close the embedded instance so short-lived scripts (seeds,
+ *  probes) can exit without leaving the WASM page cache mid-write. */
+export async function closeEmbeddedDb() {
+  if (pglite) {
+    try {
+      await pglite.close();
+    } catch {
+      // best-effort — the process is exiting anyway
+    }
+    pglite = null;
+    initPromise = null;
+  }
+}

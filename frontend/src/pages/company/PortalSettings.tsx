@@ -1,6 +1,6 @@
-/** Company Settings (spec §8 MY BUSINESS) — profile, areas, branches, availability. */
+/** Company Settings (spec §8 MY BUSINESS) — profile, areas, branches, availability, payout destination. */
 import { useEffect, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Banknote, Loader2, Save } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 interface Profile {
@@ -22,6 +22,9 @@ export default function PortalSettings() {
     companyName: "", legalName: "", description: "", website: "",
     serviceAreas: "", branches: "", availability: "available",
   });
+  const [payout, setPayout] = useState({ method: "mpesa", mpesaNumber: "", bankName: "", bankAccount: "", accountName: "" });
+  const [payoutMasked, setPayoutMasked] = useState<string | null>(null);
+  const [payoutSaving, setPayoutSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +40,20 @@ export default function PortalSettings() {
           branches: (c.branches || []).map((b) => b.name || b.address || "").filter(Boolean).join("\n"),
           availability: c.availability || "available",
         });
+        // Payout destination (masked) from the finance endpoint — owners only.
+        try {
+          const fin = await apiClient.request("/company/portal/finance") as { payoutAccount?: { method: string; mpesaNumber?: string; bankName?: string; bankAccount?: string; accountName?: string } };
+          if (fin.payoutAccount) {
+            setPayout((p) => ({
+              ...p,
+              method: fin.payoutAccount!.method || "mpesa",
+              accountName: fin.payoutAccount!.accountName || "",
+            }));
+            setPayoutMasked(fin.payoutAccount.method === "bank"
+              ? `${fin.payoutAccount.bankName || "bank"} ${fin.payoutAccount.bankAccount ?? ""}`
+              : `M-Pesa ${fin.payoutAccount.mpesaNumber ?? "not set"}`);
+          }
+        } catch { /* finance roles only — ignore */ }
       } finally {
         setLoading(false);
       }
@@ -63,6 +80,33 @@ export default function PortalSettings() {
       setNotice(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const savePayout = async () => {
+    setPayoutSaving(true); setNotice(null);
+    try {
+      const res = await apiClient.request("/company/portal/finance/payout-destination", {
+        method: "PUT",
+        body: {
+          method: payout.method,
+          mpesaNumber: payout.method === "mpesa" && payout.mpesaNumber ? payout.mpesaNumber : undefined,
+          bankName: payout.method === "bank" && payout.bankName ? payout.bankName : undefined,
+          bankAccount: payout.method === "bank" && payout.bankAccount ? payout.bankAccount : undefined,
+          accountName: payout.accountName || undefined,
+        },
+      }) as { payoutAccount?: { method: string; mpesaNumber?: string; bankName?: string; bankAccount?: string } };
+      setPayout((p) => ({ ...p, mpesaNumber: "", bankAccount: "" }));
+      if (res.payoutAccount) {
+        setPayoutMasked(res.payoutAccount.method === "bank"
+          ? `${res.payoutAccount.bankName || "bank"} ${res.payoutAccount.bankAccount ?? ""}`
+          : `M-Pesa ${res.payoutAccount.mpesaNumber ?? "not set"}`);
+      }
+      setNotice("Payout destination saved.");
+    } catch (e: unknown) {
+      setNotice(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setPayoutSaving(false);
     }
   };
 
@@ -122,17 +166,56 @@ export default function PortalSettings() {
           <p className="text-xs text-muted-foreground">Only owners and managers can edit the business profile.</p>
         )}
       </div>
+
+      {/* ── Payout destination (finance) ── */}
+      <div className="mt-8 rounded-2xl border bg-card p-5">
+        <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+          <Banknote className="h-4 w-4 text-primary" /> Payout destination
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Where settlement withdrawals are sent. Currently: <span className="font-medium text-foreground">{payoutMasked || "not configured"}</span>
+        </p>
+        {canEdit ? (
+          <div className="mt-4 grid sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="payout-method" className="text-sm font-medium">Method</label>
+              <select id="payout-method" value={payout.method} onChange={(e) => setPayout({ ...payout, method: e.target.value })}
+                className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm capitalize">
+                <option value="mpesa">M-Pesa</option>
+                <option value="bank">Bank transfer</option>
+              </select>
+            </div>
+            {payout.method === "mpesa" ? (
+              <Field label="M-Pesa number" value={payout.mpesaNumber} onChange={(v) => setPayout({ ...payout, mpesaNumber: v })} placeholder="2547XXXXXXXX" />
+            ) : (
+              <>
+                <Field label="Bank name" value={payout.bankName} onChange={(v) => setPayout({ ...payout, bankName: v })} />
+                <Field label="Account number" value={payout.bankAccount} onChange={(v) => setPayout({ ...payout, bankAccount: v })} />
+              </>
+            )}
+            <Field label="Account name" value={payout.accountName} onChange={(v) => setPayout({ ...payout, accountName: v })} />
+            <div className="sm:col-span-2">
+              <button onClick={savePayout} disabled={payoutSaving}
+                className="inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
+                {payoutSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save payout destination
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">Only owners and managers can change the payout destination.</p>
+        )}
+      </div>
     </div>
   );
 }
 
-function Field({ label, value, onChange, disabled, type = "text" }: {
-  label: string; value: string; onChange: (v: string) => void; disabled?: boolean; type?: string;
+function Field({ label, value, onChange, disabled, type = "text", placeholder }: {
+  label: string; value: string; onChange: (v: string) => void; disabled?: boolean; type?: string; placeholder?: string;
 }) {
   return (
     <div>
       <label className="text-sm font-medium">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} placeholder={placeholder}
         className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm disabled:opacity-60" />
     </div>
   );

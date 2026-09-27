@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import NotificationBell from "@/components/system/NotificationBell";
 import { apiClient } from "@/lib/api";
 import { realtimeService } from "@/services/realtime";
+import { SkipToContent } from "@/lib/a11y";
 import { toast } from "sonner";
 import { BrandLogo } from "@/assets/logo";
 
@@ -255,7 +256,8 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+                <SkipToContent />
+<main id="main-content" className="flex-1 overflow-y-auto p-4 lg:p-6">
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}

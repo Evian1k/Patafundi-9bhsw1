@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useModalA11y } from "@/lib/a11y";
 import { X, Check, AlertTriangle, MapPin, Shield, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ function statusLabel(result: string | undefined) {
 }
 
 export default function FundiVerificationModal({ fundi, onClose }: FundiVerificationModalProps) {
+  const dialogRef = useModalA11y(true, onClose);
   const [loading, setLoading] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "reupload" | null>(null);
   const [reason, setReason] = useState("");
@@ -69,11 +71,13 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
   const isOCRMatch = (fundi.ocrComparison as Record<string, unknown>)?.idNumberMatch;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Fundi verification review">
       <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">

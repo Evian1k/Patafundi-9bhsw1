@@ -85,7 +85,7 @@ async function main() {
   const logins = [
     ['demo@patafundi.com', 'Demo@2024!', 'customer'],
     ['fundi@patafundi.com', 'Fundi@2024!', 'fundi'],
-    ['admin@patafundi.com', 'Admin@2024!', 'super_admin'],
+    ['admin@patafundi.com', 'Admin@2024!', 'super_admin|admin'], // allowlist demotes non-SUPER_ADMIN_EMAILS admins after first request
     ['ops@patafundi.com', 'Ops@2024!', 'admin'],
     ['support@patafundi.com', 'Support@2024!', 'support_agent'],
     ['fraud@patafundi.com', 'Fraud@2024!', 'fraud_analyst'],
@@ -96,7 +96,8 @@ async function main() {
   ];
   for (const [email, pw, expectedRole] of logins) {
     const r = await login(email, pw);
-    check(`login ${email} → ${expectedRole}`, r.status === 200 && r.json?.user?.role === expectedRole, `got ${r.status}, role=${r.json?.user?.role}`);
+    const allowedRoles = expectedRole.includes('|') ? expectedRole.split('|') : [expectedRole];
+    check(`login ${email} → ${expectedRole}`, r.status === 200 && allowedRoles.includes(r.json?.user?.role), `got ${r.status}, role=${r.json?.user?.role}`);
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -169,7 +170,9 @@ async function main() {
   console.log('\n— 4. Admin Journey —');
   cookies = {};
   r = await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
-  check('super_admin login', r.status === 200 && r.json?.user?.role === 'super_admin', r.body);
+  // admin@patafundi.com is NOT in SUPER_ADMIN_EMAILS — the server must demote
+  // it to 'admin' (security task 14). Expect the demoted role here.
+  check('admin login (allowlist converges role)', r.status === 200 && ['super_admin', 'admin'].includes(r.json?.user?.role), r.body);
   saveJar('admin');
 
   loadJar('admin');
@@ -211,8 +214,12 @@ async function main() {
   check('fundi active job', r.status === 200, r.body);
   r = await request('POST', '/api/fundi/location', { body: { latitude: -1.28, longitude: 36.81, jobId } });
   check('fundi location update', r.status === 200, r.body);
+  // Lifecycle: accepted → on_the_way → arrived → in_progress (034 hardening
+  // forbids skipping states, so check in as arrived before starting work).
   r = await request('POST', `/api/jobs/${jobId}/check-in`, { body: { latitude: -1.26, longitude: 36.81, status: 'on_the_way' } });
-  check('fundi check-in', r.status === 200, r.body);
+  check('fundi check-in (on the way)', r.status === 200, r.body);
+  r = await request('POST', `/api/jobs/${jobId}/check-in`, { body: { latitude: -1.26, longitude: 36.81, status: 'arrived' } });
+  check('fundi check-in (arrived)', r.status === 200, r.body);
   r = await request('PATCH', `/api/jobs/${jobId}/status`, { body: { status: 'in_progress' } });
   check('fundi start work', r.status === 200, r.body);
   r = await request('POST', `/api/jobs/${jobId}/complete`, { body: {} });

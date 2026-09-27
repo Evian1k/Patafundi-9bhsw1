@@ -44,6 +44,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
     );
     const commissionAmount = money(jobValue * commissionRate);
     const providerAmount = money(jobValue - commissionAmount);
+    const currency = payment.currency_code || job.currency_code || 'KES';
 
     // 1. escrow release transaction (status must be 'released' — the value the
     //    wallet-balance query filters on)
@@ -113,13 +114,13 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       );
       // payout record (processing — admin completes the transfer)
       const payoutRes = await client.query(
-        `insert into payouts (job_id, fundi_id, amount, status, net_amount, protection_snapshot)
-         select $1, $2, $3, 'processing', $3, $4::jsonb
+        `insert into payouts (job_id, fundi_id, amount, status, net_amount, currency, protection_snapshot)
+         select $1, $2, $3, 'processing', $3, $4, $5::jsonb
          where not exists (
            select 1 from payouts where job_id = $1 and status in ('requested', 'processing', 'completed')
          )
          returning *`,
-        [jobId, job.fundi_id, providerAmount,
+        [jobId, job.fundi_id, providerAmount, currency,
          JSON.stringify({ source, platformCommission: commissionAmount })],
       );
       payout = payoutRes.rows[0] || null;
@@ -131,8 +132,8 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       `insert into revenue_ledger (payment_id, job_id, user_id, entry_type, amount, currency,
         transaction_type, customer_paid, commission_amount, platform_fee_amount, fundi_payout,
         net_revenue, payment_method, notes)
-       values ($1, $2, $3, 'commission', $4, 'KES', 'commission_earned', $5, $4, $4, $6, $4, $7, $8)`,
-      [payment.id, jobId, job.customer_id, commissionAmount, jobValue, providerAmount,
+       values ($1, $2, $3, 'commission', $4, $5, 'commission_earned', $6, $4, $4, $7, $4, $8, $9)`,
+      [payment.id, jobId, job.customer_id, commissionAmount, currency, jobValue, providerAmount,
        payment.provider || 'mpesa',
        `Escrow released via ${source}`],
     );
@@ -142,6 +143,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       jobValue,
       commissionAmount,
       providerAmount,
+      currency,
       settlement,
       payout,
       payment,
@@ -160,7 +162,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
        select owner_user_id, 'settlement_created', 'Settlement Created', $2, $3::jsonb
        from company_profiles where id = $1`,
       [released.settlement.company_id,
-       `KES ${released.settlement.net_amount.toLocaleString()} has been added to your pending settlements.`,
+       `${released.currency} ${released.settlement.net_amount.toLocaleString()} has been added to your pending settlements.`,
        JSON.stringify({ jobId, settlementId: released.settlement.id })],
     );
     const owner = await query(
@@ -175,7 +177,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       `insert into notifications (user_id, type, title, body, data)
        values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
       [released.job.fundi_id,
-       `KES ${released.providerAmount.toLocaleString()} has been credited to your wallet for the completed job.`,
+       `${released.currency} ${released.providerAmount.toLocaleString()} has been credited to your wallet for the completed job.`,
        JSON.stringify({ jobId, amount: released.providerAmount })],
     );
     emitEvent('payment:confirmed', { jobId, fundiEarnings: released.providerAmount }, `user:${released.job.fundi_id}`);

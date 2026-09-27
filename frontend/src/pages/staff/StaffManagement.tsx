@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Users, Shield, Ban, Check, LogOut, RefreshCw } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
+import { useModalA11y } from "@/lib/a11y";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -38,6 +39,7 @@ export default function StaffManagement() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<StaffMember | null>(null);
+  const roleDialogRef = useModalA11y(Boolean(selected), () => setSelected(null));
   const [newRole, setNewRole] = useState("");
 
   const fetchStaff = useCallback(async () => {
@@ -196,7 +198,7 @@ export default function StaffManagement() {
         {/* Role change modal */}
         {selected && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div ref={roleDialogRef} role="dialog" aria-modal="true" aria-label={`Change role for ${selected.full_name}`} tabIndex={-1} className="bg-white rounded-2xl p-6 max-w-md w-full focus:outline-none" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-lg font-bold text-slate-900 mb-4">Change Role: {selected.full_name}</h3>
               <p className="text-sm text-slate-500 mb-4">Current role: <strong className="capitalize">{selected.role.replace(/_/g, " ")}</strong></p>
               <select

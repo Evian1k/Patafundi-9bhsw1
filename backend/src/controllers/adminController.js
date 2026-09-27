@@ -749,6 +749,7 @@ export async function updateSettings(req, res) {
 // ════════════════════════════════════════════════════════════════
 
 // GET /admin/payouts — full payout ledger for the finance control center
+// Includes BOTH fundi withdrawals and company settlement payouts.
 export async function listPayouts(req, res) {
   const status = req.query?.status || null;
   const params = [];
@@ -758,15 +759,28 @@ export async function listPayouts(req, res) {
     where = `where p.status = $${params.length}`;
   }
   const result = await query(
-    `select p.*, u.full_name as fundi_name, u.email as fundi_email, u.phone as fundi_phone
-     from payouts p join users u on u.id = p.fundi_id
+    `select p.*, u.full_name as fundi_name, u.email as fundi_email, u.phone as fundi_phone,
+            cp.company_name, cp.contact_email as company_email
+     from payouts p
+     left join users u on u.id = p.fundi_id
+     left join company_profiles cp on cp.id = p.company_id
      ${where} order by p.created_at desc limit 200`,
     params,
   );
   const stats = await query(
     `select status, count(*)::int as count, coalesce(sum(amount), 0) as total from payouts group by status`,
   );
-  res.json({ success: true, payouts: result.rows, stats: stats.rows });
+  res.json({
+    success: true,
+    payouts: result.rows.map((row) => ({
+      ...row,
+      // normalized provider identity for the UI
+      provider_type: row.company_id ? 'company' : 'fundi',
+      provider_name: row.company_id ? row.company_name : row.fundi_name,
+      provider_email: row.company_id ? row.company_email : row.fundi_email,
+    })),
+    stats: stats.rows,
+  });
 }
 
 // GET /admin/subscriptions — platform subscription book, split by subscriber type

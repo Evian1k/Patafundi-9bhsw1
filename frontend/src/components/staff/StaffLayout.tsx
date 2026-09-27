@@ -27,6 +27,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { apiClient } from "@/lib/api";
 import NotificationBell from "@/components/system/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
+import { SkipToContent } from "@/lib/a11y";
 
 const STAFF_NAV = [
   {
@@ -237,7 +238,8 @@ export default function StaffLayout() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 md:ml-64 pt-14 md:pt-0 min-h-screen">
+              <SkipToContent />
+<main id="main-content" className="flex-1 md:ml-64 pt-14 md:pt-0 min-h-screen">
         <Outlet />
       </main>
     </div>

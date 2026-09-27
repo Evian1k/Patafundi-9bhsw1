@@ -62,14 +62,16 @@ export async function stkPush(req, res) {
       settings,
     });
     const inserted = await client.query(
-      `insert into payments (job_id, customer_id, amount, currency, provider, mpesa_number,
+      `insert into payments (job_id, customer_id, amount, currency, country_code, provider, mpesa_number,
         status, escrow_status, idempotency_key, commission_rate, commission_type,
         platform_commission, fundi_amount, commission_details)
-       values ($1, $2, $3, 'KES', 'mpesa', $4, 'pending', 'pending', $5, $6, $7, $8, $9, $10::jsonb) returning *`,
+       values ($1, $2, $3, $4, $5, 'mpesa', $6, 'pending', 'pending', $7, $8, $9, $10, $11, $12::jsonb) returning *`,
       [
         jobId,
         req.user.id,
         expectedAmount,
+        job.currency_code || 'KES',
+        job.country_code || null,
         normalizedPhone,
         key,
         commission.commissionRate,

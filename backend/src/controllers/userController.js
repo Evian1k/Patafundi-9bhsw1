@@ -40,11 +40,27 @@ export async function me(req, res) {
 }
 
 export async function updateMe(req, res) {
-  const { fullName, phone } = req.body || {};
+  const { fullName, phone, countryCode, preferredLanguage } = req.body || {};
+  // Globalization (spec §40): persist the user's region + language preference.
+  // Values are validated against the countries/languages tables when present.
+  let validatedCountry = null;
+  let validatedLanguage = null;
+  if (countryCode) {
+    const country = await query('select code from countries where code = $1 and is_active = true', [String(countryCode).toUpperCase()]);
+    if (!country.rows[0]) throw badRequest('Unsupported country code');
+    validatedCountry = country.rows[0].code;
+  }
+  if (preferredLanguage) {
+    const lang = await query('select code from languages where code = $1', [String(preferredLanguage).toLowerCase()]);
+    if (!lang.rows[0]) throw badRequest('Unsupported language code');
+    validatedLanguage = lang.rows[0].code;
+  }
   const result = await query(
-    `update users set full_name = coalesce($2, full_name), phone = coalesce($3, phone), updated_at = now()
-     where id = $1 returning id, email, full_name, phone, role, status, trust_score`,
-    [req.user.id, fullName, phone ? protectPhone(phone) : null],
+    `update users set full_name = coalesce($2, full_name), phone = coalesce($3, phone),
+       country_code = coalesce($4, country_code), preferred_language = coalesce($5, preferred_language),
+       updated_at = now()
+     where id = $1 returning id, email, full_name, phone, role, status, trust_score, country_code, preferred_language`,
+    [req.user.id, fullName, phone ? protectPhone(phone) : null, validatedCountry, validatedLanguage],
   );
   const user = result.rows[0];
   if (user) user.phone = safeDecryptPhone(user.phone);

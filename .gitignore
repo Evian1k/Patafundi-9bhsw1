@@ -69,3 +69,4 @@ dev.log
 # workspace runtime (session supervisors, logs)
 .zscripts/*.log
 .zscripts/sup-*.log
+:memory:

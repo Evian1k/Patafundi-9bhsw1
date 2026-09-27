@@ -17,6 +17,8 @@ import {
   borderRadius,
   gradients,
 } from '@patafundi/shared';
+import { useFocusEffect } from '@react-navigation/native';
+import { apiClient } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
 interface MenuItem {
@@ -43,6 +45,20 @@ const MENU: MenuItem[] = [
 export function ProfileScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+
+  // Refresh the cached profile from the server on every focus so name/phone
+  // edits (and region preferences) show up without a full app restart.
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      apiClient.getCurrentUser()
+        .then((res) => {
+          if (!cancelled && res?.user) useAuthStore.setState({ user: res.user });
+        })
+        .catch(() => { /* offline — keep cached profile */ });
+      return () => { cancelled = true; };
+    }, []),
+  );
 
   const initial = (user?.fullName?.trim()?.[0] ?? 'U').toUpperCase();
   const trustScore = user?.trustScore ?? 0;

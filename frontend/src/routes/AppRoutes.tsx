@@ -51,6 +51,7 @@ import AdminSettings from "@/pages/admin/SettingsPage";
 import AuditLogs from "@/pages/admin/AuditLogs";
 import AdminDisputeManagement from "@/pages/admin/DisputeManagement";
 import CompanyApplications from "@/pages/admin/CompanyApplications";
+import CompanyDetail from "@/pages/admin/CompanyDetail";
 import AdminPayouts from "@/pages/admin/AdminPayouts";
 import AdminRefunds from "@/pages/admin/AdminRefunds";
 import AdminSubscriptions from "@/pages/admin/AdminSubscriptions";
@@ -194,6 +195,7 @@ export default function AppRoutes() {
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
       <Route path="/admin/companies" element={<ProtectedAdminRoute element={<CompanyApplications />} />} />
+      <Route path="/admin/companies/:id" element={<ProtectedAdminRoute element={<CompanyDetail />} />} />
 
       {/* Staff login portal — rejects customer/fundi accounts */}
       <Route path="/staff/login" element={<StaffLogin />} />

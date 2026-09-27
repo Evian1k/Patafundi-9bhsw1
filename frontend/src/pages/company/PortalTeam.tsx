@@ -1,16 +1,42 @@
 /**
- * Company Team management (spec §8 TEAM) — technicians & members CRUD.
- * Server-side role gating: only owner/manager/admin can modify.
+ * Company Team management (spec §8 TEAM) — technicians & members CRUD plus
+ * the per-permission capability matrix. The server enforces capabilities on
+ * every endpoint; this UI simply edits what each member can do.
+ * Server-side role gating: only members with manage_team can modify.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, UserPlus, Users } from "lucide-react";
+import { Loader2, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 interface Member {
   id: string; userId: string; fullName: string; email: string; phone?: string;
   role: string; status: string; isAvailable: boolean; skills: string[]; activeJobs: number;
+  permissions: string[] | null;
 }
-const ROLES = ["technician", "dispatcher", "manager", "finance"];
+const ROLES = ["technician", "dispatcher", "finance", "manager", "admin"];
+
+// Mirrors backend COMPANY_CAPABILITIES + COMPANY_ROLE_CAPABILITIES defaults.
+const CAPABILITIES: { key: string; label: string; hint: string }[] = [
+  { key: "view_overview", label: "View dashboard", hint: "See the portal dashboard, schedule and reviews" },
+  { key: "handle_jobs", label: "Handle jobs", hint: "Accept, reject, quote and claim assigned work" },
+  { key: "dispatch_jobs", label: "Dispatch", hint: "Assign and unassign technicians to jobs" },
+  { key: "manage_services", label: "Manage services", hint: "Create and edit the service catalog" },
+  { key: "manage_team", label: "Manage team", hint: "Add, suspend, remove members and edit permissions" },
+  { key: "manage_settings", label: "Manage settings", hint: "Edit the business profile and payout settings" },
+  { key: "view_finance", label: "View finance", hint: "See settlements, earnings and payout history" },
+  { key: "request_payout", label: "Request payouts", hint: "Request settlement withdrawals to the payout account" },
+];
+
+const ROLE_DEFAULTS: Record<string, string[]> = {
+  owner: CAPABILITIES.map((c) => c.key),
+  manager: ["view_overview", "manage_team", "manage_services", "manage_settings", "dispatch_jobs", "handle_jobs"],
+  admin: ["view_overview", "manage_team", "manage_services", "manage_settings", "dispatch_jobs", "handle_jobs"],
+  dispatcher: ["view_overview", "dispatch_jobs", "handle_jobs"],
+  finance: ["view_overview", "view_finance", "request_payout"],
+  technician: ["view_overview", "handle_jobs"],
+};
+
+const effectivePerms = (m: Member) => (m.permissions && m.permissions.length > 0 ? m.permissions : (ROLE_DEFAULTS[m.role] || []));
 
 export default function PortalTeam() {
   const [team, setTeam] = useState<Member[]>([]);
@@ -21,6 +47,8 @@ export default function PortalTeam() {
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", role: "technician", skills: "" });
   const [busy, setBusy] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [permOpenId, setPermOpenId] = useState<string | null>(null);
+  const [draftPerms, setDraftPerms] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,12 +109,24 @@ export default function PortalTeam() {
     }
   };
 
+  const openPerms = (m: Member) => {
+    setPermOpenId(permOpenId === m.id ? null : m.id);
+    setDraftPerms(effectivePerms(m));
+  };
+
+  const savePerms = async (m: Member) => {
+    // Empty selection is rejected — reset to role defaults instead.
+    await update(m, { permissions: draftPerms.length > 0 ? draftPerms : null },
+      draftPerms.length > 0 ? "Permissions saved." : "Permissions reset to role defaults.");
+    setPermOpenId(null);
+  };
+
   return (
     <div className="max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Technicians and staff who deliver work for your company.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Technicians, dispatchers and staff — with per-person permissions.</p>
         </div>
         {canEdit && (
           <button onClick={() => setAddOpen((o) => !o)}
@@ -102,18 +142,21 @@ export default function PortalTeam() {
       {addOpen && (
         <div className="mt-4 rounded-2xl border bg-card p-5 space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
-            <Input label="Full name *" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
-            <Input label="Email *" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-            <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="2547…" />
+            <Input id="new-name" label="Full name *" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
+            <Input id="new-email" label="Email *" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+            <Input id="new-phone" label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="2547…" />
             <div>
-              <label className="text-sm font-medium">Role</label>
-              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+              <label htmlFor="new-role" className="text-sm font-medium">Role</label>
+              <select id="new-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
                 className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm capitalize">
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Default permissions: {(ROLE_DEFAULTS[form.role] || []).length} — you can fine-tune after adding.
+              </p>
             </div>
           </div>
-          <Input label="Skills (comma separated)" value={form.skills} onChange={(v) => setForm({ ...form, skills: v })} placeholder="plumbing, hvac" />
+          <Input id="new-skills" label="Skills (comma separated)" value={form.skills} onChange={(v) => setForm({ ...form, skills: v })} placeholder="plumbing, hvac" />
           <button onClick={add} disabled={busy || !form.fullName || !form.email}
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />} Add member
@@ -146,8 +189,13 @@ export default function PortalTeam() {
                     )}
                   </div>
                   {m.skills?.length > 0 && <p className="mt-2 text-xs text-muted-foreground capitalize">{m.skills.join(" · ")}</p>}
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    {effectivePerms(m).length} permission{effectivePerms(m).length === 1 ? "" : "s"}
+                    {m.permissions && m.permissions.length > 0 ? " (custom)" : " (role defaults)"}
+                  </p>
                 </div>
               </div>
+
               {canEdit && m.role !== "owner" && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {m.role === "technician" && (
@@ -156,6 +204,17 @@ export default function PortalTeam() {
                       {m.isAvailable ? "Set off duty" : "Set available"}
                     </button>
                   )}
+                  <button onClick={() => openPerms(m)}
+                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs hover:bg-muted">
+                    <ShieldCheck className="h-3 w-3" /> Permissions
+                  </button>
+                  <select
+                    aria-label={`Change role for ${m.fullName}`}
+                    value={m.role}
+                    onChange={(e) => update(m, { role: e.target.value }, "Role updated — review their permissions.")}
+                    className="rounded-lg border bg-background px-2 py-1.5 text-xs capitalize">
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
                   {m.status === "active" ? (
                     <button onClick={() => update(m, { status: "suspended" }, "Member suspended")}
                       className="rounded-lg border px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-500/5">Suspend</button>
@@ -166,6 +225,42 @@ export default function PortalTeam() {
                   <button onClick={() => remove(m)} className="rounded-lg border px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-500/5">Remove</button>
                 </div>
               )}
+
+              {canEdit && permOpenId === m.id && (
+                <div className="mt-3 rounded-xl border bg-muted/30 p-3">
+                  <p className="text-xs font-medium mb-2">Permissions for {m.fullName}</p>
+                  <div className="grid sm:grid-cols-2 gap-1.5">
+                    {CAPABILITIES.map((cap) => (
+                      <label key={cap.key} htmlFor={`perm-${m.id}-${cap.key}`}
+                        className="flex items-start gap-2 rounded-lg p-1.5 text-xs hover:bg-muted/60 cursor-pointer"
+                        title={cap.hint}>
+                        <input
+                          id={`perm-${m.id}-${cap.key}`}
+                          type="checkbox"
+                          checked={draftPerms.includes(cap.key)}
+                          onChange={(e) => setDraftPerms((prev) => e.target.checked ? [...prev, cap.key] : prev.filter((k) => k !== cap.key))}
+                          className="mt-0.5 h-3.5 w-3.5 accent-emerald-600"
+                        />
+                        <span>
+                          <span className="font-medium">{cap.label}</span>
+                          <span className="block text-[10px] text-muted-foreground">{cap.hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-2.5 flex gap-2">
+                    <button onClick={() => savePerms(m)} disabled={draftPerms.length === 0}
+                      className="rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50">
+                      Save permissions
+                    </button>
+                    <button onClick={() => update(m, { permissions: null }, "Permissions reset to role defaults.")}
+                      className="rounded-lg border px-3 py-1.5 text-xs hover:bg-muted">Reset to role defaults</button>
+                  </div>
+                  {draftPerms.length === 0 && (
+                    <p className="mt-1.5 text-[10px] text-amber-600">Select at least one permission, or use “Reset to role defaults”.</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -174,13 +269,13 @@ export default function PortalTeam() {
   );
 }
 
-function Input({ label, value, onChange, type = "text", placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+function Input({ id, label, value, onChange, type = "text", placeholder }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
 }) {
   return (
     <div>
-      <label className="text-sm font-medium">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+      <label htmlFor={id} className="text-sm font-medium">{label}</label>
+      <input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
         className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
     </div>
   );

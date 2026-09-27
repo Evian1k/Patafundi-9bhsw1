@@ -8,6 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiClient } from '@patafundi/shared';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import {
   colors,
@@ -99,12 +101,39 @@ const STATIC_SECTIONS: InfoSection[] = [
 ];
 
 export function FundiEmergencySosScreen({ navigation }: any): JSX.Element {
+  const [sosState, setSosState] = React.useState<'idle' | 'sending' | 'sent'>('idle');
+
   const callNumber = (number: string): void => {
     const url = `tel:${number}`;
     // An emergency call that silently does nothing is worse than no button.
     Linking.openURL(url).catch(() => {
       Alert.alert('Could not start the call', `Please dial ${number} manually.`);
     });
+  };
+
+  // Real server-side SOS alert — visible to platform staff in realtime.
+  const triggerAppSos = async (): Promise<void> => {
+    if (sosState === 'sending') return;
+    setSosState('sending');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location unavailable', 'We could not read your location. Please call the emergency number directly.');
+        setSosState('idle');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await apiClient.triggerSOS({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        message: 'SOS triggered from Fundi app',
+      });
+      setSosState('sent');
+      Alert.alert('SOS alert sent', 'Our safety team has been alerted and will follow up immediately. If you are in immediate danger, also call 999.');
+    } catch {
+      setSosState('idle');
+      Alert.alert('Could not send the alert', 'Please call the emergency number directly — your call takes priority.');
+    }
   };
 
   return (
@@ -172,6 +201,20 @@ export function FundiEmergencySosScreen({ navigation }: any): JSX.Element {
           <InfoSectionCard key={`${section.title}-${idx}`} section={section} />
         ))}
       </View>
+
+      <TouchableOpacity
+        style={[styles.supportBtn, { backgroundColor: colors.error, marginBottom: spacing.sm }]}
+        onPress={triggerAppSos}
+        disabled={sosState === 'sending'}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Trigger emergency SOS alert"
+      >
+        <Ionicons name="warning" size={18} color="#FFFFFF" />
+        <Text style={styles.supportBtnText}>
+          {sosState === 'sending' ? 'Sending SOS alert…' : sosState === 'sent' ? 'SOS alert sent' : 'Trigger SOS alert now'}
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.supportBtn}

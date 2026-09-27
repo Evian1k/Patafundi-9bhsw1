@@ -4,6 +4,7 @@
  * that write audit logs — the browser never performs money/verification alone.
  */
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Building2, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
@@ -16,6 +17,7 @@ interface Application {
 interface Company {
   id: string; companyName: string; status: string; ownerName?: string;
   memberCount: number; jobCount: number; rating?: number; completedJobs?: number;
+  pendingSettlements?: number; pendingSettlementsKes?: number;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -175,6 +177,7 @@ export default function CompanyApplications() {
                 <th className="px-4 py-3 font-medium text-right">Members</th>
                 <th className="px-4 py-3 font-medium text-right">Jobs</th>
                 <th className="px-4 py-3 font-medium text-right">Rating</th>
+                <th className="px-4 py-3 font-medium text-right">Pending</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -182,11 +185,18 @@ export default function CompanyApplications() {
             <tbody className="divide-y">
               {companies.map((c) => (
                 <tr key={c.id} className="hover:bg-muted/40">
-                  <td className="px-4 py-3 font-medium">{c.companyName}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link to={`/admin/companies/${c.id}`} className="hover:text-primary hover:underline">
+                      {c.companyName}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{c.ownerName || "—"}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.memberCount}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.jobCount}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.rating?.toFixed(1) || "—"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                    {c.pendingSettlementsKes ? `KES ${Number(c.pendingSettlementsKes).toLocaleString()}` : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${c.status === "approved" ? "bg-emerald-500/10 text-emerald-600" : c.status === "suspended" ? "bg-red-500/10 text-red-500" : "bg-muted"}`}>
                       {c.status}

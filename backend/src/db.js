@@ -174,11 +174,21 @@ export async function transaction(work) {
     const db = await getEmbeddedDb();
     await db.query('BEGIN');
     try {
-      const client = { query: (s, p) => db.query(s, p) };
+      const client = {
+        query: async (s, p) => {
+          try {
+            return await db.query(s, p);
+          } catch (error) {
+            if (process.env.DEBUG_DB_SQL) console.error('[db] failing SQL:', String(s).replace(/\s+/g, ' ').slice(0, 400));
+            throw error;
+          }
+        },
+      };
       const result = await work(client);
       await db.query('COMMIT');
       return result;
     } catch (error) {
+      if (process.env.DEBUG_DB_SQL) console.error('[db] failing SQL:', (error.query || '').slice(0, 300));
       await db.query('ROLLBACK');
       throw error;
     }

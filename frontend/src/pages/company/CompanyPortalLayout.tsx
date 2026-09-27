@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import NotificationBell from "@/components/system/NotificationBell";
+import { SkipToContent } from "@/lib/a11y";
 
 export interface PortalCompany {
   id: string; companyName: string; logoUrl?: string; status?: string;
@@ -163,7 +164,8 @@ export default function CompanyPortalLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 min-w-0">
+                <SkipToContent />
+<main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 min-w-0">
           <Outlet context={me} />
         </main>
 

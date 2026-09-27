@@ -120,7 +120,7 @@ export async function createFundiRegistration({ body, files, existingUserId = nu
     const fundi = await client.query(
       `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, latitude, longitude, id_number, bio,
         kra_pin, business_permit_url, terms_accepted, terms_version, terms_accepted_at, terms_accepted_ip, terms_accepted_device)
-       values ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, true, $12, now(), $13, $14)
+       values ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, true, $11, now(), $12, $13)
        on conflict (user_id) do update set
          skills = excluded.skills,
          experience = excluded.experience,

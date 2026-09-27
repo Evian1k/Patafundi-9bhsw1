@@ -11,7 +11,11 @@ import {
   getMembership,
   getCompany,
   publicCompanyProfile,
+  hasCapability,
+  effectiveCapabilities,
   COMPANY_ADMIN_ROLES,
+  COMPANY_CAPABILITIES,
+  COMPANY_MEMBER_ROLES,
   COMPANY_DISPATCH_ROLES,
   COMPANY_FINANCE_ROLES,
 } from '../middleware/companyAccess.js';
@@ -51,8 +55,27 @@ function toMemberSummary(row) {
     status: row.status,
     isAvailable: row.is_available,
     skills: row.skills || [],
+    // explicit capability overrides (null = role defaults apply)
+    permissions: row.permissions || null,
     joinedAt: row.joined_at,
   };
+}
+
+function validPermissions(value) {
+  if (value === null || value === undefined) return null; // clear overrides → role defaults
+  if (!Array.isArray(value)) throw badRequest('permissions must be an array of capability keys');
+  const unique = [...new Set(value)];
+  for (const key of unique) {
+    if (!COMPANY_CAPABILITIES.includes(key)) throw badRequest(`Unknown capability: ${key}`);
+  }
+  return JSON.stringify(unique);
+}
+
+function maskAccount(value) {
+  if (!value) return null;
+  const str = String(value);
+  if (str.length <= 4) return '••••';
+  return `•••• ${str.slice(-4)}`;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -372,8 +395,8 @@ export async function portalOverview(req, res) {
 
 export async function portalProfile(req, res) {
   if (req.method === 'PUT') {
-    // only company admins can edit the business profile
-    if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) {
+    // only members with manage_settings can edit the business profile
+    if (!hasCapability(req.companyMembership, 'manage_settings')) {
       throw forbidden('Only company owners/managers can edit the business profile');
     }
     const b = req.body || {};
@@ -416,7 +439,7 @@ export async function portalServices(req, res) {
 }
 
 export async function portalCreateService(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_services')) throw forbidden('Not authorized');
   const b = req.body || {};
   if (!b.name || !b.category) throw badRequest('name and category are required');
   const result = await query(
@@ -429,7 +452,7 @@ export async function portalCreateService(req, res) {
 }
 
 export async function portalUpdateService(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_services')) throw forbidden('Not authorized');
   const own = await query(
     `select * from company_services where id = $1 and company_id = $2`,
     [req.params.serviceId, req.company.id],
@@ -451,7 +474,7 @@ export async function portalUpdateService(req, res) {
 }
 
 export async function portalDeleteService(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_services')) throw forbidden('Not authorized');
   const result = await query(
     `delete from company_services where id = $1 and company_id = $2 returning id`,
     [req.params.serviceId, req.company.id],
@@ -474,12 +497,13 @@ export async function portalTeam(req, res) {
 }
 
 export async function portalAddMember(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_team')) throw forbidden('Not authorized');
   const b = req.body || {};
   if (!b.fullName || !b.email || !b.role) throw badRequest('fullName, email and role are required');
-  if (!['manager', 'admin', 'dispatcher', 'finance', 'technician'].includes(b.role)) {
+  if (!COMPANY_MEMBER_ROLES.filter((r) => r !== 'owner').includes(b.role)) {
     throw badRequest('Invalid role');
   }
+  const permissions = validPermissions(b.permissions);
   const bcrypt = (await import('bcryptjs')).default;
   const tempPassword = b.password || `Pf-${Math.random().toString(36).slice(2, 10)}!`;
   const hash = await bcrypt.hash(tempPassword, 12);
@@ -493,12 +517,12 @@ export async function portalAddMember(req, res) {
     );
     const userId = userRes.rows[0].id;
     const memberRes = await client.query(
-      `insert into company_members (company_id, user_id, role, status, skills, phone)
-       values ($1, $2, $3, 'active', $4, $5)
+      `insert into company_members (company_id, user_id, role, status, skills, phone, permissions)
+       values ($1, $2, $3, 'active', $4, $5, $6::jsonb)
        on conflict (company_id, user_id) do update set
-         role = excluded.role, status = 'active', skills = excluded.skills
+         role = excluded.role, status = 'active', skills = excluded.skills, permissions = excluded.permissions
        returning *`,
-      [req.company.id, userId, b.role, Array.isArray(b.skills) ? b.skills : [], b.phone || null],
+      [req.company.id, userId, b.role, Array.isArray(b.skills) ? b.skills : [], b.phone || null, permissions],
     );
     return { member: memberRes.rows[0], user: userRes.rows[0], tempPassword: b.password ? undefined : tempPassword };
   });
@@ -520,7 +544,7 @@ export async function portalAddMember(req, res) {
 }
 
 export async function portalUpdateMember(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_team')) throw forbidden('Not authorized');
   const own = await query(
     `select * from company_members where id = $1 and company_id = $2`,
     [req.params.memberId, req.company.id],
@@ -528,24 +552,44 @@ export async function portalUpdateMember(req, res) {
   if (!own.rows[0]) throw notFound('Member not found');
   if (own.rows[0].role === 'owner') throw forbidden('The owner account cannot be modified here');
   const b = req.body || {};
+  if (b.role && !COMPANY_MEMBER_ROLES.includes(b.role)) throw badRequest('Invalid role');
+  // permissions semantics: key absent = no change; null or [] = clear overrides
+  // (fall back to role defaults); non-empty array = explicit capability set.
+  const hasPerms = Object.prototype.hasOwnProperty.call(b, 'permissions');
+  let permsValue = null;
+  if (hasPerms) {
+    if (b.permissions === null || (Array.isArray(b.permissions) && b.permissions.length === 0)) {
+      permsValue = null;
+    } else if (Array.isArray(b.permissions)) {
+      for (const key of b.permissions) {
+        if (!COMPANY_CAPABILITIES.includes(key)) throw badRequest(`Unknown capability: ${key}`);
+      }
+      permsValue = JSON.stringify([...new Set(b.permissions)]);
+    } else {
+      throw badRequest('permissions must be an array of capability keys (or null to reset)');
+    }
+  }
   const result = await query(
     `update company_members set
        role = coalesce($2, role), status = coalesce($3, status),
-       is_available = coalesce($4, is_available), skills = coalesce($5, skills)
+       is_available = coalesce($4, is_available), skills = coalesce($5, skills),
+       permissions = case when $6::boolean then $7::jsonb else permissions end
      where id = $1 returning *`,
     [req.params.memberId, b.role ?? null, b.status ?? null,
      typeof b.isAvailable === 'boolean' ? b.isAvailable : null,
-     Array.isArray(b.skills) ? b.skills : null],
+     Array.isArray(b.skills) ? b.skills : null,
+     hasPerms, permsValue],
   );
   await auditLog({
     userId: req.user.id, action: 'company.member.update', entityType: 'company_member',
-    entityId: req.params.memberId, metadata: { changes: { role: b.role, status: b.status } },
+    entityId: req.params.memberId,
+    metadata: { changes: { role: b.role, status: b.status, permissions: hasPerms ? (permsValue ? JSON.parse(permsValue) : 'role_defaults') : undefined } },
   });
   res.json({ success: true, member: toMemberSummary(result.rows[0]) });
 }
 
 export async function portalRemoveMember(req, res) {
-  if (!COMPANY_ADMIN_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  if (!hasCapability(req.companyMembership, 'manage_team')) throw forbidden('Not authorized');
   const own = await query(
     `select * from company_members where id = $1 and company_id = $2`,
     [req.params.memberId, req.company.id],
@@ -799,7 +843,7 @@ export async function portalReviews(req, res) {
 
 // ── Finance: earnings + settlements (spec §9 FINANCE, §16 money flow) ──
 export async function portalFinance(req, res) {
-  if (!COMPANY_FINANCE_ROLES.includes(req.companyMembership.role)) {
+  if (!hasCapability(req.companyMembership, 'view_finance')) {
     throw forbidden('Only owners/finance users can view company finances');
   }
   const summary = await query(
@@ -825,6 +869,14 @@ export async function portalFinance(req, res) {
      group by 1 order by 1 desc limit 12`,
     [req.company.id],
   );
+  const { companyAvailableBalance } = await import('../services/companyPayoutService.js');
+  const available = await companyAvailableBalance(null, req.company.id);
+  const payoutRequests = await query(
+    `select id, amount, mpesa_number, status, provider_reference, currency, created_at, updated_at
+     from payouts where company_id = $1 order by created_at desc limit 25`,
+    [req.company.id],
+  );
+  const company = await getCompany(req.company.id);
   res.json({
     success: true,
     summary: {
@@ -833,10 +885,85 @@ export async function portalFinance(req, res) {
       net: Number(summary.rows[0]?.net || 0),
       pending: Number(summary.rows[0]?.pending || 0),
       paid: Number(summary.rows[0]?.paid || 0),
+      availableForWithdrawal: available,
     },
+    payoutAccount: {
+      method: company?.payout_method || 'mpesa',
+      mpesaNumber: maskAccount(company?.payout_mpesa_number),
+      bankName: company?.payout_bank_name || null,
+      bankAccount: maskAccount(company?.payout_bank_account),
+      accountName: company?.payout_account_name || null,
+    },
+    payoutRequests: payoutRequests.rows,
     settlements: settlements.rows,
     monthly: monthly.rows,
   });
+}
+
+// ── Payout destination (owner / manage_settings) ──
+export async function portalUpdatePayoutDestination(req, res) {
+  if (!hasCapability(req.companyMembership, 'manage_settings')) {
+    throw forbidden('Only company owners/managers can change the payout destination');
+  }
+  const b = req.body || {};
+  const method = ['mpesa', 'bank'].includes(b.method) ? b.method : 'mpesa';
+  if (method === 'mpesa' && !b.mpesaNumber && !req.company.payout_mpesa_number) {
+    throw badRequest('mpesaNumber is required for M-Pesa payouts');
+  }
+  if (method === 'bank' && (!b.bankName || !b.bankAccount) && (!req.company.payout_bank_name || !req.company.payout_bank_account)) {
+    throw badRequest('bankName and bankAccount are required for bank payouts');
+  }
+  const result = await query(
+    `update company_profiles set
+       payout_method = $2,
+       payout_mpesa_number = coalesce($3, payout_mpesa_number),
+       payout_bank_name = coalesce($4, payout_bank_name),
+       payout_bank_account = coalesce($5, payout_bank_account),
+       payout_account_name = coalesce($6, payout_account_name),
+       updated_at = now()
+     where id = $1 returning payout_method, payout_mpesa_number, payout_bank_name, payout_bank_account, payout_account_name`,
+    [req.company.id, method, b.mpesaNumber || null, b.bankName || null, b.bankAccount || null, b.accountName || null],
+  );
+  await auditLog({
+    userId: req.user.id, action: 'company.payout_destination.update', entityType: 'company', entityId: req.company.id,
+    metadata: { method },
+  });
+  const row = result.rows[0];
+  res.json({
+    success: true,
+    payoutAccount: {
+      method: row.payout_method,
+      mpesaNumber: maskAccount(row.payout_mpesa_number),
+      bankName: row.payout_bank_name,
+      bankAccount: maskAccount(row.payout_bank_account),
+      accountName: row.payout_account_name,
+    },
+  });
+}
+
+// ── Withdraw pending settlements (finance roles; server-side balance math) ──
+export async function portalWithdraw(req, res) {
+  if (!hasCapability(req.companyMembership, 'request_payout')) {
+    throw forbidden('Only owners/finance users can request settlement payouts');
+  }
+  const b = req.body || {};
+  if (!b.amount) throw badRequest('amount is required');
+  const { requestCompanyWithdrawal } = await import('../services/companyPayoutService.js');
+  const { payout } = await requestCompanyWithdrawal({
+    companyId: req.company.id,
+    actorId: req.user.id,
+    actorRole: `company:${req.companyMembership.role}`,
+    amount: b.amount,
+    mpesaNumber: b.mpesaNumber || undefined,
+    bankName: b.bankName || undefined,
+    bankAccount: b.bankAccount || undefined,
+    idempotencyKey: b.idempotencyKey || req.get('Idempotency-Key') || undefined,
+  });
+  await auditLog({
+    userId: req.user.id, action: 'company.payout.request', entityType: 'payout', entityId: payout.id,
+    metadata: { companyId: req.company.id, amount: payout.amount, via: 'portal' },
+  });
+  res.status(201).json({ success: true, payout });
 }
 
 // ── Technician experience (spec §11) — only work assigned to them ──
@@ -902,7 +1029,8 @@ export async function adminListCompanies(req, res) {
     `select cp.*, u.full_name as owner_name, u.email as owner_email,
        (select count(*) from company_members cm where cm.company_id = cp.id) as member_count,
        (select count(*) from jobs j where j.company_id = cp.id) as job_count,
-       (select count(*) from company_settlements s where s.company_id = cp.id and s.status = 'pending') as pending_settlements
+       (select count(*) from company_settlements s where s.company_id = cp.id and s.status = 'pending') as pending_settlements,
+       (select coalesce(sum(s.net_amount), 0) from company_settlements s where s.company_id = cp.id and s.status = 'pending') as pending_settlements_kes
      from company_profiles cp left join users u on u.id = cp.owner_user_id
      ${where} order by cp.created_at desc limit 200`,
     params,
@@ -916,6 +1044,7 @@ export async function adminListCompanies(req, res) {
       memberCount: Number(row.member_count || 0),
       jobCount: Number(row.job_count || 0),
       pendingSettlements: Number(row.pending_settlements || 0),
+      pendingSettlementsKes: Number(row.pending_settlements_kes || 0),
     })),
   });
 }
@@ -941,4 +1070,118 @@ export async function adminCompanyAction(req, res) {
      JSON.stringify({ companyId: company.id, action })],
   );
   res.json({ success: true, company: toCompanySummary(result.rows[0]) });
+}
+
+// ── Admin: single-company drill-down (spec §14 detailed company management) ──
+// Aggregates everything the platform knows about one company: profile,
+// members, services, jobs, settlement ledger, payout requests, application.
+export async function adminCompanyDetail(req, res) {
+  const companyId = req.params.id;
+  const company = await getCompany(companyId);
+  if (!company) throw notFound('Company not found');
+
+  const [members, services, jobs, settlementTotals, settlements, payoutRequests, application] = await Promise.all([
+    query(
+      `select cm.id, cm.user_id, cm.role, cm.status, cm.skills, cm.is_available, cm.permissions, cm.joined_at,
+              u.full_name, u.email, u.phone as user_phone
+       from company_members cm join users u on u.id = cm.user_id
+       where cm.company_id = $1 order by cm.role, cm.joined_at`,
+      [companyId],
+    ),
+    query(
+      `select id, name, category, description, base_price, duration_minutes, is_active, created_at
+       from company_services where company_id = $1 order by category, name`,
+      [companyId],
+    ),
+    query(
+      `select j.id, j.status, j.service_category, j.final_price, j.estimated_price,
+              j.escrow_status, j.payment_status, j.created_at, j.updated_at,
+              tech.full_name as technician_name, cust.full_name as customer_name
+       from jobs j
+       left join users tech on tech.id = j.technician_user_id
+       left join users cust on cust.id = j.customer_id
+       where j.company_id = $1 order by j.created_at desc limit 30`,
+      [companyId],
+    ),
+    query(
+      `select coalesce(sum(gross_amount), 0) as gross,
+              coalesce(sum(commission_amount), 0) as commission,
+              coalesce(sum(net_amount), 0) as net,
+              coalesce(sum(net_amount) filter (where status = 'pending'), 0) as pending,
+              coalesce(sum(net_amount) filter (where status = 'paid'), 0) as paid,
+              count(*) filter (where status = 'pending') as pending_count
+       from company_settlements where company_id = $1`,
+      [companyId],
+    ),
+    query(
+      `select s.*, j.service_category
+       from company_settlements s left join jobs j on j.id = s.job_id
+       where s.company_id = $1 order by s.created_at desc limit 50`,
+      [companyId],
+    ),
+    query(
+      `select id, amount, status, mpesa_number, provider_reference, currency, created_at, updated_at
+       from payouts where company_id = $1 order by created_at desc limit 25`,
+      [companyId],
+    ),
+    company.application_id
+      ? query(
+          `select id, company_name, status, company_registration_number, license_details, branches,
+                  technician_count, review_notes, reviewed_by_user_id, approved_at, created_at
+           from company_partner_applications where id = $1`,
+          [company.application_id],
+        )
+      : Promise.resolve({ rows: [] }),
+  ]);
+
+  const totals = settlementTotals.rows[0] || {};
+  const [ownerRow, payoutService] = await Promise.all([
+    query('select full_name, email, phone from users where id = $1', [company.owner_user_id]),
+    import('../services/companyPayoutService.js'),
+  ]);
+  const availableForWithdrawal = await payoutService.companyAvailableBalance(null, companyId);
+
+  res.json({
+    success: true,
+    company: {
+      ...toCompanySummary(company),
+      legalName: company.legal_name,
+      contactName: company.contact_name,
+      contactEmail: company.contact_email,
+      contactPhone: company.contact_phone,
+      registrationNumber: company.registration_number,
+      licenseDetails: company.license_details,
+      teamSize: company.team_size ?? 0,
+      payoutAccount: {
+        method: company.payout_method || 'mpesa',
+        mpesaNumber: maskAccount(company.payout_mpesa_number),
+        bankName: company.payout_bank_name || null,
+        bankAccount: maskAccount(company.payout_bank_account),
+        accountName: company.payout_account_name || null,
+      },
+    },
+    owner: ownerRow.rows[0]
+      ? { fullName: ownerRow.rows[0].full_name, email: ownerRow.rows[0].email, phone: ownerRow.rows[0].phone }
+      : null,
+    members: members.rows.map((r) => ({
+      id: r.id, userId: r.user_id, fullName: r.full_name, email: r.email,
+      phone: r.phone || r.user_phone || null, role: r.role, status: r.status,
+      skills: r.skills || [], isAvailable: r.is_available,
+      permissions: r.permissions || null, joinedAt: r.joined_at,
+    })),
+    services: services.rows,
+    jobs: jobs.rows,
+    finance: {
+      gross: Number(totals.gross || 0),
+      commission: Number(totals.commission || 0),
+      net: Number(totals.net || 0),
+      pending: Number(totals.pending || 0),
+      paid: Number(totals.paid || 0),
+      pendingCount: Number(totals.pending_count || 0),
+      availableForWithdrawal,
+    },
+    settlements: settlements.rows,
+    payoutRequests: payoutRequests.rows,
+    application: application.rows[0] || null,
+  });
 }

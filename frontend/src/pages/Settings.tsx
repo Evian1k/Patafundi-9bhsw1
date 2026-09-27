@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { useCountry } from "@/lib/country";
 import { toast } from "sonner";
 
 interface SavedPlace {
@@ -50,6 +51,9 @@ export default function Settings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [languages, setLanguages] = useState<{ code: string; native_name: string }[]>([]);
+  const [preferredLanguage, setPreferredLanguage] = useState("");
+  const { country, countries, setCountry } = useCountry();
 
   const homePlace = useMemo(() => savedPlaces.find((p) => p.type === "home") || null, [savedPlaces]);
   const workPlace = useMemo(() => savedPlaces.find((p) => p.type === "work") || null, [savedPlaces]);
@@ -70,6 +74,8 @@ export default function Settings() {
         setUser(me);
         setFullName(me?.fullName || "");
         setPhone(me?.phone || "");
+        const meAny = me as unknown as { preferredLanguage?: string; countryCode?: string } | null;
+        setPreferredLanguage(meAny?.preferredLanguage || "");
         const row = (settingsRes?.settings || {}) as SettingsRow;
         setSettings({ safetyAlerts: row.safety_alerts ?? true, shareEmergencyContact: row.share_emergency_contact ?? false, hideProfile: row.hide_profile ?? false, marketingOptIn: row.privacy_marketing_opt_in ?? true, shareLocation: row.privacy_share_location ?? true });
         setSavedPlaces((placesRes?.places || []) as SavedPlace[]);
@@ -79,12 +85,22 @@ export default function Settings() {
         setLoading(false);
       }
     })();
+
+    // Language list for the region section (public endpoint).
+    apiClient.request("/global/languages", { includeAuth: false })
+      .then((res) => setLanguages(((res as { languages?: { code: string; native_name: string }[] }).languages || [])))
+      .catch(() => { /* non-critical */ });
   }, [navigate]);
 
   const savePersonalInfo = async () => {
     try {
       setSavingProfile(true);
-      await apiClient.updateMe({ fullName: fullName.trim() || null, phone: phone.trim() || null });
+      await apiClient.updateMe({
+        fullName: fullName.trim() || null,
+        phone: phone.trim() || null,
+        countryCode: country?.code || undefined,
+        preferredLanguage: preferredLanguage || undefined,
+      });
       const meRes = await apiClient.getCurrentUser();
       setUser((meRes?.user as unknown as MeUser) || null);
       toast.success("Personal info updated");
@@ -186,7 +202,33 @@ export default function Settings() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Phone Number</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254..." className="w-full px-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={country?.phone_code ? `${country.phone_code}...` : "+254..."} className="w-full px-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" />
+              </div>
+
+              {/* Region & language (master prompt §40 globalization) */}
+              <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label htmlFor="settings-country" className="block text-sm font-medium mb-1">Country / region</label>
+                  <select id="settings-country" value={country?.code || "KE"}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm">
+                    {countries.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag_emoji ? `${c.flag_emoji} ` : ""}{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">Prices are shown in {country?.currency_code || "KES"}.</p>
+                </div>
+                <div>
+                  <label htmlFor="settings-language" className="block text-sm font-medium mb-1">Preferred language</label>
+                  <select id="settings-language" value={preferredLanguage}
+                    onChange={(e) => setPreferredLanguage(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm">
+                    <option value="">System default</option>
+                    {languages.map((l) => (
+                      <option key={l.code} value={l.code}>{l.native_name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <Button onClick={savePersonalInfo} disabled={savingProfile} className="bg-gradient-primary">
                 {savingProfile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

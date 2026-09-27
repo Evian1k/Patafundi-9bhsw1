@@ -96,6 +96,7 @@ router.post('/company/applications/:id/review', authRequired, requireRole('admin
 router.post('/company/applications/:id/approve', authRequired, requireRole('admin'), asyncHandler(company.approvePartnerApplication));
 router.get('/admin/company-applications', authRequired, requireRole('admin'), asyncHandler(company.adminListApplications));
 router.get('/admin/companies', authRequired, requireRole('admin'), asyncHandler(company.adminListCompanies));
+router.get('/admin/companies/:id', authRequired, requireRole('admin'), asyncHandler(company.adminCompanyDetail));
 router.post('/admin/companies/:id/action', authRequired, requireRole('admin'), asyncHandler(company.adminCompanyAction));
 
 // ── Company portal (organization isolation enforced by requireCompanyMember) ──
@@ -121,6 +122,8 @@ router.post('/company/jobs/:jobId/unassign-technician', authRequired, company.po
 router.get('/company/portal/schedule', authRequired, company.portalAccess, asyncHandler(company.portalSchedule));
 router.get('/company/portal/reviews', authRequired, company.portalAccess, asyncHandler(company.portalReviews));
 router.get('/company/portal/finance', authRequired, company.portalAccess, asyncHandler(company.portalFinance));
+router.put('/company/portal/finance/payout-destination', authRequired, company.portalAccess, asyncHandler(company.portalUpdatePayoutDestination));
+router.post('/company/portal/finance/withdraw', authRequired, company.portalAccess, asyncHandler(company.portalWithdraw));
 router.get('/company/technician/assignments', authRequired, asyncHandler(company.technicianAssignments));
 
 // Legacy secured overview (kept for compatibility)
