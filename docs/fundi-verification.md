@@ -5,7 +5,7 @@ within 24 hours of submission.
 
 ## Access
 
-- **Dashboard:** `https://patafundi.vercel.app/admin/fundis`
+- **Dashboard:** `https://patafundi-9bhsw1.vercel.app/admin/fundis`
 - **API:** `GET /api/admin/fundis?status=pending`
 - **Login:** admin credentials (contact ops if you don't have them)
 

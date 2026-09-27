@@ -11,7 +11,7 @@ When a fraud alert fires or a user reports being scammed, follow this playbook.
 ## Triage (5 minutes)
 
 ### 1. Open the fraud dashboard
-- Production: `https://patafundi.vercel.app/admin/security`
+- Production: `https://patafundi-9bhsw1.vercel.app/admin/security`
 - Verify you're logged in as admin
 
 ### 2. Sort alerts by severity

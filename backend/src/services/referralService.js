@@ -706,7 +706,7 @@ export async function getMyReferralDashboard(userId) {
 
   return {
     code: codeRow?.referral_code || null,
-    shareLink: codeRow ? `${process.env.FRONTEND_ORIGIN || 'https://patafundi.vercel.app'}/auth?ref=${codeRow.referral_code}` : null,
+    shareLink: codeRow ? `${process.env.FRONTEND_ORIGIN || 'https://patafundi-9bhsw1.vercel.app'}/auth?ref=${codeRow.referral_code}` : null,
     stats: {
       shares: codeRow?.total_shares || 0,
       signups: codeRow?.total_signups || 0,

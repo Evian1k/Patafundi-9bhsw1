@@ -16,7 +16,7 @@ services:
       - key: REFRESH_TOKEN_SECRET
         generateValue: true
       - key: FRONTEND_ORIGIN
-        value: https://patafundi.vercel.app
+        value: https://patafundi-9bhsw1.vercel.app
       - key: COOKIE_SECURE
         value: "true"
       - key: EMAIL_FROM

@@ -21,7 +21,7 @@ Every item must be ✅ before the soft-launch announcement goes out.
 - [ ] `JWT_SECRET` — generated (not empty)
 - [ ] `REFRESH_TOKEN_SECRET` — generated (not empty)
 - [ ] `COOKIE_SECURE=true`
-- [ ] `FRONTEND_ORIGIN=https://patafundi.vercel.app`
+- [ ] `FRONTEND_ORIGIN=https://patafundi-9bhsw1.vercel.app`
 - [ ] `R2_ACCOUNT_ID` — set
 - [ ] `R2_ACCESS_KEY_ID` — set
 - [ ] `R2_SECRET_ACCESS_KEY` — set
@@ -69,7 +69,7 @@ Every item must be ✅ before the soft-launch announcement goes out.
 
 ## 8. Frontend
 
-- [ ] `https://patafundi.vercel.app` loads without console errors
+- [ ] `https://patafundi-9bhsw1.vercel.app` loads without console errors
 - [ ] Landing page renders correctly on mobile (375px), tablet (768px), desktop (1440px)
 - [ ] Customer can register → OTP → login → create job
 - [ ] Fundi can register (PUBLIC, no login required) → upload ID + selfie → OTP → pending

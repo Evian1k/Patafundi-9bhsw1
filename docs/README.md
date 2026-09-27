@@ -18,7 +18,7 @@ a step-by-step checklist — no decisions to make in the moment, just execute.
 | What | Where |
 |---|---|
 | Production API | https://patafundi-9bhsw1.onrender.com |
-| Production frontend | https://patafundi.vercel.app |
+| Production frontend | https://patafundi-9bhsw1.vercel.app |
 | Health check | `GET https://patafundi-9bhsw1.onrender.com/health` |
 | Render dashboard | https://dashboard.render.com |
 | Vercel dashboard | https://vercel.com/evian1k/patafundi-9bhsw1 |

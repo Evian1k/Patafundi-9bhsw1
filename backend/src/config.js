@@ -120,7 +120,7 @@ export const config = {
   port: Number(process.env.PORT || 4000),
   host: process.env.HOST || '0.0.0.0',
   frontendOrigin: process.env.FRONTEND_ORIGIN
-    || (isProduction ? 'https://patafundi.vercel.app' : 'http://127.0.0.1:8080'),
+    || (isProduction ? 'https://patafundi-9bhsw1.vercel.app' : 'http://127.0.0.1:8080'),
   corsOrigins: (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((s) => s.trim())
