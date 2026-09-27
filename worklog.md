@@ -274,3 +274,18 @@ Work Log:
 
 Stage Summary:
 - Commit pushed: M-Pesa guard fix; user needs Render env vars (DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET, ENCRYPTION_KEY, FRONTEND_ORIGIN, CORS_ORIGINS, COOKIE_SECURE) + Render Postgres before real data
+
+---
+Task ID: 12-b (Render env provisioning guidance delivered)
+Agent: Super Z (main agent)
+Task: Deliver plain-English Render fix instructions for the crashed backend deploy (follow-up to Task 12).
+
+Work Log:
+- Confirmed fix commit b8ef64b on origin/main (local HEAD matches): M-Pesa production guard now conditional on M-Pesa being configured
+- Verified boot path in production: without DATABASE_URL, embedded PGlite disabled ("Embedded database is disabled in production"); JWT/REFRESH secrets required (no dev auto-generation)
+- Confirmed MPESA_CALLBACK_SECRET no longer required at boot until MPESA_* keys are set
+- Generated strong random secrets (JWT/REFRESH/ENCRYPTION/MPESA_CALLBACK) and delivered to user IN CHAT ONLY — deliberately NOT stored in repo files to avoid committing secrets
+- Instructions given: create Render Postgres (or Neon), link to web service for DATABASE_URL, add env vars, Manual Deploy latest commit (picks up b8ef64b + PataFundi branding f063fe2)
+
+Stage Summary:
+- User-side actions pending: Render Postgres creation + env vars + redeploy; expect banner "PataFundi API" and green /health after deploy
