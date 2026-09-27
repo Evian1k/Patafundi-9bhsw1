@@ -23,6 +23,12 @@ services:
       # (admin.demo@patafundi.test stays allowed in dev via the code default.)
       - key: SUPER_ADMIN_EMAILS
         value: emmanuelevian@gmail.com
+      # Platform owner account — when OWNER_PASSWORD is set (10+ chars), the
+      # server creates/heals emmanuelevian@gmail.com as super_admin on boot.
+      # Idempotent: later in-app password changes are never overwritten.
+      # sync:false → value is set in the Render dashboard, never committed.
+      - key: OWNER_PASSWORD
+        sync: false
       - key: EMAIL_FROM
         value: onboarding@resend.dev
       - key: RESEND_API_KEY

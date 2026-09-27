@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import pg from 'pg';
 import { getEmbeddedDb } from '../src/pglite-instance.js';
 import { getPgPoolConfig, isLocalDatabaseUrl } from '../src/pg-config.js';
+import { maybeBootstrapOwnerFromEnv } from '../src/ownerBootstrap.js';
 
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
@@ -366,6 +367,9 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
     }
     await ensureCustomersTable(pool);
     await seedIfEmpty(pool);
+    // Platform owner (spec §3/§39): when OWNER_PASSWORD is set, create/heal the
+    // owner account on every boot. Idempotent — existing passwords are untouched.
+    await maybeBootstrapOwnerFromEnv(pool);
     await pool.end();
     console.log('[PataFundi] PostgreSQL database ready');
     return true;
@@ -402,6 +406,7 @@ export async function ensureDevDatabase() {
     await applyMigrations(db);
     await ensureCustomersTable(db);
     await seedIfEmpty(db);
+    await maybeBootstrapOwnerFromEnv(db);
     console.log('[PataFundi] Embedded database ready');
     return true;
   } catch (error) {
