@@ -13,7 +13,7 @@ interface Member {
   role: string; status: string; isAvailable: boolean; skills: string[]; activeJobs: number;
   permissions: string[] | null;
 }
-const ROLES = ["technician", "dispatcher", "finance", "manager", "admin"];
+const ROLES = ["technician", "support", "dispatcher", "finance", "manager", "admin"];
 
 // Mirrors backend COMPANY_CAPABILITIES + COMPANY_ROLE_CAPABILITIES defaults.
 const CAPABILITIES: { key: string; label: string; hint: string }[] = [
@@ -33,6 +33,7 @@ const ROLE_DEFAULTS: Record<string, string[]> = {
   admin: ["view_overview", "manage_team", "manage_services", "manage_settings", "dispatch_jobs", "handle_jobs"],
   dispatcher: ["view_overview", "dispatch_jobs", "handle_jobs"],
   finance: ["view_overview", "view_finance", "request_payout"],
+  support: ["view_overview"],
   technician: ["view_overview", "handle_jobs"],
 };
 

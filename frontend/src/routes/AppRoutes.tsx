@@ -37,7 +37,9 @@ import FundiApp from "@/pages/FundiApp";
 import BlogIndex from "@/pages/blog/BlogIndex";
 import BlogPostPage from "@/pages/blog/BlogPostPage";
 import Careers from "@/pages/careers/Careers";
-
+import ServicesIndex from "@/pages/public/ServicesIndex";
+import Press from "@/pages/public/Press";
+import InvestorRelations from "@/pages/public/InvestorRelations";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import FundiVerificationManagement from "@/pages/admin/FundiVerificationManagement";
@@ -128,7 +130,10 @@ export default function AppRoutes() {
       <Route path="/settings" element={<Settings />} />
       <Route path="/disputes" element={<DisputeCenter />} />
 
+      <Route path="/services" element={<ServicesIndex />} />
       <Route path="/services/:slug" element={<ServicePage />} />
+      <Route path="/press" element={<Press />} />
+      <Route path="/investor-relations" element={<InvestorRelations />} />
 
       {/* ── Company portal (organization-scoped; server-side RBAC) ── */}
       <Route path="/company" element={<CompanyPortalLayout />}>

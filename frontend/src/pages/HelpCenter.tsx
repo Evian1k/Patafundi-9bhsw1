@@ -17,6 +17,23 @@ export default function HelpCenter() {
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Local input state with debounce (spec §63): the URL (and therefore the
+  // fetch) only updates after the user pauses typing, instead of firing a
+  // request on every keystroke.
+  const [searchInput, setSearchInput] = useState(q);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput === q) return;
+      setParams((p) => {
+        if (searchInput) p.set("q", searchInput);
+        else p.delete("q");
+        return p;
+      });
+    }, 280);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const fetchData = async (next: { q?: string; category?: string } = {}) => {
     const nextQ = typeof next.q === "string" ? next.q : q;
@@ -46,7 +63,7 @@ export default function HelpCenter() {
         <h1 className="text-4xl font-display font-bold mb-4">Help Center</h1>
         <p className="text-muted-foreground mb-6">Search FAQs or contact support if you can't find an answer.</p>
         <div className="flex gap-3 mb-6">
-          <Input value={q} onChange={(e) => { const v = e.target.value; setParams((p) => { if (v) p.set("q", v); else p.delete("q"); return p; }); }} placeholder="Search help topics…" className="flex-1" />
+          <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search help topics…" className="flex-1" />
           <Link to="/contact-support"><Button variant="outline">Contact Support</Button></Link>
         </div>
         <div className="flex flex-wrap gap-2 mb-6">

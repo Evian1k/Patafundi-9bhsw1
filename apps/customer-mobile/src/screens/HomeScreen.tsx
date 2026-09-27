@@ -49,7 +49,8 @@ function normalizeServicePrice(raw: Record<string, unknown>): ServicePrice | nul
 
 function formatKes(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '';
-  return `from KES ${Math.round(value).toLocaleString('en-KE')}`;
+  // KSh symbol prefix, matching the web formatMoney output (spec §50).
+  return `from KSh ${Math.round(value).toLocaleString('en-KE')}`;
 }
 
 export function HomeScreen({ navigation }: any): JSX.Element {

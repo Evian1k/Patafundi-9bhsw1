@@ -98,6 +98,7 @@ app.use('/api/auth/otp-resend', otpRateLimit);
 app.use('/api/auth/reset-password', otpRateLimit);
 app.use('/api/payments/webhook', paymentWebhookRateLimit);
 app.use('/api/payments/daraja-callback', paymentWebhookRateLimit);
+app.use('/api/payments/stripe/webhook', paymentWebhookRateLimit);
 app.use('/api/maps', mapsRateLimit);
 app.use(csrfProtection);
 
@@ -184,6 +185,13 @@ app.get('/health', async (_req, res) => {
       storage,
       email,
       mpesa,
+      // Ops visibility (spec §55): auth secrets are fail-critical. When
+      // missing, every authenticated route 503s — surface it here so the
+      // fix (set JWT_SECRET/REFRESH_TOKEN_SECRET in the host env) is obvious.
+      auth: {
+        jwtSecretConfigured: Boolean(config.jwtSecret),
+        refreshSecretConfigured: Boolean(config.refreshSecret || config.jwtSecret),
+      },
     },
   });
 });
@@ -312,6 +320,21 @@ process.on('uncaughtException', (error) => {
 });
 
 logProductionConfigWarnings();
+
+// Fail-critical env check (spec §55): without JWT_SECRET every authenticated
+// route 503s in production. Fail FAST and loud at boot with exact remediation,
+// instead of silently breaking login for every user until someone probes an API.
+if (config.nodeEnv === 'production' && !config.jwtSecret) {
+  console.error('');
+  console.error('╔══════════════════════════════════════════════════════════════════╗');
+  console.error('║  FATAL: JWT_SECRET is not set. Authentication is DOWN.          ║');
+  console.error('║  Every authenticated API route will return 503 until fixed.     ║');
+  console.error('║  Fix: Render Dashboard -> patafundi-api -> Environment ->        ║');
+  console.error('║  add JWT_SECRET and REFRESH_TOKEN_SECRET (32+ random chars),     ║');
+  console.error('║  then redeploy. See render.yaml envVars (generateValue: true).   ║');
+  console.error('╚══════════════════════════════════════════════════════════════════╝');
+  console.error('');
+}
 
 // ── Startup banner: print DB status so developers know exactly what's happening ──
 const dbUrlSet = Boolean(config.databaseUrl);

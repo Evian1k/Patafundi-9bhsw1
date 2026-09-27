@@ -22,6 +22,14 @@ export default function CompanyDirectory() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
+  // Debounced search (spec §63): the input updates instantly, the fetch only
+  // fires once the user stops typing for 280ms.
+  const [searchInput, setSearchInput] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 280);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +57,7 @@ export default function CompanyDirectory() {
           <Link to="/" className="font-semibold tracking-tight shrink-0">PataFundi <span className="text-emerald-500">Companies</span></Link>
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)}
+            <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search companies…" aria-label="Search companies"
               className="w-full rounded-xl border bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
           </div>

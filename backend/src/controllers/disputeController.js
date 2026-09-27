@@ -22,6 +22,29 @@ async function canAccessJob(user, job) {
   return false;
 }
 
+async function notifyDisputeParties(job, exceptUserId, payload) {
+  // Spec §35: dispute events must reach every other party (in-app + queued
+  // push), not only sockets. Best-effort: never blocks the response.
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    const recipients = new Set();
+    if (job.customer_id) recipients.add(job.customer_id);
+    if (job.fundi_id) recipients.add(job.fundi_id);
+    if (job.technician_user_id) recipients.add(job.technician_user_id);
+    if (job.company_id) {
+      const owners = await query(
+        `select user_id from company_members where company_id = $1 and role in ('owner', 'manager') and status = 'active'`,
+        [job.company_id],
+      );
+      owners.rows.forEach((r) => recipients.add(r.user_id));
+    }
+    recipients.delete(exceptUserId);
+    await Promise.all([...recipients].map((userId) => notify({ userId, ...payload })));
+  } catch (err) {
+    console.warn('[disputes] party notification failed (non-blocking):', err.message);
+  }
+}
+
 export async function createDispute(req, res) {
   const { jobId, reason, evidenceUrls = [] } = req.body || {};
   if (!jobId || !reason) throw badRequest('Job and reason are required');
@@ -44,6 +67,13 @@ export async function createDispute(req, res) {
     return result.rows[0];
   });
   emitEvent('dispute:opened', { jobId, disputeId: dispute.id }, `job:${jobId}`);
+  const jobRow = await query('select customer_id, fundi_id, company_id, technician_user_id, service_category from jobs where id = $1', [jobId]);
+  await notifyDisputeParties(jobRow.rows[0] || {}, req.user.id, {
+    type: 'dispute_opened',
+    title: 'A dispute was opened',
+    body: `A dispute was opened on your ${jobRow.rows[0]?.service_category || ''} job. Our team will review it.`.trim(),
+    data: { jobId, disputeId: dispute.id },
+  });
   res.status(201).json({ success: true, dispute });
 }
 
@@ -150,6 +180,13 @@ export async function resolveDispute(req, res) {
     return d.rows[0];
   });
   emitEvent('dispute:resolved', { jobId: dispute.job_id, disputeId: req.params.id }, `job:${dispute.job_id}`);
+  const resolvedJob = await query('select customer_id, fundi_id, company_id, technician_user_id, service_category from jobs where id = $1', [dispute.job_id]);
+  await notifyDisputeParties(resolvedJob.rows[0] || {}, req.user.id, {
+    type: 'dispute_resolved',
+    title: 'Dispute resolved',
+    body: `The dispute on your ${resolvedJob.rows[0]?.service_category || ''} job has been resolved.`.trim(),
+    data: { jobId: dispute.job_id, disputeId: req.params.id },
+  });
   // Auditability (spec §56): dispute resolution is a significant action.
   await auditLog({
     userId: req.user.id,

@@ -4,7 +4,7 @@
 import { query } from '../db.js';
 import { forbidden, notFound } from '../utils/http.js';
 
-export const COMPANY_MEMBER_ROLES = ['owner', 'manager', 'admin', 'dispatcher', 'finance', 'technician'];
+export const COMPANY_MEMBER_ROLES = ['owner', 'manager', 'admin', 'dispatcher', 'finance', 'support', 'technician'];
 // roles allowed to administer the company (profile, team, services, finance)
 export const COMPANY_ADMIN_ROLES = ['owner', 'manager', 'admin'];
 // roles allowed to dispatch (assign technicians)
@@ -34,6 +34,7 @@ const CAPS_MANAGER = ['view_overview', 'manage_team', 'manage_services', 'manage
 const CAPS_DISPATCHER = ['view_overview', 'dispatch_jobs', 'handle_jobs'];
 const CAPS_FINANCE = ['view_overview', 'view_finance', 'request_payout'];
 const CAPS_TECHNICIAN = ['view_overview', 'handle_jobs'];
+const CAPS_SUPPORT = ['view_overview'];
 
 export const COMPANY_ROLE_CAPABILITIES = {
   owner: CAPS_ALL,
@@ -41,6 +42,7 @@ export const COMPANY_ROLE_CAPABILITIES = {
   admin: CAPS_MANAGER,
   dispatcher: CAPS_DISPATCHER,
   finance: CAPS_FINANCE,
+  support: CAPS_SUPPORT,
   technician: CAPS_TECHNICIAN,
 };
 
@@ -87,9 +89,14 @@ export function requireCompanyMember(options = {}) {
   const { roles = null, capability = null, primary = false } = options;
   return async (req, _res, next) => {
     try {
-      const companyId = primary ? null : (req.params.companyId || req.body?.companyId || req.query?.companyId);
+      const companyId = primary
+        ? (req.query?.companyId || req.body?.companyId || null)
+        : (req.params.companyId || req.body?.companyId || req.query?.companyId);
       if (!primary && !companyId) throw notFound('Company not found');
       if (isPlatformStaff(req.user)) {
+        // Platform staff act on a specific company context; when they call a
+        // primary-company endpoint they must name the company explicitly, and
+        // handlers must treat req.company as possibly null.
         const company = companyId ? await getCompany(companyId) : null;
         if (companyId && !company) throw notFound('Company not found');
         req.company = company;
@@ -107,6 +114,27 @@ export function requireCompanyMember(options = {}) {
           [req.user.id],
         );
         membership = rows.rows[0] || null;
+        // Self-heal (root-cause fix for the reported /company/portal/overview
+        // 403): a user whose role was flipped to company_admin at approval can
+        // end up with no active membership row (pre-032 approvals, partial
+        // migrations). If they own a company profile, restore the owner
+        // membership instead of hard-failing their whole portal.
+        if (!membership && req.user?.role === 'company_admin') {
+          const owned = await query(
+            `select id from company_profiles where owner_user_id = $1 order by created_at asc limit 1`,
+            [req.user.id],
+          );
+          if (owned.rows[0]) {
+            await query(
+              `insert into company_members (company_id, user_id, role, status)
+               values ($1, $2, 'owner', 'active')
+               on conflict (company_id, user_id) do update set status = 'active'`,
+              [owned.rows[0].id, req.user.id],
+            );
+            membership = await getMembership(owned.rows[0].id, req.user.id);
+            company = await getCompany(owned.rows[0].id);
+          }
+        }
         if (membership) company = await getCompany(membership.company_id);
       } else {
         company = await getCompany(companyId);

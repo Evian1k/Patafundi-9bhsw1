@@ -24,7 +24,13 @@
 
 const DEFAULT_SUPER_ADMINS = [
   'emmanuelevian@gmail.com', // platform owner (spec §39)
-  'admin.demo@patafundi.test', // shipped demo owner — REMOVE by setting SUPER_ADMIN_EMAILS in production
+];
+
+// The demo owner account is a DEV convenience only. It must never grant
+// super_admin privileges if production is misconfigured (spec §3: zero demo
+// accounts in production). parseAllowlist filters it out outside development.
+const DEV_ONLY_SUPER_ADMINS = [
+  'admin.demo@patafundi.test',
 ];
 
 function parseAllowlist() {
@@ -33,7 +39,9 @@ function parseAllowlist() {
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  return entries.length > 0 ? entries : DEFAULT_SUPER_ADMINS;
+  if (entries.length > 0) return entries;
+  if (process.env.NODE_ENV === 'production') return DEFAULT_SUPER_ADMINS;
+  return [...DEFAULT_SUPER_ADMINS, ...DEV_ONLY_SUPER_ADMINS];
 }
 
 /** Case-insensitive check against the configured allowlist. */

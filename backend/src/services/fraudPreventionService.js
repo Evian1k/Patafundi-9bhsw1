@@ -326,6 +326,27 @@ export async function recordLoginEvent(userId, ipAddress, deviceInfo = {}) {
     });
   }
 
+  // Spec §35/§52: security events must reach the user (in-app + queued push),
+  // not only the fraud dashboard. A new device/IP with impossible travel or a
+  // first-time device both warrant a "was this you?" notification.
+  try {
+    const { notify } = await import('./notificationService.js');
+    const isNewDevice = Boolean(prev && prev.device_id && deviceInfo.deviceId && prev.device_id !== deviceInfo.deviceId);
+    if (isImpossibleTravel || isNewDevice) {
+      await notify({
+        userId,
+        type: 'security_new_login',
+        title: 'New sign-in to your account',
+        body: isImpossibleTravel
+          ? `We noticed a sign-in from a new location (${deviceInfo.city || deviceInfo.country || ipAddress}). If this was not you, change your password immediately.`
+          : 'Your account was signed in from a new device. If this was not you, change your password.',
+        data: { ipAddress, deviceId: deviceInfo.deviceId || null, impossibleTravel: isImpossibleTravel },
+      });
+    }
+  } catch (err) {
+    console.warn('[fraud-prevention] security notify failed (non-blocking):', err.message);
+  }
+
   return { isImpossibleTravel, travelDistanceKm, travelTimeMinutes, previousLoginId: prev?.id };
 }
 

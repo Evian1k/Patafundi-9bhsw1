@@ -192,8 +192,14 @@ export async function webhook(req, res) {
           throw badRequest('Callback amount does not match pending subscription');
         }
         // Server-controlled entitlement grant: money confirmed -> subscription active.
-        // Duration is derived from the SERVER-side plan (never client input).
-        const days = sub.plan === 'yearly' ? 365 : 30;
+        // Duration is derived from the SERVER-side plan table (never client
+        // input); the legacy 30/365 heuristic covers pre-043 rows.
+        const planLookup = await client.query(
+          `select duration_days from subscription_plans where code = $1 and is_active = true`,
+          [sub.plan],
+        );
+        const days = planLookup.rows[0]?.duration_days
+          ?? (sub.plan === 'yearly' || sub.plan === 'fundi_pro_yearly' || sub.plan === 'company_growth_yearly' ? 365 : 30);
         const activated = await client.query(
           `update subscriptions
              set status = 'active', starts_at = now(),
@@ -374,5 +380,185 @@ export async function walletBalance(req, res) {
     balance: Math.max(0, totalEarnings - paidOrPending),
     escrowPending,
     totalEarnings,
+  });
+}
+
+// ── Card payments (spec §26-27): Stripe, env-gated ──────────────────────────
+// Mirrors the M-Pesa flow server-side: amount is always recomputed from the
+// job (never trusted from the client), a pending payment row is created, and
+// Stripe returns a client secret for the frontend to authorize. Without
+// STRIPE_SECRET_KEY the endpoint answers honestly that cards are not enabled.
+
+export async function stripeIntent(req, res) {
+  const { jobId } = req.body || {};
+  if (!jobId) throw badRequest('Job is required');
+  const { stripeStatus, createPaymentIntent } = await import('../services/stripeService.js');
+  if (!stripeStatus().configured) {
+    return res.status(503).json({
+      success: false,
+      code: 'cards_not_enabled',
+      message: 'Card payments are not enabled yet. Please pay with M-Pesa.',
+    });
+  }
+  const payment = await transaction(async (client) => {
+    const jobResult = await client.query('select * from jobs where id = $1 for update', [jobId]);
+    const job = jobResult.rows[0];
+    if (!job) throw notFound('Job not found');
+    if (job.customer_id !== req.user.id && req.user.role !== 'admin') throw forbidden('Only the job customer can pay for this job');
+    if (['cancelled', 'failed'].includes(job.status)) throw badRequest('Cannot pay for a cancelled or failed job');
+    if (['escrow_held', 'payout_processing', 'payout_completed'].includes(job.payment_status)) {
+      throw badRequest('This job has already been paid');
+    }
+    const expectedAmount = parsePositiveAmount(job.final_price || job.estimated_price);
+    const settings = await getPaymentSettings(client);
+    const commission = calculateCommission({ amount: expectedAmount, category: job.service_category, settings });
+    const inserted = await client.query(
+      `insert into payments (job_id, customer_id, amount, currency, country_code, provider,
+        status, escrow_status, commission_rate, commission_type, platform_commission, fundi_amount, commission_details)
+       values ($1, $2, $3, $4, $5, 'stripe', 'pending', 'pending', $6, $7, $8, $9, $10::jsonb) returning *`,
+      [
+        jobId, req.user.id, expectedAmount, job.currency_code || 'KES', job.country_code || null,
+        commission.commissionRate, commission.commissionType, commission.platformCommission,
+        commission.fundiAmount, JSON.stringify(commission.details),
+      ],
+    );
+    return { payment: inserted.rows[0], job };
+  });
+
+  const intent = await createPaymentIntent({
+    amount: Number(payment.payment.amount),
+    currency: String(payment.payment.currency || 'KES'),
+    metadata: { paymentId: payment.payment.id, jobId, customerEmail: req.user.email || '' },
+  });
+  if (!intent.ok) {
+    await query(`update payments set status = 'failed', metadata = jsonb_build_object('error', $2::text) where id = $1 and status = 'pending'`, [payment.payment.id, intent.error]);
+    throw badRequest(intent.error);
+  }
+  await query(
+    `update payments set metadata = jsonb_build_object('stripe_intent_id', $2::text, 'stripe_client_secret', $3::text) where id = $1`,
+    [payment.payment.id, intent.intentId, intent.clientSecret],
+  );
+  res.status(202).json({
+    success: true,
+    paymentId: payment.payment.id,
+    clientSecret: intent.clientSecret,
+    message: 'Card payment initialized. Complete the card prompt to pay.',
+  });
+}
+
+// Stripe webhook: verifies signature against STRIPE_WEBHOOK_SECRET using the
+// raw body (registered BEFORE express.json via express.raw on this path),
+// then confirms the payment through the same escrow path as the M-Pesa callback.
+export async function stripeWebhook(req, res) {
+  const { config } = await import('../config.js');
+  const secret = config.stripe?.webhookSecret;
+  const signature = req.get('stripe-signature') || '';
+  if (!secret) {
+    return res.status(503).json({ success: false, message: 'Stripe webhooks are not configured' });
+  }
+  // Stripe signature scheme: t=<timestamp>,v1=<hmac_sha256(timestamp.payload)>
+  const parts = Object.fromEntries(signature.split(',').map((p) => p.split('=')));
+  const timestamp = parts.t;
+  const expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${req.rawBody || ''}`).digest('hex');
+  const a = Buffer.from(String(expected));
+  const b = Buffer.from(String(parts.v1 || ''));
+  if (!timestamp || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(400).json({ success: false, message: 'Invalid Stripe signature' });
+  }
+  let event;
+  try {
+    event = JSON.parse(req.rawBody || '{}');
+  } catch {
+    return res.status(400).json({ success: false, message: 'Invalid payload' });
+  }
+  if (event.type === 'payment_intent.succeeded') {
+    const intent = event.data?.object || {};
+    const paymentId = intent.metadata?.paymentId;
+    if (paymentId) {
+      const paid = await query(
+        `update payments set status = 'completed', escrow_status = 'held', updated_at = now()
+          where id = $1 and status = 'pending'
+          returning *`,
+        [paymentId],
+      );
+      const row = await query(`select job_id, customer_id from payments where id = $1`, [paymentId]);
+      const job = row.rows[0];
+      if (paid.rows[0] && job?.job_id) {
+        await query(`update jobs set payment_status = 'escrow_held', updated_at = now() where id = $1`, [job.job_id]);
+        await query(
+          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
+           values ($1, $2, 'hold', (select amount from payments where id = $2), 'held')`,
+          [job.job_id, paymentId],
+        );
+      }
+    }
+  }
+  res.json({ received: true });
+}
+
+// ── Finance reconciliation (spec §26-28) ─────────────────────────────────────
+// Cross-checks real financial records for a date window: completed payments
+// vs escrow holds vs revenue ledger vs payouts. Reports mismatches so finance
+// staff can investigate drift instead of trusting numbers blindly.
+
+export async function financeReconciliation(req, res) {
+  const from = String(req.query.from || '').slice(0, 10) || null;
+  const to = String(req.query.to || '').slice(0, 10) || null;
+  const params = [];
+  if (from) { params.push(from); }
+  if (to) { params.push(`${to} 23:59:59`); }
+  const window = params.length === 2
+    ? 'where p.created_at between $1 and $2'
+    : params.length === 1
+      ? 'where p.created_at >= $1'
+      : '';
+
+  const payments = await query(
+    `select date_trunc('day', p.created_at) as day,
+            count(*)::int as count,
+            sum(p.amount) filter (where p.status = 'completed') as gross,
+            sum(p.platform_commission) filter (where p.status = 'completed') as commission,
+            sum(p.fundi_amount) filter (where p.status = 'completed') as fundi_amount
+     from payments p ${window}
+     group by 1 order by 1 desc limit 90`,
+    params,
+  );
+
+  const ledger = await query(
+    `select date_trunc('day', l.period_date) as day,
+            sum(l.amount) filter (where l.entry_type = 'commission') as commission_booked,
+            sum(l.amount) filter (where l.entry_type = 'payout') as payouts_booked
+     from revenue_ledger l
+     ${window.replace(/\bp\./g, 'l.').replace('p.created_at', 'l.period_date')}
+     group by 1 order by 1 desc limit 90`,
+    params,
+  );
+
+  const escrow = await query(
+    `select date_trunc('day', e.created_at) as day,
+            sum(e.amount) filter (where e.type = 'hold' and e.status in ('held', 'frozen')) as held,
+            sum(e.amount) filter (where e.type = 'release' and e.status = 'released') as released,
+            sum(e.amount) filter (where e.type = 'refund') as refunded
+     from escrow_transactions e
+     ${window.replace(/\bp\./g, 'e.').replace('p.created_at', 'e.created_at')}
+     group by 1 order by 1 desc limit 90`,
+    params,
+  );
+
+  const mismatchCount = await query(
+    `select count(*)::int as total
+     from payments p
+     left join escrow_transactions e on e.payment_id = p.id and e.type = 'hold'
+     where p.status = 'completed' and e.id is null`,
+  );
+
+  res.json({
+    success: true,
+    window: { from: from || 'all-time', to: to || 'now' },
+    payments: payments.rows,
+    ledger: ledger.rows,
+    escrow: escrow.rows,
+    completedPaymentsMissingEscrow: mismatchCount.rows[0]?.total || 0,
+    note: 'Completed payments must each have exactly one escrow hold. Investigate any day where commission booked does not match payment commission.',
   });
 }

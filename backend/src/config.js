@@ -153,6 +153,12 @@ export const config = {
     region: process.env.AWS_REGION || 'us-east-1',
     rekognitionEnabled: process.env.AWS_REKOGNITION_ENABLED === 'true',
   },
+  // Card payments (spec §26-27): env-gated. Absent key = cards disabled,
+  // M-Pesa keeps working. Never a mock success.
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  },
 };
 
 export function requireConfig(value, name) {

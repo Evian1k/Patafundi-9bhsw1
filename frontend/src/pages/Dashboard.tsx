@@ -11,6 +11,7 @@ import { ReportProblemModal } from "@/components/support/ReportProblemModal";
 import { HelpLinksInline } from "@/components/support/HelpKit";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { realtimeService } from "@/services/realtime";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { toast } from "sonner";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
@@ -213,6 +214,9 @@ export default function Dashboard() {
   };
 
   const handleSignOut = async () => {
+    // Close the realtime socket BEFORE clearing the token (spec §57): the
+    // singleton must not survive logout trying to reconnect with a dead JWT.
+    realtimeService.disconnect();
     await apiClient.logout().catch(console.error);
     toast.success("Signed out");
     navigate("/");

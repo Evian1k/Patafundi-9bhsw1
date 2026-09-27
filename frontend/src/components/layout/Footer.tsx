@@ -15,10 +15,10 @@ const Footer = () => {
   const footerLinks = {
     platform: [
       { name: "How It Works", href: "/how-it-works" },
-      { name: "Browse Services", href: "/dashboard" },
+      { name: "Services", href: "/services" },
       { name: "Service Companies", href: "/companies" },
       { name: "Trust & Safety", href: "/trust-safety" },
-      { name: "Partner Program", href: "/partner-program" },
+      { name: "About", href: "/about" },
       { name: "Blog", href: "/blog" },
     ],
     support: [
@@ -42,6 +42,13 @@ const Footer = () => {
       { name: "Fundi App", href: "/fundi/app" },
       { name: "Fundi Resources", href: "/fundi/resources" },
       { name: "Careers", href: "/careers" },
+      { name: "Partner Program", href: "/partner-program" },
+    ],
+    company: [
+      { name: "About", href: "/about" },
+      { name: "Press", href: "/press" },
+      { name: "Investor Relations", href: "/investor-relations" },
+      { name: "Contact", href: "/contact" },
     ],
   };
 
@@ -98,12 +105,24 @@ const Footer = () => {
             </div>
           ))}
 
-          {/* Rules & For Professionals */}
+          {/* Rules, Company & For Professionals */}
           <div className="space-y-6">
             <div>
               <h4 className="font-semibold text-background mb-3 text-sm">Rules & Policies</h4>
               <ul className="space-y-2">
                 {footerLinks.rules.map((link) => (
+                  <li key={link.name}>
+                    <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-background mb-3 text-sm">Company</h4>
+              <ul className="space-y-2">
+                {footerLinks.company.map((link) => (
                   <li key={link.name}>
                     <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
                       {link.name}

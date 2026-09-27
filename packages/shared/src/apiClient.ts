@@ -21,6 +21,59 @@ function resolveBaseUrl(): string {
 const DEFAULT_API_URL = resolveBaseUrl();
 const STORAGE_KEYS = { TOKEN: 'auth_token', REFRESH_TOKEN: 'refresh_token', USER: 'cached_user' } as const;
 
+// ── Secure token storage (spec §48) ──────────────────────────────────────────
+// Tokens belong in the device Keychain/Keystore (expo-secure-store), not
+// plain AsyncStorage. The module resolves dynamically so the shared package
+// keeps working in hosts where the native module is unavailable (older Expo
+// Go, web) - in that case we degrade to AsyncStorage, never crash.
+type SecureStoreLike = {
+  getItemAsync: (key: string) => Promise<string | null>;
+  setItemAsync: (key: string, value: string) => Promise<void>;
+  deleteItemAsync: (key: string) => Promise<void>;
+};
+let secureStore: SecureStoreLike | null | undefined;
+async function getSecureStore(): Promise<SecureStoreLike | null> {
+  if (secureStore !== undefined) return secureStore;
+  try {
+    const mod = await import('expo-secure-store');
+    secureStore = (mod.default ?? mod) as unknown as SecureStoreLike;
+    // Probe once: a native/JS SDK mismatch throws here, not on every call.
+    await secureStore!.getItemAsync('__patafundi_probe');
+  } catch {
+    secureStore = null;
+  }
+  return secureStore;
+}
+
+/** Read a token: SecureStore when available, AsyncStorage fallback. */
+async function readToken(key: string): Promise<string | null> {
+  const store = await getSecureStore();
+  if (store) {
+    try { const v = await store.getItemAsync(key); if (v != null) return v; } catch { /* fall through */ }
+  }
+  try { return await AsyncStorage.getItem(key); } catch { return null; }
+}
+
+/** Write a token to the most secure storage available; removes the insecure copy on migration. */
+async function writeToken(key: string, value: string): Promise<void> {
+  const store = await getSecureStore();
+  if (store) {
+    try {
+      await store.setItemAsync(key, value);
+      // Migration hygiene: once the secure copy exists, purge plaintext.
+      await AsyncStorage.removeItem(key).catch(() => {});
+      return;
+    } catch { /* fall through to AsyncStorage */ }
+  }
+  await AsyncStorage.setItem(key, value);
+}
+
+async function deleteToken(key: string): Promise<void> {
+  const store = await getSecureStore();
+  if (store) { try { await store.deleteItemAsync(key); } catch { /* ignore */ } }
+  await AsyncStorage.removeItem(key).catch(() => {});
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -35,22 +88,21 @@ class ApiClient {
   getBaseUrl(): string { return this.baseUrl; }
 
   private async loadTokens(): Promise<void> {
-    try { this.token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN); this.refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN); }
-    catch { this.token = null; this.refreshToken = null; }
+    this.token = await readToken(STORAGE_KEYS.TOKEN);
+    this.refreshToken = await readToken(STORAGE_KEYS.REFRESH_TOKEN);
   }
   private async saveTokens(token: string, refreshToken: string): Promise<void> {
     this.token = token; this.refreshToken = refreshToken;
-    // AsyncStorage 3.x dropped multiSet — write keys individually (v1-compatible).
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token),
-      AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken),
+      writeToken(STORAGE_KEYS.TOKEN, token),
+      writeToken(STORAGE_KEYS.REFRESH_TOKEN, refreshToken),
     ]);
   }
   private async clearTokens(): Promise<void> {
     this.token = null; this.refreshToken = null;
     await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEYS.TOKEN),
-      AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+      deleteToken(STORAGE_KEYS.TOKEN),
+      deleteToken(STORAGE_KEYS.REFRESH_TOKEN),
       AsyncStorage.removeItem(STORAGE_KEYS.USER),
     ]);
   }

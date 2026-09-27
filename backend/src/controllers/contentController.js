@@ -1,17 +1,92 @@
-import { query } from '../db.js';
+import { query, transaction } from '../db.js';
 import { badRequest, notFound } from '../utils/http.js';
 import { detectBypass, recordFraudAlert } from '../services/fraudService.js';
 import { auditLog } from '../services/auditService.js';
 import { logNonFatal } from '../utils/logError.js';
 
+const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+
 export async function supportTicket(req, res) {
-  const { name = null, email = null, subject = null, message = '' } = req.body || {};
+  const { name = null, email = null, subject = null, message = '', priority = 'normal' } = req.body || {};
   if (!message.trim()) throw badRequest('Message is required');
-  const result = await query(
-    `insert into support_tickets (name, email, subject, message) values ($1, $2, $3, $4) returning *`,
-    [name, email, subject, message],
+  if (!TICKET_PRIORITIES.includes(priority)) {
+    throw badRequest(`Valid priorities: ${TICKET_PRIORITIES.join(', ')}`);
+  }
+  // Authenticated filers get their user attached so they can follow up on the
+  // thread from the app (spec §71); anonymous filers keep the email fallback.
+  const userId = req.user?.id || null;
+  const attachmentUrl = typeof req.body?.attachmentUrl === 'string' ? req.body.attachmentUrl.slice(0, 500) : null;
+  const result = await transaction(async (client) => {
+    const ticket = await client.query(
+      `insert into support_tickets (name, email, subject, message, priority, user_id)
+       values ($1, $2, $3, $4, $5, $6) returning *`,
+      [userId ? null : name, userId ? null : email, subject, message, priority, userId],
+    );
+    await client.query(
+      `insert into support_ticket_messages (ticket_id, author_id, author_role, body, attachment_url)
+       values ($1, $2, 'customer', $3, $4)`,
+      [ticket.rows[0].id, userId, message, attachmentUrl],
+    );
+    return ticket.rows[0];
+  });
+  res.status(201).json({ success: true, ticket: result });
+}
+
+/** GET /api/support/tickets/mine — the authenticated user's tickets with threads (spec §71). */
+export async function mySupportTickets(req, res) {
+  const tickets = await query(
+    `select t.*,
+            (select json_agg(json_build_object(
+                'id', m.id, 'authorRole', m.author_role, 'body', m.body,
+                'attachmentUrl', m.attachment_url, 'createdAt', m.created_at)
+                order by m.created_at asc)
+             from support_ticket_messages m where m.ticket_id = t.id) as messages
+     from support_tickets t
+     where t.user_id = $1
+     order by t.created_at desc limit 50`,
+    [req.user.id],
   );
-  res.status(201).json({ success: true, ticket: result.rows[0] });
+  res.json({ success: true, tickets: tickets.rows });
+}
+
+/** GET /api/support/tickets/:id — one ticket with its thread (owner or staff only). */
+export async function getSupportTicket(req, res) {
+  const staffRoles = ['admin', 'super_admin', 'support_agent', 'fraud_analyst', 'finance_team', 'dispatch_team', 'devops_engineer', 'auditor'];
+  const ticket = await query(`select * from support_tickets where id = $1`, [req.params.id]);
+  if (!ticket.rows[0]) throw notFound('Ticket not found');
+  const t = ticket.rows[0];
+  const isStaff = staffRoles.includes(req.user.role);
+  if (t.user_id !== req.user.id && !isStaff) {
+    return res.status(403).json({ success: false, message: 'You can only view your own tickets' });
+  }
+  const messages = await query(
+    `select id, author_role, body, attachment_url, created_at
+     from support_ticket_messages where ticket_id = $1 order by created_at asc limit 200`,
+    [req.params.id],
+  );
+  res.json({
+    success: true,
+    ticket: { ...t, internal_notes: isStaff ? t.internal_notes : undefined },
+    messages: messages.rows,
+  });
+}
+
+/** POST /api/support/tickets/:id/messages — filer replies on their own ticket. */
+export async function replySupportTicket(req, res) {
+  const { message = '', attachmentUrl = null } = req.body || {};
+  if (!message.trim()) throw badRequest('Message is required');
+  const ticket = await query(`select * from support_tickets where id = $1`, [req.params.id]);
+  if (!ticket.rows[0]) throw notFound('Ticket not found');
+  if (ticket.rows[0].user_id !== req.user.id) {
+    return res.status(403).json({ success: false, message: 'You can only reply to your own tickets' });
+  }
+  const inserted = await query(
+    `insert into support_ticket_messages (ticket_id, author_id, author_role, body, attachment_url)
+     values ($1, $2, 'customer', $3, $4) returning *`,
+    [req.params.id, req.user.id, message, attachmentUrl],
+  );
+  await query(`update support_tickets set status = 'open', updated_at = now() where id = $1 and status = 'waiting_customer'`, [req.params.id]);
+  res.status(201).json({ success: true, message: inserted.rows[0] });
 }
 
 /** GET /api/admin/support/tickets — list tickets with search + filter (staff only) */
@@ -49,14 +124,17 @@ export async function listSupportTickets(req, res) {
 
 const TICKET_STATUSES = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed'];
 
-/** PATCH /api/admin/support/tickets/:id — status, assignment, internal notes (staff only) */
+/** PATCH /api/admin/support/tickets/:id — status, assignment, internal notes, priority (staff only) */
 export async function updateSupportTicket(req, res) {
-  const { status, internalNote = null, assignedTo = undefined } = req.body || {};
+  const { status, internalNote = null, assignedTo = undefined, priority } = req.body || {};
   if (status && !TICKET_STATUSES.includes(status)) {
     throw badRequest(`Valid statuses: ${TICKET_STATUSES.join(', ')}`);
   }
-  if (!status && internalNote == null && assignedTo === undefined) {
-    throw badRequest('Nothing to update: provide status, internalNote or assignedTo');
+  if (priority && !TICKET_PRIORITIES.includes(priority)) {
+    throw badRequest(`Valid priorities: ${TICKET_PRIORITIES.join(', ')}`);
+  }
+  if (!status && internalNote == null && assignedTo === undefined && !priority) {
+    throw badRequest('Nothing to update: provide status, internalNote, assignedTo or priority');
   }
   // Validate assignee exists and is platform staff (least privilege, spec §20).
   let assigneeId = null;
@@ -81,9 +159,10 @@ export async function updateSupportTicket(req, res) {
          when $4::boolean then null
          when $5::uuid is not null then $5
          else assigned_to end,
+       priority = coalesce($6, priority),
        updated_at = now()
      where id = $1 returning *`,
-    [req.params.id, status || null, internalNote, assigneeCleared, assigneeId],
+    [req.params.id, status || null, internalNote, assigneeCleared, assigneeId, priority || null],
   );
   if (!result.rows[0]) throw notFound('Ticket not found');
   await auditLog({
@@ -91,9 +170,42 @@ export async function updateSupportTicket(req, res) {
     action: 'support.ticket_update',
     entityType: 'support_ticket',
     entityId: req.params.id,
-    metadata: { status: status || null, internalNote: internalNote ? String(internalNote).slice(0, 200) : null, assignedTo: assigneeId, assignedToCleared: assigneeCleared },
+    metadata: { status: status || null, internalNote: internalNote ? String(internalNote).slice(0, 200) : null, assignedTo: assigneeId, assignedToCleared: assigneeCleared, priority: priority || null },
   });
   res.json({ success: true, ticket: result.rows[0] });
+}
+
+/** GET /api/admin/support/tickets/:id/messages — full thread for staff (spec §71). */
+export async function adminTicketMessages(req, res) {
+  const messages = await query(
+    `select m.*, u.email as author_email
+     from support_ticket_messages m left join users u on u.id = m.author_id
+     where m.ticket_id = $1 order by m.created_at asc limit 200`,
+    [req.params.id],
+  );
+  res.json({ success: true, messages: messages.rows });
+}
+
+/** POST /api/admin/support/tickets/:id/messages — staff reply on the thread. */
+export async function adminReplyTicket(req, res) {
+  const { message = '', attachmentUrl = null } = req.body || {};
+  if (!message.trim()) throw badRequest('Message is required');
+  const ticket = await query(`select id from support_tickets where id = $1`, [req.params.id]);
+  if (!ticket.rows[0]) throw notFound('Ticket not found');
+  const inserted = await query(
+    `insert into support_ticket_messages (ticket_id, author_id, author_role, body, attachment_url)
+     values ($1, $2, 'staff', $3, $4) returning *`,
+    [req.params.id, req.user.id, message, attachmentUrl],
+  );
+  // A staff reply means the ball is in the customer's court.
+  await query(`update support_tickets set status = 'waiting_customer', updated_at = now() where id = $1 and status in ('open', 'in_progress')`, [req.params.id]);
+  await auditLog({
+    userId: req.user.id,
+    action: 'support.ticket_reply',
+    entityType: 'support_ticket',
+    entityId: req.params.id,
+  });
+  res.status(201).json({ success: true, message: inserted.rows[0] });
 }
 
 export async function fraudReport(req, res) {

@@ -44,6 +44,12 @@ export function FundiDashboard() {
   const [subPlan, setSubPlan] = useState<"monthly" | "yearly">("monthly");
   const [subSubmitting, setSubSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Weekly availability schedule (spec §12): same API as the mobile app
+  // (GET/PUT /fundi/availability) so web and mobile stay in sync.
+  const [schedule, setSchedule] = useState<{ day_of_week: number; start_hour: number; end_hour: number; is_available: boolean }[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const maxAccuracyMeters = getMaxGpsAccuracyMeters();
   const { jobRequest, remaining, acceptJob, declineJob } = useJobRequest();
   // Report-a-problem opens INLINE on this dashboard - the fundi never leaves.
@@ -89,6 +95,44 @@ export function FundiDashboard() {
   }, [navigate]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  // Load the weekly schedule once; default to Mon-Fri 8-17 when empty so the
+  // first save is a sensible starting point, never fabricated data shown as real.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.request("/fundi/availability") as { schedule?: { day_of_week: number; start_hour: number; end_hour: number; is_available: boolean }[] };
+        const rows = res.schedule || [];
+        setSchedule(
+          Array.from({ length: 7 }, (_, d) => {
+            const found = rows.find((r) => r.day_of_week === d);
+            return found
+              ? { day_of_week: d, start_hour: found.start_hour, end_hour: found.end_hour, is_available: found.is_available }
+              : { day_of_week: d, start_hour: 8, end_hour: 17, is_available: false };
+          }),
+        );
+      } catch {
+        setSchedule(Array.from({ length: 7 }, (_, d) => ({ day_of_week: d, start_hour: 8, end_hour: 17, is_available: false })));
+      } finally {
+        setScheduleLoading(false);
+      }
+    })();
+  }, []);
+
+  const saveSchedule = async () => {
+    setScheduleSaving(true);
+    try {
+      await apiClient.request("/fundi/availability", {
+        method: "PUT",
+        body: JSON.stringify({ schedule: schedule.filter((s) => s.is_available) }),
+      });
+      toast.success("Availability saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save availability");
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!socketToken) return;
@@ -269,6 +313,64 @@ export function FundiDashboard() {
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <MapPin className="w-3 h-3" />
               <span>Online - visible to nearby customers</span>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Weekly availability (spec §12): which days/hours you take work */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-5 border border-border/50">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-semibold text-sm">Weekly availability</p>
+              <p className="text-xs text-muted-foreground">Days and hours you accept job requests. Ticks are shown to dispatch matching.</p>
+            </div>
+            <Button size="sm" variant="outline" disabled={scheduleLoading || scheduleSaving} onClick={saveSchedule}>
+              {scheduleSaving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+          {scheduleLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-9 rounded-xl bg-muted animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {schedule.map((slot, idx) => (
+                <div key={slot.day_of_week} className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 w-28 shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={slot.is_available}
+                      onChange={(e) => setSchedule((prev) => prev.map((s, i) => (i === idx ? { ...s, is_available: e.target.checked } : s)))}
+                      className="h-4 w-4 rounded border-input accent-primary"
+                      aria-label={`Available on ${DAY_NAMES[slot.day_of_week]}`}
+                    />
+                    <span className="text-sm">{DAY_NAMES[slot.day_of_week].slice(0, 3)}</span>
+                  </label>
+                  {slot.is_available ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <select
+                        value={slot.start_hour}
+                        onChange={(e) => setSchedule((prev) => prev.map((s, i) => (i === idx ? { ...s, start_hour: Number(e.target.value) } : s)))}
+                        className="h-8 rounded-lg border bg-background text-sm px-2"
+                        aria-label={`Start hour for ${DAY_NAMES[slot.day_of_week]}`}
+                      >
+                        {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+                      </select>
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <select
+                        value={slot.end_hour}
+                        onChange={(e) => setSchedule((prev) => prev.map((s, i) => (i === idx ? { ...s, end_hour: Number(e.target.value) } : s)))}
+                        className="h-8 rounded-lg border bg-background text-sm px-2"
+                        aria-label={`End hour for ${DAY_NAMES[slot.day_of_week]}`}
+                      >
+                        {Array.from({ length: 24 }, (_, h) => <option key={h + 1} value={h + 1}>{String(h + 1).padStart(2, "0")}:00</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground flex-1">Not available</span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </motion.div>

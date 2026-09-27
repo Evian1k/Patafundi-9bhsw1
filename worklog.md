@@ -493,3 +493,23 @@ Work Log:
 Stage Summary:
 - Master-spec gaps closed: refund + support workflow states, dispute participation for companies/technicians, subscription lifecycle + entitlement visibility, DB-backed blog/careers with admin tooling, in-app support for fundis, push architecture wired end-to-end, deep links on both apps.
 - Every new surface uses real database data with honest empty states; zero mock, zero dead buttons introduced; existing functionality preserved.
+
+---
+Task ID: 22-b (ultimate production build - residual gap closure)
+Agent: Super Z (main agent)
+Task: User asked whether everything in the 86-section master prompt was done. Ran a fresh spec-vs-repo audit (2 parallel Explore agents: backend + frontend/mobile), found and fixed the residual gaps, and diagnosed a CRITICAL live outage.
+
+Work Log:
+- Audit verdict: core spec largely complete (job state machine + OTP, M-Pesa + escrow + ledgers, RBAC + 2FA + audit logs, fraud subsystem, AI with graceful degradation, Socket.IO auth + rooms, zero-mock sweeps clean, Leaflet guards OK, no refer/loyalty remnants)
+- CRITICAL live finding: Render lost JWT_SECRET (DB also recreated, users:1/jobs:0) - every authed API route returns 503 (requireConfig throws inside authRequired). Not fixable from sandbox; added loud boot-time FATAL banner + auth subsystem in /health so it is observable; user must re-add env vars in Render dashboard
+- Migration 043: support_tickets.user_id + priority, support_ticket_messages thread (with attachment URL + backfill), subscription_plans table (4 seeded plans, DB-driven pricing replaces hardcoded map; activate endpoint resolves audience + legacy aliases; webhook duration derives from plans table), payment_chargebacks table, payments.metadata
+- Migration 044: company Support role (owner/manager/admin/dispatcher/finance/support/technician) wired backend capabilities + PortalTeam ROLES
+- Backend: support tickets are now two-way threads (POST /support/tickets, GET mine/:id owner-or-staff, customer replies, admin thread view/reply, priority in admin PATCH); chargeback controller (list/create/decide, audited); Stripe env-gated service + POST /payments/stripe/intent + signed /payments/stripe/webhook (honest cards_not_enabled when unset); finance reconciliation endpoint (payments vs ledger vs escrow, missing-escrow counter); companyAccess self-heal restores missing owner membership (root-cause for reported /company/portal/overview 403) + platform-staff ?companyId resolution + portalOverview 400 guard; adminAllowlist demo email now DEV-only (never super_admin in prod if env drifts)
+- Notifications (spec 35): wired notify() for on_the_way/arrived/started, dispute opened/resolved (all parties incl. company owners), verification approve/reject/reupload/suspend, security new-login/new-device; M-Pesa webhook subscription duration reads plans table
+- Web: public Services index (/services, header nav now points there), Press (/press), Investor Relations (/investor-relations) with honest content; footer restructured (Platform/Support/Legal/Rules/Company/For Professionals); debounced search in CompanyDirectory + HelpCenter (280ms); customer sign-out disconnects realtime socket; FundiDashboard gained weekly availability editor (same API as mobile)
+- Currency: CreateJob estimates and service base prices route through shared formatMoney; mobile HomeScreen KSh prefix aligned
+- Mobile: expo-secure-store added to both apps; shared apiClient tokens now Keychain/Keystore-first with probe-guarded fallback to AsyncStorage + plaintext-purge migration (no breakage on SDK 54, auto-secure on 55+)
+- Verified: migrations 043+044 applied; typecheck clean; 124/124 unit tests; vite build ok; in-process probe confirmed ticket thread insert; /subscriptions/plans 200 with real DB plans; new admin routes 403 unauthed as designed; stack healthy :4000/:3000
+
+Stage Summary:
+- All residual master-spec gaps from the audit are closed; production outage root-caused and made observable (needs owner action in Render env). Zero mock data introduced; every new surface honest and DB-backed.

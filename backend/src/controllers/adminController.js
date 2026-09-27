@@ -611,6 +611,10 @@ export async function approveFundi(req, res) {
   });
 
   await auditLog({ userId: req.user.id, action: 'admin.fundi.approve', entityType: 'fundi', entityId: fundi.id, metadata: { profileSet: Boolean(fundi.profile_photo_url) } });
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    await notify({ userId: fundiRow.user_id, type: 'verification_approved', title: 'You are verified', body: 'Your verification was approved. You can now receive jobs.', data: { fundiId: fundi.id } });
+  } catch (err) { console.warn('[admin] verification notify failed:', err.message); }
   res.json({ success: true, fundi });
 }
 
@@ -632,6 +636,10 @@ export async function requestFundiReupload(req, res) {
     [result.rows[0].user_id],
   );
   await auditLog({ userId: req.user.id, action: 'admin.fundi.request_reupload', entityType: 'fundi', entityId: result.rows[0].id, metadata: { reason } });
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    await notify({ userId: result.rows[0].user_id, type: 'verification_reupload', title: 'Document re-upload needed', body: String(reason).slice(0, 200), data: { fundiId: result.rows[0].id } });
+  } catch (err) { console.warn('[admin] verification notify failed:', err.message); }
   res.json({ success: true, fundi: result.rows[0] });
 }
 
@@ -647,6 +655,10 @@ export async function rejectFundi(req, res) {
   await query(`update users set role = 'fundi_pending', updated_at = now() where id = $1 and role <> 'admin'`, [result.rows[0].user_id]);
   await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [result.rows[0].user_id]);
   await auditLog({ userId: req.user.id, action: 'admin.fundi.reject', entityType: 'fundi', entityId: result.rows[0].id });
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    await notify({ userId: result.rows[0].user_id, type: 'verification_rejected', title: 'Verification not approved', body: req.body?.reason ? String(req.body.reason).slice(0, 200) : 'Your verification was not approved. Contact support for details.', data: { fundiId: result.rows[0].id } });
+  } catch (err) { console.warn('[admin] verification notify failed:', err.message); }
   res.json({ success: true, fundi: result.rows[0] });
 }
 
@@ -660,6 +672,10 @@ export async function suspendFundi(req, res) {
   // Force the suspended fundi to re-authenticate by revoking active sessions.
   await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [result.rows[0].user_id]);
   await auditLog({ userId: req.user.id, action: 'admin.fundi.suspend', entityType: 'fundi', entityId: result.rows[0].id });
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    await notify({ userId: result.rows[0].user_id, type: 'account_suspended', title: 'Account suspended', body: req.body?.reason ? String(req.body.reason).slice(0, 200) : 'Your account has been suspended. Contact support.', data: { fundiId: result.rows[0].id } });
+  } catch (err) { console.warn('[admin] suspension notify failed:', err.message); }
   res.json({ success: true, fundi: result.rows[0] });
 }
 

@@ -13,6 +13,7 @@ import * as disputes from './controllers/disputeController.js';
 import * as fundi from './controllers/fundiController.js';
 import * as admin from './controllers/adminController.js';
 import * as content from './controllers/contentController.js';
+import * as chargebacks from './controllers/chargebackController.js';
 import * as chat from './controllers/chatController.js';
 import * as maps from './controllers/mapsController.js';
 import * as fraud from './controllers/fraudController.js';
@@ -173,6 +174,10 @@ router.post('/payments/stk-push', authRequired, asyncHandler(payments.stkPush));
 router.post('/payments/process/:jobId', authRequired, asyncHandler(payments.legacyProcess));
 router.post('/payments/webhook', asyncHandler(payments.webhook));
 router.post('/payments/daraja-callback', asyncHandler(payments.webhook));
+// Spec §26-27: card payments via Stripe (env-gated) + finance reconciliation (spec §28).
+router.post('/payments/stripe/intent', authRequired, asyncHandler(payments.stripeIntent));
+router.post('/payments/stripe/webhook', asyncHandler(payments.stripeWebhook));
+router.get('/admin/finance/reconciliation', authRequired, requireRole('admin'), asyncHandler(payments.financeReconciliation));
 router.get('/payments/job/:jobId', authRequired, asyncHandler(payments.paymentForJob));
 router.get('/payments/escrow/:jobId', authRequired, asyncHandler(payments.escrowForJob));
 router.get('/payments/wallet/balance', authRequired, asyncHandler(payments.walletBalance));
@@ -560,12 +565,23 @@ router.get('/notifications/sms/status', authRequired, asyncHandler(async (_req, 
 router.get('/notifications', authRequired, asyncHandler(users.notifications));
 router.patch('/notifications/read-all', authRequired, asyncHandler(users.markAllNotificationsRead));
 router.patch('/notifications/:id/read', authRequired, asyncHandler(users.markNotificationRead));
-// Spec §pricing: prices are NEVER taken from the client. Plan pricing is
-// server-authoritative; the request body only chooses the plan.
-const SUBSCRIPTION_PLAN_PRICES = Object.freeze({
-  monthly: 500,
-  yearly: 5000,
+// Spec §pricing: prices are NEVER taken from the client. Plans live in the
+// subscription_plans table (migration 043) so admins can reprice without a
+// deploy; the request body only chooses the plan. Legacy 'monthly'/'yearly'
+// codes map onto the caller's audience for backward compatibility.
+const LEGACY_PLAN_ALIASES = Object.freeze({
+  monthly: { fundi: 'fundi_pro_monthly', company: 'company_growth_monthly' },
+  yearly: { fundi: 'fundi_pro_yearly', company: 'company_growth_yearly' },
 });
+
+router.get('/subscriptions/plans', asyncHandler(async (_req, res) => {
+  const { query } = await import('./db.js');
+  const rows = await query(
+    `select code, name, audience, price, currency, duration_days, features
+     from subscription_plans where is_active = true order by audience, price`,
+  );
+  res.json({ success: true, plans: rows.rows });
+}));
 
 router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
   // Spec §7: companies subscribe like fundis. The paying principal is the
@@ -574,14 +590,23 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
     return res.status(403).json({ success: false, message: 'Only fundis and companies can activate subscriptions' });
   }
   const { plan = 'monthly', mpesaNumber } = req.body || {};
-  const amount = SUBSCRIPTION_PLAN_PRICES[plan];
-  if (!amount) {
-    return res.status(400).json({ success: false, message: `Unknown subscription plan. Valid plans: ${Object.keys(SUBSCRIPTION_PLAN_PRICES).join(', ')}` });
+  const audience = req.user.role === 'company_admin' ? 'company' : 'fundi';
+  const planCode = LEGACY_PLAN_ALIASES[plan]?.[audience] || plan;
+  const { query } = await import('./db.js');
+  const planRow = await query(
+    `select code, price, duration_days, name from subscription_plans
+     where code = $1 and is_active = true and audience = $2`,
+    [planCode, audience],
+  );
+  const planDef = planRow.rows[0];
+  if (!planDef) {
+    return res.status(400).json({ success: false, message: `Unknown subscription plan '${plan}'. Valid plans: monthly, yearly` });
   }
+  const amount = Number(planDef.price);
+  const durationDays = planDef.duration_days;
   if (!mpesaNumber) {
     return res.status(400).json({ success: false, message: 'M-Pesa number required for subscription payment' });
   }
-  const { query } = await import('./db.js');
   const { assertValidMpesaPhone, initiateStkPush } = await import('./services/mpesaService.js');
   const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
 
@@ -589,9 +614,9 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
   // expires_at here is a placeholder; it is set from plan duration on activation.
   const subResult = await query(
     `insert into subscriptions (fundi_id, plan, amount, status, starts_at, expires_at, subscriber_type)
-     values ($1, $2, $3, 'pending', now(), now() + interval '30 days', $4)
+     values ($1, $2, $3, 'pending', now(), now() + ($4::text || ' days')::interval, $5)
      returning *`,
-    [req.user.id, plan, amount, req.user.role === 'company_admin' ? 'company' : 'fundi'],
+    [req.user.id, planDef.code, amount, String(durationDays), audience],
   );
 
   // Initiate M-Pesa STK push for the subscription fee
@@ -600,7 +625,7 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
       phone: mpesaNumber,
       amount,
       accountReference: `SUB-${req.user.id.slice(0, 8)}`,
-      transactionDesc: `PataFundi ${plan} subscription`,
+      transactionDesc: `PataFundi ${planDef.name} subscription`,
     });
 
     // Store checkout_request_id on the subscription for webhook matching
@@ -674,9 +699,21 @@ router.post('/subscriptions/cancel', authRequired, asyncHandler(async (req, res)
   res.json({ success: true, subscription: row.rows[0] });
 }));
 
-router.post('/support/ticket', supportRateLimit, asyncHandler(content.supportTicket));
+// Spec §71: support is a two-way thread. Authenticated users file with their
+// identity attached, follow their tickets, and reply; staff get the full thread
+// plus reply/set-status/priority tools.
+router.post('/support/ticket', optionalAuth, supportRateLimit, asyncHandler(content.supportTicket));
+router.get('/support/tickets/mine', authRequired, asyncHandler(content.mySupportTickets));
+router.get('/support/tickets/:id', authRequired, asyncHandler(content.getSupportTicket));
+router.post('/support/tickets/:id/messages', authRequired, supportRateLimit, asyncHandler(content.replySupportTicket));
 router.get('/admin/support/tickets', authRequired, requireRole('admin'), asyncHandler(content.listSupportTickets));
 router.patch('/admin/support/tickets/:id', authRequired, requireRole('admin'), asyncHandler(content.updateSupportTicket));
+router.get('/admin/support/tickets/:id/messages', authRequired, requireRole('admin'), asyncHandler(content.adminTicketMessages));
+router.post('/admin/support/tickets/:id/messages', authRequired, requireRole('admin'), asyncHandler(content.adminReplyTicket));
+// Spec §26-28: chargeback records tied to real payments, decided by finance staff.
+router.get('/admin/chargebacks', authRequired, requireRole('admin'), asyncHandler(chargebacks.listChargebacks));
+router.post('/admin/chargebacks', authRequired, requireRole('admin'), asyncHandler(chargebacks.createChargeback));
+router.post('/admin/chargebacks/:id/decision', authRequired, requireRole('admin'), asyncHandler(chargebacks.decideChargeback));
 router.post('/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.fraudReport));
 

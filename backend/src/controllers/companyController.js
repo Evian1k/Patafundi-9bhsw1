@@ -453,6 +453,12 @@ export async function myMembership(req, res) {
 }
 
 export async function portalOverview(req, res) {
+  // Platform staff hit this endpoint with ?companyId=<id> resolved by the
+  // middleware; company members always have req.company. Without either there
+  // is nothing to summarize - return a clean 400 instead of a 500.
+  if (!req.company?.id) {
+    return res.status(400).json({ success: false, message: 'companyId is required to load a company portal overview' });
+  }
   const companyId = req.company.id;
   const stats = await query(
     `select

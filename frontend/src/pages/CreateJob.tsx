@@ -25,6 +25,7 @@ import AddressDisplay from "@/components/maps/AddressDisplay";
 import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import { SERVICE_CATALOG, bookingPathForService } from "@/config/services";
+import { formatMoney } from "@/lib/money";
 
 interface PhotoData {
   file: File;
@@ -483,7 +484,7 @@ const CreateJob = () => {
                       >
                         <span>{cs.name}</span>
                         {cs.basePrice ? (
-                          <span className="ml-2 text-xs text-muted-foreground">from KES {Number(cs.basePrice).toLocaleString()}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">from {formatMoney(Number(cs.basePrice))}</span>
                         ) : null}
                       </button>
                     ))}
@@ -642,7 +643,7 @@ const CreateJob = () => {
                       {aiAnalysis.estimateRange && (
                         <p className="text-sm">
                           <span className="text-muted-foreground text-xs">Typical range: </span>
-                          <span className="font-semibold">KES {aiAnalysis.estimateRange.min.toLocaleString()} - {aiAnalysis.estimateRange.max.toLocaleString()}</span>
+                          <span className="font-semibold">{aiAnalysis.estimateRange ? `${formatMoney(aiAnalysis.estimateRange.min)} - ${formatMoney(aiAnalysis.estimateRange.max)}` : ""}</span>
                           <span className="text-xs text-muted-foreground"> (estimate, not a quote)</span>
                         </p>
                       )}

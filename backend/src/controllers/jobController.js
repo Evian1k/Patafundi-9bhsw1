@@ -819,6 +819,22 @@ export async function checkIn(req, res) {
   emitEvent('job:checkin', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
   emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  // Spec §35: lifecycle milestones must reach the customer beyond the job room
+  // (in-app + queued push), not just live sockets. Non-blocking by contract.
+  try {
+    const { notify } = await import('../services/notificationService.js');
+    const subject = job.service_category || 'your job';
+    const milestone = status === 'on_the_way'
+      ? { type: 'job_fundi_on_the_way', title: 'Your fundi is on the way', body: `Heading to you for your ${subject} job.` }
+      : status === 'arrived'
+        ? { type: 'job_fundi_arrived', title: 'Your fundi has arrived', body: `Your fundi checked in at the location for your ${subject} job.` }
+        : { type: 'job_started', title: 'Work has started', body: `Work started on your ${subject} job.` };
+    if (job.customer_id) {
+      await notify({ userId: job.customer_id, ...milestone, data: { jobId: job.id, status } });
+    }
+  } catch (err) {
+    logNonFatal('job.checkinNotify', err, { jobId: req.params.id });
+  }
   res.json({ success: true, job: publicJob(result.rows[0]) });
 }
 
