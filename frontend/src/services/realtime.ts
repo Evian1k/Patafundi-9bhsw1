@@ -1,5 +1,5 @@
 /**
- * FundiHub realtime service.
+ * PataFundi realtime service.
  *
  * Uses Socket.IO in production when VITE_SOCKET_URL is configured. A polling
  * watcher remains as a resilience fallback for status/payment changes.

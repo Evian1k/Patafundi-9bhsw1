@@ -34,7 +34,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: 'flash',
-    title: 'FundiHub',
+    title: 'PataFundi',
     subtitle: 'Connect with verified local professionals for any service',
   },
   {

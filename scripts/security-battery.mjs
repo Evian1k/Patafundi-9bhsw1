@@ -11,7 +11,7 @@
  * access denial.
  */
 const BASE = process.env.PATAFUNDI_BATTERY_BASE || 'http://127.0.0.1:4000';
-const PASSWORD = 'FundiHub#2026';
+const PASSWORD = 'PataFundi#2026';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -46,9 +46,9 @@ async function main() {
   console.log(`\n=== PataFundi Security Battery — ${BASE} ===\n`);
 
   // ── 0. Logins ──────────────────────────────────────────────────────────
-  const customer = await login('customer.demo@fundihub.test');
-  const fundi = await login('fundi.demo@fundihub.test');
-  const admin = await login('admin.demo@fundihub.test');
+  const customer = await login('customer.demo@patafundi.test');
+  const fundi = await login('fundi.demo@patafundi.test');
+  const admin = await login('admin.demo@patafundi.test');
   console.log('demo logins OK\n');
 
   // ── 1. RBAC walls ──────────────────────────────────────────────────────

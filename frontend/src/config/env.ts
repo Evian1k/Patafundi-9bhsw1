@@ -1,5 +1,5 @@
 /**
- * FundiHub environment configuration.
+ * PataFundi environment configuration.
  * API URLs are defined in @/api/config — import from there for new code.
  */
 
@@ -27,7 +27,7 @@ export const env = {
 export function validateEnv(): void {
   if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
     console.info(
-      `[FundiHub] Using production API default: ${API_BASE_URL}`,
+      `[PataFundi] Using production API default: ${API_BASE_URL}`,
     );
   }
 }

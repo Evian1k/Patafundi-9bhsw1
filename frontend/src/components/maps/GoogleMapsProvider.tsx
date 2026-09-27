@@ -25,7 +25,7 @@ export function useGoogleMapsReady() {
 function GoogleMapsLoader({ children }: { children: React.ReactNode }) {
   const apiKey = env.GOOGLE_MAPS_API_KEY || '';
   const { isLoaded, loadError } = useJsApiLoader({
-    id: 'fundihub-google-maps',
+    id: 'patafundi-google-maps',
     googleMapsApiKey: apiKey,
     libraries: LIBRARIES,
     preventGoogleFontsLoading: true,

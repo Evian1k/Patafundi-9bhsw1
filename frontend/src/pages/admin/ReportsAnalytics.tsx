@@ -71,7 +71,7 @@ export default function ReportsAnalytics() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `fundihub-report-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `patafundi-report-${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

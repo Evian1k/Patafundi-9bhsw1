@@ -1,5 +1,5 @@
 /**
- * FundiHub shared motion primitives.
+ * PataFundi shared motion primitives.
  *
  * Goals:
  *   - 60 FPS animations on mid-range mobile (transform/opacity only).

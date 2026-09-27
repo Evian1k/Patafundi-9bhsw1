@@ -6,7 +6,7 @@ const SECTIONS: InfoSection[] = [
   {
     icon: 'card',
     title: 'Identity Verification',
-    body: 'Every fundi undergoes ID verification before approval. No anonymous providers on FundiHub.',
+    body: 'Every fundi undergoes ID verification before approval. No anonymous providers on PataFundi.',
     color: '#F97316',
   },
   {
@@ -67,7 +67,7 @@ export function SafetyPromiseScreen({ navigation }: any): JSX.Element {
       <InfoPageScreen
         heroIcon="shield-checkmark"
         heroTitle="Our Safety Promise"
-        heroSubtitle="Nine layers of protection on every FundiHub job."
+        heroSubtitle="Nine layers of protection on every PataFundi job."
         heroGradient="primary"
         sections={SECTIONS}
       />

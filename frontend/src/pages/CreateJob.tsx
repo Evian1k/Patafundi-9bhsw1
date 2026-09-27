@@ -73,7 +73,7 @@ const services = [
 const providerChoices = [
   {
     id: "platform_match" as const,
-    title: "Let FundiHub Match",
+    title: "Let PataFundi Match",
     subtitle: "Recommended",
     description: "Our matching engine picks the best available professional for your job, based on skills, distance, rating and workload.",
     icon: Sparkles,
@@ -142,10 +142,10 @@ const CreateJob = () => {
         const known = services.find((s) => s.id === cat || s.name.toLowerCase().includes(cat));
         if (known && known.id !== jobData.service) {
           setJobData((prev) => ({ ...prev, service: known.name }));
-          toast.success(`FundiHub AI suggests: ${known.name}`);
+          toast.success(`PataFundi AI suggests: ${known.name}`);
         }
         if (res.analysis.suggestedProviderType === "company" && jobData.providerChoice === "platform_match") {
-          toast("Tip: FundiHub AI suggests a service company for this job.", { duration: 5000 });
+          toast("Tip: PataFundi AI suggests a service company for this job.", { duration: 5000 });
         }
       }
     } catch {
@@ -332,7 +332,7 @@ const CreateJob = () => {
                       className="gap-2"
                     >
                       {aiAnalyzing ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-emerald-500" />}
-                      {aiAnalyzing ? "Analyzing…" : "Ask FundiHub AI"}
+                      {aiAnalyzing ? "Analyzing…" : "Ask PataFundi AI"}
                     </Button>
                     <span className="text-xs text-muted-foreground">Get category, questions & an estimated price range</span>
                   </div>
@@ -341,7 +341,7 @@ const CreateJob = () => {
                     <div className="mt-3 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">FundiHub AI analysis</p>
+                        <p className="text-sm font-semibold">PataFundi AI analysis</p>
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground ml-auto">
                           {aiAnalysis.engine === "heuristic" ? "basic mode" : "AI estimate"}
                         </span>
@@ -423,7 +423,7 @@ const CreateJob = () => {
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">Who should handle it?</h2>
-              <p className="text-muted-foreground text-sm mb-6">You choose — an individual professional, a verified company, or let FundiHub match you.</p>
+              <p className="text-muted-foreground text-sm mb-6">You choose — an individual professional, a verified company, or let PataFundi match you.</p>
               <div className="grid gap-3">
                 {providerChoices.map((choice) => (
                   <button
@@ -463,7 +463,7 @@ const CreateJob = () => {
               {jobData.providerChoice === "individual" && !jobData.preferredFundiId && (
                 <div className="mt-4 p-4 rounded-xl border border-border bg-card">
                   <p className="text-sm font-medium">No fundi selected yet</p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified professionals and pick one, or submit and FundiHub will broadcast your job to qualified fundis.</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified professionals and pick one, or submit and PataFundi will broadcast your job to qualified fundis.</p>
                   <Button type="button" variant="outline" size="sm" onClick={() => navigate("/services/plumbing")}>
                     Browse fundis
                   </Button>

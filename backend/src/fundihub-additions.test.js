@@ -7,7 +7,7 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(here, '..');
 
-// FUNDIHUB completion additions — pure-function tests (no DB required).
+// PATAFUNDI completion additions — pure-function tests (no DB required).
 
 test('llmService extractJson parses fenced JSON', async () => {
   const { extractJson } = await import('../src/services/llmService.js');

@@ -1,5 +1,5 @@
 /**
- * FundiHub custom map marker system.
+ * PataFundi custom map marker system.
  *
  * Premium Uber-quality markers with:
  *   - Profile photo or initials fallback

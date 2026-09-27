@@ -117,7 +117,7 @@ export default function DisputeCenter() {
           <div>
             <p className="font-semibold text-blue-800 text-sm">Fair Dispute Resolution</p>
             <p className="text-xs text-blue-700 mt-1">
-              FundiHub mediates all disputes fairly. Escrow funds are held until resolution.
+              PataFundi mediates all disputes fairly. Escrow funds are held until resolution.
               Our team typically responds within 24 hours.
             </p>
           </div>

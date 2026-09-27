@@ -23,7 +23,7 @@ interface FlowStep {
 
 const FLOW_STEPS: FlowStep[] = [
   { icon: 'phone-portrait', title: 'Customer Pays', description: 'You pay via M-Pesa STK push from within the app.' },
-  { icon: 'lock-closed', title: 'Secure Escrow', description: 'Funds are held safely in escrow by FundiHub.' },
+  { icon: 'lock-closed', title: 'Secure Escrow', description: 'Funds are held safely in escrow by PataFundi.' },
   { icon: 'build', title: 'Fundi Works', description: 'The fundi completes the agreed work at your location.' },
   { icon: 'checkmark-circle', title: 'Customer Confirms', description: 'You confirm the job is done to your satisfaction.' },
   { icon: 'cash', title: 'Payment Released', description: 'Funds are released to the fundi automatically.' },
@@ -51,7 +51,7 @@ const STATIC_SECTIONS: InfoSection[] = [
   {
     icon: 'lock-closed',
     title: 'M-Pesa protection',
-    body: 'All M-Pesa payments are processed through the Safaricom Daraja API with end-to-end encryption. Your PIN is never seen or stored by FundiHub.',
+    body: 'All M-Pesa payments are processed through the Safaricom Daraja API with end-to-end encryption. Your PIN is never seen or stored by PataFundi.',
     color: colors.success,
   },
   {

@@ -238,3 +238,24 @@ Work Log:
 Stage Summary:
 - Frontend now deploys under EITHER Vercel configuration (Root=frontend with modern config, or Root=./ with corrected legacy config)
 - Build verified passing on f74d750; user action: Redeploy on Vercel
+
+---
+Task ID: 11 (Revert FundiHub brand to PataFundi + restore original logo)
+Agent: Super Z (main agent)
+Task: User: "u changed my apps logo use my previous app logo and it is not patahub it is patafundi" — restore previous logo + name; keep functional FUNDIHUB work.
+
+Work Log:
+- Traced rebrand commit ef31fc6: logo change = 4 files only (index.html, favicon.svg, assets/logo.tsx, BrandLogo.tsx); logo-source.png untouched
+- Verified no external code depends on old OR new brand component APIs before restore
+- Restored index.html (title/meta/theme-color), assets/logo.tsx, BrandLogo.tsx from pre-rebrand 6ee9cd0; removed rebrand-only favicon.svg
+- Case-aware sed (FUNDIHUB/FundiHub/fundihub -> PATAFUNDI/PataFundi/patafundi) across 69 code files: frontend src, both mobile apps + app.json, packages/shared, backend display strings (emailService, llmService, controllers, server banner), seeds, security scripts, .env.example, DEMO_ACCOUNTS.md; worklog + migrations left as history
+- Discovered seeds' DEMO_PASSWORD had been changed to FundiHub#2026 — original at 6ee9cd0 was PataFundi#2026, so rename restored ORIGINAL credentials; demo emails back to @patafundi.test set
+- Fixed rename side-effect: test read migration by path 036_patafundi_upgrade.sql -> repointed to real filename 036_fundihub_upgrade.sql
+- Fresh .pgdata rebuild; hit PRE-EXISTING matcher test failure (109/110) — reproduced on UNMODIFIED f74d750 via git worktree with seeded DB: when demo ecosystem is seeded, fundi.demo (badge=true, rating 4.9) outranks the test fixture (no badge/rating). Task 9's 110/110 held only on unseeded DB
+- Deterministic test fix: fixture fundi gets rating 5.0 + verification_badge=true (verified via DB candidate dump: only competitor is fundi.demo@patafundi.test at 0.82km); no other test uses findNearbyFundis
+- Infra: stale 100%-CPU backend (PID 1005, PGlite pathology) killed; stack-supervisor daemon restored for live-server suites
+
+Stage Summary:
+- Verification: frontend build passes (17.3s, original logo); DB reseeded (12 accounts, PataFundi#2026); 110/110 unit+E2E; 16/16 security probe; 19/19 security battery
+- Brand is PataFundi everywhere user-facing; all functional FUNDIHUB improvements (three-way booking, AI, refunds, admin pages, security fixes) preserved
+- Note for user: demo logins are the ORIGINAL accounts again (e.g. customer.demo@patafundi.test / PataFundi#2026 — see DEMO_ACCOUNTS.md); @fundihub.* aliases may linger in old local DBs but are no longer seeded

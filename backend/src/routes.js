@@ -574,7 +574,7 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
       phone: mpesaNumber,
       amount,
       accountReference: `SUB-${req.user.id.slice(0, 8)}`,
-      transactionDesc: `FundiHub ${plan} subscription`,
+      transactionDesc: `PataFundi ${plan} subscription`,
     });
 
     // Store checkout_request_id on the subscription for webhook matching

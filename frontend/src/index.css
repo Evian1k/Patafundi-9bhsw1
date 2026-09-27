@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* FundiHub Design System */
+/* PataFundi Design System */
 
 @layer base {
   :root {
@@ -17,7 +17,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 24 10% 10%;
 
-    /* Primary — FundiHub Emerald (dark/emerald identity, spec §34) */
+    /* Primary — PataFundi Emerald (dark/emerald identity, spec §34) */
     --primary: 160 84% 26%;
     --primary-foreground: 0 0% 100%;
 

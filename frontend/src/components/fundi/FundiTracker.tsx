@@ -865,7 +865,7 @@ export default function FundiTracker({
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
                 <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-blue-800">Protected by FundiHub Escrow</p>
+                  <p className="text-xs font-semibold text-blue-800">Protected by PataFundi Escrow</p>
                   <p className="text-xs text-blue-700 mt-0.5">Your payment is held securely until the fundi payout is approved.</p>
                 </div>
               </div>
@@ -947,7 +947,7 @@ export default function FundiTracker({
               </div>
               <div>
                 <h3 className="font-semibold text-base">Payment Receipt</h3>
-                <p className="text-xs text-muted-foreground">Official FundiHub transaction record</p>
+                <p className="text-xs text-muted-foreground">Official PataFundi transaction record</p>
               </div>
             </div>
             <div className="rounded-xl border border-border/60 divide-y divide-border/40 text-sm">
@@ -1007,7 +1007,7 @@ export default function FundiTracker({
                   </Button>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  A FundiHub administrator reviews every request — approval triggers a real, audited reversal to your original payment method.
+                  A PataFundi administrator reviews every request — approval triggers a real, audited reversal to your original payment method.
                 </p>
               </div>
             )}
@@ -1054,7 +1054,7 @@ export default function FundiTracker({
               <ShieldCheck className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="font-semibold text-xl">All Done!</h3>
-            <p className="text-muted-foreground text-sm">Thank you for using FundiHub.</p>
+            <p className="text-muted-foreground text-sm">Thank you for using PataFundi.</p>
             <Button onClick={() => (window.location.href = "/dashboard")} className="bg-gradient-primary">
               Back to Dashboard
             </Button>

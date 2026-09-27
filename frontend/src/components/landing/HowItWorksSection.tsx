@@ -39,7 +39,7 @@ const HowItWorksSection = () => {
           className="text-center mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
-            How <span className="text-gradient-primary">FundiHub</span> works
+            How <span className="text-gradient-primary">PataFundi</span> works
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             Getting help is simple. We handle the complexity so you don't have to.

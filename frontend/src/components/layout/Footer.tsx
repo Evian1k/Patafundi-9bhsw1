@@ -3,8 +3,8 @@ import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { BrandLogo } from "@/assets/logo";
 
 const Footer = () => {
-  const companyName = "FundiHub";
-  const supportEmail = "support@fundihub.com";
+  const companyName = "PataFundi";
+  const supportEmail = "support@patafundi.com";
 
   const footerLinks = {
     services: [

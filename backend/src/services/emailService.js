@@ -14,20 +14,20 @@ function getResendClient() {
 }
 
 function otpSubject(purpose) {
-  if (purpose === 'password_reset') return 'Reset your FundiHub password';
-  return 'Verify your FundiHub account';
+  if (purpose === 'password_reset') return 'Reset your PataFundi password';
+  return 'Verify your PataFundi account';
 }
 
 function otpIntro(purpose) {
   if (purpose === 'password_reset') {
-    return 'Use the code below to reset your FundiHub password.';
+    return 'Use the code below to reset your PataFundi password.';
   }
-  return 'Use the code below to verify your FundiHub account.';
+  return 'Use the code below to verify your PataFundi account.';
 }
 
 function buildOtpText({ code, purpose, expiryMinutes }) {
   return [
-    'FundiHub',
+    'PataFundi',
     '',
     otpIntro(purpose),
     '',
@@ -45,7 +45,7 @@ function buildOtpHtml({ code, purpose, expiryMinutes }) {
 <html lang="en">
 <head><meta charset="utf-8"><title>${otpSubject(purpose)}</title></head>
 <body style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;margin:0 auto;padding:24px;">
-  <h1 style="font-size:22px;margin:0 0 16px;">FundiHub</h1>
+  <h1 style="font-size:22px;margin:0 0 16px;">PataFundi</h1>
   <p style="margin:0 0 16px;">${intro}</p>
   <p style="margin:0 0 8px;font-size:14px;color:#4b5563;">Your verification code</p>
   <p style="margin:0 0 20px;font-size:32px;font-weight:700;letter-spacing:6px;">${code}</p>
@@ -105,7 +105,7 @@ export async function sendFraudWarningEmail({ to, subject, body }) {
     const result = await client.emails.send({
       from: config.emailFrom,
       to: [recipient],
-      subject: subject || 'FundiHub Security Notice',
+      subject: subject || 'PataFundi Security Notice',
       html: `<p>${body}</p>`,
       text: body,
     });
@@ -125,14 +125,14 @@ export async function sendNotificationEmail({ to, subject, body, title }) {
   if (!recipient || !subject) return { sent: false, reason: 'invalid_payload' };
   const client = getResendClient();
   if (!client) return { sent: false, reason: 'not_configured' };
-  const heading = title || 'FundiHub';
+  const heading = title || 'PataFundi';
   try {
     const result = await client.emails.send({
       from: config.emailFrom,
       to: [recipient],
       subject: String(subject).slice(0, 200),
-      html: `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head><body style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;margin:0 auto;padding:24px;"><h1 style="font-size:20px;margin:0 0 16px;">FundiHub</h1><p style="font-size:15px;font-weight:600;margin:0 0 12px;">${heading}</p><p style="margin:0 0 16px;white-space:pre-line;">${body || ''}</p><p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">You are receiving this because of activity on your FundiHub account.</p></body></html>`,
-      text: `FundiHub\n\n${heading}\n\n${body || ''}`,
+      html: `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head><body style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#111827;max-width:520px;margin:0 auto;padding:24px;"><h1 style="font-size:20px;margin:0 0 16px;">PataFundi</h1><p style="font-size:15px;font-weight:600;margin:0 0 12px;">${heading}</p><p style="margin:0 0 16px;white-space:pre-line;">${body || ''}</p><p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">You are receiving this because of activity on your PataFundi account.</p></body></html>`,
+      text: `PataFundi\n\n${heading}\n\n${body || ''}`,
     });
     if (result.error) return { sent: false, reason: result.error.message };
     return { sent: true, id: result.data?.id };

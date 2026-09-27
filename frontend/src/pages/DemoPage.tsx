@@ -6,25 +6,25 @@
  * VITE_DEV_DEMO flag and NODE_ENV check.
  *
  * Core accounts (seeded automatically at dev boot by ensure-dev-db.js):
- *   demo@fundihub.com / Demo@2024!         → customer
- *   fundi@fundihub.com / Fundi@2024!       → fundi (approved)
- *   admin@fundihub.com / Admin@2024!       → super_admin
- *   ops@fundihub.com / Ops@2024!           → admin (ops manager)
- *   support@fundihub.com / Support@2024!   → support_agent
- *   fraud@fundihub.com / Fraud@2024!       → fraud_analyst
- *   finance@fundihub.com / Finance@2024!   → finance_team
- *   dispatch@fundihub.com / Dispatch@2024! → dispatch_team
- *   devops@fundihub.com / Devops@2024!     → devops_engineer
- *   auditor@fundihub.com / Auditor@2024!   → auditor
+ *   demo@patafundi.com / Demo@2024!         → customer
+ *   fundi@patafundi.com / Fundi@2024!       → fundi (approved)
+ *   admin@patafundi.com / Admin@2024!       → super_admin
+ *   ops@patafundi.com / Ops@2024!           → admin (ops manager)
+ *   support@patafundi.com / Support@2024!   → support_agent
+ *   fraud@patafundi.com / Fraud@2024!       → fraud_analyst
+ *   finance@patafundi.com / Finance@2024!   → finance_team
+ *   dispatch@patafundi.com / Dispatch@2024! → dispatch_team
+ *   devops@patafundi.com / Devops@2024!     → devops_engineer
+ *   auditor@patafundi.com / Auditor@2024!   → auditor
  *
  * Takeover ecosystem (seeded automatically at dev boot by seed-takeover.js
  * — see DEMO_ACCOUNTS.md):
- *   customer.demo@fundihub.test            → customer
- *   fundi.demo@fundihub.test               → fundi (John Kamau)
- *   company.demo@fundihub.test             → company_admin (Apex owner)
- *   dispatcher.demo@fundihub.test          → company dispatcher
- *   technician.demo@fundihub.test          → company technician
- *   admin.demo@fundihub.test               → super_admin
+ *   customer.demo@patafundi.test            → customer
+ *   fundi.demo@patafundi.test               → fundi (John Kamau)
+ *   company.demo@patafundi.test             → company_admin (Apex owner)
+ *   dispatcher.demo@patafundi.test          → company dispatcher
+ *   technician.demo@patafundi.test          → company technician
+ *   admin.demo@patafundi.test               → super_admin
  */
 
 import { useState } from "react";
@@ -52,7 +52,7 @@ interface DemoAccount {
 
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
-    email: "demo@fundihub.com",
+    email: "demo@patafundi.com",
     password: "Demo@2024!",
     role: "customer",
     label: "Customer",
@@ -61,7 +61,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#2595FF",
   },
   {
-    email: "fundi@fundihub.com",
+    email: "fundi@patafundi.com",
     password: "Fundi@2024!",
     role: "fundi",
     label: "Fundi (Approved)",
@@ -70,7 +70,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#10B981",
   },
   {
-    email: "admin@fundihub.com",
+    email: "admin@patafundi.com",
     password: "Admin@2024!",
     role: "super_admin",
     label: "Super Admin",
@@ -79,7 +79,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#1E293B",
   },
   {
-    email: "ops@fundihub.com",
+    email: "ops@patafundi.com",
     password: "Ops@2024!",
     role: "admin",
     label: "Ops Manager",
@@ -88,7 +88,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#475569",
   },
   {
-    email: "support@fundihub.com",
+    email: "support@patafundi.com",
     password: "Support@2024!",
     role: "support_agent",
     label: "Support Agent",
@@ -97,7 +97,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#8B5CF6",
   },
   {
-    email: "fraud@fundihub.com",
+    email: "fraud@patafundi.com",
     password: "Fraud@2024!",
     role: "fraud_analyst",
     label: "Fraud Analyst",
@@ -106,7 +106,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#EF4444",
   },
   {
-    email: "finance@fundihub.com",
+    email: "finance@patafundi.com",
     password: "Finance@2024!",
     role: "finance_team",
     label: "Finance Team",
@@ -115,7 +115,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#059669",
   },
   {
-    email: "dispatch@fundihub.com",
+    email: "dispatch@patafundi.com",
     password: "Dispatch@2024!",
     role: "dispatch_team",
     label: "Dispatch Team",
@@ -124,7 +124,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#D97706",
   },
   {
-    email: "devops@fundihub.com",
+    email: "devops@patafundi.com",
     password: "Devops@2024!",
     role: "devops_engineer",
     label: "DevOps Engineer",
@@ -133,7 +133,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#0891B2",
   },
   {
-    email: "auditor@fundihub.com",
+    email: "auditor@patafundi.com",
     password: "Auditor@2024!",
     role: "auditor",
     label: "Auditor (Read-Only)",
@@ -141,10 +141,10 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     icon: ScrollText,
     color: "#6B7280",
   },
-  // ── Takeover demo ecosystem (@fundihub.test) — see DEMO_ACCOUNTS.md ──
+  // ── Takeover demo ecosystem (@patafundi.test) — see DEMO_ACCOUNTS.md ──
   {
-    email: "customer.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "customer.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "customer",
     label: "Customer (Takeover Demo)",
     description: "Book companies & fundis, properties, pay, review",
@@ -152,8 +152,8 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#2595FF",
   },
   {
-    email: "fundi.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "fundi.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "fundi",
     label: "Fundi — John Kamau (Takeover Demo)",
     description: "Verified individual fundi with wallet",
@@ -161,8 +161,8 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#10B981",
   },
   {
-    email: "company.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "company.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "company_admin",
     label: "Apex Home Services Owner (Takeover Demo)",
     description: "Full company portal: dispatch, team, finance",
@@ -170,8 +170,8 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#059669",
   },
   {
-    email: "dispatcher.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "dispatcher.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "company",
     label: "Apex Dispatcher (Takeover Demo)",
     description: "Accept + assign jobs (no finance access)",
@@ -179,8 +179,8 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#D97706",
   },
   {
-    email: "technician.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "technician.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "technician",
     label: "Apex Technician (Takeover Demo)",
     description: "Assigned jobs, status updates",
@@ -188,8 +188,8 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     color: "#0891B2",
   },
   {
-    email: "admin.demo@fundihub.test",
-    password: "FundiHub#2026",
+    email: "admin.demo@patafundi.test",
+    password: "PataFundi#2026",
     role: "super_admin",
     label: "Super Admin (Takeover Demo)",
     description: "Command center incl. company approvals",
@@ -260,7 +260,7 @@ export default function DemoPage() {
           <motion.div variants={itemVariants} className="text-center mb-10">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Demo Accounts</h1>
             <p className="text-slate-600">
-              FundiHub has {DEMO_ACCOUNTS.length} demo accounts covering every role — customers, fundis, the
+              PataFundi has {DEMO_ACCOUNTS.length} demo accounts covering every role — customers, fundis, the
               company portal (owner, dispatcher, technician) and all staff consoles. Click any card to log in instantly,
               or copy the credentials to use on the login page.
             </p>

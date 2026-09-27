@@ -53,7 +53,7 @@ const TestimonialsSection = () => {
             Loved by <span className="text-gradient-primary">thousands</span>
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            See what our customers have to say about their FundiHub experience
+            See what our customers have to say about their PataFundi experience
           </p>
         </motion.div>
 

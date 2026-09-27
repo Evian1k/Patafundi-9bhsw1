@@ -431,7 +431,7 @@ export async function createJob(req, res) {
     });
   }
 
-  // ── Option C (spec §2/§13): "Let FundiHub match" — weighted smart match ──
+  // ── Option C (spec §2/§13): "Let PataFundi match" — weighted smart match ──
   // Uses the full scoring engine (distance, rating, quality, acceptance,
   // completion, cancellation history, verification, workload) instead of the
   // distance-first fallback. Falls back to nearest-fundis if the engine fails.

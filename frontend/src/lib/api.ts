@@ -1,6 +1,6 @@
 /**
- * API Client for FundiHub — Node.js Express Backend
- * All routes map to /api/* on the FundiHub backend.
+ * API Client for PataFundi — Node.js Express Backend
+ * All routes map to /api/* on the PataFundi backend.
  */
 
 import { buildApiUrl, isApiConfigured } from '@/api/config';

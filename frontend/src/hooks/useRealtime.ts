@@ -1,5 +1,5 @@
 /**
- * useRealtime — polling-based realtime hook for FundiHub
+ * useRealtime — polling-based realtime hook for PataFundi
  * Compatible with the polling RealtimeService
  */
 

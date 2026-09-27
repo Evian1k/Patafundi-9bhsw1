@@ -41,7 +41,7 @@ const CTASection = () => {
             <span className="text-xs font-medium text-primary uppercase tracking-wider">For Professionals</span>
             <h3 className="text-2xl font-display font-bold mt-1 mb-3 text-background">Grow your business</h3>
             <p className="text-background/70 mb-6 leading-relaxed">
-              Join thousands of fundis earning more with FundiHub.
+              Join thousands of fundis earning more with PataFundi.
               Get verified, get jobs, get paid directly.
             </p>
             <Link to="/register/fundi">

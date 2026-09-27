@@ -97,7 +97,7 @@ export default function AdminLogin() {
           <div className="text-center mb-8">
             <BrandLogo size="lg" linkTo={false} className="justify-center mb-4" />
             <h1 className="text-white text-2xl font-display font-bold">Admin Access</h1>
-            <p className="text-emerald-100/70 text-sm mt-1">FundiHub Management Panel</p>
+            <p className="text-emerald-100/70 text-sm mt-1">PataFundi Management Panel</p>
           </div>
 
           {/* Error */}
@@ -119,7 +119,7 @@ export default function AdminLogin() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@fundihub.com"
+                  placeholder="you@patafundi.com"
                   className="pl-10 bg-[hsl(168_40%_9%)] border-white/15 text-white placeholder:text-emerald-100/30 focus:border-primary"
                   required
                   disabled={loading}

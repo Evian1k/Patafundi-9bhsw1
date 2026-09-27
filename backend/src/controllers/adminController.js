@@ -745,7 +745,7 @@ export async function updateSettings(req, res) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// FUNDIHUB completion additions (spec §4-§8, §20, §29)
+// PATAFUNDI completion additions (spec §4-§8, §20, §29)
 // ════════════════════════════════════════════════════════════════
 
 // GET /admin/payouts — full payout ledger for the finance control center

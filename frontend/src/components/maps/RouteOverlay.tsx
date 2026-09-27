@@ -1,5 +1,5 @@
 /**
- * FundiHub route visualization — Uber-style animated route drawing.
+ * PataFundi route visualization — Uber-style animated route drawing.
  *
  * Features:
  *   - Progressive line animation (route "draws" itself over ~1.5s)

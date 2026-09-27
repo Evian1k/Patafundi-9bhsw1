@@ -41,7 +41,7 @@ export default function ProviderSection() {
             For the people who <span className="text-gradient-primary">get the work done</span>
           </h2>
           <p className="text-muted-foreground">
-            FundiHub gives fundis and companies a fair, structured way to win more jobs, build trust, and manage earnings through a professional service platform.
+            PataFundi gives fundis and companies a fair, structured way to win more jobs, build trust, and manage earnings through a professional service platform.
           </p>
         </motion.div>
 
@@ -69,7 +69,7 @@ export default function ProviderSection() {
             <Button className="bg-gradient-primary">Join as a fundi</Button>
           </Link>
           <Link to="/companies">
-            <Button variant="outline">Partner with FundiHub</Button>
+            <Button variant="outline">Partner with PataFundi</Button>
           </Link>
         </div>
       </div>

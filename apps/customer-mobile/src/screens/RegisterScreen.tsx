@@ -55,7 +55,7 @@ export function RegisterScreen({ navigation }: any): JSX.Element {
         <ScreenHeader title="Create Account" onBack={() => navigation.goBack()} />
 
         <Text style={styles.title}>Create account</Text>
-        <Text style={styles.subtitle}>Join FundiHub to hire trusted fundis.</Text>
+        <Text style={styles.subtitle}>Join PataFundi to hire trusted fundis.</Text>
 
         <View style={styles.card}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}

@@ -68,7 +68,7 @@ export function AppUpdateRequiredScreen({ route, navigation }: any): JSX.Element
         <View style={styles.logoCircle}>
           <Ionicons name="flash" size={48} color={colors.primaryForeground} />
         </View>
-        <Text style={styles.appName}>FundiHub</Text>
+        <Text style={styles.appName}>PataFundi</Text>
         {version ? <Text style={styles.appVersion}>New version {version}</Text> : null}
       </View>
 
@@ -87,8 +87,8 @@ export function AppUpdateRequiredScreen({ route, navigation }: any): JSX.Element
           {message
             ? message
             : isOptional
-              ? 'A new version of FundiHub is ready to install. Get the latest features and improvements.'
-              : 'This version of FundiHub is no longer supported. Please update to continue using the app.'}
+              ? 'A new version of PataFundi is ready to install. Get the latest features and improvements.'
+              : 'This version of PataFundi is no longer supported. Please update to continue using the app.'}
         </Text>
 
         <TouchableOpacity onPress={handleUpdate} activeOpacity={0.85}>

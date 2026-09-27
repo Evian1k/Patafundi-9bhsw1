@@ -11,12 +11,12 @@ const api = async (path, { method='GET', token, body } = {}) => {
   let json = null; try { json = await res.json(); } catch {}
   return { status: res.status, json };
 };
-const login = async (email, password='FundiHub#2026') => (await api('/auth/login', { method:'POST', body:{ email, password } })).json?.token;
+const login = async (email, password='PataFundi#2026') => (await api('/auth/login', { method:'POST', body:{ email, password } })).json?.token;
 
-const customer = await login('customer.demo@fundihub.test');
-const fundi = await login('fundi.demo@fundihub.test');
-const admin = await login('admin.demo@fundihub.test');
-const company = await login('company.demo@fundihub.test');
+const customer = await login('customer.demo@patafundi.test');
+const fundi = await login('fundi.demo@patafundi.test');
+const admin = await login('admin.demo@patafundi.test');
+const company = await login('company.demo@patafundi.test');
 
 // 1. IDOR: customer reads another user's job (nonexistent uuid → 404, not leak)
 const r1 = await api('/jobs/00000000-0000-4000-8000-000000000000', { token: customer });
@@ -74,7 +74,7 @@ check('webhook: unknown checkout id not processed as success', wh.status !== 200
 // 12. Rate limiting on auth (20/15min) — fire 25 rapid failures
 let limited = false;
 for (let i = 0; i < 25; i++) {
-  const r = await api('/auth/login', { method: 'POST', body: { email: 'ratelimit-probe@fundihub.test', password: 'wrong' } });
+  const r = await api('/auth/login', { method: 'POST', body: { email: 'ratelimit-probe@patafundi.test', password: 'wrong' } });
   if (r.status === 429) { limited = true; break; }
 }
 check('rate-limit: login brute force throttled', limited);

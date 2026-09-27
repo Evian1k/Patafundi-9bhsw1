@@ -41,7 +41,7 @@ export default function BusinessSection() {
             Built for <span className="text-gradient-primary">service businesses</span>
           </h2>
           <p className="text-muted-foreground">
-            FundiHub gives verified service companies a safer channel to win demand, assign work, and manage growth without exposing internal platform operations.
+            PataFundi gives verified service companies a safer channel to win demand, assign work, and manage growth without exposing internal platform operations.
           </p>
         </motion.div>
 

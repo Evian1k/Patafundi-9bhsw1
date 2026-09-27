@@ -6,9 +6,9 @@ export default function About() {
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-3xl">
-        <h1 className="text-4xl font-display font-bold mb-4">About FundiHub</h1>
+        <h1 className="text-4xl font-display font-bold mb-4">About PataFundi</h1>
         <p className="text-muted-foreground text-lg mb-8">
-          FundiHub is built to make local services safer, faster, and more reliable — for customers and for professionals.
+          PataFundi is built to make local services safer, faster, and more reliable — for customers and for professionals.
         </p>
 
         <div className="space-y-8">

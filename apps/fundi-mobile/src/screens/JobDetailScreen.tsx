@@ -215,7 +215,7 @@ export function JobDetailScreen({ navigation, route }: any): JSX.Element {
   const handleSOS = (): void => {
     Alert.alert(
       'Trigger SOS',
-      'This will alert FundiHub safety and your emergency contact. Continue?',
+      'This will alert PataFundi safety and your emergency contact. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {

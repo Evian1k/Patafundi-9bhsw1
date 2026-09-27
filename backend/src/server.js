@@ -318,7 +318,7 @@ const dbUrlSet = Boolean(config.databaseUrl);
 const dbUrlSource = dbUrlSet ? (config.databaseUrl.includes('localhost') ? 'local' : config.databaseUrl.includes('neon') ? 'Neon' : config.databaseUrl.includes('supabase') ? 'Supabase' : 'cloud') : 'none';
 console.log('');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('  FundiHub API — starting...');
+console.log('  PataFundi API — starting...');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log(`  Environment:    ${config.nodeEnv}`);
 console.log(`  DATABASE_URL:   ${dbUrlSet ? `set (${dbUrlSource})` : 'NOT SET — will use PGlite embedded DB'}`);

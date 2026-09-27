@@ -159,7 +159,7 @@ const Auth = () => {
       await apiClient.otpVerify(pendingEmail, otpCode, "register");
       localStorage.removeItem("pending_otp_email");
       localStorage.removeItem("pending_otp_purpose");
-      toast.success("Verified! Welcome to FundiHub.");
+      toast.success("Verified! Welcome to PataFundi.");
       await routeAfterAuth();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "OTP verification failed");
@@ -252,7 +252,7 @@ const Auth = () => {
       : "Enter the code and choose a new password")
     : mode === "login"
       ? "Sign in to access your account"
-      : "Get started with FundiHub today";
+      : "Get started with PataFundi today";
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">

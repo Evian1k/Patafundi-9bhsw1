@@ -68,14 +68,16 @@ test('job creation and matching use the real database-backed workflow', async ()
   const fundi = (await query('select id from users where email = $1', ['fundi@patafundi.com'])).rows[0];
 
   await query(
-    `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, online, latitude, longitude)
-     values ($1, $2, $3, $4, 'approved', true, -1.2864, 36.8172)
+    `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, online, latitude, longitude, rating, verification_badge)
+     values ($1, $2, $3, $4, 'approved', true, -1.2864, 36.8172, 5.0, true)
      on conflict (user_id) do update set
        skills = excluded.skills,
        approval_status = 'approved',
        online = true,
        latitude = excluded.latitude,
-       longitude = excluded.longitude`,
+       longitude = excluded.longitude,
+       rating = excluded.rating,
+       verification_badge = true`,
     [fundi.id, ['plumbing', 'electrical'], '5 years experience', '254712000002'],
   );
 

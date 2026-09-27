@@ -1,5 +1,5 @@
 /**
- * LLM Service — real AI backend for FundiHub (spec §31-32)
+ * LLM Service — real AI backend for PataFundi (spec §31-32)
  *
  * Wraps z-ai-web-dev-sdk (server-side ONLY — never exposed to the client).
  * Guarantees required by the spec:

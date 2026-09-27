@@ -46,7 +46,7 @@ export default function CompanyDirectory() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-30 bg-background/80 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <Link to="/" className="font-semibold tracking-tight shrink-0">FundiHub <span className="text-emerald-500">Companies</span></Link>
+          <Link to="/" className="font-semibold tracking-tight shrink-0">PataFundi <span className="text-emerald-500">Companies</span></Link>
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
@@ -64,7 +64,7 @@ export default function CompanyDirectory() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Verified service companies</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Professional companies — vetted by FundiHub, rated by real customers.
+              Professional companies — vetted by PataFundi, rated by real customers.
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">

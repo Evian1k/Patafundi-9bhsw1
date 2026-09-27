@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
 export default function Contact() {
-  const supportEmail = "support@fundihub.com";
+  const supportEmail = "support@patafundi.com";
   return (
     <SiteLayout>
       <div className="container mx-auto px-4 py-16 max-w-2xl">

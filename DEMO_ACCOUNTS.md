@@ -1,9 +1,9 @@
-# FundiHub — Demo Accounts (DEVELOPMENT ONLY)
+# PataFundi — Demo Accounts (DEVELOPMENT ONLY)
 
 > ⚠️ **These credentials are for local development and demo environments ONLY.**
 > They are seeded by `backend/scripts/seed-takeover.js` and `ensure-dev-db.js`,
 > which **refuse to run against production** (`NODE_ENV=production` aborts).
-> Never reuse them for real accounts. The `.test` / `fundihub.com` demo domains
+> Never reuse them for real accounts. The `.test` / `patafundi.com` demo domains
 > are reserved for this purpose.
 
 ## Platform owner (all environments)
@@ -14,53 +14,53 @@ accounts; in production it is created **only** by
 
 | Account | Email | Password (dev only) | Role |
 |---|---|---|---|
-| Emmanuel Evian | `emmanuelevian@gmail.com` | `FundiHubOwner@2026` | super_admin |
+| Emmanuel Evian | `emmanuelevian@gmail.com` | `PataFundiOwner@2026` | super_admin |
 
 ## Unified demo password
 
 ```
-FundiHub#2026
+PataFundi#2026
 ```
 
-## Takeover demo ecosystem (`@fundihub.test`)
+## Takeover demo ecosystem (`@patafundi.test`)
 
 | Account | Email | Role / surface | What to test |
 |---|---|---|---|
-| Demo Customer | `customer.demo@fundihub.test` | Customer app | Search, book **Apex Home Services Ltd**, track, pay (dev provider), confirm OTP, review, multi-property |
-| Demo Fundi (John Kamau) | `fundi.demo@fundihub.test` | Fundi app | Individual fundi with wallet, accepted/complete flows |
-| Apex Company Owner | `company.demo@fundihub.test` | `/company` portal | Dashboard, jobs, dispatch, team, services, schedule, quality, finance, settings |
-| Apex Dispatcher | `dispatcher.demo@fundihub.test` | `/company` portal | Accept + assign jobs. **Blocked from finance** (verify) |
-| Apex Technician | `technician.demo@fundihub.test` | `/technician` app | Assigned jobs only: on the way → arrived → start work |
-| Apex Technician 2 | `tech2.demo@fundihub.test` | `/technician` app | Electrical/HVAC assignments |
-| Apex Technician 3 | `tech3.demo@fundihub.test` | `/technician` app | Appliance/HVAC assignments |
-| Staff Operations | `operations.demo@fundihub.test` | `/staff` | Ops dashboard, fundis, jobs, users |
-| Staff Support | `support.demo@fundihub.test` | `/staff` | Disputes & support queue |
-| Staff Finance | `finance.demo@fundihub.test` | `/staff` | Payments, escrow, payouts, revenue |
-| Staff Fraud | `fraud.demo@fundihub.test` | `/staff` | Fraud alerts & risk signals |
-| Staff DevOps | `devops.demo@fundihub.test` | `/staff` | System health & integrations |
-| Staff Auditor | `auditor.demo@fundihub.test` | `/staff` | Read-only audit logs |
-| Super Admin | `admin.demo@fundihub.test` | `/admin` | Command center incl. **Companies**, Payouts, Refunds, Subscriptions, Reviews |
+| Demo Customer | `customer.demo@patafundi.test` | Customer app | Search, book **Apex Home Services Ltd**, track, pay (dev provider), confirm OTP, review, multi-property |
+| Demo Fundi (John Kamau) | `fundi.demo@patafundi.test` | Fundi app | Individual fundi with wallet, accepted/complete flows |
+| Apex Company Owner | `company.demo@patafundi.test` | `/company` portal | Dashboard, jobs, dispatch, team, services, schedule, quality, finance, settings |
+| Apex Dispatcher | `dispatcher.demo@patafundi.test` | `/company` portal | Accept + assign jobs. **Blocked from finance** (verify) |
+| Apex Technician | `technician.demo@patafundi.test` | `/technician` app | Assigned jobs only: on the way → arrived → start work |
+| Apex Technician 2 | `tech2.demo@patafundi.test` | `/technician` app | Electrical/HVAC assignments |
+| Apex Technician 3 | `tech3.demo@patafundi.test` | `/technician` app | Appliance/HVAC assignments |
+| Staff Operations | `operations.demo@patafundi.test` | `/staff` | Ops dashboard, fundis, jobs, users |
+| Staff Support | `support.demo@patafundi.test` | `/staff` | Disputes & support queue |
+| Staff Finance | `finance.demo@patafundi.test` | `/staff` | Payments, escrow, payouts, revenue |
+| Staff Fraud | `fraud.demo@patafundi.test` | `/staff` | Fraud alerts & risk signals |
+| Staff DevOps | `devops.demo@patafundi.test` | `/staff` | System health & integrations |
+| Staff Auditor | `auditor.demo@patafundi.test` | `/staff` | Read-only audit logs |
+| Super Admin | `admin.demo@patafundi.test` | `/admin` | Command center incl. **Companies**, Payouts, Refunds, Subscriptions, Reviews |
 
 ## Quick-login pages
 
-- `/demo` — customer-facing quick login (uses the `@fundihub.com` set below)
+- `/demo` — customer-facing quick login (uses the `@patafundi.com` set below)
 - `/staff/login` — staff console entry
 - `/admin/login` — owner/admin entry (never linked from public pages; access is
   enforced server-side by role, not by hiding the button)
 
-## FundiHub-branded core accounts (`@fundihub.com`)
+## PataFundi-branded core accounts (`@patafundi.com`)
 
 Seeded by `ensure-dev-db.js` at boot, shown on `/demo`:
 
-`demo@fundihub.com` / `Demo@2024!` (customer) · `fundi@fundihub.com` / `Fundi@2024!` ·
-`company@fundihub.com` / `Company@2024!` · `admin@fundihub.com` / `Admin@2024!` (super_admin) ·
+`demo@patafundi.com` / `Demo@2024!` (customer) · `fundi@patafundi.com` / `Fundi@2024!` ·
+`company@patafundi.com` / `Company@2024!` · `admin@patafundi.com` / `Admin@2024!` (super_admin) ·
 plus `ops@ / support@ / fraud@ / finance@ / dispatch@ / devops@ / auditor@`
 (each with its own documented password in `backend/scripts/ensure-dev-db.js`).
 
 ## Legacy demo accounts (`@patafundi.com` / `@patafundi.test`)
 
 Still seeded and working for backward compatibility — same passwords as their
-FundiHub-branded twins (`PataFundi#2026` was the legacy unified password).
+PataFundi-branded twins (`PataFundi#2026` was the legacy unified password).
 They are no longer listed on `/demo`.
 
 ## Demo company — "Apex Home Services Ltd"

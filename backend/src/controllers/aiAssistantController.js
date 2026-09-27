@@ -1,5 +1,5 @@
 /**
- * AI Assistant Controller (spec §31-32) — REAL LLM features for FundiHub.
+ * AI Assistant Controller (spec §31-32) — REAL LLM features for PataFundi.
  *
  * Three capabilities, all advisory-only:
  *   1. analyzeJob        — customer describes a problem; AI suggests category,
@@ -89,7 +89,7 @@ export async function analyzeJob(req, res) {
   const categories = await knownCategories();
   const categoryHint = categories ? `Known service categories on this platform: ${categories.join(', ')}.` : '';
   const system = [
-    'You are FundiHub Assist, the intake analyst for a home-services marketplace (Kenya; currency KES).',
+    'You are PataFundi Assist, the intake analyst for a home-services marketplace (Kenya; currency KES).',
     'Given a customer\'s problem description you classify it so the right professionals can be matched.',
     categoryHint,
     'Rules:',
@@ -174,7 +174,7 @@ export async function summarizeDispute(req, res) {
   };
 
   const system = [
-    'You are the dispute-triage analyst for FundiHub platform ADMINISTRATORS.',
+    'You are the dispute-triage analyst for PataFundi platform ADMINISTRATORS.',
     'Summarise the dispute dossier faithfully. NEVER fabricate facts that are not in the dossier.',
     'You are advisory only: you do NOT decide outcomes, refunds or penalties — the human admin decides.',
     'Respond with JSON only, shape: {"summary":string,"keyPoints":string[],"policyConsiderations":string[],"suggestedNextSteps":string[],"riskLevel":"low"|"medium"|"high"}',
@@ -228,8 +228,8 @@ export async function improveProfile(req, res) {
   if (text.length > 3000) throw badRequest('Profile text is too long (3000 characters max)');
 
   const system = kind === 'company'
-    ? 'You improve service-company profiles for FundiHub, a home-services marketplace. Rewrite the given business description to be clear, trustworthy and specific (max 140 words). Keep every factual claim the user wrote — do NOT invent certifications, staff counts, years of experience or clients. Return JSON: {"improved":string,"tips":string[]}.'
-    : 'You improve professional profiles for FundiHub, a home-services marketplace. Rewrite the given professional bio to be clear, trustworthy and specific (max 120 words). Keep every factual claim the user wrote — do NOT invent certifications, years of experience or clients. Return JSON: {"improved":string,"tips":string[]}.';
+    ? 'You improve service-company profiles for PataFundi, a home-services marketplace. Rewrite the given business description to be clear, trustworthy and specific (max 140 words). Keep every factual claim the user wrote — do NOT invent certifications, staff counts, years of experience or clients. Return JSON: {"improved":string,"tips":string[]}.'
+    : 'You improve professional profiles for PataFundi, a home-services marketplace. Rewrite the given professional bio to be clear, trustworthy and specific (max 120 words). Keep every factual claim the user wrote — do NOT invent certifications, years of experience or clients. Return JSON: {"improved":string,"tips":string[]}.';
 
   const ai = await completeJSON({
     userId: req.user.id,

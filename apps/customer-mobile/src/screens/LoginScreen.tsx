@@ -47,7 +47,7 @@ export function LoginScreen({ navigation }: any): JSX.Element {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.brandWrap}>
-          <Text style={styles.logo}>FundiHub</Text>
+          <Text style={styles.logo}>PataFundi</Text>
           <Text style={styles.tagline}>Trusted local fundis, on demand.</Text>
         </View>
 

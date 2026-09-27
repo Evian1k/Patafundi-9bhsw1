@@ -45,7 +45,7 @@ const HOW_IT_WORKS_SECTION: InfoSection[] = [
     color: colors.primary,
     bullets: [
       'Share your unique referral code with a friend',
-      'Friend signs up on FundiHub using your code',
+      'Friend signs up on PataFundi using your code',
       'You both get rewarded when they complete their first job',
     ],
   },
@@ -61,7 +61,7 @@ const HOW_IT_WORKS_SECTION: InfoSection[] = [
     body: 'A few simple conditions:',
     color: colors.info,
     bullets: [
-      'Referred user must be a brand-new FundiHub account',
+      'Referred user must be a brand-new PataFundi account',
       'One referral per device (no duplicates)',
       'Voucher expires 30 days after issuance',
       'Reward unlocks only after the friend\'s first job is completed and paid',
@@ -84,12 +84,12 @@ export function ReferralProgramScreen({ navigation }: any): JSX.Element {
 
   const handleInvite = (option: InviteOption): void => {
     if (option.icon === 'logo-whatsapp') {
-      const url = `https://wa.me/?text=${encodeURIComponent('Join me on FundiHub! Use my referral code to get KES 100 off your first job.')}`;
+      const url = `https://wa.me/?text=${encodeURIComponent('Join me on PataFundi! Use my referral code to get KES 100 off your first job.')}`;
       openShareUrl(url, 'WhatsApp');
       return;
     }
     if (option.icon === 'chatbubble') {
-      const url = `sms:?body=${encodeURIComponent('Join me on FundiHub! Use my referral code to get KES 100 off your first job.')}`;
+      const url = `sms:?body=${encodeURIComponent('Join me on PataFundi! Use my referral code to get KES 100 off your first job.')}`;
       openShareUrl(url, 'Messages');
       return;
     }
@@ -98,8 +98,8 @@ export function ReferralProgramScreen({ navigation }: any): JSX.Element {
       return;
     }
     void Share.share({
-      message: 'Join me on FundiHub! Use my referral code to get KES 100 off your first job.',
-      title: 'FundiHub referral',
+      message: 'Join me on PataFundi! Use my referral code to get KES 100 off your first job.',
+      title: 'PataFundi referral',
     }).catch(() => {
       Alert.alert('Could not open the share sheet', 'Copy your referral code and share it manually instead.');
     });

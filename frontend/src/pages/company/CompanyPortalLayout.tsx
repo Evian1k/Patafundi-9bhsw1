@@ -81,14 +81,14 @@ export default function CompanyPortalLayout() {
           <h1 className="mt-3 font-semibold">Company portal</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {denied === "suspended"
-              ? "This company account is currently suspended. Contact FundiHub support."
+              ? "This company account is currently suspended. Contact PataFundi support."
               : denied === "forbidden"
-              ? "You are not a member of a company on FundiHub. Apply through the Partner Program or log in with your company account."
+              ? "You are not a member of a company on PataFundi. Apply through the Partner Program or log in with your company account."
               : "Unable to load the company portal. Try again."}
           </p>
           <div className="mt-5 flex flex-col sm:flex-row gap-2 justify-center">
             <button onClick={() => navigate(0)} className="rounded-xl border px-4 py-2 text-sm">Retry</button>
-            <NavLink to="/partner-program" className="rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm">Partner with FundiHub</NavLink>
+            <NavLink to="/partner-program" className="rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm">Partner with PataFundi</NavLink>
           </div>
         </div>
       </div>

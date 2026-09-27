@@ -18,7 +18,7 @@ export function FundiTrustCenterScreen({ navigation }: any): JSX.Element {
     <TrustCenterScreen
       navigation={navigation}
       cards={TRUST_CARDS}
-      heroSubtitle="Safety and clarity for every fundi on the FundiHub platform."
+      heroSubtitle="Safety and clarity for every fundi on the PataFundi platform."
     />
   );
 }

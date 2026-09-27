@@ -21,10 +21,10 @@ export default function CompanyPage() {
             <p className="text-sm uppercase tracking-[0.2em] text-primary font-semibold mb-4">Company partner portal</p>
             <h1 className="text-4xl md:text-6xl font-display font-bold mb-5">Deliver real service growth for your business.</h1>
             <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-              FundiHub helps verified service companies receive job demand, control field teams, monitor performance, and keep customers happy without operating a fragmented service stack.
+              PataFundi helps verified service companies receive job demand, control field teams, monitor performance, and keep customers happy without operating a fragmented service stack.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link to="/partner-program"><Button className="bg-gradient-primary">Partner with FundiHub</Button></Link>
+              <Link to="/partner-program"><Button className="bg-gradient-primary">Partner with PataFundi</Button></Link>
               <Link to="/contact"><Button variant="outline">Talk to sales</Button></Link>
             </div>
           </div>
@@ -59,7 +59,7 @@ export default function CompanyPage() {
         </div>
 
         <div className="mb-16">
-          <h2 className="text-3xl font-display font-bold mb-8">Why companies choose FundiHub</h2>
+          <h2 className="text-3xl font-display font-bold mb-8">Why companies choose PataFundi</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
             {pillars.map((pillar) => (
               <div key={pillar.title} className="p-6 bg-card border border-border rounded-2xl">
