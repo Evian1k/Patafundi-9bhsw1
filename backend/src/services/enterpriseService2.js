@@ -82,7 +82,7 @@ export async function restoreBackup(backupId, initiatedBy) {
 export async function requestDataExport(userId) {
   // Collect all user data
   const tables = ['users', 'jobs', 'payments', 'reviews', 'notifications', 'chat_messages',
-    'referrals', 'referral_rewards', 'otp_codes', 'audit_logs', 'user_loyalty',
+    'otp_codes', 'audit_logs',
     'favorite_fundis', 'saved_places', 'support_tickets', 'disputes'];
 
   const userData = {};
@@ -335,7 +335,6 @@ const EMERGENCY_CONTROLS = {
   disable_fundi_signups: { flag: 'fundi_signups', label: 'Disable Fundi Signups' },
   disable_chat: { flag: 'chat', label: 'Disable Chat' },
   disable_ai: { flag: 'ai', label: 'Disable AI' },
-  disable_referrals: { flag: 'referrals', label: 'Disable Referrals' },
 };
 
 export async function getEmergencyControlStatus() {

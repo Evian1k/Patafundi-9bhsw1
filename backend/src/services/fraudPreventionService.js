@@ -541,11 +541,10 @@ export async function listBlacklist(type = null, limit = 100) {
 export async function calculateBehavioralRisk(userId) {
   // Gather user activity data
   const [
-    loginData, paymentData, referralData, reviewData, jobData, messageData, userData, trustData,
+    loginData, paymentData, reviewData, jobData, messageData, userData, trustData,
   ] = await Promise.all([
     query('select count(*)::int as n from login_history where user_id = $1 and created_at > now() - interval \'30 days\'', [userId]),
     query('select count(*)::int as n from payments where user_id = $1 and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0 }] })),
-    query('select count(*)::int as n from referrals where referrer_id = $1 and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0 }] })),
     query('select count(*)::int as n, avg(rating)::numeric as avg_rating from reviews where reviewer_id = $1 and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0, avg_rating: 0 }] })),
     query(`select
              count(*)::int as total,
@@ -559,7 +558,6 @@ export async function calculateBehavioralRisk(userId) {
 
   const loginFreq = loginData.rows[0]?.n || 0;
   const paymentFreq = paymentData.rows[0]?.n || 0;
-  const referralActivity = referralData.rows[0]?.n || 0;
   const reviewCount = reviewData.rows[0]?.n || 0;
   const avgRating = Number(reviewData.rows[0]?.avg_rating || 0);
   const totalJobs = jobData.rows[0]?.total || 0;
@@ -587,10 +585,6 @@ export async function calculateBehavioralRisk(userId) {
   if (paymentFreq > 100) { riskScore += 20; factors.high_payment_frequency = paymentFreq; }
   else if (paymentFreq > 50) { riskScore += 10; factors.elevated_payment_frequency = paymentFreq; }
 
-  // High referral activity (possible referral abuse)
-  if (referralActivity > 20) { riskScore += 25; factors.high_referral_activity = referralActivity; }
-  else if (referralActivity > 10) { riskScore += 12; factors.elevated_referral_activity = referralActivity; }
-
   // Review anomaly (all 5-star or all 1-star reviews)
   if (reviewCount >= 5 && (avgRating === 5 || avgRating === 1)) {
     riskScore += 20; factors.review_anomaly = `All ${avgRating}-star reviews`;
@@ -603,7 +597,7 @@ export async function calculateBehavioralRisk(userId) {
   if (messagesLastHour > 50) { riskScore += 15; factors.message_spam = messagesLastHour; }
 
   // New account with high activity
-  if (accountAgeDays < 7 && (paymentFreq > 10 || referralActivity > 5)) {
+  if (accountAgeDays < 7 && paymentFreq > 10) {
     riskScore += 20; factors.new_account_high_activity = `${accountAgeDays} days old`;
   }
 
@@ -618,14 +612,13 @@ export async function calculateBehavioralRisk(userId) {
   await query(
     `insert into behavioral_risk_scores
       (user_id, risk_score, risk_level, login_frequency_30d, payment_frequency_30d,
-       referral_activity_30d, review_anomaly_score, job_cancellation_rate, message_spam_score,
+       review_anomaly_score, job_cancellation_rate, message_spam_score,
        account_age_days, completion_rate, acceptance_rate, trust_score, factors, last_recalculated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, now())
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, now())
      on conflict (user_id) do update set
        risk_score = excluded.risk_score, risk_level = excluded.risk_level,
        login_frequency_30d = excluded.login_frequency_30d,
        payment_frequency_30d = excluded.payment_frequency_30d,
-       referral_activity_30d = excluded.referral_activity_30d,
        review_anomaly_score = excluded.review_anomaly_score,
        job_cancellation_rate = excluded.job_cancellation_rate,
        message_spam_score = excluded.message_spam_score,
@@ -637,7 +630,7 @@ export async function calculateBehavioralRisk(userId) {
        last_recalculated_at = now(),
        updated_at = now()`,
     [
-      userId, riskScore, riskLevel, loginFreq, paymentFreq, referralActivity,
+      userId, riskScore, riskLevel, loginFreq, paymentFreq,
       reviewCount, cancellationRate, messagesLastHour, accountAgeDays,
       completionRate, acceptanceRate, trustScore, JSON.stringify(factors),
     ],

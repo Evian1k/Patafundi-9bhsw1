@@ -27,7 +27,6 @@ export function RegisterScreen({ navigation }: any): JSX.Element {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('+254');
   const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState('');
   const register = useAuthStore((s) => s.register);
   const loading = useAuthStore((s) => s.loading);
   const error = useAuthStore((s) => s.error);
@@ -36,7 +35,7 @@ export function RegisterScreen({ navigation }: any): JSX.Element {
   const handleRegister = async (): Promise<void> => {
     clearError();
     try {
-      await register(email.trim(), password, fullName.trim(), phone.trim(), referralCode.trim() || undefined);
+      await register(email.trim(), password, fullName.trim(), phone.trim());
       Alert.alert('Account created', 'A verification code has been sent to your email.');
       navigation.replace('Otp', { email: email.trim() });
     } catch (e) {
@@ -76,13 +75,6 @@ export function RegisterScreen({ navigation }: any): JSX.Element {
             keyboardType="phone-pad"
           />
           <Input label="Password" value={password} onChangeText={setPassword} placeholder="••••••••" secureTextEntry />
-          <Input
-            label="Referral code (optional)"
-            value={referralCode}
-            onChangeText={setReferralCode}
-            placeholder="ABC123"
-            autoCapitalize="characters"
-          />
           <TouchableOpacity onPress={handleRegister} disabled={loading} activeOpacity={0.85}>
             <LinearGradient
               colors={[gradients.primary.start, gradients.primary.end]}

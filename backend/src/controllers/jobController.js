@@ -245,12 +245,6 @@ export async function createJob(req, res) {
     if (providerType === 'company') providerType = 'fundi';
   }
 
-  // ── Referral voucher application ────────────────────────────────────
-  // If the customer requests to use a voucher AND has an active voucher,
-  // apply the discount to the job's server-computed price.
-  // Single-use, non-stackable, validated server-side.
-  let voucherApplied = null;
-
   // ── Server-authoritative pricing (spec §14): the customer never sets the
   // price. The pricing engine computes the estimate from the category's
   // configured pricing rules; the client's estimate is only a fallback for
@@ -275,23 +269,6 @@ export async function createJob(req, res) {
     // estimate (still validated/clamped downstream at completion/payment).
     finalPrice = body.estimatedPrice || body.estimated_price || null;
     logNonFatal('job.createJob.pricingFallback', pricingErr, { serviceCategory });
-  }
-  if (body.useReferralVoucher === true && finalPrice && Number(finalPrice) > 0) {
-    try {
-      const { applyVoucherToJob, confirmVoucherRedemption } = await import('../services/referralService.js');
-      const result = await applyVoucherToJob(req.user.id, Number(finalPrice), 0);
-      if (result.applied) {
-        finalPrice = Math.max(0, Number(finalPrice) - Number(result.discount));
-        voucherApplied = {
-          voucherId: result.voucherId,
-          voucherCode: result.voucherCode,
-          discountKes: result.discount,
-          discountPercentage: result.discountPercentage,
-        };
-      }
-    } catch (err) {
-      console.warn('[referral] voucher application failed (non-blocking):', err.message);
-    }
   }
 
   // Company jobs wait for company acceptance (or dispatcher assignment);
@@ -340,7 +317,7 @@ export async function createJob(req, res) {
     eventType: 'job_created',
     actorId: req.user.id,
     actorRole: req.user.role,
-    metadata: { serviceCategory, urgency: body.urgency || 'normal', voucherApplied, pricingSource, estimatedPrice: finalPrice },
+    metadata: { serviceCategory, urgency: body.urgency || 'normal', pricingSource, estimatedPrice: finalPrice },
   });
   await recordTimelineEvent({
     jobId: job.id,
@@ -349,22 +326,6 @@ export async function createJob(req, res) {
     actorRole: req.user.role,
   });
 
-  // ── Confirm voucher redemption (after job is created) ──────────────
-  if (voucherApplied) {
-    try {
-      const { confirmVoucherRedemption } = await import('../services/referralService.js');
-      await confirmVoucherRedemption({
-        voucherId: voucherApplied.voucherId,
-        jobId: job.id,
-        userId: req.user.id,
-        originalPrice: Number(finalPrice),
-        discountApplied: voucherApplied.discountKes,
-        ipAddress: req.ip,
-      });
-    } catch (err) {
-      console.warn('[referral] voucher redemption confirmation failed (non-blocking):', err.message);
-    }
-  }
   if (body.description) {
     const scan = await scanContent({
       content: body.description,
@@ -918,8 +879,8 @@ export async function confirmCompletion(req, res) {
   if (!job) throw notFound('Job not found');
   requireCustomer(req.user, job);
   // Prevent double-confirmation — if already confirmed, return success without
-  // re-processing (idempotent). This prevents duplicate referral vouchers,
-  // duplicate escrow releases, and duplicate notifications.
+  // re-processing (idempotent). This prevents duplicate escrow releases
+  // and duplicate notifications.
   if (job.customer_completion_confirmed) {
     return res.json({ success: true, job: publicJob(job), alreadyConfirmed: true });
   }
@@ -958,19 +919,6 @@ export async function confirmCompletion(req, res) {
     await releaseJobEscrow({ jobId: req.params.id, actorId: req.user.id, actorRole: req.user.role, source: 'customer_confirmation' });
   } catch (err) {
     console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
-  }
-
-  // ── Referral voucher issuance ────────────────────────────────────────
-  // After a job is confirmed completed + paid, check if the customer was a
-  // referee whose first paid job this is. If so, issue a discount voucher
-  // to the referrer (subject to fraud checks).
-  // Non-blocking — failures here must not break the job completion flow.
-  try {
-    const { processJobCompletionForReferral } = await import('../services/referralService.js');
-    const jobValue = Number(job.final_price || job.estimated_price || 0);
-    await processJobCompletionForReferral(req.params.id, req.user.id, jobValue);
-  } catch (err) {
-    console.warn('[referral] voucher issuance failed (non-blocking):', err.message);
   }
 
   res.json({ success: true, job: publicJob(result.rows[0]) });

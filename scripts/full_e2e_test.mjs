@@ -283,7 +283,6 @@ const endpoints = [
   { path: '/api/staff/dashboard', name: 'Staff dashboard' },
   { path: '/api/fraud/overview', name: 'Fraud overview' },
   { path: '/api/ai/dashboard', name: 'AI dashboard' },
-  { path: '/api/referrals/analytics', name: 'Referral analytics' },
   { path: '/api/admin/emergency/status', name: 'Emergency controls' },
   { path: '/api/geo/controls', name: 'Geo controls' },
   { path: '/api/geo/service-radius', name: 'Service radius rules' },

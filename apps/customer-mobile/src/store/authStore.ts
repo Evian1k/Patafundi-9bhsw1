@@ -3,7 +3,7 @@ import { adoptSession, apiClient, createBaseAuthState, runAuthAction } from '@pa
 import type { AuthGuard, BaseAuthState } from '@patafundi/shared';
 
 interface AuthState extends BaseAuthState {
-  register: (email: string, password: string, fullName: string, phone: string, referralCode?: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, phone: string) => Promise<void>;
   verifyOtp: (email: string, code: string) => Promise<void>;
   resendOtp: (email: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -17,9 +17,9 @@ const guard: AuthGuard = {
 export const useAuthStore = create<AuthState>((set, get) => ({
   ...createBaseAuthState(set, get, guard),
 
-  register: async (email: string, password: string, fullName: string, phone: string, referralCode?: string) => {
+  register: async (email: string, password: string, fullName: string, phone: string) => {
     await runAuthAction(set, 'Registration failed', () =>
-      apiClient.register(email, password, fullName, phone, referralCode),
+      apiClient.register(email, password, fullName, phone),
     );
   },
 

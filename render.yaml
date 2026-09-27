@@ -19,6 +19,10 @@ services:
         value: https://patafundi-9bhsw1.vercel.app
       - key: COOKIE_SECURE
         value: "true"
+      # Super Admin allowlist — production should contain ONLY the owner email.
+      # (admin.demo@patafundi.test stays allowed in dev via the code default.)
+      - key: SUPER_ADMIN_EMAILS
+        value: emmanuelevian@gmail.com
       - key: EMAIL_FROM
         value: onboarding@resend.dev
       - key: RESEND_API_KEY

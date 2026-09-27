@@ -8,7 +8,7 @@
  * Core accounts (seeded automatically at dev boot by ensure-dev-db.js):
  *   demo@patafundi.com / Demo@2024!         → customer
  *   fundi@patafundi.com / Fundi@2024!       → fundi (approved)
- *   admin@patafundi.com / Admin@2024!       → super_admin
+ *   admin@patafundi.com / Admin@2024!       → admin (demo owner — real super_admin is allowlisted)
  *   ops@patafundi.com / Ops@2024!           → admin (ops manager)
  *   support@patafundi.com / Support@2024!   → support_agent
  *   fraud@patafundi.com / Fraud@2024!       → fraud_analyst
@@ -72,9 +72,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     email: "admin@patafundi.com",
     password: "Admin@2024!",
-    role: "super_admin",
-    label: "Super Admin",
-    description: "Full access — manage everything",
+    role: "admin",
+    label: "Admin (demo)",
+    description: "Admin tools — super_admin is reserved for the allowlisted owner",
     icon: Shield,
     color: "#1E293B",
   },

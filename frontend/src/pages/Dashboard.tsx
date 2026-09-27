@@ -15,7 +15,6 @@ import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
-import ReferralLoyaltyWidget from "@/components/customer/ReferralLoyaltyWidget";
 
 interface JobData {
   id: string;
@@ -328,9 +327,6 @@ export default function Dashboard() {
             </Button>
           </div>
         )}
-
-        {/* Referral + Loyalty */}
-        {!DEMO_MODE && <ReferralLoyaltyWidget />}
       </div>
     </div>
   );

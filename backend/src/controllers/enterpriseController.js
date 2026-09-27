@@ -4,8 +4,6 @@
 import {
   calculateQualityScore, getQualityScore, recalculateAllQualityScores,
   createInternalNote, listInternalNotes, deleteInternalNote,
-  createReferral, completeReferral, getReferralStats,
-  updateLoyaltyScore, getLoyaltyScore,
   createEscalation, resolveEscalation, listEscalations,
   createSlaTrack, getSlaBreaches,
   recordCommissionChange, getCommissionHistory,
@@ -49,35 +47,6 @@ export async function listNotes(req, res) {
 export async function deleteNote(req, res) {
   await deleteInternalNote(req.params.id, req.user.id);
   res.json({ success: true });
-}
-
-// ── Referrals ──
-export async function getMyReferrals(req, res) {
-  const stats = await getReferralStats(req.user.id);
-  const code = `PF-${req.user.id.slice(0, 8).toUpperCase()}`;
-  res.json({ success: true, referralCode: code, stats });
-}
-
-export async function listReferrals(req, res) {
-  const result = await query(
-    `select r.*, ru.full_name as referrer_name, re.full_name as referee_name
-     from referrals r
-     join users ru on ru.id = r.referrer_id
-     join users re on re.id = r.referee_id
-     order by r.created_at desc limit 100`,
-  );
-  res.json({ success: true, referrals: result.rows });
-}
-
-// ── Loyalty ──
-export async function getMyLoyalty(req, res) {
-  const loyalty = await getLoyaltyScore(req.user.id);
-  res.json({ success: true, loyalty });
-}
-
-export async function recalculateLoyalty(req, res) {
-  const result = await updateLoyaltyScore(req.params.userId || req.user.id);
-  res.json({ success: true, loyalty: result });
 }
 
 // ── Escalations ──

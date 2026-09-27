@@ -1,5 +1,5 @@
 /**
- * Enterprise Services — quality scores, internal notes, referrals, loyalty, escalations, SLA, commission history.
+ * Enterprise Services — quality scores, internal notes, escalations, SLA, commission history.
  *
  * Each function is self-contained and uses the shared `query` from db.js.
  * All write operations are audit-logged via auditService.
@@ -149,111 +149,6 @@ export async function deleteInternalNote(noteId, userId) {
   if (!result.rows[0]) throw notFound('Note not found or not owned by you');
   await auditLog({ userId, action: 'note.delete', entityType: 'internal_note', entityId: noteId });
   return result.rows[0];
-}
-
-// ============================================================
-// 3. REFERRAL SYSTEM (Phase 8)
-// ============================================================
-export async function generateReferralCode(userId) {
-  const code = `PF-${userId.slice(0, 8).toUpperCase()}`;
-  return code;
-}
-
-export async function createReferral({ referrerId, refereeId, rewardAmount = 100, rewardType = 'wallet_credit' }) {
-  const code = await generateReferralCode(referrerId);
-  const result = await query(
-    `insert into referrals (referrer_id, referee_id, referral_code, status, reward_type, reward_amount)
-     values ($1, $2, $3, 'pending', $4, $5)
-     on conflict (referee_id) do nothing
-     on conflict (referral_code) do nothing
-     returning *`,
-    [referrerId, refereeId, code, rewardType, rewardAmount],
-  );
-  return result.rows[0];
-}
-
-export async function completeReferral(refereeId) {
-  const result = await query(
-    `update referrals set status = 'completed', rewarded_at = now()
-     where referee_id = $1 and status = 'pending' returning *`,
-    [refereeId],
-  );
-  if (result.rows[0]) {
-    await query(
-      `insert into notifications (user_id, type, title, body, data)
-       values ($1, 'referral_completed', 'Referral Reward', 'You earned KES $2 for referring a new user!', $3::jsonb)`,
-      [result.rows[0].referrer_id, result.rows[0].reward_amount, JSON.stringify({ refereeId, rewardAmount: result.rows[0].reward_amount })],
-    );
-  }
-  return result.rows[0];
-}
-
-export async function getReferralStats(userId) {
-  const result = await query(
-    `select
-       count(*)::int as total_referrals,
-       count(*) filter (where status = 'completed')::int as completed,
-       count(*) filter (where status = 'rewarded')::int as rewarded,
-       coalesce(sum(reward_amount) filter (where status in ('completed', 'rewarded')), 0)::numeric as total_earned
-     from referrals where referrer_id = $1`,
-    [userId],
-  );
-  return result.rows[0];
-}
-
-// ============================================================
-// 4. LOYALTY SYSTEM (Phase 9)
-// ============================================================
-const LOYALTY_TIERS = {
-  bronze: { minPoints: 0, minJobs: 0, minSpent: 0 },
-  silver: { minPoints: 100, minJobs: 5, minSpent: 5000 },
-  gold: { minPoints: 500, minJobs: 20, minSpent: 20000 },
-  platinum: { minPoints: 1500, minJobs: 50, minSpent: 75000 },
-  diamond: { minPoints: 5000, minJobs: 150, minSpent: 250000 },
-};
-
-export async function updateLoyaltyScore(userId) {
-  const stats = await query(
-    `select
-       count(*) filter (where j.status = 'completed')::int as jobs_completed,
-       coalesce(sum(p.amount), 0)::numeric as total_spent
-     from jobs j
-     left join payments p on p.job_id = j.id and p.status = 'completed'
-     where j.customer_id = $1`,
-    [userId],
-  );
-
-  const jobsCompleted = Number(stats.rows[0]?.jobs_completed || 0);
-  const totalSpent = Number(stats.rows[0]?.total_spent || 0);
-  const points = jobsCompleted * 10 + Math.floor(totalSpent / 100);
-
-  let tier = 'bronze';
-  for (const [t, req] of Object.entries(LOYALTY_TIERS).reverse()) {
-    if (points >= req.minPoints && jobsCompleted >= req.minJobs && totalSpent >= req.minSpent) {
-      tier = t;
-      break;
-    }
-  }
-
-  await query(
-    `insert into user_loyalty (user_id, tier, points, jobs_completed, total_spent, tier_achieved_at, updated_at)
-     values ($1, $2, $3, $4, $5, now(), now())
-     on conflict (user_id) do update set
-       tier = excluded.tier,
-       points = excluded.points,
-       jobs_completed = excluded.jobs_completed,
-       total_spent = excluded.total_spent,
-       tier_achieved_at = case when user_loyalty.tier <> excluded.tier then now() else user_loyalty.tier_achieved_at end,
-       updated_at = now()`,
-    [userId, tier, points, jobsCompleted, totalSpent],
-  );
-
-  return { tier, points, jobsCompleted, totalSpent };
-}
-
-export async function getLoyaltyScore(userId) {
-  const result = await query('select * from user_loyalty where user_id = $1', [userId]);
-  return result.rows[0] || { tier: 'bronze', points: 0, jobs_completed: 0, total_spent: 0 };
 }
 
 // ============================================================

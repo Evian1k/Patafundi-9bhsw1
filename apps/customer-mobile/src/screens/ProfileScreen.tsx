@@ -30,7 +30,6 @@ const MENU: MenuItem[] = [
   { label: 'Saved Places', icon: 'location-outline', route: 'SavedPlaces' },
   { label: 'Favorites', icon: 'heart-outline', route: 'Favorites' },
   { label: 'Trust & Safety', icon: 'shield-checkmark-outline', route: 'TrustCenter' },
-  { label: 'Refer & Earn', icon: 'gift-outline', route: 'ReferEarn' },
   { label: 'My Jobs', icon: 'briefcase-outline', route: 'Jobs' },
   { label: 'Disputes', icon: 'alert-circle-outline', route: 'Disputes' },
   { label: 'Notifications', icon: 'notifications-outline', route: 'Notifications' },

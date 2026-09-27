@@ -18,7 +18,6 @@ import * as maps from './controllers/mapsController.js';
 import * as fraud from './controllers/fraudController.js';
 import * as storage from './controllers/storageController.js';
 import * as verification from './controllers/verificationController.js';
-import * as referral from './controllers/referralController.js';
 import * as company from './controllers/companyController.js';
 import * as aiAssistant from './controllers/aiAssistantController.js';
 import * as refunds from './controllers/refundController.js';
@@ -383,27 +382,6 @@ router.post('/admin/quality/:fundiId/calculate', authRequired, requireRole('admi
 router.post('/staff/notes', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.createNote));
 router.get('/staff/notes/:entityType/:entityId', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.listNotes));
 router.delete('/staff/notes/:id', authRequired, requirePerm('can_view_users'), asyncHandler(enterprise.deleteNote));
-
-// Referrals (Phase 8) — legacy + new voucher-based system
-router.get('/referrals/me', authRequired, asyncHandler(referral.getMyReferrals));
-router.get('/admin/referrals', authRequired, requireRole('admin'), asyncHandler(enterprise.listReferrals));
-
-// New voucher-based referral system (Migration 017)
-router.post('/referrals/validate', authRequired, asyncHandler(referral.validateReferral));
-
-// Referral campaigns — super_admin management
-router.get('/referrals/campaigns', authRequired, requirePermission('can_view_referral_analytics'), asyncHandler(referral.listCampaignsHandler));
-router.post('/referrals/campaigns', authRequired, requirePermission('can_manage_referral_campaigns'), asyncHandler(referral.createCampaignHandler));
-router.patch('/referrals/campaigns/:id/status', authRequired, requirePermission('can_manage_referral_campaigns'), asyncHandler(referral.updateCampaignStatusHandler));
-
-// Referral analytics & fraud — staff access
-router.get('/referrals/analytics', authRequired, requirePermission('can_view_referral_analytics'), asyncHandler(referral.analyticsHandler));
-router.get('/referrals/fraud', authRequired, requirePermission('can_view_referral_analytics'), asyncHandler(referral.fraudListHandler));
-router.patch('/referrals/fraud/:id/review', authRequired, requirePermission('can_review_referral_fraud'), asyncHandler(referral.reviewFraudHandler));
-
-// Loyalty (Phase 9)
-router.get('/loyalty/me', authRequired, asyncHandler(enterprise.getMyLoyalty));
-router.post('/admin/loyalty/:userId/recalculate', authRequired, requireRole('admin'), asyncHandler(enterprise.recalculateLoyalty));
 
 // Escalations (Phase 6)
 router.post('/staff/escalations', authRequired, requireStaff(), asyncHandler(enterprise.createEscalationReq));

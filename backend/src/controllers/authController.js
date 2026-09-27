@@ -86,7 +86,7 @@ async function findValidOtp(email, purpose) {
 }
 
 export async function register(req, res) {
-  const { email, password, fullName, phone, referralCode } = req.body || {};
+  const { email, password, fullName, phone } = req.body || {};
   const role = 'customer';
   if (!email || !password || !fullName) throw badRequest('Email, password, and full name are required');
   requireStrongPassword(password);
@@ -111,47 +111,10 @@ export async function register(req, res) {
       [inserted.rows[0].id],
     );
     await client.query(
-      `insert into user_loyalty (user_id, tier, points, jobs_completed, total_spent) values ($1, 'bronze', 0, 0, 0)`,
-      [inserted.rows[0].id],
-    );
-    await client.query(
       `insert into otp_codes (user_id, purpose, code_hash, expires_at)
        values ($1, 'register', $2, now() + interval '10 minutes')`,
       [inserted.rows[0].id, await bcrypt.hash(otpCode, 10)],
     );
-
-    // Process referral code if provided (new voucher-based system)
-    // This creates a 'pending' referral row. The voucher is issued only
-    // after the referee verifies email + completes first paid job.
-    if (referralCode) {
-      try {
-        const { validateReferralCode, createReferral } = await import('../services/referralService.js');
-        const ipAddress = req.ip || req.socket?.remoteAddress || null;
-        const deviceFingerprint = req.get('X-Device-Fingerprint') || null;
-        const validation = await validateReferralCode(
-          referralCode,
-          inserted.rows[0].id,
-          email,
-          phone || null,
-          ipAddress,
-          deviceFingerprint,
-        );
-        if (validation.valid) {
-          await createReferral({
-            referrerId: validation.referrerId,
-            refereeId: inserted.rows[0].id,
-            code: referralCode.toUpperCase().trim(),
-            campaignId: validation.campaignId,
-            ipAddress,
-            deviceFingerprint,
-          });
-        }
-        // If invalid, silently ignore — don't fail registration
-      } catch (err) {
-        console.warn('[referral] could not process referral code during registration:', err.message);
-        // Don't fail registration if referral processing fails
-      }
-    }
 
     return inserted.rows[0];
   });

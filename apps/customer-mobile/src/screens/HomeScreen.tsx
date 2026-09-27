@@ -22,7 +22,7 @@ import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
 } from '@patafundi/shared';
-import type { Job, Referral } from '@patafundi/shared';
+import type { Job } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
 interface ServicePrice {
@@ -55,19 +55,16 @@ function formatKes(value: number | null): string {
 export function HomeScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [referral, setReferral] = useState<Referral | null>(null);
   const [priceMap, setPriceMap] = useState<Record<string, ServicePrice>>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async (): Promise<void> => {
     try {
-      const [jobsResp, refResp, pricesResp] = await Promise.allSettled([
+      const [jobsResp, pricesResp] = await Promise.allSettled([
         apiClient.listJobs({ limit: 5 }),
-        apiClient.getReferralDashboard(),
         apiClient.listServicePrices(),
       ]);
       if (jobsResp.status === 'fulfilled') setJobs(jobsResp.value.jobs || []);
-      if (refResp.status === 'fulfilled') setReferral(refResp.value);
       if (pricesResp.status === 'fulfilled') {
         const services = pricesResp.value?.services ?? [];
         const nextMap: Record<string, ServicePrice> = {};
@@ -149,21 +146,6 @@ export function HomeScreen({ navigation }: any): JSX.Element {
           );
         })}
       </View>
-
-      {referral ? (
-        <LinearGradient
-          colors={[gradients.accent.start, gradients.accent.end]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.referralCard}
-        >
-          <Text style={styles.referralTitle}>Refer & earn</Text>
-          <Text style={styles.referralCode}>Code: {referral.code}</Text>
-          <Text style={styles.referralStats}>
-            {referral.stats.signups} signups · {referral.stats.completedJobs} completed
-          </Text>
-        </LinearGradient>
-      ) : null}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent jobs</Text>
@@ -299,31 +281,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
-  },
-  referralCard: {
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  referralTitle: {
-    fontFamily: fonts.display,
-    fontWeight: '700',
-    fontSize: fontSize.lg,
-    color: colors.accentForeground,
-  },
-  referralCode: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.md,
-    color: colors.accentForeground,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  referralStats: {
-    fontFamily: fonts.sans,
-    fontSize: fontSize.sm,
-    color: colors.accentForeground,
-    marginTop: 4,
-    opacity: 0.9,
   },
   sectionHeader: {
     flexDirection: 'row',

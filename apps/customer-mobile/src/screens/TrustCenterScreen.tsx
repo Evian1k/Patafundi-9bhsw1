@@ -12,8 +12,6 @@ const TRUST_CARDS: TrustCard[] = [
   { icon: 'wallet', title: 'Payment Protection', subtitle: 'Escrow-secured payments', color: colors.success, route: 'PaymentProtection' },
   { icon: 'calculator', title: 'How Pricing Works', subtitle: 'Transparent, fair pricing', color: '#8B5CF6', route: 'PricingExplained' },
   { icon: 'warning', title: 'Emergency SOS', subtitle: 'One-tap emergency help', color: colors.error, route: 'EmergencySos' },
-  { icon: 'gift', title: 'Referral Program', subtitle: 'Earn by inviting friends', color: colors.primary, route: 'ReferralProgram' },
-  { icon: 'trophy', title: 'Loyalty Program', subtitle: 'Rewards for loyal customers', color: '#F59E0B', route: 'LoyaltyProgram' },
   ...LEGAL_TRUST_CARDS,
 ];
 

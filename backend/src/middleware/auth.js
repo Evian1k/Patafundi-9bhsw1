@@ -5,6 +5,8 @@ import { query } from '../db.js';
 import { forbidden } from '../utils/http.js';
 import { logAccessDecision } from './accessDebug.js';
 import { logNonFatal, swallow } from '../utils/logError.js';
+import { isSuperAdminEmail } from '../adminAllowlist.js';
+import { auditLog } from '../services/auditService.js';
 
 export function signAccessToken(user) {
   requireConfig(config.jwtSecret, 'JWT_SECRET');
@@ -113,6 +115,29 @@ export async function authRequired(req, _res, next) {
     if (!result.rows[0]) throw forbidden('User account not found');
     if (result.rows[0].status !== 'active') throw forbidden('Account is not active');
     req.user = result.rows[0];
+
+    // Super Admin allowlist (spec §39): fail-closed. If a super_admin role
+    // exists in the DB for an email that is NOT allowlisted (DB drift, restore
+    // from backup, manual edit), demote it to 'admin' on first authenticated
+    // request, revoke sessions, and raise a security audit event. Only the
+    // allowlisted platform owner may ever hold super_admin privileges.
+    if (req.user.role === 'super_admin' && !isSuperAdminEmail(req.user.email)) {
+      await query("update users set role = 'admin', updated_at = now() where id = $1", [req.user.id]);
+      await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [req.user.id]);
+      try {
+        await auditLog({
+          userId: req.user.id,
+          action: 'security.super_admin_allowlist_demotion',
+          entityType: 'user',
+          entityId: req.user.id,
+          metadata: { email: req.user.email, reason: 'email not on SUPER_ADMIN_EMAILS allowlist' },
+        });
+      } catch (auditErr) {
+        logNonFatal('auth.superAdminDemotion.audit', auditErr, { userId: req.user.id });
+      }
+      req.user.role = 'admin';
+    }
+
     req.user.isAdmin = isAdminRole(req.user);
     req.authPayload = payload;
     await logAccessDecision(req, 'authRequired:ok', { jwtRole: payload.role ?? null });

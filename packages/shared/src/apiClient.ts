@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
-import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, Referral, Loyalty, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
+import type { AuthResponse, User, Job, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
 
 function resolveBaseUrl(): string {
   // Spec §32: endpoints are environment-driven — NEVER hardcoded localhost
@@ -102,7 +102,7 @@ class ApiClient {
   }
 
   // Auth
-  async register(email: string, password: string, fullName: string, phone: string, referralCode?: string): Promise<AuthResponse & { devOtp?: string }> { return this.request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, fullName, phone, referralCode }) }); }
+  async register(email: string, password: string, fullName: string, phone: string): Promise<AuthResponse & { devOtp?: string }> { return this.request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, fullName, phone }) }); }
   async registerFundi(payload: FormData): Promise<AuthResponse> { return this.upload('/auth/register/fundi', payload); }
   async login(email: string, password: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken || data.token); if (data.user) await this.cacheUser(data.user); } return data; }
   async logout(): Promise<void> { try { await this.request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: this.refreshToken }) }); } catch (error) { console.warn('[api] server logout failed; clearing local session anyway:', error); } await this.clearTokens(); this.disconnectSocket(); }
@@ -196,11 +196,6 @@ class ApiClient {
     return this.request('/pricing/calculate', { method: 'POST', body: JSON.stringify(params) });
   }
   listServicePrices(): Promise<{ success: boolean; services: any[] }> { return this.request('/pricing/services'); }
-
-  // Referral + Loyalty
-  getReferralDashboard(): Promise<Referral> { return this.request('/referrals/me'); }
-  validateReferral(code: string): Promise<{ valid: boolean; reward?: number }> { return this.request('/referrals/validate', { method: 'POST', body: JSON.stringify({ code }) }); }
-  getLoyalty(): Promise<{ loyalty: Loyalty }> { return this.request('/loyalty/me'); }
 
   // Notifications
   getNotifications(): Promise<{ notifications: Notification[] }> { return this.request('/notifications'); }

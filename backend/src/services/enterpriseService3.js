@@ -146,15 +146,13 @@ export async function resolveIncident(id, { rootCause, lessonsLearned, postmorte
 // ============================================================
 
 export async function getCustomerCRM(userId) {
-  const [user, jobs, payments, reviews, disputes, tickets, referrals, loyalty, wallet, notes, devices, logins, notifications, fraudScore] = await Promise.all([
+  const [user, jobs, payments, reviews, disputes, tickets, wallet, notes, devices, logins, notifications, fraudScore] = await Promise.all([
     query('select id, email, full_name, phone, role, status, trust_score, created_at, last_login_at from users where id = $1', [userId]),
     query('select id, service_category, status, estimated_price, final_price, created_at from jobs where customer_id = $1 order by created_at desc limit 20', [userId]),
     query('select id, amount, status, escrow_status, mpesa_receipt_number, created_at from payments where user_id = $1 order by created_at desc limit 20', [userId]).catch(() => ({ rows: [] })),
     query('select r.*, j.service_category from reviews r join jobs j on j.id = r.job_id where r.reviewer_id = $1 order by r.created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
     query('select * from disputes where customer_id = $1 order by created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
     query('select * from support_tickets where email = (select email from users where id = $1) order by created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
-    query('select * from referrals where referrer_id = $1 or referee_id = $1 order by created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
-    query('select * from user_loyalty where user_id = $1', [userId]).catch(() => ({ rows: [] })),
     query('select * from wallets where user_id = $1', [userId]).catch(() => ({ rows: [] })),
     query('select n.*, u.full_name as author_name from crm_notes n left join users u on u.id = n.author_id where n.entity_type = $1 and n.entity_id = $2 order by n.created_at desc', ['customer', userId]),
     query('select * from device_fingerprints where user_id = $1 order by last_seen desc limit 10', [userId]).catch(() => ({ rows: [] })),
@@ -170,8 +168,6 @@ export async function getCustomerCRM(userId) {
     reviews: reviews.rows,
     disputes: disputes.rows,
     tickets: tickets.rows,
-    referrals: referrals.rows,
-    loyalty: loyalty.rows[0],
     wallet: wallet.rows[0],
     notes: notes.rows,
     devices: devices.rows,
