@@ -450,3 +450,23 @@ Work Log:
 
 Stage Summary:
 - The dash sign is gone from every user-visible surface: code, copy, seeds, existing database rows (web + mobile). Loading states use skeletons or honest words instead of placeholder characters.
+
+---
+Task ID: 21 (dispute UX + never-redirect help + modern dashboards)
+Agent: Super Z (main agent)
+Task: User asked why fundis must type a Job ID to report a problem, why help links redirect to other sections, and demanded ClickUp-style modern dashboards where fundi/customer are never directed elsewhere.
+
+Work Log:
+- Audited DisputeCenter (mounted at /disputes + /fundi/disputes), both dashboards, backend contracts: POST /disputes {jobId, reason}, GET /jobs already role-aware (customer_id vs fundi_id), /support/ticket live, policies API slugs safety + platform-rules
+- New shared HelpKit.tsx: ContactSupportModal (real ticket), PolicyModal (fetched + cached sections), HelpLinksInline row - every help action opens in place, zero navigation
+- New ReportProblemModal.tsx: DisputeForm with real job picker (no manual Job ID anywhere), fixed-job preselect, honest states; submit folds reason+details like web contract
+- DisputeCenter rebuilt: inline form, job dropdown, modern cards, ?job= deep-link; help opens inline
+- Customer Dashboard: honest stat strip, per-job Flag report buttons, Get help on completed cards, HelpLinksInline footer
+- FundiDashboard: profile-completion progress bar, Report a Problem entry, HelpLinksInline footer
+- Mobile customer app: CreateDisputeScreen gained the same job picker when no jobId param; FIXED silent data loss (backend stores reason only - description now folded into reason); DisputesScreen gained Report + Contact Support actions; CreateDispute registered in ProfileStack (was missing -> runtime nav crash)
+- Browser-verified live: customer dispute submitted end-to-end from dashboard modal and listed in Dispute Center; picker 11 real jobs (customer) / 2 (fundi); help modals stay on-page; zero console errors
+- 124/124 unit tests, web typecheck clean, vite build clean. Commit 040c7e7 pushed.
+- Honest note: fundi MOBILE app has no dispute screen yet (web has full support) - candidate next step.
+
+Stage Summary:
+- Fundis and customers can now report problems, contact support and read safety/rules without ever leaving their dashboard; disputes are filed against real bookings picked from a dropdown, never typed IDs.
