@@ -10,11 +10,14 @@
 
 Spec §3 names the authorized owner account. In dev it is seeded like the demo
 accounts; in production it is created **only** by
-`backend/scripts/bootstrap-owner.js` (password from `OWNER_PASSWORD`).
+`backend/scripts/bootstrap-owner.js` with a password you supply via the
+`OWNER_PASSWORD` environment variable (never committed, never printed to logs).
+The dev seed password is local-only and is hard-refused for production
+seeded accounts — see `ensure-dev-db.js`.
 
-| Account | Email | Password (dev only) | Role |
+| Account | Email | Password | Role |
 |---|---|---|---|
-| Emmanuel Evian | `emmanuelevian@gmail.com` | `PataFundiOwner@2026` | super_admin |
+| Emmanuel Evian | `emmanuelevian@gmail.com` | set via `OWNER_PASSWORD` at bootstrap (dev: see seed script) | super_admin |
 
 ## Unified demo password
 

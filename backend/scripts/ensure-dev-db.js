@@ -14,10 +14,17 @@ if (process.env.NODE_ENV !== 'production') {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
 
+const OWNER_EMAIL = 'emmanuelevian@gmail.com';
+// Local-development default for the owner account. Never valid in production:
+// production demo seeding requires an explicit OWNER_PASSWORD (fail-closed),
+// and the only scripted production path for the owner remains
+// scripts/bootstrap-owner.js (OWNER_PASSWORD env / auto-generate opt-in).
+const DEV_OWNER_PASSWORD = 'PataFundiOwner@2026';
+
 const demoUsers = [
   // Platform owner (spec §3): the authorized owner account, always provisioned.
   // In production use scripts/bootstrap-owner.js instead (env-controlled password).
-  { email: 'emmanuelevian@gmail.com', password: 'PataFundiOwner@2026', fullName: 'Emmanuel Evian', role: 'super_admin', phone: '254712000000' },
+  { email: OWNER_EMAIL, password: DEV_OWNER_PASSWORD, fullName: 'Emmanuel Evian', role: 'super_admin', phone: '254712000000' },
   // Public platform users — PataFundi-branded demo set (legacy @patafundi.com
   // twins below are kept seeded for backward compatibility).
   { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712100001' },
@@ -223,7 +230,17 @@ async function seedIfEmpty(db) {
     const existing = await db.query('select id from users where lower(email) = lower($1)', [user.email]);
     if (existing.rows[0]) continue;
 
-    const hash = await bcrypt.hash(user.password, 12);
+    let password = user.password;
+    if (process.env.NODE_ENV === 'production' && user.email === OWNER_EMAIL) {
+      // Fail-closed: the public dev default must never create a production owner.
+      password = process.env.OWNER_PASSWORD || '';
+      if (!password) {
+        console.warn(`[seed] production demo seeding: skipping owner account ${OWNER_EMAIL} (set OWNER_PASSWORD) — dev default is never used in production`);
+        continue;
+      }
+    }
+
+    const hash = await bcrypt.hash(password, 12);
     const inserted = await db.query(
       `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
        values (lower($1), $2, $3, $4, $5, 'active', now())
