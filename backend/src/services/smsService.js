@@ -20,7 +20,15 @@ const PROVIDERS = {
 };
 
 function getProvider() {
-  return process.env.SMS_PROVIDER || '';
+  // Explicit selection wins; otherwise auto-detect from whichever provider's
+  // credentials are present so deployments only need to set the keys.
+  const explicit = process.env.SMS_PROVIDER || '';
+  if (explicit) return explicit;
+  if (process.env.AT_API_KEY && process.env.AT_USERNAME) return PROVIDERS.africas_talking;
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+    return PROVIDERS.twilio;
+  }
+  return '';
 }
 
 function isConfigured() {
@@ -146,4 +154,13 @@ export function getSmsStatus() {
     provider: getProvider() || 'none',
     configured: isConfigured(),
   };
+}
+
+/**
+ * Single source of truth for "can this deployment send SMS right now?".
+ * The notification service gates SMS enqueueing on this so the gate and the
+ * sender can never disagree (they previously read different env var names).
+ */
+export function isSmsConfigured() {
+  return isConfigured();
 }

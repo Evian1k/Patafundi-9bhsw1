@@ -85,6 +85,11 @@ function publicFundiShape(row, photoUrls = {}) {
     profile_photo_url: photoUrls.profilePhotoUrl || null,
     verified: Boolean(row.verification_badge) || row.approval_status === 'approved',
     verificationBadge: Boolean(row.verification_badge),
+    // Pro subscription visibility (spec §24): paying subscribers are flagged
+    // publicly and sort first in search; verification/eligibility rules above
+    // are never overridden by payment status.
+    pro: Boolean(row.pro_active),
+    proActive: Boolean(row.pro_active),
     // Public profile depth (spec §15): about, experience, track record.
     bio: row.bio || null,
     experience: row.experience || null,
@@ -138,7 +143,10 @@ export async function searchFundis(req, res) {
       f.updated_at as last_active,
       (select count(*) from jobs j where j.fundi_id = f.user_id and j.status = 'completed')::int as completed_jobs,
       coalesce(qs.overall_score, 0) as quality_score,
-      qs.tier as quality_tier
+      qs.tier as quality_tier,
+      (select 1 from subscriptions s
+        where s.fundi_id = f.user_id and s.status = 'active' and s.expires_at > now()
+        order by s.expires_at desc limit 1) as pro_active
      from fundis f
      join users u on u.id = f.user_id
      left join fundi_quality_scores qs on qs.fundi_id = f.id
@@ -148,7 +156,7 @@ export async function searchFundis(req, res) {
        and f.online = true
        and f.latitude is not null
        and f.longitude is not null
-     order by f.rating desc nulls last, f.trust_score desc nulls last
+     order by pro_active desc nulls last, f.rating desc nulls last, f.trust_score desc nulls last
      limit $1`,
     [limit],
   );

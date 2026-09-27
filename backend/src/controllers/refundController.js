@@ -17,7 +17,7 @@ import { badRequest, notFound, forbidden } from '../utils/http.js';
 import { notify } from '../services/notificationService.js';
 import { auditLog } from '../services/auditService.js';
 
-const OPEN_STATUSES = ['requested', 'approved', 'processing'];
+const OPEN_STATUSES = ['requested', 'under_review', 'approved', 'processing'];
 
 export async function createRefundRequest(req, res) {
   const jobId = req.params.id || req.body?.jobId;
@@ -109,7 +109,9 @@ export async function listRefundRequests(req, res) {
 export async function decideRefundRequest(req, res) {
   const { action, notes } = req.body || {};
   const amountOverride = req.body?.amount != null ? Number(req.body.amount) : null;
-  if (!['approve', 'reject'].includes(action)) throw badRequest('action must be approve or reject');
+  if (!['review', 'approve', 'reject'].includes(action)) {
+    throw badRequest('action must be review, approve or reject');
+  }
 
   const decision = await transaction(async (client) => {
     const rr = await client.query(
@@ -120,6 +122,17 @@ export async function decideRefundRequest(req, res) {
     if (!request) throw notFound('Refund request not found');
     if (!OPEN_STATUSES.includes(request.status)) {
       throw badRequest(`This refund request was already ${request.status}`);
+    }
+
+    // "review" moves the request into the UNDER_REVIEW state (spec §38) so the
+    // customer can see that a human has picked it up. No money moves.
+    if (action === 'review') {
+      const reviewing = await client.query(
+        `update refund_requests set status = 'under_review', reviewed_by = $2, updated_at = now()
+         where id = $1 returning *`,
+        [request.id, req.user.id],
+      );
+      return { request: reviewing.rows[0], refundResult: null, reviewedOnly: true };
     }
 
     if (action === 'reject') {
@@ -170,6 +183,25 @@ export async function decideRefundRequest(req, res) {
   });
 
   const approved = action === 'approve';
+  // Review-only transitions get their own lighter-weight notification.
+  if (decision.reviewedOnly) {
+    await notify({
+      userId: decision.request.customer_id,
+      type: 'refund_under_review',
+      title: 'Refund request under review',
+      body: 'A member of our team has picked up your refund request. You will be notified of the decision.',
+      data: { jobId: decision.request.job_id, refundRequestId: decision.request.id },
+    });
+    await auditLog({
+      userId: req.user.id,
+      action: 'refund.under_review',
+      entityType: 'refund_request',
+      entityId: decision.request.id,
+      metadata: { jobId: decision.request.job_id },
+    });
+    res.json({ success: true, refundRequest: decision.request });
+    return;
+  }
   await notify({
     userId: decision.request.customer_id,
     type: approved ? 'refund_approved' : 'refund_rejected',

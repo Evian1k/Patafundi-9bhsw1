@@ -43,3 +43,14 @@ export const aiRateLimit = rateLimit({
   message: { success: false, message: 'AI assistant rate limit reached. Please try again in a few minutes.' },
   keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.user?.id || 'anon'}`,
 });
+
+// Public support-ticket endpoint accepts guests, so it needs its own tight
+// limiter (spec §71) — the global 120/min alone is far too generous for an
+// unauthenticated write endpoint and would allow ticket spam.
+export const supportRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many support requests submitted. Please try again later.' },
+});

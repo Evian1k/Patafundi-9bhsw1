@@ -7,6 +7,7 @@ import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Bookings from "@/pages/customer/Bookings";
 import Favorites from "@/pages/customer/Favorites";
+import Notifications from "@/pages/customer/Notifications";
 import FundiProfile from "@/pages/customer/FundiProfile";
 import CreateJob from "@/pages/CreateJob";
 import FundiRegister from "@/pages/FundiRegister";
@@ -33,6 +34,9 @@ import Socials from "@/pages/Socials";
 import PolicyPage from "@/pages/PolicyPage";
 import FundiResources from "@/pages/FundiResources";
 import FundiApp from "@/pages/FundiApp";
+import BlogIndex from "@/pages/blog/BlogIndex";
+import BlogPostPage from "@/pages/blog/BlogPostPage";
+import Careers from "@/pages/careers/Careers";
 
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -51,6 +55,7 @@ import AdminPayouts from "@/pages/admin/AdminPayouts";
 import AdminRefunds from "@/pages/admin/AdminRefunds";
 import AdminSubscriptions from "@/pages/admin/AdminSubscriptions";
 import AdminReviews from "@/pages/admin/AdminReviews";
+import AdminContent from "@/pages/admin/AdminContent";
 
 // Company ecosystem (takeover) — public directory + partner program + portal
 import CompanyDirectory from "@/pages/company/CompanyDirectory";
@@ -116,6 +121,7 @@ export default function AppRoutes() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/bookings" element={<Bookings />} />
       <Route path="/favorites" element={<Favorites />} />
+      <Route path="/notifications" element={<Notifications />} />
       <Route path="/fundis/:fundiId" element={<FundiProfile />} />
       <Route path="/create-job" element={<CreateJob />} />
       <Route path="/job/:jobId/tracking" element={<JobTracking />} />
@@ -141,6 +147,9 @@ export default function AppRoutes() {
       <Route path="/how-it-works" element={<HowItWorks />} />
       <Route path="/trust-safety" element={<TrustSafety />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/blog" element={<BlogIndex />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
+      <Route path="/careers" element={<Careers />} />
 
       <Route path="/help" element={<HelpCenter />} />
       <Route path="/safety-guidelines" element={<SafetyGuidelines />} />
@@ -182,6 +191,7 @@ export default function AppRoutes() {
       <Route path="/admin/refunds" element={<ProtectedAdminRoute element={<AdminRefunds />} />} />
       <Route path="/admin/subscriptions" element={<ProtectedAdminRoute element={<AdminSubscriptions />} />} />
       <Route path="/admin/reviews" element={<ProtectedAdminRoute element={<AdminReviews />} />} />
+      <Route path="/admin/content" element={<ProtectedAdminRoute element={<AdminContent />} />} />
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
       <Route path="/admin/companies" element={<ProtectedAdminRoute element={<CompanyApplications />} />} />

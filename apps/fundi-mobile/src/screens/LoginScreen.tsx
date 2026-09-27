@@ -78,6 +78,13 @@ export function LoginScreen({ navigation }: any): JSX.Element {
               <Text style={styles.btnText}>Sign In</Text>
             </LinearGradient>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.forgotWrap}
+            onPress={() => navigation.navigate('ForgotPassword')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -119,6 +126,16 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.textSecondary,
     marginTop: 6,
+  },
+  forgotWrap: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  forgotText: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.primary,
   },
   card: {
     backgroundColor: colors.card,

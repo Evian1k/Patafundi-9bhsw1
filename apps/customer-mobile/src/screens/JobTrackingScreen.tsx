@@ -223,6 +223,9 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
   const showConfirm = job.status === 'completed' && !job.customer_completion_confirmed;
   const showReview = job.status === 'completed' && !job.hasReview;
   const showCancel = job.status === 'matching';
+  // Report a Problem (spec §37): any live job can be disputed from right here
+  // - previously this button was missing and users had to hunt for the form.
+  const showReport = job.status !== 'disputed' && job.status !== 'cancelled';
   const paymentPaid = payment?.status === 'completed';
   const showPayNow =
     job.status === 'completed' &&
@@ -338,6 +341,17 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
             >
               <Text style={styles.btnText}>Leave Review</Text>
             </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+
+        {showReport ? (
+          <TouchableOpacity
+            style={[styles.outlineBtn, { borderColor: colors.warning }]}
+            onPress={() => navigation.navigate('CreateDispute', { jobId: job.id })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="flag-outline" size={18} color={colors.warning} />
+            <Text style={[styles.outlineBtnText, { color: colors.warning }]}>Report a Problem</Text>
           </TouchableOpacity>
         ) : null}
 

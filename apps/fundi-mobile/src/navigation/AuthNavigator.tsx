@@ -3,11 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '../screens/LoginScreen';
 import { FundiRegisterScreen } from '../screens/FundiRegisterScreen';
 import { FundiOtpScreen } from '../screens/FundiOtpScreen';
+import { FundiForgotPasswordScreen } from '../screens/FundiForgotPasswordScreen';
 
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   Otp: { email: string; devOtp?: string };
+  ForgotPassword: undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -18,6 +20,7 @@ export function AuthNavigator(): JSX.Element {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={FundiRegisterScreen} />
       <Stack.Screen name="Otp" component={FundiOtpScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="ForgotPassword" component={FundiForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }

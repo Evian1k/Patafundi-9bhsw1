@@ -9,8 +9,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Linking,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -89,18 +87,10 @@ export function FundiHelpCenterScreen({ navigation }: any): JSX.Element {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleContactSupport = async (): Promise<void> => {
-    const email = 'mailto:support@patafundi.com?subject=Fundi%20App%20Support';
-    try {
-      const supported = await Linking.canOpenURL(email);
-      if (supported) {
-        await Linking.openURL(email);
-      } else {
-        Alert.alert('Contact support', 'Email us at support@patafundi.com');
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to open email client.');
-    }
+  // Support now opens the in-app ticket form (spec §71) - no mailto detour,
+  // the fundi never leaves the app to get help.
+  const handleContactSupport = (): void => {
+    navigation.navigate('Support');
   };
 
   if (loading) {
@@ -208,7 +198,7 @@ export function FundiHelpCenterScreen({ navigation }: any): JSX.Element {
 
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => void handleContactSupport()}
+          onPress={handleContactSupport}
         >
           <LinearGradient
             colors={[gradients.primary.start, gradients.primary.end]}

@@ -4,10 +4,9 @@ import { BrandLogo } from "@/assets/logo";
 
 /**
  * Footer (spec §50) — concise, professional, and HONEST: every link resolves
- * to a page that actually exists with real content. Marketing placeholders
- * without real content (Investor Relations, Blog, Press, Careers) are
- * intentionally absent. Service links go straight into the booking flow
- * (spec §15).
+ * to a page that actually exists with real content. Blog and Careers are
+ * database-backed (spec §46-47) and shown whenever they exist. Service links
+ * go straight into the booking flow (spec §15).
  */
 const Footer = () => {
   const companyName = "PataFundi";
@@ -20,6 +19,7 @@ const Footer = () => {
       { name: "Service Companies", href: "/companies" },
       { name: "Trust & Safety", href: "/trust-safety" },
       { name: "Partner Program", href: "/partner-program" },
+      { name: "Blog", href: "/blog" },
     ],
     support: [
       { name: "Help Center", href: "/help" },
@@ -41,6 +41,7 @@ const Footer = () => {
       { name: "Become a Fundi", href: "/register/fundi" },
       { name: "Fundi App", href: "/fundi/app" },
       { name: "Fundi Resources", href: "/fundi/resources" },
+      { name: "Careers", href: "/careers" },
     ],
   };
 

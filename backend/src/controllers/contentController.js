@@ -47,15 +47,43 @@ export async function listSupportTickets(req, res) {
   });
 }
 
-/** PATCH /api/admin/support/tickets/:id — update ticket status (staff only) */
+const TICKET_STATUSES = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed'];
+
+/** PATCH /api/admin/support/tickets/:id — status, assignment, internal notes (staff only) */
 export async function updateSupportTicket(req, res) {
-  const { status, internalNote = null } = req.body || {};
-  if (!status || !['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
-    throw badRequest('Valid status required: open, in_progress, resolved, closed');
+  const { status, internalNote = null, assignedTo = undefined } = req.body || {};
+  if (status && !TICKET_STATUSES.includes(status)) {
+    throw badRequest(`Valid statuses: ${TICKET_STATUSES.join(', ')}`);
+  }
+  if (!status && internalNote == null && assignedTo === undefined) {
+    throw badRequest('Nothing to update: provide status, internalNote or assignedTo');
+  }
+  // Validate assignee exists and is platform staff (least privilege, spec §20).
+  let assigneeId = null;
+  let assigneeCleared = false;
+  if (assignedTo !== undefined) {
+    if (assignedTo === null) {
+      assigneeCleared = true;
+    } else {
+      const staff = await query(
+        `select id from users where id = $1 and role in ('admin','super_admin','support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor')`,
+        [assignedTo],
+      );
+      if (!staff.rows[0]) throw badRequest('assignedTo must be a platform staff member');
+      assigneeId = staff.rows[0].id;
+    }
   }
   const result = await query(
-    `update support_tickets set status = $2, updated_at = now() where id = $1 returning *`,
-    [req.params.id, status],
+    `update support_tickets set
+       status = coalesce($2, status),
+       internal_notes = case when $3::text is not null then $3 else internal_notes end,
+       assigned_to = case
+         when $4::boolean then null
+         when $5::uuid is not null then $5
+         else assigned_to end,
+       updated_at = now()
+     where id = $1 returning *`,
+    [req.params.id, status || null, internalNote, assigneeCleared, assigneeId],
   );
   if (!result.rows[0]) throw notFound('Ticket not found');
   await auditLog({
@@ -63,7 +91,7 @@ export async function updateSupportTicket(req, res) {
     action: 'support.ticket_update',
     entityType: 'support_ticket',
     entityId: req.params.id,
-    metadata: { status, internalNote },
+    metadata: { status: status || null, internalNote: internalNote ? String(internalNote).slice(0, 200) : null, assignedTo: assigneeId, assignedToCleared: assigneeCleared },
   });
   res.json({ success: true, ticket: result.rows[0] });
 }
@@ -277,4 +305,164 @@ export async function listCareerApplications(req, res) {
     [status, limit],
   );
   res.json({ success: true, applications: result.rows });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Admin content management (spec §46-47): blog posts + career jobs are real
+// database-backed content. Admins can create, edit, publish and retire them.
+// ────────────────────────────────────────────────────────────────────────────
+function slugify(text) {
+  return String(text).toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) || `post-${Date.now()}`;
+}
+
+export async function adminListBlogPosts(_req, res) {
+  const result = await query(
+    `select id, slug, title, excerpt, author, status, published_at, created_at, updated_at
+     from blog_posts order by created_at desc limit 200`,
+  );
+  res.json({ success: true, posts: result.rows });
+}
+
+export async function adminCreateBlogPost(req, res) {
+  const { title, excerpt = null, body, author = 'PataFundi Team', status = 'draft', publishedAt = null } = req.body || {};
+  if (!String(title || '').trim()) throw badRequest('Title is required');
+  if (!String(body || '').trim()) throw badRequest('Body is required');
+  if (!['draft', 'published', 'archived'].includes(status)) throw badRequest('Invalid status');
+  const slug = slugify(req.body?.slug || title);
+  const existing = await query('select 1 from blog_posts where slug = $1', [slug]);
+  if (existing.rows[0]) throw badRequest('A post with this slug already exists');
+  const result = await query(
+    `insert into blog_posts (slug, title, excerpt, body, author, status, published_at)
+     values ($1, $2, $3, $4, $5, $6, $7) returning *`,
+    [slug, title.trim(), excerpt, body, author, status, status === 'published' ? (publishedAt || new Date().toISOString()) : publishedAt],
+  );
+  await auditLog({
+    userId: req.user.id, action: 'content.blog_created',
+    entityType: 'blog_post', entityId: result.rows[0].id,
+    metadata: { slug, title, status },
+  });
+  res.status(201).json({ success: true, post: result.rows[0] });
+}
+
+export async function adminUpdateBlogPost(req, res) {
+  const allowed = ['title', 'excerpt', 'body', 'author', 'status'];
+  const updates = [];
+  const params = [];
+  for (const field of allowed) {
+    if (req.body?.[field] !== undefined) {
+      params.push(req.body[field]);
+      updates.push(`${field} = $${params.length}`);
+    }
+  }
+  if (req.body?.status !== undefined) {
+    if (!['draft', 'published', 'archived'].includes(req.body.status)) throw badRequest('Invalid status');
+    if (req.body.status === 'published') {
+      params.push(new Date().toISOString());
+      updates.push(`published_at = coalesce(published_at, $${params.length})`);
+    }
+  }
+  if (!updates.length) throw badRequest('Nothing to update');
+  params.push(req.params.id, new Date().toISOString());
+  const result = await query(
+    `update blog_posts set ${updates.join(', ')}, updated_at = $${params.length} where id = $${params.length - 1} returning *`,
+    params,
+  );
+  if (!result.rows[0]) throw notFound('Post not found');
+  await auditLog({
+    userId: req.user.id, action: 'content.blog_updated',
+    entityType: 'blog_post', entityId: req.params.id,
+    metadata: { fields: allowed.filter((f) => req.body?.[f] !== undefined) },
+  });
+  res.json({ success: true, post: result.rows[0] });
+}
+
+export async function adminDeleteBlogPost(req, res) {
+  const result = await query('delete from blog_posts where id = $1 returning id, slug', [req.params.id]);
+  if (!result.rows[0]) throw notFound('Post not found');
+  await auditLog({
+    userId: req.user.id, action: 'content.blog_deleted',
+    entityType: 'blog_post', entityId: req.params.id,
+    metadata: { slug: result.rows[0].slug },
+  });
+  res.json({ success: true });
+}
+
+export async function adminListCareerJobs(_req, res) {
+  const result = await query(
+    `select id, title, department, location, type, status, created_at
+     from career_jobs order by created_at desc limit 200`,
+  );
+  res.json({ success: true, jobs: result.rows });
+}
+
+export async function adminCreateCareerJob(req, res) {
+  const { title, department = null, location = 'Nairobi, Kenya', type = 'Full-time', description = null, requirements = null, status = 'open' } = req.body || {};
+  if (!String(title || '').trim()) throw badRequest('Title is required');
+  if (!['Full-time', 'Part-time', 'Contract', 'Internship'].includes(type)) throw badRequest('Invalid job type');
+  if (!['open', 'closed', 'filled'].includes(status)) throw badRequest('Invalid status');
+  const result = await query(
+    `insert into career_jobs (title, department, location, type, description, requirements, status)
+     values ($1, $2, $3, $4, $5, $6, $7) returning *`,
+    [title.trim(), department, location, type, description, requirements, status],
+  );
+  await auditLog({
+    userId: req.user.id, action: 'content.career_job_created',
+    entityType: 'career_job', entityId: result.rows[0].id,
+    metadata: { title, status },
+  });
+  res.status(201).json({ success: true, job: result.rows[0] });
+}
+
+export async function adminUpdateCareerJob(req, res) {
+  const allowed = ['title', 'department', 'location', 'type', 'description', 'requirements', 'status'];
+  const updates = [];
+  const params = [];
+  for (const field of allowed) {
+    if (req.body?.[field] !== undefined) {
+      if (field === 'type' && !['Full-time', 'Part-time', 'Contract', 'Internship'].includes(req.body.type)) {
+        throw badRequest('Invalid job type');
+      }
+      if (field === 'status' && !['open', 'closed', 'filled'].includes(req.body.status)) {
+        throw badRequest('Invalid status');
+      }
+      params.push(req.body[field]);
+      updates.push(`${field} = $${params.length}`);
+    }
+  }
+  if (!updates.length) throw badRequest('Nothing to update');
+  params.push(req.params.id);
+  const result = await query(
+    `update career_jobs set ${updates.join(', ')} where id = $${params.length} returning *`,
+    params,
+  );
+  if (!result.rows[0]) throw notFound('Career job not found');
+  await auditLog({
+    userId: req.user.id, action: 'content.career_job_updated',
+    entityType: 'career_job', entityId: req.params.id,
+    metadata: { fields: allowed.filter((f) => req.body?.[f] !== undefined) },
+  });
+  res.json({ success: true, job: result.rows[0] });
+}
+
+export async function adminDeleteCareerJob(req, res) {
+  const inUse = await query('select 1 from career_applications where job_id = $1 limit 1', [req.params.id]);
+  if (inUse.rows[0]) {
+    // Retire instead of delete when applications reference the job.
+    const result = await query(`update career_jobs set status = 'closed' where id = $1 returning id, status`, [req.params.id]);
+    if (!result.rows[0]) throw notFound('Career job not found');
+    res.json({ success: true, closed: true, job: result.rows[0] });
+    return;
+  }
+  const result = await query('delete from career_jobs where id = $1 returning id', [req.params.id]);
+  if (!result.rows[0]) throw notFound('Career job not found');
+  await auditLog({
+    userId: req.user.id, action: 'content.career_job_deleted',
+    entityType: 'career_job', entityId: req.params.id, metadata: {},
+  });
+  res.json({ success: true });
 }

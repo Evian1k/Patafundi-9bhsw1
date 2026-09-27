@@ -149,7 +149,14 @@ export function HomeScreen({ navigation }: any): JSX.Element {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent jobs</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Jobs')}>
+        <TouchableOpacity
+          onPress={() => {
+            // Type-safe cross-tab navigation: resolve the parent navigator and
+            // jump to the Jobs tab (naked string nav only resolves by accident).
+            const parent = navigation.getParent?.() ?? navigation;
+            parent.navigate('JobsTab');
+          }}
+        >
           <Text style={styles.seeAll}>See all</Text>
         </TouchableOpacity>
       </View>

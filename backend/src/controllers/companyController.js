@@ -257,6 +257,48 @@ export async function approvePartnerApplication(req, res) {
   return reviewPartnerApplication(req, res);
 }
 
+// Applicant-facing submit (POST /company/applications/:id/submit). Distinct
+// from the admin review path: forces the draft → submitted transition, checks
+// ownership, and never accepts admin-only statuses from this route.
+export async function submitPartnerApplication(req, res) {
+  const appRes = await query('select * from company_partner_applications where id = $1', [req.params.id]);
+  const application = appRes.rows[0];
+  if (!application) throw notFound('Application not found');
+  if (application.user_id !== req.user.id) {
+    throw forbidden('You can only submit your own application');
+  }
+  if (application.status !== 'draft') {
+    throw badRequest('Only draft applications can be submitted');
+  }
+  const updated = await query(
+    `update company_partner_applications
+     set status = 'submitted', updated_at = now()
+     where id = $1 and status = 'draft' returning *`,
+    [req.params.id],
+  );
+  await auditLog({
+    userId: req.user.id,
+    action: 'company.application.submitted',
+    entityType: 'company_partner_application',
+    entityId: req.params.id,
+    metadata: { companyName: application.company_name },
+  });
+  // Notify reviewers: platform staff review queue gets an in-app row.
+  const reviewers = await query(
+    `select id from users where role in ('admin', 'super_admin') limit 20`,
+  );
+  for (const reviewer of reviewers.rows) {
+    await query(
+      `insert into notifications (user_id, type, title, body, data)
+       values ($1, 'company_application', 'New Partner Application', $2, $3::jsonb)`,
+      [reviewer.id,
+       `${application.company_name} submitted a partner application for review.`,
+       JSON.stringify({ applicationId: application.id, status: 'submitted' })],
+    );
+  }
+  res.json({ success: true, application: toPartnerApplicationSummary(updated.rows[0]) });
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // PUBLIC DIRECTORY (customer-safe, spec §5) — no internal data ever
 // ────────────────────────────────────────────────────────────────────────────

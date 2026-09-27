@@ -9,7 +9,7 @@ import NotificationBell from "@/components/system/NotificationBell";
 import {
   BarChart3, Wallet, AlertCircle, TrendingUp, MapPin, LogOut,
   Wifi, WifiOff, ChevronRight, RefreshCw, Scale, ArrowUpRight,
-  UserCog, Star, Smartphone, X, Flag,
+  UserCog, Star, Smartphone, X, Flag, BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getMaxGpsAccuracyMeters } from "@/lib/gps";
@@ -35,6 +35,8 @@ export function FundiDashboard() {
   const [loading, setLoading] = useState(true);
   const [subscriptionActive, setSubscriptionActive] = useState<boolean | null>(null);
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState<number | null>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string | null>(null);
+  const [cancellingSub, setCancellingSub] = useState(false);
   // Subscription activation collects the M-Pesa number for the STK push —
   // the backend rejects plan-only requests (contract: { plan, mpesaNumber }).
   const [subDialogOpen, setSubDialogOpen] = useState(false);
@@ -70,6 +72,10 @@ export function FundiDashboard() {
           setSubscriptionActive(Boolean(st.status.subscriptionActive));
           setSubscriptionDaysLeft(typeof st.status.daysLeft === "number" ? st.status.daysLeft : null);
         }
+        // Plan name for the subscription card (spec §22: subscribers see what
+        // they are paying for and can cancel renewals).
+        const sub = await apiClient.getSubscriptionStatus() as { active?: boolean; plan?: string | null };
+        setSubscriptionPlan(sub?.active ? sub.plan || null : null);
       } catch { /* ignore status fetch errors */ }
     } catch (error) {
       const status = (error as { status?: number })?.status;
@@ -279,6 +285,48 @@ export function FundiDashboard() {
                   Activate Subscription
                 </Button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Subscription status (spec §22): active plan, remaining days, cancel */}
+        {subscriptionActive === true && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-green-50 border border-green-200 rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <BadgeCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold text-green-800 text-sm">
+                    Pro subscription active{subscriptionPlan ? ` - ${subscriptionPlan}` : ""}
+                  </p>
+                  <p className="text-xs text-green-700 mt-0.5">
+                    {subscriptionDaysLeft != null
+                      ? `${subscriptionDaysLeft} day${subscriptionDaysLeft === 1 ? "" : "s"} remaining. You rank first in customer search results.`
+                      : "You rank first in customer search results."}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-green-300 text-green-700 hover:bg-green-100 shrink-0"
+                disabled={cancellingSub}
+                onClick={async () => {
+                  if (!window.confirm("Cancel your subscription? You keep access until the end of the paid period.")) return;
+                  setCancellingSub(true);
+                  try {
+                    await apiClient.cancelSubscription();
+                    toast.success("Subscription cancelled. You keep access until the paid period ends.");
+                    fetchDashboard(true);
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not cancel the subscription");
+                  } finally {
+                    setCancellingSub(false);
+                  }
+                }}
+              >
+                {cancellingSub ? "Cancelling..." : "Cancel"}
+              </Button>
             </div>
           </motion.div>
         )}

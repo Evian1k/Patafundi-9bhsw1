@@ -819,6 +819,73 @@ class ApiClient {
       body: JSON.stringify({ origin, destination }),
     });
   }
+
+  // ── Public content (spec §46-47): Blog + Careers are database-backed ─────
+  async listBlogPosts() {
+    return this.request('/blog', { includeAuth: false });
+  }
+
+  async getBlogPost(slug: string) {
+    return this.request(`/blog/${encodeURIComponent(slug)}`, { includeAuth: false });
+  }
+
+  async listCareersJobs() {
+    return this.request('/careers/jobs', { includeAuth: false });
+  }
+
+  async applyToCareerJob(payload: Record<string, unknown>) {
+    return this.request('/careers/apply', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      includeAuth: false,
+    });
+  }
+
+  // ── Subscriptions (spec §22-23): subscriber lifecycle management ─────────
+  async getMySubscriptions() {
+    return this.request('/subscriptions/mine');
+  }
+
+  async getSubscriptionStatus() {
+    return this.request('/subscriptions/status');
+  }
+
+  async cancelSubscription() {
+    return this.request('/subscriptions/cancel', { method: 'POST' });
+  }
+
+  // ── Admin content management (blog posts + career jobs) ──────────────────
+  async adminListBlogPosts() {
+    return this.request('/admin/blog');
+  }
+
+  async adminCreateBlogPost(payload: Record<string, unknown>) {
+    return this.request('/admin/blog', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async adminUpdateBlogPost(id: string, payload: Record<string, unknown>) {
+    return this.request(`/admin/blog/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  }
+
+  async adminDeleteBlogPost(id: string) {
+    return this.request(`/admin/blog/${id}`, { method: 'DELETE' });
+  }
+
+  async adminListCareerJobs() {
+    return this.request('/admin/careers/jobs');
+  }
+
+  async adminCreateCareerJob(payload: Record<string, unknown>) {
+    return this.request('/admin/careers/jobs', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async adminUpdateCareerJob(id: string, payload: Record<string, unknown>) {
+    return this.request(`/admin/careers/jobs/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  }
+
+  async adminDeleteCareerJob(id: string) {
+    return this.request(`/admin/careers/jobs/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const apiClient = new ApiClient();

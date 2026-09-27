@@ -5,18 +5,30 @@ import { auditLog } from '../services/auditService.js';
 import { uploadPrivateFile, getSignedAccessUrl } from '../services/storageService.js';
 import { mapMulterFiles } from '../middleware/upload.js';
 
-function canAccessJob(user, job) {
+async function canAccessJob(user, job) {
   // super_admin must be recognized everywhere (isAdminRole parity, Task 4 fix)
-  return user.role === 'admin' || user.role === 'super_admin' || job.customer_id === user.id || job.fundi_id === user.id;
+  if (user.role === 'admin' || user.role === 'super_admin') return true;
+  if (job.customer_id === user.id || job.fundi_id === user.id) return true;
+  // Assigned company technician participates in the job (chat parity).
+  if (job.technician_user_id === user.id) return true;
+  // Company members can act on jobs booked from their company.
+  if (job.company_id) {
+    const member = await query(
+      'select 1 from company_members where company_id = $1 and user_id = $2 limit 1',
+      [job.company_id, user.id],
+    );
+    if (member.rows[0]) return true;
+  }
+  return false;
 }
 
 export async function createDispute(req, res) {
   const { jobId, reason, evidenceUrls = [] } = req.body || {};
   if (!jobId || !reason) throw badRequest('Job and reason are required');
   const dispute = await transaction(async (client) => {
-    const job = await client.query('select customer_id, fundi_id from jobs where id = $1 for update', [jobId]);
+    const job = await client.query('select customer_id, fundi_id, company_id, technician_user_id from jobs where id = $1 for update', [jobId]);
     if (!job.rows[0]) throw notFound('Job not found');
-    if (!canAccessJob(req.user, job.rows[0])) throw forbidden('Not allowed to dispute this job');
+    if (!(await canAccessJob(req.user, job.rows[0]))) throw forbidden('Not allowed to dispute this job');
     const existing = await client.query(
       `select id from disputes where job_id = $1 and status in ('open', 'under_review') limit 1`,
       [jobId],
@@ -40,7 +52,13 @@ export async function listDisputes(req, res) {
   const result = await query(
     `select d.* from disputes d join jobs j on j.id = d.job_id
      where ($2::text is null or d.status = $2)
-       and ($3::text = 'admin' or j.customer_id = $1 or j.fundi_id = $1)
+       and (
+         $3::text in ('admin', 'super_admin')
+         or j.customer_id = $1
+         or j.fundi_id = $1
+         or j.technician_user_id = $1
+         or j.company_id in (select company_id from company_members where user_id = $1)
+       )
      order by d.created_at desc`,
     [req.user.id, status || null, req.user.role],
   );
@@ -52,13 +70,13 @@ export async function uploadEvidence(req, res) {
   if (!files.length) throw badRequest('At least one evidence file is required');
 
   const dispute = await query(
-    `select d.*, j.customer_id, j.fundi_id
+    `select d.*, j.customer_id, j.fundi_id, j.company_id, j.technician_user_id
      from disputes d join jobs j on j.id = d.job_id
      where d.id = $1`,
     [req.params.id],
   );
   if (!dispute.rows[0]) throw notFound('Dispute not found');
-  if (!canAccessJob(req.user, dispute.rows[0])) throw forbidden('Not allowed to update this dispute');
+  if (!(await canAccessJob(req.user, dispute.rows[0]))) throw forbidden('Not allowed to update this dispute');
   if (dispute.rows[0].status !== 'open' && dispute.rows[0].status !== 'under_review') throw badRequest('Dispute is closed');
 
   const uploadedFiles = [];

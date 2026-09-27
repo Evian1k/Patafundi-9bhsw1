@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, CalendarClock, MessageSquare, Star, Wrench } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CalendarClock, Heart, MessageSquare, Star, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
+import { toast } from "sonner";
 
 type FundiProfile = {
   id: string;
@@ -38,6 +39,8 @@ export default function FundiProfile() {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +67,50 @@ export default function FundiProfile() {
       });
     return () => { active = false; };
   }, [fundiId]);
+
+  // Saved state (spec §70): signed-in customers can keep this fundi in their
+  // Saved list. Guests are asked to sign in first.
+  useEffect(() => {
+    let active = true;
+    if (!fundi || !localStorage.getItem("auth_token")) return;
+    apiClient
+      .listFavoriteFundis()
+      .then((res: { favorites?: { fundi_user_id: string }[] }) => {
+        if (!active) return;
+        const targetId = fundi?.user_id || fundi?.id;
+        setSaved(Boolean(res.favorites?.some((f) => f.fundi_user_id === targetId)));
+      })
+      .catch(() => {
+        // Non-fatal: profile still loads; saving simply starts unmarked.
+      });
+    return () => { active = false; };
+  }, [fundi]);
+
+  const toggleSaved = async () => {
+    if (!localStorage.getItem("auth_token")) {
+      toast.info("Sign in to save this fundi to your list.");
+      navigate("/auth");
+      return;
+    }
+    const targetId = fundi?.user_id || fundi?.id;
+    if (!targetId) return;
+    setSaveBusy(true);
+    try {
+      if (saved) {
+        await apiClient.removeFavoriteFundi(targetId);
+        setSaved(false);
+        toast.success("Removed from your saved fundis");
+      } else {
+        await apiClient.addFavoriteFundi(targetId);
+        setSaved(true);
+        toast.success("Saved - find this fundi under Saved in your dashboard");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update your saved list. Try again.");
+    } finally {
+      setSaveBusy(false);
+    }
+  };
 
   const name = fundi?.name || fundi?.full_name || "Fundi";
   const rating = fundi?.rating != null && Number(fundi.rating) > 0 ? Number(fundi.rating) : null;
@@ -162,6 +209,16 @@ export default function FundiProfile() {
             <Link to={`/create-job?fundi=${fundi.user_id || fundi.id}`} className="flex-1">
               <Button className="w-full bg-gradient-primary">Book this fundi</Button>
             </Link>
+            <Button
+              variant="outline"
+              onClick={toggleSaved}
+              disabled={saveBusy}
+              aria-pressed={saved}
+              className={saved ? "border-rose-200 text-rose-600 hover:bg-rose-50" : ""}
+            >
+              <Heart className={`w-4 h-4 mr-2 ${saved ? "fill-rose-500 text-rose-500" : ""}`} />
+              {saved ? "Saved" : "Save"}
+            </Button>
           </div>
         </div>
 

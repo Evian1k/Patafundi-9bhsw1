@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle, ChevronLeft, Clock, CheckCircle, Loader2, RefreshCw,
-  AlertOctagon, Scale, Plus,
+  AlertOctagon, Scale, Plus, Banknote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -36,12 +36,34 @@ const STATUS_CONFIG: Record<DisputeStatus, { label: string; color: string; icon:
   escalated: { label: 'Escalated', color: 'bg-red-100 text-red-800', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 };
 
+interface RefundRequest {
+  id: string;
+  job_id: string;
+  amount: string | number;
+  reason: string;
+  status: 'requested' | 'under_review' | 'approved' | 'rejected' | 'processing' | 'completed' | 'cancelled';
+  review_notes?: string | null;
+  service_category?: string | null;
+  created_at: string;
+}
+
+const REFUND_STATUS_CONFIG: Record<RefundRequest['status'], { label: string; color: string }> = {
+  requested: { label: 'Requested', color: 'bg-yellow-100 text-yellow-800' },
+  under_review: { label: 'Under review', color: 'bg-blue-100 text-blue-800' },
+  approved: { label: 'Approved', color: 'bg-green-100 text-green-800' },
+  processing: { label: 'Processing', color: 'bg-blue-100 text-blue-800' },
+  completed: { label: 'Refunded', color: 'bg-green-100 text-green-800' },
+  rejected: { label: 'Declined', color: 'bg-red-100 text-red-800' },
+  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
+};
+
 export default function DisputeCenter() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const deepLinkedJob = searchParams.get('job') || undefined;
 
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(Boolean(deepLinkedJob));
@@ -51,8 +73,18 @@ export default function DisputeCenter() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.getDisputes() as { disputes?: Dispute[] };
-      setDisputes(res.disputes || []);
+      const [disputeRes, refundRes] = await Promise.allSettled([
+        apiClient.getDisputes() as Promise<{ disputes?: Dispute[] }>,
+        apiClient.listMyRefundRequests() as Promise<{ refundRequests?: RefundRequest[] }>,
+      ]);
+      if (disputeRes.status === 'rejected') {
+        setError('Unable to load disputes. Please try again.');
+        setDisputes([]);
+      } else {
+        setDisputes(disputeRes.value.disputes || []);
+      }
+      // Refunds are customer-scoped; a 403/404 for other roles is expected.
+      setRefunds(refundRes.status === 'fulfilled' ? refundRes.value.refundRequests || [] : []);
     } catch (e) {
       console.error('[DisputeCenter]', e);
       setError('Unable to load disputes. Please try again.');
@@ -188,6 +220,48 @@ export default function DisputeCenter() {
             </div>
           )}
         </div>
+
+        {/* Refund requests (spec §38): customers track money requests here */}
+        {refunds.length > 0 && (
+          <div>
+            <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Banknote className="w-4 h-4" />
+              Your Refund Requests ({refunds.length})
+            </h3>
+            <div className="space-y-3">
+              {refunds.map((refund) => {
+                const cfg = REFUND_STATUS_CONFIG[refund.status] || REFUND_STATUS_CONFIG.requested;
+                return (
+                  <Card key={refund.id} className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">
+                          KES {Number(refund.amount).toLocaleString()}
+                          {refund.service_category ? (
+                            <span className="font-normal text-muted-foreground"> - {refund.service_category}</span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{refund.reason}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(refund.created_at).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                    {refund.review_notes && (
+                      <div className="mt-3 p-3 bg-muted/50 rounded-xl">
+                        <p className="text-xs font-medium mb-0.5">Team notes</p>
+                        <p className="text-xs text-muted-foreground">{refund.review_notes}</p>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Help - opens right here, never redirects */}
         <HelpLinksInline title="Need more help?" />

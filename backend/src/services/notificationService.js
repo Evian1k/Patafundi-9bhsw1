@@ -12,12 +12,12 @@
  */
 import { query } from '../db.js';
 import { emitEvent } from '../realtime.js';
+import { isSmsConfigured } from './smsService.js';
 
 const EMAIL_ENABLED = () => Boolean(process.env.RESEND_API_KEY);
-const SMS_ENABLED = () => Boolean(
-  (process.env.AFRICAS_TALKING_API_KEY || process.env.TWILIO_ACCOUNT_TOKEN)
-  && (process.env.AFRICAS_TALKING_USERNAME || process.env.TWILIO_ACCOUNT_SID),
-);
+// Gate on the SMS service's own capability check so the enqueue gate and the
+// queue-worker sender always agree on which env vars configure SMS.
+const SMS_ENABLED = () => isSmsConfigured();
 
 async function enqueue(queueName, payload, priority = 5) {
   try {

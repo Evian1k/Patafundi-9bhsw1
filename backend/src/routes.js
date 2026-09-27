@@ -28,7 +28,8 @@ import {
   requireProfilePhotoAccess,
 } from './middleware/storageAccess.js';
 import { asyncHandler } from './utils/http.js';
-import { aiRateLimit } from './middleware/rateLimit.js';
+import { aiRateLimit, supportRateLimit } from './middleware/rateLimit.js';
+import { auditLog } from './services/auditService.js';
 
 export const router = express.Router();
 
@@ -91,7 +92,7 @@ router.get('/companies/:id', asyncHandler(company.publicCompanyProfileById));
 // ── Company partner applications ──
 router.post('/company/applications', authRequired, asyncHandler(company.createPartnerApplication));
 router.get('/company/applications/me', authRequired, asyncHandler(company.listMyApplications));
-router.post('/company/applications/:id/submit', authRequired, asyncHandler(company.reviewPartnerApplication));
+router.post('/company/applications/:id/submit', authRequired, asyncHandler(company.submitPartnerApplication));
 router.post('/company/applications/:id/review', authRequired, requireRole('admin'), asyncHandler(company.reviewPartnerApplication));
 router.post('/company/applications/:id/approve', authRequired, requireRole('admin'), asyncHandler(company.approvePartnerApplication));
 router.get('/admin/company-applications', authRequired, requireRole('admin'), asyncHandler(company.adminListApplications));
@@ -626,11 +627,68 @@ router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, re
   }
 }));
 
-router.post('/support/ticket', asyncHandler(content.supportTicket));
+// Spec §22-23: subscribers manage their own subscription lifecycle.
+router.get('/subscriptions/mine', authRequired, asyncHandler(async (req, res) => {
+  const rows = await query(
+    `select id, plan, amount, status, starts_at, expires_at, subscriber_type, created_at
+     from subscriptions where fundi_id = $1 order by created_at desc limit 24`,
+    [req.user.id],
+  );
+  res.json({ success: true, subscriptions: rows.rows });
+}));
+
+router.get('/subscriptions/status', authRequired, asyncHandler(async (req, res) => {
+  const row = await query(
+    `select id, plan, expires_at from subscriptions
+     where fundi_id = $1 and status = 'active' and expires_at > now()
+     order by expires_at desc limit 1`,
+    [req.user.id],
+  );
+  const active = Boolean(row.rows[0]);
+  res.json({
+    success: true,
+    active,
+    plan: active ? row.rows[0].plan : null,
+    expiresAt: active ? row.rows[0].expires_at : null,
+  });
+}));
+
+router.post('/subscriptions/cancel', authRequired, asyncHandler(async (req, res) => {
+  // Cancelling stops future renewals; an already-active period keeps running
+  // until expires_at (standard marketplace behaviour, spec §22 "cancellation").
+  const row = await query(
+    `update subscriptions set status = 'cancelled'
+     where fundi_id = $1 and status in ('pending', 'active') returning id, status, expires_at`,
+    [req.user.id],
+  );
+  if (!row.rows[0]) {
+    return res.status(400).json({ success: false, message: 'No cancellable subscription found' });
+  }
+  await auditLog({
+    userId: req.user.id,
+    action: 'subscription.cancelled',
+    entityType: 'subscription',
+    entityId: row.rows[0].id,
+    metadata: { previousStatus: row.rows[0].status },
+  });
+  res.json({ success: true, subscription: row.rows[0] });
+}));
+
+router.post('/support/ticket', supportRateLimit, asyncHandler(content.supportTicket));
 router.get('/admin/support/tickets', authRequired, requireRole('admin'), asyncHandler(content.listSupportTickets));
 router.patch('/admin/support/tickets/:id', authRequired, requireRole('admin'), asyncHandler(content.updateSupportTicket));
 router.post('/fraud-report', authRequired, asyncHandler(content.fraudReport));
 router.post('/jobs/:jobId/fraud-report', authRequired, asyncHandler(content.fraudReport));
+
+// Spec §46-47: admin content management for the public Blog and Careers pages.
+router.get('/admin/blog', authRequired, requireRole('admin'), asyncHandler(content.adminListBlogPosts));
+router.post('/admin/blog', authRequired, requireRole('admin'), asyncHandler(content.adminCreateBlogPost));
+router.patch('/admin/blog/:id', authRequired, requireRole('admin'), asyncHandler(content.adminUpdateBlogPost));
+router.delete('/admin/blog/:id', authRequired, requireRole('admin'), asyncHandler(content.adminDeleteBlogPost));
+router.get('/admin/careers/jobs', authRequired, requireRole('admin'), asyncHandler(content.adminListCareerJobs));
+router.post('/admin/careers/jobs', authRequired, requireRole('admin'), asyncHandler(content.adminCreateCareerJob));
+router.patch('/admin/careers/jobs/:id', authRequired, requireRole('admin'), asyncHandler(content.adminUpdateCareerJob));
+router.delete('/admin/careers/jobs/:id', authRequired, requireRole('admin'), asyncHandler(content.adminDeleteCareerJob));
 router.get('/blog', asyncHandler(content.genericList('posts')));
 router.get('/blog/:slug', asyncHandler(content.blogPost));
 router.get('/careers/jobs', asyncHandler(content.genericList('jobs')));
