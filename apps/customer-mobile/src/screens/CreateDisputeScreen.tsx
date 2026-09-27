@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -41,12 +41,35 @@ const REASONS = [
 ];
 
 export function CreateDisputeScreen({ route, navigation }: any): JSX.Element {
-  const jobId: string = route?.params?.jobId;
+  const fixedJobId: string | undefined = route?.params?.jobId;
+  // When opened without a job, the user picks from their REAL jobs - nobody
+  // should ever have to find and type a Job ID (web parity, user directive).
+  const [jobs, setJobs] = useState<Array<{ id: string; description?: string; status?: string; created_at?: string }>>([]);
+  const [jobsLoading, setJobsLoading] = useState<boolean>(!fixedJobId);
+  const [selectedJobId, setSelectedJobId] = useState<string | undefined>(fixedJobId);
   const [reason, setReason] = useState<string>(REASONS[0]);
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<PhotoAsset[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (fixedJobId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const resp = await apiClient.listJobs();
+        if (alive) setJobs(resp.jobs || []);
+      } catch {
+        if (alive) setJobs([]);
+      } finally {
+        if (alive) setJobsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [fixedJobId]);
 
   const pickPhotos = async (): Promise<void> => {
     setPickerOpen(true);
@@ -77,15 +100,21 @@ export function CreateDisputeScreen({ route, navigation }: any): JSX.Element {
   };
 
   const handleSubmit = async (): Promise<void> => {
+    if (!selectedJobId) {
+      Alert.alert('Job required', 'Please choose the job this dispute is about.');
+      return;
+    }
     if (!description.trim()) {
       Alert.alert('Description required', 'Please describe the issue.');
       return;
     }
     setSubmitting(true);
     try {
+      // Backend stores the reason field only - fold the description into it
+      // so details are never lost (same contract the web app uses).
       const { dispute } = await apiClient.createDispute({
-        jobId,
-        reason,
+        jobId: selectedJobId,
+        reason: `${reason}: ${description.trim()}`,
         description: description.trim(),
       });
       if (photos.length > 0) {
@@ -113,6 +142,36 @@ export function CreateDisputeScreen({ route, navigation }: any): JSX.Element {
         contentContainerStyle={{ paddingBottom: spacing.xl }}
         keyboardShouldPersistTaps="handled"
       >
+        {!fixedJobId ? (
+          <View>
+            <Text style={styles.label}>Which job is this about?</Text>
+            {jobsLoading ? (
+              <ActivityIndicator style={{ marginVertical: spacing.md }} color={colors.primary} />
+            ) : jobs.length === 0 ? (
+              <Text style={styles.jobMeta}>You have no jobs to report yet. Disputes are tied to a booking.</Text>
+            ) : (
+              <View style={styles.jobList}>
+                {jobs.slice(0, 30).map((j) => {
+                  const active = selectedJobId === j.id;
+                  return (
+                    <TouchableOpacity
+                      key={j.id}
+                      style={[styles.jobRow, active ? styles.jobRowActive : null]}
+                      onPress={() => setSelectedJobId(j.id)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.jobTitle} numberOfLines={1}>{j.description || 'Job'}</Text>
+                        <Text style={styles.jobMeta}>{j.status || ''}{j.created_at ? ` - ${new Date(j.created_at).toLocaleDateString()}` : ''}</Text>
+                      </View>
+                      {active ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
+
         <Text style={styles.label}>Reason</Text>
         <View style={styles.reasonsWrap}>
           {REASONS.map((r) => (
@@ -193,6 +252,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+  },
+  jobList: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card,
+    marginBottom: spacing.sm,
+  },
+  jobRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  jobRowActive: {
+    backgroundColor: `${colors.primary}14`,
+  },
+  jobTitle: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  jobMeta: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   reasonChip: {
     paddingHorizontal: 12,

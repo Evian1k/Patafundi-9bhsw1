@@ -63,6 +63,7 @@ export type ProfileStackParamList = {
   SavedPlaces: undefined;
   Notifications: undefined;
   Disputes: undefined;
+  CreateDispute: { jobId: string } | undefined;
   JobTracking: { jobId: string };
   Chat: { jobId: string };
   Review: { jobId: string };
@@ -142,6 +143,7 @@ function ProfileStackScreen(): JSX.Element {
       <ProfileStack.Screen name="SavedPlaces" component={SavedPlacesScreen} options={{ title: 'Saved Places' }} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <ProfileStack.Screen name="Disputes" component={DisputesScreen} options={{ title: 'Disputes' }} />
+      <ProfileStack.Screen name="CreateDispute" component={CreateDisputeScreen} options={{ title: 'Dispute' }} />
       <ProfileStack.Screen name="JobTracking" component={JobTrackingScreen} options={{ title: 'Job' }} />
       <ProfileStack.Screen name="Chat" component={ChatScreen} options={{ title: 'Chat' }} />
       <ProfileStack.Screen name="Review" component={ReviewScreen} options={{ title: 'Review' }} />

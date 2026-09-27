@@ -5,8 +5,10 @@ import {
   Plus, Clock, CheckCircle, MapPin, LogOut, Settings,
   Wrench, ChevronRight, AlertCircle, Trash2, RefreshCw,
   Wallet, Scale, CalendarDays, Heart, LifeBuoy, Search,
-  MessageSquareText,
+  MessageSquareText, Flag, TrendingUp,
 } from "lucide-react";
+import { ReportProblemModal } from "@/components/support/ReportProblemModal";
+import { HelpLinksInline } from "@/components/support/HelpKit";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
@@ -143,6 +145,14 @@ export default function Dashboard() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [showAllServices, setShowAllServices] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
+  // Report-a-problem opens INLINE on this dashboard - the user never leaves.
+  const [reportJob, setReportJob] = useState<JobData | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const openReport = (job: JobData) => {
+    setReportJob(job);
+    setReportOpen(true);
+  };
 
   const fetchUserJobs = useCallback(async () => {
     setJobsLoading(true);
@@ -256,6 +266,28 @@ export default function Dashboard() {
 
         {/* Branded location onboarding (spec §8) */}
         <LocationOnboarding />
+
+        {/* ClickUp-style stat strip - honest counts from the user's real jobs */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-card rounded-2xl border border-border/50 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-bold text-xl leading-none">{activeJobs.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Active jobs</p>
+            </div>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="font-bold text-xl leading-none">{recentJobs.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Completed</p>
+            </div>
+          </div>
+        </div>
 
         {/* What do you need help with? (spec §11 hero card) */}
         <div className="bg-gradient-primary rounded-3xl p-6 text-white shadow-glow relative overflow-hidden">
@@ -414,6 +446,14 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-1 ml-2">
                       <button
+                        onClick={(e) => { e.stopPropagation(); openReport(job); }}
+                        className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
+                        title="Report a problem with this job"
+                        aria-label="Report a problem with this job"
+                      >
+                        <Flag className="w-3.5 h-3.5" />
+                      </button>
+                      <button
                         onClick={(e) => { e.stopPropagation(); cancelJob(job.id); }}
                         className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors"
                         title="Cancel job"
@@ -449,9 +489,17 @@ export default function Dashboard() {
                       Completed {new Date(job.updated_at || job.updatedAt || '').toLocaleDateString('en-KE', { month: 'short', day: 'numeric' })}
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {job.service_categories?.name || job.urgency || job.category}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {job.service_categories?.name || job.urgency || job.category}
+                    </span>
+                    <button
+                      onClick={() => openReport(job)}
+                      className="text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                    >
+                      Get help
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -477,7 +525,18 @@ export default function Dashboard() {
             </Button>
           </div>
         )}
+
+        {/* Help - opens right here, never redirects */}
+        <HelpLinksInline title="Need help with anything?" />
       </div>
+
+      {/* Report-a-problem modal (inline; job preselected when opened from a card) */}
+      <ReportProblemModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        jobId={reportJob?.id}
+        onSubmitted={fetchUserJobs}
+      />
     </div>
   );
 }

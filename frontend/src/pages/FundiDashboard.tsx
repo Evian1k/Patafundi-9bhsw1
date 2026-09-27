@@ -9,11 +9,13 @@ import NotificationBell from "@/components/system/NotificationBell";
 import {
   BarChart3, Wallet, AlertCircle, TrendingUp, MapPin, LogOut,
   Wifi, WifiOff, ChevronRight, RefreshCw, Scale, ArrowUpRight,
-  UserCog, Star, Smartphone, X,
+  UserCog, Star, Smartphone, X, Flag,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getMaxGpsAccuracyMeters } from "@/lib/gps";
+import { Button } from "@/components/ui/button";
+import { ReportProblemModal } from "@/components/support/ReportProblemModal";
+import { HelpLinksInline } from "@/components/support/HelpKit";
 import { JobRequestModal } from "@/components/fundi/JobRequestModal";
 import { BrandLogo } from "@/assets/logo";
 
@@ -42,6 +44,8 @@ export function FundiDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const maxAccuracyMeters = getMaxGpsAccuracyMeters();
   const { jobRequest, remaining, acceptJob, declineJob } = useJobRequest();
+  // Report-a-problem opens INLINE on this dashboard - the fundi never leaves.
+  const [reportOpen, setReportOpen] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastSentAtRef = useRef<number>(0);
@@ -221,7 +225,7 @@ export function FundiDashboard() {
       <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10 space-y-4">
         {/* Status Card */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-5 border border-border/50">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Verification</p>
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statColor}`}>
@@ -232,6 +236,14 @@ export function FundiDashboard() {
               <p className="text-xs text-muted-foreground">Profile</p>
               <p className="font-bold text-primary text-xl">{dashboard.profileCompletion}%</p>
             </div>
+          </div>
+
+          {/* Profile completion progress (real completion from the API) */}
+          <div className="h-2 rounded-full bg-muted overflow-hidden mb-4" role="progressbar" aria-valuenow={dashboard.profileCompletion} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-400 transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, dashboard.profileCompletion))}%` }}
+            />
           </div>
 
           <div className="flex gap-2">
@@ -453,13 +465,33 @@ export function FundiDashboard() {
               </div>
               <div className="text-left">
                 <p className="font-semibold text-sm">Disputes</p>
-                <p className="text-xs text-muted-foreground">Report or view disputes</p>
+                <p className="text-xs text-muted-foreground">Track disputes and outcomes</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+
+          {/* Report a problem - opens the inline modal, no navigation */}
+          <button onClick={() => setReportOpen(true)} className="w-full bg-card rounded-2xl p-4 border border-amber-200 flex items-center justify-between hover:bg-amber-50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <Flag className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Report a Problem</p>
+                <p className="text-xs text-muted-foreground">Open a dispute about one of your jobs</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
+
+        {/* Help - opens right here, never redirects */}
+        <HelpLinksInline title="Need help?" />
       </div>
+
+      {/* Report-a-problem modal (inline; fundi picks the job inside) */}
+      <ReportProblemModal open={reportOpen} onClose={() => setReportOpen(false)} />
     </div>
   );
 }

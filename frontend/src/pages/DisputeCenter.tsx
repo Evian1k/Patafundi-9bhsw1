@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  AlertTriangle, MessageSquare, Camera, ChevronLeft,
-  Clock, CheckCircle, XCircle, Loader2, RefreshCw,
-  AlertOctagon, FileText, Scale,
+  AlertTriangle, ChevronLeft, Clock, CheckCircle, Loader2, RefreshCw,
+  AlertOctagon, Scale, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { apiClient } from '@/lib/api';
-import { toast } from 'sonner';
 import { isApiConfigured } from '@/config/env';
 import ServiceUnavailableState from '@/components/system/ServiceUnavailableState';
+import { DisputeForm } from '@/components/support/ReportProblemModal';
+import { HelpLinksInline } from '@/components/support/HelpKit';
 
 type DisputeStatus = 'open' | 'investigating' | 'customer_won' | 'fundi_won' | 'resolved' | 'escalated';
 
@@ -36,25 +36,16 @@ const STATUS_CONFIG: Record<DisputeStatus, { label: string; color: string; icon:
   escalated: { label: 'Escalated', color: 'bg-red-100 text-red-800', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 };
 
-const DISPUTE_REASONS = [
-  'Work not completed as agreed',
-  'Fundi did not show up',
-  'Poor quality of work',
-  'Overcharged / price mismatch',
-  'Abusive or unsafe behaviour',
-  'Property damage',
-  'Off-platform payment pressure',
-  'Other',
-];
-
 export default function DisputeCenter() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const deepLinkedJob = searchParams.get('job') || undefined;
+
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [form, setForm] = useState({ jobId: '', reason: DISPUTE_REASONS[0], details: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [showNewForm, setShowNewForm] = useState(Boolean(deepLinkedJob));
+  const [formKey, setFormKey] = useState(0);
 
   const fetchDisputes = useCallback(async () => {
     setLoading(true);
@@ -72,39 +63,19 @@ export default function DisputeCenter() {
 
   useEffect(() => { fetchDisputes(); }, [fetchDisputes]);
 
-  const handleSubmitDispute = async () => {
-    if (!form.jobId.trim()) { toast.error('Please enter your Job ID'); return; }
-    if (!form.details.trim() || form.details.length < 20) {
-      toast.error('Please provide more detail (at least 20 characters)');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await apiClient.openDispute(form.jobId.trim(), `${form.reason}: ${form.details}`);
-      toast.success('Dispute submitted. Our team will review within 24 hours.');
-      setShowNewForm(false);
-      setForm({ jobId: '', reason: DISPUTE_REASONS[0], details: '' });
-      fetchDisputes();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to submit dispute');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-hero">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-muted rounded-xl transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Go back">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
             <h1 className="font-display font-bold">Dispute Center</h1>
-            <p className="text-xs text-muted-foreground">Report issues and get support</p>
+            <p className="text-xs text-muted-foreground">Report issues and get support - all in one place</p>
           </div>
-          <button onClick={fetchDisputes} className="p-2 hover:bg-muted rounded-xl transition-colors">
+          <button onClick={fetchDisputes} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
             <RefreshCw className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
@@ -126,12 +97,12 @@ export default function DisputeCenter() {
         {/* Open new dispute */}
         <div>
           <Button
-            onClick={() => setShowNewForm(!showNewForm)}
+            onClick={() => { setShowNewForm(!showNewForm); setFormKey((k) => k + 1); }}
             className={showNewForm ? 'w-full' : 'w-full bg-gradient-primary'}
             variant={showNewForm ? 'outline' : 'default'}
           >
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            {showNewForm ? 'Cancel' : 'Open New Dispute'}
+            <Plus className="w-4 h-4 mr-2" />
+            {showNewForm ? 'Cancel' : 'Report a Problem'}
           </Button>
         </div>
 
@@ -139,63 +110,17 @@ export default function DisputeCenter() {
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <Card className="p-5 space-y-4">
               <h3 className="font-semibold flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
                 New Dispute
               </h3>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Job ID</label>
-                <input
-                  type="text"
-                  value={form.jobId}
-                  onChange={(e) => setForm({ ...form, jobId: e.target.value })}
-                  placeholder="Enter the Job ID from your job details"
-                  className="w-full h-11 px-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  You can find the Job ID in your Dashboard under the job details.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Reason</label>
-                <select
-                  value={form.reason}
-                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  className="w-full h-11 px-4 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-                >
-                  {DISPUTE_REASONS.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Details</label>
-                <textarea
-                  value={form.details}
-                  onChange={(e) => setForm({ ...form, details: e.target.value })}
-                  placeholder="Describe the issue in detail. Include dates, amounts, and any relevant information..."
-                  rows={4}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none"
-                />
-                <p className="text-xs text-muted-foreground mt-1">{form.details.length} / min 20 characters</p>
-              </div>
-
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-xs text-amber-800">
-                  <span className="font-semibold">Important:</span> False disputes may affect your trust score.
-                  Provide honest and accurate information.
-                </p>
-              </div>
-
-              <Button
-                onClick={handleSubmitDispute}
-                disabled={submitting || !isApiConfigured()}
-                className="w-full bg-gradient-primary"
-              >
-                {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : 'Submit Dispute'}
-              </Button>
+              <DisputeForm
+                key={formKey}
+                fixedJobId={deepLinkedJob}
+                onSubmitted={() => {
+                  setShowNewForm(false);
+                  fetchDisputes();
+                }}
+              />
             </Card>
           </motion.div>
         )}
@@ -264,21 +189,8 @@ export default function DisputeCenter() {
           )}
         </div>
 
-        {/* Help links */}
-        <div className="bg-muted/50 rounded-2xl p-4 space-y-3">
-          <h4 className="font-semibold text-sm">Need More Help?</h4>
-          <div className="space-y-2">
-            <Link to="/contact-support" className="flex items-center gap-2 text-sm text-primary hover:underline">
-              <MessageSquare className="w-4 h-4" />Contact Support
-            </Link>
-            <Link to="/safety-guidelines" className="flex items-center gap-2 text-sm text-primary hover:underline">
-              <Camera className="w-4 h-4" />Safety Guidelines
-            </Link>
-            <Link to="/platform-rules" className="flex items-center gap-2 text-sm text-primary hover:underline">
-              <FileText className="w-4 h-4" />Platform Rules
-            </Link>
-          </div>
-        </div>
+        {/* Help - opens right here, never redirects */}
+        <HelpLinksInline title="Need more help?" />
       </div>
     </div>
   );

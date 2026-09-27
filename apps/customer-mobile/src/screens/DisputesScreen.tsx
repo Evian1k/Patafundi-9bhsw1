@@ -90,6 +90,26 @@ export function DisputesScreen({ navigation }: any): JSX.Element {
     <View style={styles.container}>
       <ScreenHeader title="My Disputes" onBack={() => navigation.goBack()} />
 
+      {/* Report entry point - stays inside the app flow (user directive) */}
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
+        <TouchableOpacity
+          style={styles.reportBtn}
+          onPress={() => navigation.navigate('CreateDispute')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="flag" size={18} color={colors.primaryForeground} />
+          <Text style={styles.reportBtnText}>Report a Problem</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.supportBtn}
+          onPress={() => navigation.navigate('Support')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="help-buoy" size={18} color={colors.primary} />
+          <Text style={styles.supportBtnText}>Contact Support</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={disputes}
         keyExtractor={(item) => item.id}
@@ -132,6 +152,39 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 13,
+    marginBottom: 8,
+  },
+  reportBtnText: {
+    color: colors.primaryForeground,
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  supportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 12,
+  },
+  supportBtnText: {
+    color: colors.primary,
+    fontFamily: fonts.sans,
+    fontWeight: '600',
+    fontSize: fontSize.md,
   },
   row: {
     flexDirection: 'row',
