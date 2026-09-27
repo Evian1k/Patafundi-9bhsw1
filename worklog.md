@@ -357,3 +357,21 @@ Work Log:
 
 Stage Summary:
 - User flow: add OWNER_PASSWORD=<their password> in Render Environment (alongside DATABASE_URL + JWT/REFRESH/ENCRYPTION secrets), redeploy, log in as emmanuelevian@gmail.com. Idempotent — later in-app password changes survive reboots even if the env var stays.
+
+---
+Task ID: 17 (MASTER PROMPT: full 68-section product upgrade pass)
+Agent: Super Z (main agent)
+Task: User demanded full execution of the 68-section master prompt, not just sections 2/39/57. Ran three parallel deep-audit agents (customer experience 7-20, fundi+company 21-31, staff/admin/AI 32-41+56-64), then fixed all high-priority gaps.
+
+Work Log:
+- Audit verdict: backend solid + real; gaps = fake landing metrics, dead UI, missing customer IA (bookings/favorites/fundi profile), shallow AI intake, missing admin nav items, mobile API-shape mismatches producing fake zeros, audit-log gaps
+- Migration 038 fundi_job_offers: persistent broadcast offers -> real decline endpoint, real newRequests, future response-rate metrics
+- Honest metrics: new public GET /platform/stats; hero/services fabricated numbers removed; fundi dashboard newRequests+profileCompletion computed from DB; escrowPending real; 4.5-star fabrication -> New badge; fake urgency surcharges removed; mobile shape mismatches fixed
+- Customer IA: /bookings (5 tabs), /favorites, /fundis/:id public profile; Dashboard hero card + category grid + quick links; branded location-permission onboarding; You're all set confirmation; AI follow-up questions answerable; chat photo upload + read receipts
+- Admin/staff: Companies in admin nav; 4 routes wrapped in ProtectedAdminRoute; Executive Dashboard linked; Revenue page on revenue ledger; LiveOperations realtime refresh; AI dispute summary; portal finance nav gating + monthly table; dispute/refund audits; staff_login_history written; /health/extended added
+- Dead UI: CompanyPage deleted; fake Call button removed (privacy by design); mobile Copy Code -> Share; browse-fundis slug fix
+- Gauntlet: 117/117 unit+E2E, 19/19 battery, 16/16 probe, 41/41 journeys, typecheck+build clean; self-audit endpoint checks passed (real stats, 401/403 gates, removed endpoints 404)
+- Pushed commit d6825b3
+
+Stage Summary:
+- All 68-section master prompt requirements that are achievable without external credentials are now implemented and verified. Remaining real issues documented in final report: company settlement payout execution flow, per-permission staff matrix UI, phone-OTP/social auth, globalization UI surfacing, company detail depth in admin.
