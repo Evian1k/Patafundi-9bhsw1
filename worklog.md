@@ -401,3 +401,35 @@ Work Log:
 Stage Summary:
 - Master prompt remaining gaps CLOSED: company payout execution is real end-to-end, per-permission staff matrix enforced server-side + editable in UI, globalization surfaced (currency formatting + country/language persistence), admin company drill-down complete, a11y baseline (reduced motion, skip links, dialog semantics), mobile SOS is real. Logo/brand untouched; all communication English.
 - Probe ordering note: run patafundi-e2e before verify-company-payout (probe consumes the pending settlement the e2e creates). Never import backend/src/db.js while the server holds the PGlite data dir.
+---
+Task ID: 19
+Agent: Super Z (main agent)
+Task: "Build everything" — user's console error report + PATAFUNDI ULTIMATE REPAIR, ENHANCEMENT & PRODUCTION COMPLETION PROMPT
+
+Work Log:
+- Read user's console log; audited codebase (routes.js 409 routes, frontend api client, AppRoutes, maps, realtime).
+- Determined /platform/stats + /ai/analyze-job + payouts/refund-requests/subscriptions/reviews 404s came from a STALE local backend process (current code serves them — verified live boot).
+- realtime.ts: idempotent connect (no duplicate sockets), BFCache pagehide/pageshow/visibilitychange lifecycle, quiet disconnect reasons.
+- OsmLiveTrackingMap + OsmSearchingRadarMap: MapLifecycleGuard (map.stop() pre-teardown), non-animated fitBounds/setView — root cause of Leaflet _leaflet_pos crash.
+- Backend: new GET /company/my-membership (200 even for non-members; kills 403 console noise); postLoginRoute + DemoPage use it; explicit customer ?next wins over membership probe.
+- FundiDashboard: subscription activation dialog (plan + M-Pesa number, STK push copy) — fixes /subscriptions/activate 400; apiClient.activateSubscription(plan, mpesaNumber).
+- New scripts/api-contract-probe.mjs: statics every frontend call vs 409 backend routes → found 2 real mismatches (admin/company-applications/:id/review, admin/users/:id/unblock) → frontend fixed → CONTRACT OK 175/175.
+- Live probes: /platform/stats 200 real data; /ai/analyze-job 401 (route exists, auth-gated); activate validation correct.
+- config/services.ts: 28-service global catalog + guessServiceFromText + bookingPathForService.
+- Dashboard: compact core-8 grid, View all (28), service search box, all clicks → /create-job?service=; DEMO_MODE removed.
+- ServicePage: now a redirect shim into the booking wizard (no informational page).
+- CreateJob: initial step 2 when service preselected; persistent company banner on all steps; company's own services pinned in step 1; CompanyPickerInline (verified companies for the chosen service, reviewCount-ordered) in step 3; auth redirect preserves full ?company&service intent; CompanyProfile book() uses ?next only.
+- Company directory backend: reviewCount + isBookable, service= filter (business_categories OR company_services), REQUIRE_COMPANY_SUBSCRIPTION env gate, most-reviewed-first with per-request shuffle among ties.
+- BackBar component; added to Bookings + Favorites (others verified to already have back paths).
+- Footer: real links only; Careers/Blog/Press/Investors pages + routes deleted; policy links kept.
+- Migration 040_policy_content.sql: full real Terms/Privacy/Cookies/Refund/Safety/Platform Rules/Enforcement with jurisdiction notice; contentController returns structured sections (policyBodyToSections); PolicyPage honest empty state.
+- Mock data removed: lib/demo.ts deleted, DEMO_MODE branches removed from Dashboard/FundiWallet/admin Dashboard; all "—" placeholders replaced with honest text repo-wide; fixed pre-existing corrupted useState in FundiWallet.
+- Super Admin: /admin/dashboard-stats returns full command-center metric set (customers online, fundis online, companies, failed payments, fraud, escrow, subscription revenue, payouts, staff, 14-day chart); admin Dashboard renders 20 real widgets + keeps legacy keys.
+- Mobile: app.json both apps — adaptive icons, POST_NOTIFICATIONS, fundi UIBackgroundModes location, extra (apiBaseUrl/privacy/terms/support email).
+- Validation: npm test 124/124, security battery 19/19, api contract 175/175 OK, tsc clean, vite build clean, live policy/directory/admin probes green. Commit 849e005 pushed.
+
+Stage Summary:
+- All user-reported console errors resolved at root (or proven stale-runtime and re-verified live).
+- Booking UX matches master prompt §15/§16: service click → wizard, company never lost, verified companies surfaced by real review counts.
+- UI is honest: zero fake stats/pages/dashes; policies are real product policies.
+- Command center live on real data. Mobile configs store-shaped. All pushed (849e005).
