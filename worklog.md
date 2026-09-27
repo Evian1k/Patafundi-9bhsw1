@@ -325,3 +325,19 @@ Work Log:
 Stage Summary:
 - Commit 7714d83 pushed. Referral + loyalty: GONE (code, tables, permissions, UI, nav, mobile). Allowlist: enforced server-side, fail-closed. Logo/brand untouched.
 - Flagged to user: emmanuelevian@gmail.com owner password PataFundiOwner@2026 is public in dev seed script — must be changed for production (OWNER_PASSWORD env / DB update)
+
+---
+Task ID: 15 (MASTER PROMPT: close flagged owner-password exposure)
+Agent: Super Z (main agent)
+Task: Close the security flag from Task 14 — owner password public in dev seed script/docs; confirm all master-prompt critical items complete and pushed.
+
+Work Log:
+- Confirmed Task 14 commit 7714d83 already on origin/main; pushed pending worklog commit 9be2c75
+- ensure-dev-db.js: owner account now fail-closed in production seeding (SEED_DEMO_USERS=true requires explicit OWNER_PASSWORD; public dev default skipped with warning)
+- DEMO_ACCOUNTS.md: literal owner password removed; docs now point to OWNER_PASSWORD bootstrap path
+- bootstrap-owner.js verified unchanged and correct (env-controlled, idempotent, refuses localhost in prod)
+- Gauntlet re-run: npm test 110/110 pass
+- Pushed commit f3b1c94 to origin/main
+
+Stage Summary:
+- Owner password can no longer be created from public repo values on any production path. All critical master-prompt items (Sections 2, 39, 57 + security hardening) complete, tested, pushed. Logo/brand untouched throughout.
