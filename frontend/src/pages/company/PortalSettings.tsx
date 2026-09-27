@@ -151,8 +151,8 @@ export default function PortalSettings() {
 
         {profile && (
           <div className="rounded-2xl border bg-primary/100/5 p-4 text-xs text-muted-foreground grid grid-cols-3 gap-3">
-            <div><p className="font-medium text-foreground capitalize">Status</p>{profile.verificationStatus || "—"}</div>
-            <div><p className="font-medium text-foreground">Rating</p>{profile.rating?.toFixed(1) || "—"}</div>
+            <div><p className="font-medium text-foreground capitalize">Status</p>{profile.verificationStatus || "Not set"}</div>
+            <div><p className="font-medium text-foreground">Rating</p>{profile.rating?.toFixed(1) || "Not set"}</div>
             <div><p className="font-medium text-foreground">Completed jobs</p>{(profile.completedJobs || 0).toLocaleString()}</div>
           </div>
         )}

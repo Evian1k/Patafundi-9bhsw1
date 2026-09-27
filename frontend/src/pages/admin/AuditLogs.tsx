@@ -164,7 +164,7 @@ export default function AuditLogs() {
                         </td>
                         <td className="px-4 py-3 text-xs">{log.targetType}</td>
                         <td className="px-4 py-3 font-mono text-xs">{log.targetId ? `${log.targetId.substring(0, 12)}...` : "-"}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-48 truncate">{log.reason || "—"}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-48 truncate">{log.reason || "Not recorded"}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(log.createdAt)}</td>
                       </motion.tr>
                     ))}

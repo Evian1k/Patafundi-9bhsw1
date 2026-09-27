@@ -100,7 +100,7 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
                   <tr key={row.id || i} className="border-b border-slate-50 hover:bg-slate-50">
                     {columns.map((col) => (
                       <td key={col.key} className="px-4 py-3 text-slate-700">
-                        {col.render ? col.render(row) : String(row[col.key] ?? "—")}
+                        {col.render ? col.render(row) : String(row[col.key] ?? "Not recorded")}
                       </td>
                     ))}
                   </tr>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Crosshair, Layers, Minus, Plus } from 'lucide-react';
@@ -15,17 +15,48 @@ function toLatLng(c: Coordinates): L.LatLngExpression {
 function FitBounds({ points }: { points: Coordinates[] }) {
   const map = useMap();
   const key = points.map((p) => `${p.latitude},${p.longitude}`).join('|');
+  const fittedOnce = useRef(false);
 
   useEffect(() => {
     if (points.length === 0) return;
-    if (points.length === 1) {
-      map.setView(toLatLng(points[0]), 15);
-      return;
+    // Programmatic camera moves are intentionally non-animated: animated
+    // zoom/pan can outlive the container (modals closing, wizard steps
+    // swapping) and crash Leaflet's transition end handler with
+    // "Cannot read properties of undefined (reading '_leaflet_pos')".
+    try {
+      if (points.length === 1) {
+        map.setView(toLatLng(points[0]), 15, { animate: false });
+      } else {
+        const bounds = L.latLngBounds(points.map((p) => toLatLng(p)));
+        map.fitBounds(bounds, { padding: [48, 48], animate: fittedOnce.current });
+      }
+      fittedOnce.current = true;
+    } catch {
+      /* map already torn down — nothing to fit */
     }
-    const bounds = L.latLngBounds(points.map((p) => toLatLng(p)));
-    map.fitBounds(bounds, { padding: [48, 48] });
   }, [map, key, points]);
 
+  return null;
+}
+
+/**
+ * Teardown guard (spec §12): React runs child effect cleanups BEFORE the
+ * MapContainer's own unmount (map.remove()). Calling map.stop() here cancels
+ * any in-flight pan/zoom animation while the map is still fully intact, so
+ * its transition-end handler can never fire on a removed map — the root
+ * cause of the _leaflet_pos crash during route/modal transitions.
+ */
+function MapLifecycleGuard() {
+  const map = useMap();
+  useEffect(() => {
+    return () => {
+      try {
+        map.stop();
+      } catch {
+        /* map already removed */
+      }
+    };
+  }, [map]);
   return null;
 }
 
@@ -94,12 +125,16 @@ export default function OsmLiveTrackingMap({
 
   const recenter = () => {
     if (!map || fitPoints.length === 0) return;
-    if (fitPoints.length === 1) {
-      map.setView(toLatLng(fitPoints[0]), 15);
-      return;
+    try {
+      if (fitPoints.length === 1) {
+        map.setView(toLatLng(fitPoints[0]), 15);
+        return;
+      }
+      const bounds = L.latLngBounds(fitPoints.map((p) => toLatLng(p)));
+      map.fitBounds(bounds, { padding: [48, 48] });
+    } catch {
+      /* map removed mid-click — ignore */
     }
-    const bounds = L.latLngBounds(fitPoints.map((p) => toLatLng(p)));
-    map.fitBounds(bounds, { padding: [48, 48] });
   };
 
   return (
@@ -114,6 +149,7 @@ export default function OsmLiveTrackingMap({
       >
         <TileLayer key={theme} url={tiles.url} attribution={tiles.attribution} />
         <MapRefBridge onMap={onMapReady} />
+        <MapLifecycleGuard />
         {autoFit && <FitBounds points={fitPoints} />}
         {polylinePath.length > 1 && (
           <Polyline positions={polylinePath} pathOptions={{ color: '#10b981', weight: 5, opacity: 0.92 }} />

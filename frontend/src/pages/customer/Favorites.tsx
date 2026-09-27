@@ -4,6 +4,7 @@ import { Heart, RefreshCw, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import BackBar from "@/components/layout/BackBar";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 
@@ -69,6 +70,7 @@ export default function Favorites() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-6">
+        <BackBar to="/dashboard" label="Home" className="mb-3" />
         <div className="flex items-center justify-between mb-4">
           <h1 className="font-display font-bold text-2xl">Saved Providers</h1>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">

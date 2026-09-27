@@ -195,8 +195,8 @@ export default function SecurityCenter() {
                 <tbody>
                   {history.slice(0, 20).map(h => (
                     <tr key={h.id} className="border-b border-slate-50">
-                      <td className="px-3 py-2 text-slate-600">{h.ip_address || "—"}</td>
-                      <td className="px-3 py-2 text-slate-500 max-w-xs truncate">{h.user_agent || "—"}</td>
+                      <td className="px-3 py-2 text-slate-600">{h.ip_address || "Unknown"}</td>
+                      <td className="px-3 py-2 text-slate-500 max-w-xs truncate">{h.user_agent || "Unknown device"}</td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${h.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                           {h.success ? "Success" : "Failed"}

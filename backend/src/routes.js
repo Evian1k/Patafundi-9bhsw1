@@ -124,6 +124,8 @@ router.get('/company/portal/reviews', authRequired, company.portalAccess, asyncH
 router.get('/company/portal/finance', authRequired, company.portalAccess, asyncHandler(company.portalFinance));
 router.put('/company/portal/finance/payout-destination', authRequired, company.portalAccess, asyncHandler(company.portalUpdatePayoutDestination));
 router.post('/company/portal/finance/withdraw', authRequired, company.portalAccess, asyncHandler(company.portalWithdraw));
+// Lightweight membership probe (200 even for non-members — no 403 console noise)
+router.get('/company/my-membership', authRequired, asyncHandler(company.myMembership));
 router.get('/company/technician/assignments', authRequired, asyncHandler(company.technicianAssignments));
 
 // Legacy secured overview (kept for compatibility)

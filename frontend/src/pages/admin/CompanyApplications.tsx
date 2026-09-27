@@ -60,7 +60,8 @@ export default function CompanyApplications() {
   const review = async (id: string, status: string) => {
     setBusy(id + status); setNotice(null);
     try {
-      await apiClient.request(`/admin/company-applications/${id}/review`, {
+      // Backend route: POST /company/applications/:id/review (admin-gated)
+      await apiClient.request(`/company/applications/${id}/review`, {
         method: "POST", body: { status },
       });
       setNotice(`Application ${status}.`);
@@ -190,12 +191,12 @@ export default function CompanyApplications() {
                       {c.companyName}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{c.ownerName || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.ownerName || "Not provided"}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.memberCount}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.jobCount}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{c.rating?.toFixed(1) || "—"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{c.rating?.toFixed(1) || "Not provided"}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                    {c.pendingSettlementsKes ? `KES ${Number(c.pendingSettlementsKes).toLocaleString()}` : "—"}
+                    {c.pendingSettlementsKes ? `KES ${Number(c.pendingSettlementsKes).toLocaleString()}` : "KES 0"}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${c.status === "approved" ? "bg-emerald-500/10 text-emerald-600" : c.status === "suspended" ? "bg-red-500/10 text-red-500" : "bg-muted"}`}>

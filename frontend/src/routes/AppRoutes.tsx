@@ -22,13 +22,8 @@ import JobTracking from "@/pages/JobTracking";
 import NotFound from "@/pages/NotFound";
 import ServicePage from "@/pages/ServicePage";
 import About from "@/pages/About";
-import Careers from "@/pages/Careers";
-import Blog from "@/pages/Blog";
-import BlogPost from "@/pages/BlogPost";
-import Press from "@/pages/Press";
 import HowItWorks from "@/pages/HowItWorks";
 import TrustSafety from "@/pages/TrustSafety";
-import Investors from "@/pages/Investors";
 import Contact from "@/pages/Contact";
 import HelpCenter from "@/pages/HelpCenter";
 import SafetyGuidelines from "@/pages/SafetyGuidelines";
@@ -143,13 +138,8 @@ export default function AppRoutes() {
       <Route path="/technician" element={<TechnicianApp />} />
 
       <Route path="/about" element={<About />} />
-      <Route path="/careers" element={<Careers />} />
-      <Route path="/blog" element={<Blog />} />
-      <Route path="/blog/:slug" element={<BlogPost />} />
-      <Route path="/press" element={<Press />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
       <Route path="/trust-safety" element={<TrustSafety />} />
-      <Route path="/investors" element={<Investors />} />
       <Route path="/contact" element={<Contact />} />
 
       <Route path="/help" element={<HelpCenter />} />

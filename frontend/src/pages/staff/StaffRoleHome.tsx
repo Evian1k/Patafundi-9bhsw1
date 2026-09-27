@@ -199,7 +199,7 @@ function FraudHome() {
         <StatCard label="Open alerts" value={alerts.filter((a) => !["resolved", "dismissed"].includes(String(a.status))).length} icon={AlertTriangle} tone="text-red-600 bg-red-500/10" />
         <StatCard label="Total alerts" value={alerts.length} icon={AlertTriangle} tone="text-amber-600 bg-amber-500/10" />
         <StatCard label="High severity" value={alerts.filter((a) => ["high", "critical"].includes(String(a.severity))).length} icon={AlertTriangle} tone="text-red-600 bg-red-500/10" />
-        <StatCard label="Blocked actions (30d)" value={dashboard?.stats?.blockedActions ?? dashboard?.stats?.blocked_actions ?? "—"} icon={ShieldCheck} tone="text-emerald-600 bg-emerald-500/10" />
+        <StatCard label="Blocked actions (30d)" value={String(dashboard?.stats?.blockedActions ?? dashboard?.stats?.blocked_actions ?? 0)} icon={ShieldCheck} tone="text-emerald-600 bg-emerald-500/10" />
       </div>
       <ListCard title="Alerts" items={alerts} emptyText="No fraud alerts. All clear."
         render={(a) => (
@@ -318,7 +318,7 @@ function OpsHome() {
   if (loading) return <SkeletonGrid />;
   if (error) return <ErrorBox message={error} />;
   const stats = (dash?.stats || dash || {}) as Record<string, unknown>;
-  const num = (k: string) => (typeof stats[k] === "number" ? (stats[k] as number) : (stats[k] != null ? Number(stats[k]) : "—"));
+  const num = (k: string) => (typeof stats[k] === "number" ? (stats[k] as number) : (stats[k] != null ? Number(stats[k]) : 0));
   return (
     <>
       <Header title="Operations" subtitle="Platform-wide operational picture." />

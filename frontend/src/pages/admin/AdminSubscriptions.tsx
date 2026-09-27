@@ -92,7 +92,7 @@ export default function AdminSubscriptions() {
                   {subs.map((s) => (
                     <tr key={s.id} className="border-t border-border/60">
                       <td className="p-3">
-                        <p className="font-medium">{s.subscriber_name || "—"}</p>
+                        <p className="font-medium">{s.subscriber_name || "Unknown subscriber"}</p>
                         <p className="text-xs text-muted-foreground">{s.subscriber_email || ""}</p>
                       </td>
                       <td className="p-3 capitalize">{s.subscriber_type}</td>

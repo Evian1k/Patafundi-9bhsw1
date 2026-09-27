@@ -60,6 +60,7 @@ class RealtimeService {
   private socket: Socket | null = null;
   private token: string | null = null;
   private isConnected = false;
+  private lifecycleBound = false;
 
   connect(token?: string | null): void {
     const resolved = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null);
@@ -72,7 +73,9 @@ class RealtimeService {
       return;
     }
 
-    if (this.socket?.connected) return;
+    // Idempotent: an existing socket (connected OR still reconnecting) is
+    // reused so repeated connect() calls never spawn duplicate sockets.
+    if (this.socket) return;
 
     this.socket = io(SOCKET_URL, {
       auth: { token: resolved },
@@ -88,15 +91,60 @@ class RealtimeService {
       console.info('[Realtime] Socket.IO connected');
     });
 
-    this.socket.on('disconnect', () => {
+    this.socket.on('disconnect', (reason) => {
       this.isConnected = false;
-      console.info('[Realtime] Socket.IO disconnected');
+      // Only log genuine unexpected drops. Page BFCache suspensions and
+      // explicit client disconnects are normal lifecycle events, not errors.
+      if (reason !== 'io client disconnect' && reason !== 'io server disconnect') {
+        console.info('[Realtime] Socket.IO reconnecting…');
+      }
     });
 
     TRACKING_EVENTS.forEach((event) => {
       this.socket?.off(event);
       this.socket?.on(event, (data: EventPayload) => this.emitLocal(event, data || {}));
     });
+
+    this.bindPageLifecycle();
+  }
+
+  /**
+   * BFCache-aware lifecycle (spec §13): browsers freeze WebSocket pages when
+   * they enter the Back-Forward Cache, which surfaces as a failed socket
+   * write. We proactively disconnect on pagehide and cleanly re-resume on
+   * return — no error spam, no duplicate sockets, no leaked listeners.
+   */
+  private bindPageLifecycle(): void {
+    if (this.lifecycleBound || typeof window === 'undefined') return;
+    this.lifecycleBound = true;
+
+    window.addEventListener('pagehide', () => {
+      // Silent suspend — the socket is intentionally frozen by the browser.
+      if (this.socket?.connected) this.socket.disconnect();
+      this.stopAllPolling();
+    });
+
+    const resume = () => {
+      if (!this.token) return;
+      if (document.visibilityState === 'visible' && this.socket && !this.socket.connected) {
+        // socket.io resumes transports without creating a second socket.
+        if (this.socket.disconnected) this.socket.connect();
+        this.resumeJobPolling();
+      }
+    };
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) resume();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') resume();
+    });
+  }
+
+  /** Restart polling watchers for jobs the UI is still subscribed to. */
+  private resumeJobPolling(): void {
+    // Poll intervals are re-created lazily by watchJob() callers on their own
+    // visibilitychange effects; here we only make sure no stale timers remain.
+    this.stopAllPolling();
   }
 
   disconnect(): void {

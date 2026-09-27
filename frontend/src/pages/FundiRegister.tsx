@@ -190,7 +190,7 @@ export default function FundiRegister() {
           {step === 4 && (
             <div className="space-y-3 mt-4 text-sm">
               {[["Name", data.fullName], ["Email", data.email], ["Phone", data.phone], ["County", data.county], ["Town", data.town], ["Skills", data.skills.join(", ")]].map(([k, v]) => (
-                <div key={k as string} className="flex justify-between border-b py-2"><span className="text-muted-foreground">{k as string}</span><span className="font-medium text-right max-w-[60%]">{v as string || "—"}</span></div>
+                <div key={k as string} className="flex justify-between border-b py-2"><span className="text-muted-foreground">{k as string}</span><span className="font-medium text-right max-w-[60%]">{v as string || "Not provided"}</span></div>
               ))}
               <div className="p-3 bg-yellow-50 rounded-xl flex gap-2 text-xs text-yellow-800"><AlertCircle className="w-4 h-4 shrink-0" />After email verification, an admin will review your documents before you can go online.</div>
             </div>

@@ -223,10 +223,10 @@ export default function CommissionControl() {
                   history.map((h) => (
                     <tr key={h.id} className="border-b border-slate-50">
                       <td className="px-4 py-2 capitalize">{h.scope}{h.scope_value ? ` (${h.scope_value})` : ""}</td>
-                      <td className="px-4 py-2">{h.old_rate ? (Number(h.old_rate) * 100).toFixed(1) + "%" : "—"}</td>
+                      <td className="px-4 py-2">{h.old_rate ? (Number(h.old_rate) * 100).toFixed(1) + "%" : "Initial rate"}</td>
                       <td className="px-4 py-2 font-medium text-primary">{(Number(h.new_rate) * 100).toFixed(1)}%</td>
-                      <td className="px-4 py-2 text-slate-500">{h.reason || "—"}</td>
-                      <td className="px-4 py-2 text-slate-500">{h.changed_by_name || "—"}</td>
+                      <td className="px-4 py-2 text-slate-500">{h.reason || "Not recorded"}</td>
+                      <td className="px-4 py-2 text-slate-500">{h.changed_by_name || "System"}</td>
                       <td className="px-4 py-2 text-slate-500">{new Date(h.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))

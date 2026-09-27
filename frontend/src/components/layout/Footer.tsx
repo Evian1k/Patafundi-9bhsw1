@@ -2,46 +2,45 @@ import { Link } from "react-router-dom";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { BrandLogo } from "@/assets/logo";
 
+/**
+ * Footer (spec §50) — concise, professional, and HONEST: every link resolves
+ * to a page that actually exists with real content. Marketing placeholders
+ * without real content (Investor Relations, Blog, Press, Careers) are
+ * intentionally absent. Service links go straight into the booking flow
+ * (spec §15).
+ */
 const Footer = () => {
   const companyName = "PataFundi";
   const supportEmail = "support@patafundi.com";
 
   const footerLinks = {
-    services: [
-      { name: "Plumbing", href: "/services/plumbing" },
-      { name: "Electrical", href: "/services/electrical" },
-      { name: "AC & HVAC", href: "/services/hvac" },
-      { name: "Cleaning", href: "/services/cleaning" },
-      { name: "Carpentry", href: "/services/carpentry" },
-    ],
-    company: [
-      { name: "About Us", href: "/about" },
-      { name: "Careers", href: "/careers" },
-      { name: "Blog", href: "/blog" },
-      { name: "Press", href: "/press" },
+    platform: [
       { name: "How It Works", href: "/how-it-works" },
+      { name: "Browse Services", href: "/dashboard" },
+      { name: "Service Companies", href: "/companies" },
       { name: "Trust & Safety", href: "/trust-safety" },
-      { name: "Investor Relations", href: "/investors" },
-      { name: "Contact Us", href: "/contact" },
+      { name: "Partner Program", href: "/partner-program" },
     ],
     support: [
       { name: "Help Center", href: "/help" },
       { name: "Safety Guidelines", href: "/safety-guidelines" },
-      { name: "Refund Policy", href: "/refund-policy" },
-      { name: "Terms of Service", href: "/terms" },
-      { name: "Privacy Policy", href: "/privacy" },
-      { name: "Cookies Policy", href: "/cookies" },
       { name: "Contact Support", href: "/contact-support" },
       { name: "Report a Problem", href: "/report-problem" },
+    ],
+    legal: [
+      { name: "Terms of Service", href: "/terms" },
+      { name: "Privacy Policy", href: "/privacy" },
+      { name: "Cookie Policy", href: "/cookies" },
+      { name: "Refund Policy", href: "/refund-policy" },
     ],
     rules: [
       { name: "Platform Rules", href: "/platform-rules" },
       { name: "Enforcement Policy", href: "/enforcement" },
     ],
     forPros: [
-      { name: "Become a Fundi", href: "/fundi/register" },
-      { name: "Fundi Resources", href: "/fundi/resources" },
+      { name: "Become a Fundi", href: "/register/fundi" },
       { name: "Fundi App", href: "/fundi/app" },
+      { name: "Fundi Resources", href: "/fundi/resources" },
     ],
   };
 
@@ -52,12 +51,18 @@ const Footer = () => {
     { icon: Linkedin, href: "/socials", label: "LinkedIn" },
   ];
 
+  const columns: { title: string; links: { name: string; href: string }[] }[] = [
+    { title: "Platform", links: footerLinks.platform },
+    { title: "Support", links: footerLinks.support },
+    { title: "Legal", links: footerLinks.legal },
+  ];
+
   return (
     <footer className="bg-foreground text-background/80 mt-16">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
           {/* Brand */}
-          <div className="col-span-2 md:col-span-3 lg:col-span-1">
+          <div className="col-span-2 md:col-span-3 lg:col-span-2">
             <BrandLogo size="md" className="mb-4" />
             <p className="text-sm text-background/60 mb-4 leading-relaxed">
               Connecting you with verified local professionals for all your home and business needs.
@@ -77,49 +82,22 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Services */}
-          <div>
-            <h4 className="font-semibold text-background mb-3 text-sm">Services</h4>
-            <ul className="space-y-2">
-              {footerLinks.services.map((link) => (
-                <li key={link.name}>
-                  <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {columns.map((col) => (
+            <div key={col.title}>
+              <h4 className="font-semibold text-background mb-3 text-sm">{col.title}</h4>
+              <ul className="space-y-2">
+                {col.links.map((link) => (
+                  <li key={link.name}>
+                    <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
-          {/* Company */}
-          <div>
-            <h4 className="font-semibold text-background mb-3 text-sm">Company</h4>
-            <ul className="space-y-2">
-              {footerLinks.company.map((link) => (
-                <li key={link.name}>
-                  <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h4 className="font-semibold text-background mb-3 text-sm">Support</h4>
-            <ul className="space-y-2">
-              {footerLinks.support.map((link) => (
-                <li key={link.name}>
-                  <Link to={link.href} className="text-xs text-background/60 hover:text-background transition-colors">
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Rules & For Pros */}
+          {/* Rules & For Professionals */}
           <div className="space-y-6">
             <div>
               <h4 className="font-semibold text-background mb-3 text-sm">Rules & Policies</h4>

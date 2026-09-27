@@ -109,7 +109,7 @@ export default function FundiMyReviews() {
           <>
             <div className="bg-card rounded-2xl p-5 border border-border/50 flex items-center gap-4">
               <div className="text-4xl font-display font-bold text-primary">
-                {average ? average.toFixed(1) : "—"}
+                {average ? average.toFixed(1) : "No reviews yet"}
               </div>
               <div className="space-y-1">
                 <Stars value={Math.round(average || 0)} />

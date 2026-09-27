@@ -91,7 +91,8 @@ export default function StaffManagement() {
         await apiClient.request(`/admin/users/${userId}/disable`, { method: "POST", includeAuth: true });
         toast.success("Staff member disabled");
       } else {
-        await apiClient.request(`/admin/users/${userId}/unblock`, { method: "POST", includeAuth: true });
+        // Backend route: POST /admin/customers/:id/unblock (shared user unblock)
+        await apiClient.request(`/admin/customers/${userId}/unblock`, { method: "POST", includeAuth: true });
         toast.success("Staff member activated");
       }
       fetchStaff();

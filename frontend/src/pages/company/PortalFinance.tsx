@@ -198,7 +198,7 @@ export default function PortalFinance() {
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[p.status] || "bg-muted"}`}>{p.status}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.provider_reference || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.provider_reference || "Not recorded"}</td>
                   </tr>
                 ))}
               </tbody>

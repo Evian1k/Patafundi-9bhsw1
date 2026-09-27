@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/card';
 import { apiClient } from '@/lib/api';
 import { toast } from 'sonner';
 import { isApiConfigured } from '@/config/env';
-import { demoWalletData, DEMO_MODE } from '@/lib/demo';
 import ServiceUnavailableState from '@/components/system/ServiceUnavailableState';
 
 interface WalletTransaction {
@@ -71,10 +70,6 @@ export default function FundiWallet() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      if (DEMO_MODE) {
-        setData(demoWalletData as WalletData);
-        return;
-      }
       const [balRes, txRes] = await Promise.all([
         apiClient.getFundiWalletBalance() as Promise<{ balance?: number; escrowPending?: number; totalEarnings?: number }>,
         apiClient.getFundiWalletTransactions(20, 0) as Promise<{ transactions?: WalletTransaction[] }>,
@@ -87,11 +82,7 @@ export default function FundiWallet() {
       });
     } catch (e) {
       console.error('[FundiWallet] fetch error:', e);
-      if (DEMO_MODE) {
-        setData(demoWalletData as WalletData);
-      } else {
-        setError('Unable to load wallet. Please try again.');
-      }
+      setError('Unable to load wallet. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -163,7 +154,6 @@ export default function FundiWallet() {
           </button>
           <div className="flex-1">
             <h1 className="font-display font-bold">My Wallet</h1>
-            {DEMO_MODE && <p className="text-xs text-amber-600">Demo mode</p>}
           </div>
           <button onClick={() => fetchWallet(true)} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
             <RefreshCw className="w-4 h-4 text-muted-foreground" />

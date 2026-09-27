@@ -12,9 +12,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patafundi.customer",
@@ -28,18 +25,29 @@
     "android": {
       "package": "com.patafundi.customer",
       "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
       ]
     },
     "scheme": "patafundi-customer",
     "plugins": [
       "expo-location"
     ],
+    "extra": {
+      "apiBaseUrl": "https://patafundi-9bhsw1.onrender.com",
+      "privacyPolicyUrl": "https://patafundi-9bhsw1.vercel.app/privacy",
+      "termsUrl": "https://patafundi-9bhsw1.vercel.app/terms",
+      "supportEmail": "support@patafundi.com"
+    },
     "experiments": {
       "typedRoutes": true
     }

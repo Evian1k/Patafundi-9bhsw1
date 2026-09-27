@@ -261,8 +261,12 @@ export async function approvePartnerApplication(req, res) {
 // PUBLIC DIRECTORY (customer-safe, spec §5) — no internal data ever
 // ────────────────────────────────────────────────────────────────────────────
 export async function publicCompanyDirectory(req, res) {
-  const { category, search, area } = req.query || {};
+  const { category, search, area, service } = req.query || {};
   const params = [];
+  // Spec §42 visibility: a company is bookable only when approved, active and
+  // (when the platform requires it) subscription-paid. Uneligible companies
+  // never appear as available.
+  const requireSub = String(process.env.REQUIRE_COMPANY_SUBSCRIPTION || '').toLowerCase() === 'true';
   let where = `where cp.status = 'approved'`;
   if (category) {
     params.push(category);
@@ -276,21 +280,62 @@ export async function publicCompanyDirectory(req, res) {
     params.push(`%${search}%`);
     where += ` and (cp.company_name ilike $${params.length} or cp.description ilike $${params.length})`;
   }
+  if (service) {
+    // Companies offering a specific service: match business categories OR a
+    // published company_services row (name or category).
+    params.push(service);
+    const p = `$${params.length}`;
+    where += ` and (
+      ${p} = any(cp.business_categories)
+      or exists (
+        select 1 from company_services cs
+        where cs.company_id = cp.id and cs.is_active = true
+          and (cs.name ilike '%' || ${p} || '%' or cs.category ilike '%' || ${p} || '%')
+      )
+    )`;
+  }
+  if (requireSub) {
+    where += ` and exists (
+      select 1 from subscriptions s
+      where s.subscriber_type = 'company'
+        and s.status = 'active' and s.expires_at > now()
+        and s.fundi_id = cp.owner_user_id
+    )`;
+  }
+  // Review count powers the "most reviewed on top" ordering the customer
+  // asked for; it also decides who leads the featured area.
   const result = await query(
     `select cp.*,
        (select count(*) from company_members cm where cm.company_id = cp.id and cm.role = 'technician' and cm.status = 'active') as active_technicians,
        (select count(*) from jobs j where j.company_id = cp.id and j.status = 'completed') as completed_count,
+       (select count(r.id) from reviews r join jobs j2 on j2.id = r.job_id where j2.company_id = cp.id) as review_count,
        (select coalesce(avg(r.rating), 0) from reviews r join jobs j2 on j2.id = r.job_id where j2.company_id = cp.id) as avg_rating
      from company_profiles cp ${where}
-     order by avg_rating desc nulls last, completed_count desc limit 60`,
+     order by completed_count desc, avg_rating desc nulls last limit 60`,
     params,
   );
-  const companies = result.rows.map((row) => ({
+  const mapped = result.rows.map((row) => ({
     ...publicCompanyProfile(row, { withStats: true }),
     completedJobs: Number(row.completed_count || row.completed_jobs || 0),
+    reviewCount: Number(row.review_count || 0),
     rating: Math.round(Number(row.avg_rating || row.rating || 0) * 10) / 10,
     teamSize: Number(row.active_technicians || 0),
+    isBookable: true, // every row already passed the eligibility filter above
   }));
+  // Most reviewed first; ties shuffle per request so the featured area is not
+  // permanently frozen (authentic: ratings and counts are never altered).
+  mapped.sort((a, b) => b.reviewCount - a.reviewCount || b.completedJobs - a.completedJobs);
+  const groups = new Map();
+  for (const c of mapped) {
+    const key = `${c.reviewCount}:${c.completedJobs}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  }
+  const companies = [];
+  for (const group of groups.values()) {
+    if (group.length > 1) group.sort(() => Math.random() - 0.5);
+    companies.push(...group);
+  }
   res.json({ success: true, companies });
 }
 
@@ -316,12 +361,17 @@ export async function publicCompanyProfileById(req, res) {
      from jobs where company_id = $1`,
     [company.id],
   );
+  const reviewStats = await query(
+    `select count(*) as total from reviews r join jobs j on j.id = r.job_id where j.company_id = $1`,
+    [company.id],
+  );
   res.json({
     success: true,
     company: {
       ...publicCompanyProfile(company, { withStats: true }),
       completedJobs: Number(stats.rows[0]?.completed || 0),
       activeJobs: Number(stats.rows[0]?.active || 0),
+      reviewCount: Number(reviewStats.rows[0]?.total || 0),
     },
     services: services.rows,
     reviews: reviewsRes.rows,
@@ -334,6 +384,31 @@ export async function publicCompanyProfileById(req, res) {
 // ────────────────────────────────────────────────────────────────────────────
 
 export const portalAccess = requireCompanyMember({ primary: true });
+
+/**
+ * Lightweight membership probe for post-login routing. Returns 200 for EVERY
+ * authenticated user — non-members simply get isMember:false — so the login
+ * flow can detect company staff without producing 403 console noise.
+ * The portal itself (company/portal/*) stays strictly member-gated.
+ */
+export async function myMembership(req, res) {
+  const result = await query(
+    `select cm.role, cm.status, cm.company_id, cp.company_name
+     from company_members cm
+     join company_profiles cp on cp.id = cm.company_id
+     where cm.user_id = $1 and cm.status = 'active'
+     order by cm.joined_at asc limit 1`,
+    [req.user.id],
+  );
+  const membership = result.rows[0] || null;
+  res.json({
+    success: true,
+    isMember: Boolean(membership),
+    myRole: membership?.role || null,
+    companyId: membership?.company_id || null,
+    companyName: membership?.company_name || null,
+  });
+}
 
 export async function portalOverview(req, res) {
   const companyId = req.company.id;

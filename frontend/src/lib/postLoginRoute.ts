@@ -61,16 +61,24 @@ export async function resolvePostLoginPath(
   }
 
   // Company ecosystem routing (takeover): company admins → portal;
-  // dispatchers/technicians detect membership server-side.
+  // dispatchers/technicians detect membership server-side. Uses the dedicated
+  // membership probe (200 for everyone) — the portal overview itself is
+  // member-gated and would log a 403 for regular customers.
   if (String(user.role || "").toLowerCase() === "company_admin") {
     return next || "/company";
   }
+  // An explicit customer-app destination (mid-booking login) always wins over
+  // membership probing — the user was booking, not opening a work console.
+  if (next && (next.startsWith("/create-job") || next.startsWith("/companies"))) {
+    return next;
+  }
   try {
-    const portal = (await apiClient.request("/company/portal/overview")) as {
-      myRole?: string;
+    const membership = (await apiClient.request("/company/my-membership")) as {
+      isMember?: boolean;
+      myRole?: string | null;
     };
-    if (portal?.myRole === "technician") return next || "/technician";
-    return next || "/company";
+    if (membership?.isMember && membership.myRole === "technician") return next || "/technician";
+    if (membership?.isMember) return next || "/company";
   } catch {
     // not a company member — fall through to the customer app
   }

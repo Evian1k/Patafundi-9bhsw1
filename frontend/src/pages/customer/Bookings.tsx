@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CalendarDays, ChevronRight, RefreshCw, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import BackBar from "@/components/layout/BackBar";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 
@@ -62,7 +63,7 @@ function JobCard({ job }: { job: JobRow }) {
               {job.title || job.service_category || "Service job"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {job.description || job.location_name || "—"}
+              {job.description || job.location_name || "No details provided"}
             </p>
             <p className="text-[11px] text-muted-foreground mt-1">
               {job.created_at ? new Date(job.created_at).toLocaleDateString() : ""}
@@ -131,6 +132,7 @@ export default function Bookings() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-6">
+        <BackBar to="/dashboard" label="Home" className="mb-3" />
         <div className="flex items-center justify-between mb-4">
           <h1 className="font-display font-bold text-2xl">My Bookings</h1>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">

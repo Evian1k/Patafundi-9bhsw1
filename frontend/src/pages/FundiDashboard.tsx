@@ -9,7 +9,7 @@ import NotificationBell from "@/components/system/NotificationBell";
 import {
   BarChart3, Wallet, AlertCircle, TrendingUp, MapPin, LogOut,
   Wifi, WifiOff, ChevronRight, RefreshCw, Scale, ArrowUpRight,
-  UserCog, Star,
+  UserCog, Star, Smartphone, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -33,6 +33,12 @@ export function FundiDashboard() {
   const [loading, setLoading] = useState(true);
   const [subscriptionActive, setSubscriptionActive] = useState<boolean | null>(null);
   const [subscriptionDaysLeft, setSubscriptionDaysLeft] = useState<number | null>(null);
+  // Subscription activation collects the M-Pesa number for the STK push —
+  // the backend rejects plan-only requests (contract: { plan, mpesaNumber }).
+  const [subDialogOpen, setSubDialogOpen] = useState(false);
+  const [subPhone, setSubPhone] = useState("");
+  const [subPlan, setSubPlan] = useState<"monthly" | "yearly">("monthly");
+  const [subSubmitting, setSubSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const maxAccuracyMeters = getMaxGpsAccuracyMeters();
   const { jobRequest, remaining, acceptJob, declineJob } = useJobRequest();
@@ -257,24 +263,79 @@ export function FundiDashboard() {
               <div className="flex-1">
                 <p className="font-semibold text-yellow-800 text-sm">Subscription Inactive</p>
                 <p className="text-xs text-yellow-700 mt-0.5 mb-3">Activate to accept jobs and receive payments.</p>
-                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={async () => {
-                  try {
-                    await apiClient.activateSubscription("monthly");
-                    const st = await apiClient.getFundiStatus() as { status?: Record<string, unknown> };
-                    if (st?.status) {
-                      setSubscriptionActive(Boolean(st.status.subscriptionActive));
-                      setSubscriptionDaysLeft(typeof st.status.daysLeft === "number" ? st.status.daysLeft : null);
-                    }
-                    toast.success("Subscription activated!");
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "Failed to activate");
-                  }
-                }}>
+                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => { setSubPlan("monthly"); setSubDialogOpen(true); }}>
                   Activate Subscription
                 </Button>
               </div>
             </div>
           </motion.div>
+        )}
+
+        {subDialogOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-label="Activate subscription">
+            <div className="bg-card w-full max-w-sm rounded-3xl border border-border/50 p-6 relative">
+              <button onClick={() => setSubDialogOpen(false)} className="absolute right-4 top-4 p-1 rounded-lg hover:bg-muted" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2 mb-1">
+                <Smartphone className="w-5 h-5 text-primary" />
+                <h3 className="font-bold">Activate subscription</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Choose a plan and enter your M-Pesa number. You will receive an STK push to confirm the payment.
+              </p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {(["monthly", "yearly"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSubPlan(p)}
+                    className={`rounded-xl border-2 p-3 text-left transition-colors ${subPlan === p ? "border-primary bg-primary/5" : "border-border"}`}
+                  >
+                    <p className="text-sm font-semibold capitalize">{p}</p>
+                    <p className="text-xs text-muted-foreground">KES {p === "monthly" ? "500" : "5,000"}</p>
+                  </button>
+                ))}
+              </div>
+              <label className="block text-xs font-medium mb-1" htmlFor="mpesa-number">M-Pesa phone number</label>
+              <input
+                id="mpesa-number"
+                type="tel"
+                inputMode="tel"
+                value={subPhone}
+                onChange={(e) => setSubPhone(e.target.value)}
+                placeholder="07XX XXX XXX or 2547XXXXXXXX"
+                className="w-full h-10 px-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 mb-4"
+              />
+              <Button
+                className="w-full bg-gradient-primary"
+                disabled={subSubmitting || subPhone.trim().length < 9}
+                onClick={async () => {
+                  setSubSubmitting(true);
+                  try {
+                    await apiClient.activateSubscription(subPlan, subPhone.trim());
+                    toast.success("Payment initiated. Check your phone for the M-Pesa prompt.");
+                    setSubDialogOpen(false);
+                    setSubPhone("");
+                    const st = await apiClient.getFundiStatus() as { status?: Record<string, unknown> };
+                    if (st?.status) {
+                      setSubscriptionActive(Boolean(st.status.subscriptionActive));
+                      setSubscriptionDaysLeft(typeof st.status.daysLeft === "number" ? st.status.daysLeft : null);
+                    }
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Failed to start activation");
+                  } finally {
+                    setSubSubmitting(false);
+                  }
+                }}
+              >
+                {subSubmitting ? "Starting payment…" : `Pay KES ${subPlan === "monthly" ? "500" : "5,000"} via M-Pesa`}
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                The subscription activates only after M-Pesa confirms the payment.
+              </p>
+            </div>
+          </div>
         )}
 
         {subscriptionActive === true && subscriptionDaysLeft != null && subscriptionDaysLeft <= 7 && (

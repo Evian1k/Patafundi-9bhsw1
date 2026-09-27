@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -8,15 +8,14 @@ import {
   Camera,
   Wrench,
   Zap,
-  Droplets,
-  Wind,
-  Hammer,
   Sparkles,
-  Car,
-  PaintBucket,
   CheckCircle,
   X,
   Loader,
+  Search,
+  Building2,
+  BadgeCheck,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -25,6 +24,7 @@ import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
 import AddressDisplay from "@/components/maps/AddressDisplay";
 import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
+import { SERVICE_CATALOG, bookingPathForService } from "@/config/services";
 
 interface PhotoData {
   file: File;
@@ -59,16 +59,12 @@ interface AiAnalysis {
   disclaimers?: string[];
 }
 
-const services = [
-  { id: "plumbing", name: "Plumbing", icon: Droplets, color: "from-blue-500 to-cyan-500" },
-  { id: "electrical", name: "Electrical", icon: Zap, color: "from-yellow-500 to-orange-500" },
-  { id: "hvac", name: "AC & HVAC", icon: Wind, color: "from-sky-500 to-blue-500" },
-  { id: "cleaning", name: "Cleaning", icon: Sparkles, color: "from-emerald-500 to-teal-500" },
-  { id: "carpentry", name: "Carpentry", icon: Hammer, color: "from-amber-500 to-yellow-600" },
-  { id: "auto", name: "Auto Repair", icon: Car, color: "from-red-500 to-rose-500" },
-  { id: "painting", name: "Painting", icon: PaintBucket, color: "from-purple-500 to-pink-500" },
-  { id: "general", name: "General Repair", icon: Wrench, color: "from-gray-500 to-slate-500" },
-];
+interface CompanyServiceItem { id: string; name: string; category: string; description?: string; basePrice?: string | number }
+interface SelectedCompany { id: string; companyName: string; logoUrl?: string | null }
+
+// Spec §22: the full global catalog — customers can also type any custom
+// service in the search box (step 1) and PataFundi routes the request.
+const services = SERVICE_CATALOG;
 
 const providerChoices = [
   {
@@ -102,13 +98,119 @@ const urgencyOptions = [
   { id: "scheduled", label: "Schedule", description: "Pick a date & time", price: "Standard" },
 ];
 
+interface InlineCompany {
+  id: string;
+  companyName: string;
+  rating?: number | null;
+  completedJobs?: number;
+  reviewCount?: number;
+  description?: string;
+}
+
+/**
+ * Inline company discovery inside the booking wizard (spec §17/§20): verified,
+ * eligible companies that offer the selected service appear FIRST, ordered by
+ * real review count. Empty state stays honest — the open pool still works.
+ */
+function CompanyPickerInline({ service, onPick }: { service: string; onPick: (id: string, name: string) => void }) {
+  const [companies, setCompanies] = useState<InlineCompany[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (service) params.set("service", service);
+        const res = await apiClient.request(`/companies?${params.toString()}`, { includeAuth: false }) as {
+          companies?: InlineCompany[];
+        };
+        if (!cancelled) setCompanies(res.companies || []);
+      } catch {
+        if (!cancelled) setCompanies([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [service]);
+
+  if (companies === null) {
+    return (
+      <div className="mt-4 p-4 rounded-xl border border-border bg-card">
+        <div className="h-4 w-40 bg-muted rounded animate-pulse mb-2" />
+        <div className="h-16 bg-muted/60 rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold">
+          {service ? `Verified companies for ${service}` : "Verified companies"}
+        </p>
+        <Link to="/companies" className="text-xs font-medium text-primary hover:underline">
+          View all
+        </Link>
+      </div>
+      {companies.length === 0 ? (
+        <div className="p-4 rounded-xl border border-border bg-card">
+          <p className="text-sm font-medium">No approved companies available for this service right now.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Submit anyway and your job goes to the company open pool — the first eligible company claims it.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {companies.slice(0, 4).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onPick(c.id, c.companyName)}
+              className="w-full p-4 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all text-left flex items-center gap-3"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-sm truncate">{c.companyName}</p>
+                  <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {typeof c.rating === "number" && c.rating > 0 && (
+                    <span className="inline-flex items-center gap-0.5 mr-2">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {c.rating.toFixed(1)}
+                    </span>
+                  )}
+                  {typeof c.reviewCount === "number" && `${c.reviewCount} reviews`}
+                  {typeof c.completedJobs === "number" && c.completedJobs > 0 && ` · ${c.completedJobs} jobs done`}
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-primary shrink-0">Select</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CreateJob = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    // Spec §15: clicking a service drops the customer INTO the flow — when a
+    // service arrives preselected we start at the "describe the problem" step.
+    return searchParams.get("service") ? 2 : 1;
+  });
   const [loading, setLoading] = useState(false);
   const [locationSelection, setLocationSelection] = useState<LocationSelection | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
+  // The selected company persists across every step of the wizard (spec §16):
+  // a banner + its service catalog are shown so the customer never "lands
+  // back at the start" mid-booking.
+  const [companyInfo, setCompanyInfo] = useState<SelectedCompany | null>(null);
+  const [companyServices, setCompanyServices] = useState<CompanyServiceItem[]>([]);
   const [jobData, setJobData] = useState<JobFormData>({
     service: searchParams.get("service") || "",
     problem: searchParams.get("problem") || "",
@@ -163,11 +265,43 @@ const CreateJob = () => {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token) {
-      navigate("/auth");
+      // Preserve the ENTIRE booking intent through login (spec §25/§26) — the
+      // customer returns exactly where they were, company and service intact.
+      const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+      navigate(`/auth?mode=login&next=${next}`);
       return;
     }
     apiClient.getCurrentUser().catch(() => navigate("/auth"));
   }, [navigate]);
+
+  // Load the preselected company's public profile + published services so the
+  // customer books from the services the company ACTUALLY offers (spec §16).
+  useEffect(() => {
+    const companyId = jobData.companyId;
+    if (!companyId) {
+      setCompanyInfo(null);
+      setCompanyServices([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiClient.request(`/companies/${companyId}`, { includeAuth: false }) as {
+          company?: SelectedCompany;
+          services?: CompanyServiceItem[];
+        };
+        if (cancelled) return;
+        setCompanyInfo(res.company ? { id: res.company.id, companyName: res.company.companyName, logoUrl: res.company.logoUrl } : null);
+        setCompanyServices(res.services || []);
+      } catch {
+        if (!cancelled) {
+          setCompanyInfo(null);
+          setCompanyServices([]);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [jobData.companyId]);
 
   const syncLocation = (selection: LocationSelection | null) => {
     setLocationSelection(selection);
@@ -284,14 +418,103 @@ const CreateJob = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8 lg:py-10">
+        {/* Persistent company banner (spec §16): the selected company stays
+            visible and changeable on EVERY step of the booking flow. */}
+        {companyInfo && (
+          <div className="mb-5 rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+              {companyInfo.logoUrl
+                ? <img src={companyInfo.logoUrl} alt="" className="w-full h-full object-cover" />
+                : <Building2 className="w-5 h-5 text-primary" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-semibold truncate">Booking with {companyInfo.companyName}</p>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                  <BadgeCheck className="w-3 h-3" /> Verified
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {companyServices.length > 0
+                  ? `${companyServices.length} services offered · pick yours below`
+                  : "Your request goes to this company's dispatch team"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setJobData((prev) => ({ ...prev, companyId: undefined, providerChoice: "platform_match" }))}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              aria-label="Change company"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {/* Step 1: Service Selection */}
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="text-xl font-display font-bold mb-2">What service do you need?</h2>
-              <p className="text-muted-foreground text-sm mb-6">Select the category that best matches your needs.</p>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {services.map((service) => (
+              <p className="text-muted-foreground text-sm mb-5">
+                {companyInfo
+                  ? `Pick one of the services ${companyInfo.companyName} offers, or search.`
+                  : "Select the category that best matches your needs — or type what you're looking for."}
+              </p>
+
+              {/* Company's own services first (spec §16) — only what the company
+                  actually offers is offered for booking. */}
+              {companyInfo && companyServices.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    {companyInfo.companyName} services
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {companyServices.map((cs) => (
+                      <button
+                        key={cs.id}
+                        type="button"
+                        onClick={() => setJobData((prev) => ({ ...prev, service: cs.name }))}
+                        className={`px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all text-left ${
+                          jobData.service === cs.name
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-border bg-card hover:border-primary/30"
+                        }`}
+                      >
+                        <span>{cs.name}</span>
+                        {cs.basePrice ? (
+                          <span className="ml-2 text-xs text-muted-foreground">from KES {Number(cs.basePrice).toLocaleString()}</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Search — custom services the catalog may not list (spec §23) */}
+              {!companyInfo && (
+                <div className="relative mb-5">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && serviceSearch.trim()) {
+                        setJobData((prev) => ({ ...prev, service: serviceSearch.trim() }));
+                        setStep(2);
+                      }
+                    }}
+                    placeholder="Type a service, e.g. water heater repair"
+                    aria-label="Search for a service"
+                    className="w-full h-11 pl-10 pr-4 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
+                {services
+                  .filter((s) => !serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase()))
+                  .map((service) => (
                   <button
                     key={service.id}
                     onClick={() => setJobData((prev) => ({ ...prev, service: service.name }))}
@@ -308,6 +531,21 @@ const CreateJob = () => {
                   </button>
                 ))}
               </div>
+              {serviceSearch.trim() && !services.some((s) => s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase())) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJobData((prev) => ({ ...prev, service: serviceSearch.trim() }));
+                    setStep(2);
+                  }}
+                  className="mt-4 w-full p-4 rounded-2xl border border-dashed border-primary/40 bg-card text-left hover:bg-primary/5 transition-colors flex items-center gap-3"
+                >
+                  <Sparkles className="w-5 h-5 text-primary shrink-0" />
+                  <span className="text-sm">
+                    Can't find your service? Request <span className="font-semibold">“{serviceSearch.trim()}”</span> and we'll match you with the right professional.
+                  </span>
+                </button>
+              )}
             </motion.div>
           )}
 
@@ -497,30 +735,20 @@ const CreateJob = () => {
               {jobData.providerChoice === "individual" && !jobData.preferredFundiId && (
                 <div className="mt-4 p-4 rounded-xl border border-border bg-card">
                   <p className="text-sm font-medium">No fundi selected yet</p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified professionals and pick one, or submit and PataFundi will broadcast your job to qualified fundis.</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const svc = services.find(
-                        (s) => s.id === jobData.service || s.name.toLowerCase() === jobData.service.toLowerCase(),
-                      );
-                      navigate(svc ? `/services/${svc.id}` : "/companies");
-                    }}
-                  >
-                    Browse fundis
-                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Submit and PataFundi will broadcast your job to qualified fundis near you — the first verified professional to accept gets it. You can also open a fundi's profile and book them directly from there.
+                  </p>
                 </div>
               )}
               {jobData.providerChoice === "company" && !jobData.companyId && (
-                <div className="mt-4 p-4 rounded-xl border border-border bg-card">
-                  <p className="text-sm font-medium">No company selected yet</p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">Browse verified service companies, or submit and your job will go to the company open pool — the first eligible company claims it.</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => navigate("/companies")}>
-                    Browse companies
-                  </Button>
-                </div>
+                <CompanyPickerInline
+                  service={jobData.service}
+                  onPick={(id, name) => {
+                    setJobData((prev) => ({ ...prev, companyId: id }));
+                    setCompanyInfo({ id, companyName: name });
+                    toast.success(`${name} selected — they stay with you to the confirmation step.`);
+                  }}
+                />
               )}
             </motion.div>
           )}

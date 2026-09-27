@@ -4,13 +4,13 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, Shield, Briefcase, TrendingUp, AlertCircle, Clock, RefreshCw,
   Wallet, AlertOctagon, CheckCircle, XCircle, Scale, Activity,
+  Building2, Wifi, Radio, Ban, CreditCard, Banknote, UserCog, ShieldAlert,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
-import { demoDashboardStats, DEMO_MODE } from "@/lib/demo";
 
 interface DashboardStats {
   totalUsers: number;
@@ -25,6 +25,18 @@ interface DashboardStats {
   escrowPending?: number;
   bypassAlerts?: number;
   openDisputes?: number;
+  // Command-center extensions (spec §33/§34) — all real data
+  customersOnline?: number;
+  activeFundis?: number;
+  activeCompanies?: number;
+  pendingCompanyApprovals?: number;
+  cancelledJobs?: number;
+  failedPayments?: number;
+  fraudAlerts?: number;
+  subscriptionRevenue?: number;
+  payoutsPending?: number;
+  payoutsPendingCount?: number;
+  staffAccounts?: number;
 }
 
 interface ChartPoint { name: string; value?: number; jobs?: number; revenue?: number }
@@ -38,17 +50,12 @@ const DEFAULT_STATS: DashboardStats = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>(DEMO_MODE ? (demoDashboardStats as DashboardStats) : DEFAULT_STATS);
+  const [stats, setStats] = useState<DashboardStats>(DEFAULT_STATS);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
-  const [loading, setLoading] = useState(!DEMO_MODE);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(DEMO_MODE ? new Date() : null);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
-    if (DEMO_MODE) {
-      setStats(demoDashboardStats as DashboardStats);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       const response = await apiClient.request('/admin/dashboard-stats', { includeAuth: true }) as {
@@ -86,6 +93,17 @@ export default function AdminDashboard() {
     { icon: Clock, title: "Escrow Queue", value: (stats.escrowPending || 0).toLocaleString(), color: "text-orange-600 bg-orange-50", action: () => navigate('/admin/payments') },
     { icon: Scale, title: "Open Disputes", value: (stats.openDisputes || 0).toLocaleString(), color: (stats.openDisputes || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/disputes'), urgent: (stats.openDisputes || 0) > 0 },
     { icon: TrendingUp, title: "Rejected Fundis", value: stats.rejectedFundis.toLocaleString(), color: "text-red-500 bg-red-50" },
+    // Command-center row (spec §33/§34)
+    { icon: Building2, title: "Active Companies", value: (stats.activeCompanies || 0).toLocaleString(), color: "text-indigo-600 bg-indigo-50", action: () => navigate('/admin/companies') },
+    { icon: Wifi, title: "Fundis Online", value: (stats.activeFundis || 0).toLocaleString(), color: "text-lime-600 bg-lime-50" },
+    { icon: Radio, title: "Customers Online", value: (stats.customersOnline || 0).toLocaleString(), color: "text-sky-600 bg-sky-50" },
+    { icon: Building2, title: "Pending Company Approvals", value: (stats.pendingCompanyApprovals || 0).toLocaleString(), color: "text-amber-600 bg-amber-50", action: () => navigate('/admin/companies'), urgent: (stats.pendingCompanyApprovals || 0) > 0 },
+    { icon: XCircle, title: "Failed Payments", value: (stats.failedPayments || 0).toLocaleString(), color: (stats.failedPayments || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/payments') },
+    { icon: Ban, title: "Cancelled Jobs", value: (stats.cancelledJobs || 0).toLocaleString(), color: "text-gray-600 bg-gray-50", action: () => navigate('/admin/jobs') },
+    { icon: CreditCard, title: "Subscription Revenue", value: formatCurrency(stats.subscriptionRevenue || 0), color: "text-teal-600 bg-teal-50" },
+    { icon: Banknote, title: "Payouts Pending", value: (stats.payoutsPendingCount || 0).toLocaleString(), color: "text-orange-500 bg-orange-50", action: () => navigate('/admin/payouts') },
+    { icon: UserCog, title: "Staff Accounts", value: (stats.staffAccounts || 0).toLocaleString(), color: "text-slate-600 bg-slate-100" },
+    { icon: ShieldAlert, title: "Fraud Alerts", value: (stats.fraudAlerts || 0).toLocaleString(), color: (stats.fraudAlerts || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/security'), urgent: (stats.fraudAlerts || 0) > 0 },
   ];
 
   return (
@@ -96,7 +114,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-500 text-sm">
-              {DEMO_MODE ? 'Demo data — connect backend for live stats' : 'Real-time platform overview'}
+              Real-time platform overview
             </p>
             {lastRefresh && (
               <p className="text-xs text-gray-400 mt-0.5">

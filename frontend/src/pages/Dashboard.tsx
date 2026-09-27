@@ -11,22 +11,11 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { toast } from "sonner";
-import { DEMO_MODE, demoJobs, demoUser } from "@/lib/demo";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
-
-const HOME_CATEGORIES = [
-  { slug: "plumbing", name: "Plumbing" },
-  { slug: "electrical", name: "Electrical" },
-  { slug: "cleaning", name: "Cleaning" },
-  { slug: "hvac", name: "AC & HVAC" },
-  { slug: "auto", name: "Auto Repair" },
-  { slug: "carpentry", name: "Carpentry" },
-  { slug: "painting", name: "Painting" },
-  { slug: "general", name: "General Repair" },
-];
+import { SERVICE_CATALOG, CORE_SERVICE_IDS, findService, bookingPathForService } from "@/config/services";
 
 const LOCATION_ONBOARDING_KEY = "pf_location_onboarding";
 
@@ -141,31 +130,21 @@ const STATUS_COLORS: Record<string, string> = {
 const ACTIVE_STATUSES = ['pending', 'matching', 'accepted', 'on_the_way', 'arrived', 'in_progress'];
 
 function openJobTracking(navigate: ReturnType<typeof useNavigate>, jobId: string) {
-  if (DEMO_MODE) {
-    toast.info("Demo mode is off for live jobs — sign in with a real account.");
-    navigate("/auth");
-    return;
-  }
   navigate(`/job/${jobId}/tracking`);
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ id?: string; email?: string; fullName?: string | null } | null>(
-    DEMO_MODE ? demoUser : null
-  );
-  const [loading, setLoading] = useState(!DEMO_MODE);
-  const [activeJobs, setActiveJobs] = useState<JobData[]>(
-    DEMO_MODE ? demoJobs.filter((j) => ACTIVE_STATUSES.includes(j.status)) : []
-  );
-  const [recentJobs, setRecentJobs] = useState<JobData[]>(
-    DEMO_MODE ? demoJobs.filter((j) => j.status === 'completed') : []
-  );
+  const [user, setUser] = useState<{ id?: string; email?: string; fullName?: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeJobs, setActiveJobs] = useState<JobData[]>([]);
+  const [recentJobs, setRecentJobs] = useState<JobData[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
+  const [showAllServices, setShowAllServices] = useState(false);
+  const [serviceQuery, setServiceQuery] = useState("");
 
   const fetchUserJobs = useCallback(async () => {
-    if (DEMO_MODE) return;
     setJobsLoading(true);
     setJobsError(null);
     try {
@@ -182,7 +161,6 @@ export default function Dashboard() {
   }, []);
 
   const loadUserData = useCallback(async () => {
-    if (DEMO_MODE) { setLoading(false); return; }
     try {
       const userData = await apiClient.getCurrentUser();
       bootstrapAuthSessionFromUser(userData.user);
@@ -208,10 +186,8 @@ export default function Dashboard() {
   }, [navigate, fetchUserJobs]);
 
   useEffect(() => {
-    if (!DEMO_MODE) {
-      const token = localStorage.getItem("auth_token");
-      if (!token) { navigate("/auth"); return; }
-    }
+    const token = localStorage.getItem("auth_token");
+    if (!token) { navigate("/auth"); return; }
     loadUserData();
   }, [navigate, loadUserData]);
 
@@ -250,17 +226,12 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BrandLogo size="xs" iconOnly linkTo={false} />
-            {DEMO_MODE && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Demo</span>}
           </div>
           <div className="flex items-center gap-1">
-            {!DEMO_MODE && (
-              <>
-                <button onClick={() => fetchUserJobs()} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
-                  <RefreshCw className="w-4 h-4 text-muted-foreground" />
-                </button>
-                <NotificationBell />
-              </>
-            )}
+            <button onClick={() => fetchUserJobs()} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Refresh">
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <NotificationBell />
             <button onClick={() => navigate("/settings")} className="p-2 hover:bg-muted rounded-xl transition-colors" aria-label="Settings">
               <Settings className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -310,22 +281,65 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Service categories (spec §11 grid) */}
+        {/* Service categories (spec §11 grid, §22/§28 catalog): every click
+            goes DIRECTLY into the booking flow — no informational page. */}
         <div id="home-categories">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Services</h2>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              value={serviceQuery}
+              onChange={(e) => setServiceQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && serviceQuery.trim()) {
+                  navigate(`/create-job?service=${encodeURIComponent(serviceQuery.trim())}`);
+                }
+              }}
+              placeholder="Search for a service, e.g. water heater repair"
+              aria-label="Search for a service"
+              className="w-full h-11 pl-10 pr-4 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {HOME_CATEGORIES.map((c) => (
+            {(showAllServices
+              ? SERVICE_CATALOG
+              : SERVICE_CATALOG.filter((s) => (CORE_SERVICE_IDS as readonly string[]).includes(s.id))
+            )
+              .filter((s) => !serviceQuery.trim() || s.name.toLowerCase().includes(serviceQuery.trim().toLowerCase()))
+              .map((s) => (
               <Link
-                key={c.slug}
-                to={`/services/${c.slug}`}
+                key={s.id}
+                to={bookingPathForService(s.name)}
                 className="bg-card rounded-2xl border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all"
               >
-                <Wrench className="w-5 h-5 text-primary mb-2" />
-                <p className="text-sm font-semibold">{c.name}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Find a professional</p>
+                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-2`}>
+                  <s.icon className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-sm font-semibold leading-tight">{s.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Book now</p>
               </Link>
             ))}
+            {serviceQuery.trim() &&
+              SERVICE_CATALOG.filter((s) => s.name.toLowerCase().includes(serviceQuery.trim().toLowerCase())).length === 0 && (
+              <Link
+                to={`/create-job?service=${encodeURIComponent(serviceQuery.trim())}`}
+                className="md:col-span-3 col-span-1 bg-card rounded-2xl border border-dashed border-primary/40 p-4 flex items-center gap-3 hover:bg-primary/5 transition-colors"
+              >
+                <Plus className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">Can't find “{serviceQuery.trim()}”?</p>
+                  <p className="text-[11px] text-muted-foreground">Describe what you need and we'll match you with the right professional.</p>
+                </div>
+              </Link>
+            )}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowAllServices((v) => !v)}
+            className="mt-3 text-sm font-medium text-primary hover:underline"
+          >
+            {showAllServices ? "Show fewer services" : `View all services (${SERVICE_CATALOG.length})`}
+          </button>
         </div>
 
         {/* Quick links (spec §20 customer IA) */}

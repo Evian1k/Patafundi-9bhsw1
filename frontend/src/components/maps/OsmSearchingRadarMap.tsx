@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { apiClient } from '@/lib/api';
 import type { Coordinates, NearbyFundi } from '@/lib/maps/types';
 import { createOsmMarkerIcon, OSM_TILES } from './osmMarkers';
@@ -10,6 +10,21 @@ interface OsmSearchingRadarMapProps {
   center: Coordinates;
   height?: string | number;
   skill?: string | null;
+}
+
+/** Teardown guard — cancels in-flight map animations before unmount (spec §12). */
+function MapLifecycleGuard() {
+  const map = useMap();
+  useEffect(() => {
+    return () => {
+      try {
+        map.stop();
+      } catch {
+        /* map already removed */
+      }
+    };
+  }, [map]);
+  return null;
 }
 
 export default function OsmSearchingRadarMap({
@@ -70,6 +85,7 @@ export default function OsmSearchingRadarMap({
         attributionControl
       >
         <TileLayer url={tiles.url} attribution={tiles.attribution} />
+        <MapLifecycleGuard />
         <Marker position={[center.latitude, center.longitude]} icon={customerIcon} />
         {nearbyFundis.map((fundi) => (
           <Marker

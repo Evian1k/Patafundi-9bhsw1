@@ -476,8 +476,13 @@ class ApiClient {
     });
   }
 
-  async activateSubscription(plan: string) {
-    return this.request('/subscriptions/activate', { method: 'POST', body: JSON.stringify({ plan }) });
+  /** Backend contract: POST /subscriptions/activate { plan, mpesaNumber } — the
+   *  STK push is sent to mpesaNumber; payment confirmation activates the plan. */
+  async activateSubscription(plan: string, mpesaNumber: string) {
+    return this.request('/subscriptions/activate', {
+      method: 'POST',
+      body: JSON.stringify({ plan, mpesaNumber }),
+    });
   }
 
   // ── Jobs ─────────────────────────────────────────────────────────────────

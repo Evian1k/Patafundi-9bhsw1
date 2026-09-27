@@ -40,7 +40,7 @@ export default function PortalQuality() {
           <div className="rounded-2xl border bg-card p-4">
             <p className="text-xs text-muted-foreground">Average rating</p>
             <p className="mt-1 text-3xl font-semibold tracking-tight flex items-center gap-1.5">
-              {stats.averageRating.toFixed(1) || "—"}
+              {stats.averageRating.toFixed(1) || "Not recorded"}
               <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
             </p>
           </div>

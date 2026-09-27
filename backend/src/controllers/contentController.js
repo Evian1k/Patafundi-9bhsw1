@@ -177,23 +177,53 @@ export async function help(_req, res) {
   });
 }
 
+/** Split a markdown policy body on '## ' headings into renderable sections. */
+function policyBodyToSections(body) {
+  const text = String(body || '').replace(/\r\n/g, '\n');
+  const parts = text.split(/\n(?=## )/g).map((chunk) => chunk.trim()).filter(Boolean);
+  return parts.map((chunk, idx) => {
+    const m = chunk.match(/^##\s+([^\n]+)/);
+    const title = m ? m[1].replace(/^\d+\.\s*/, '').trim() : `Section ${idx + 1}`;
+    const content = m ? chunk.slice(m[0].length).trim() : chunk;
+    return { id: `s${idx + 1}`, title, content, order: idx + 1 };
+  });
+}
+
 export async function policy(req, res) {
   try {
     const result = await query('select * from policies where slug = $1 and status = $2', [req.params.slug, 'active']);
     if (result.rows[0]) {
-      res.json({ success: true, policy: result.rows[0] });
+      const row = result.rows[0];
+      res.json({
+        success: true,
+        policy: {
+          slug: row.slug,
+          title: row.title,
+          version: `v${row.version}`,
+          sections: policyBodyToSections(row.body),
+        },
+      });
       return;
     }
   } catch (error) {
     logNonFatal('content.policyLookup', error, { slug: req.params.slug });
   }
-  // Fallback to hardcoded
+  // Fallback mirrors the DB shape (structured sections) so the page renders
+  // even before migration 040 has run.
   const policies = {
-    privacy: { slug: 'privacy', title: 'Privacy Policy', body: 'PataFundi stores account, job, payment, and safety data needed to operate the platform.' },
-    terms: { slug: 'terms', title: 'Terms of Service', body: 'Users must keep communication and payments on-platform and comply with local law.' },
+    privacy: { slug: 'privacy', title: 'Privacy Policy', body: 'PataFundi stores account, job, payment, and safety data needed to operate the platform. We never sell your data. Verification documents are stored in a private bucket with signed URL access only.' },
+    terms: { slug: 'terms', title: 'Terms of Service', body: 'Users must keep communication and payments on-platform and comply with local law. Off-platform payments are blocked and may result in account suspension.' },
     safety: { slug: 'safety', title: 'Safety Policy', body: 'Fraud, harassment, unsafe work, and off-platform payment solicitation can lead to restrictions.' },
   };
-  res.json({ success: true, policy: policies[req.params.slug] || null });
+  const p = policies[req.params.slug];
+  if (!p) {
+    res.json({ success: true, policy: null });
+    return;
+  }
+  res.json({
+    success: true,
+    policy: { slug: p.slug, title: p.title, version: 'v1', sections: policyBodyToSections(p.body) },
+  });
 }
 
 export async function service(req, res) {

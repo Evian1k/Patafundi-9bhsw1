@@ -178,7 +178,7 @@ export default function ReportsAnalytics() {
                     <tr key={fundi.id} className="hover:bg-muted/30">
                       <td className="px-4 py-2">#{idx + 1} {fundi.name}</td>
                       <td className="px-4 py-2">{fundi.jobCount} jobs</td>
-                      <td className="px-4 py-2">⭐ {typeof fundi.rating === "number" ? fundi.rating.toFixed(1) : String(fundi.rating ?? "—")}</td>
+                      <td className="px-4 py-2">⭐ {typeof fundi.rating === "number" ? fundi.rating.toFixed(1) : String(fundi.rating ?? "No rating yet")}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -12,9 +12,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patafundi.fundi",
@@ -23,12 +20,17 @@
         "NSCameraUsageDescription": "Allow PataFundi to access your camera for profile photos and job documentation",
         "NSLocationWhenInUseUsageDescription": "Allow PataFundi to access your location to receive job requests and provide accurate service",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow PataFundi to access your location even when the app is in background to receive job requests",
-        "NSPhotoLibraryUsageDescription": "Allow PataFundi to access your photo library for profile photos and job documentation"
+        "NSPhotoLibraryUsageDescription": "Allow PataFundi to access your photo library for profile photos and job documentation",
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {
       "package": "com.patafundi.fundi",
       "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -43,6 +45,12 @@
     "plugins": [
       "expo-location"
     ],
+    "extra": {
+      "apiBaseUrl": "https://patafundi-9bhsw1.onrender.com",
+      "privacyPolicyUrl": "https://patafundi-9bhsw1.vercel.app/privacy",
+      "termsUrl": "https://patafundi-9bhsw1.vercel.app/terms",
+      "supportEmail": "support@patafundi.com"
+    },
     "experiments": {
       "typedRoutes": true
     }

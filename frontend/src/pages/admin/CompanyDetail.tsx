@@ -114,11 +114,11 @@ export default function CompanyDetail() {
               <span className={badge(c.status)}>{c.status}</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {c.legalName ? `${c.legalName} · ` : ""}Reg: {c.registrationNumber || data.application?.company_registration_number || "—"}
+              {c.legalName ? `${c.legalName} · ` : ""}Reg: {c.registrationNumber || data.application?.company_registration_number || "Not recorded"}
               {c.rating ? ` · ★ ${Number(c.rating).toFixed(1)}` : ""}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Owner: {data.owner?.fullName || "—"} ({data.owner?.email || "—"}) · Contact: {c.contactName || "—"} {c.contactPhone || ""}
+              Owner: {data.owner?.fullName || "Unknown"} ({data.owner?.email || "Unknown"}) · Contact: {c.contactName || "Unknown"} {c.contactPhone || ""}
             </p>
             {c.description && <p className="mt-2 text-sm text-muted-foreground max-w-2xl">{c.description}</p>}
           </div>
@@ -181,7 +181,7 @@ export default function CompanyDetail() {
                   </td>
                   <td className="px-4 py-3 capitalize">{m.role}</td>
                   <td className="px-4 py-3"><span className={badge(m.status)}>{m.status}</span></td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{m.skills?.join(" · ") || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{m.skills?.join(" · ") || "No skills listed"}</td>
                 </tr>
               ))}
             </tbody>
@@ -228,7 +228,7 @@ export default function CompanyDetail() {
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatMoney(p.amount)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{p.mpesa_number || "saved account"}</td>
                     <td className="px-4 py-3"><span className={badge(p.status)}>{p.status}</span></td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.provider_reference || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{p.provider_reference || "Not recorded"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -260,12 +260,12 @@ export default function CompanyDetail() {
                 {data.settlements.map((s) => (
                   <tr key={s.id}>
                     <td className="px-4 py-3 whitespace-nowrap">{new Date(s.created_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 capitalize text-xs">{(s.service_category || "—").replace("_", " ")}</td>
+                    <td className="px-4 py-3 capitalize text-xs">{(s.service_category || "Uncategorized").replace("_", " ")}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatMoney(s.gross_amount)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">−{formatMoney(s.commission_amount)}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatMoney(s.net_amount)}</td>
                     <td className="px-4 py-3"><span className={badge(s.status)}>{s.status}</span></td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.paid_at ? new Date(s.paid_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.paid_at ? new Date(s.paid_at).toLocaleDateString() : "Not paid yet"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -296,8 +296,8 @@ export default function CompanyDetail() {
                 {data.jobs.map((j) => (
                   <tr key={j.id}>
                     <td className="px-4 py-3 whitespace-nowrap text-xs">{new Date(j.created_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 capitalize text-xs">{(j.service_category || "—").replace("_", " ")}</td>
-                    <td className="px-4 py-3 text-xs">{j.customer_name || "—"}</td>
+                    <td className="px-4 py-3 capitalize text-xs">{(j.service_category || "Uncategorized").replace("_", " ")}</td>
+                    <td className="px-4 py-3 text-xs">{j.customer_name || "Unknown customer"}</td>
                     <td className="px-4 py-3 text-xs">{j.technician_name || "Unassigned"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatMoney(j.final_price || j.estimated_price || 0)}</td>
                     <td className="px-4 py-3"><span className="capitalize text-xs">{j.status.replace("_", " ")}</span></td>

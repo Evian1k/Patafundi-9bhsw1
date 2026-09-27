@@ -56,16 +56,18 @@ export default function CompanyProfile() {
 
   const book = (service?: ServiceItem) => {
     const token = localStorage.getItem("auth_token");
+    // The booking intent (company + service) travels in the URL through login
+    // via ?next= — after signing in, the customer lands back here exactly
+    // where they were and clicks through into the wizard (spec §16/§25).
     if (!token) {
-      sessionStorage.setItem("pf_booking_company", id || "");
       navigate("/auth?mode=login&next=" + encodeURIComponent(`/companies/${id}`));
       return;
     }
     // Send the customer into the booking wizard with this company preselected
-    // (spec §2/§24): the wizard captures the customer's real location and the
+    // (spec §2/§16): the wizard captures the customer's real location and the
     // server prices the job — the client never fabricates coordinates or prices.
     const params = new URLSearchParams({ company: id || "" });
-    if (service?.category) params.set("service", service.name);
+    if (service?.name) params.set("service", service.name);
     navigate(`/create-job?${params.toString()}`);
   };
 

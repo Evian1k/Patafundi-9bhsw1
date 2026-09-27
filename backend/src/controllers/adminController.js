@@ -89,20 +89,70 @@ function publicFundi(row) {
 }
 
 export async function dashboard(req, res) {
-  const [users, jobs, payments, disputes, revenue, fundis, pendingFundis] = await Promise.all([
+  // Spec §33/§34: the Super Admin command center. EVERY number is a real
+  // database query — fabricated or defaulted metrics are forbidden. The
+  // response keeps the legacy keys (users/jobs/fundis/…) for older callers
+  // and adds the full metric set the command-center UI renders.
+  const [
+    usersTotal, customersOnline, fundisApproved, fundisPending, fundisRejected,
+    fundisSuspended, fundisOnline, companiesApproved, companiesPending,
+    jobsActive, jobsCompleted, jobsCancelled, disputesOpen,
+    escrowHeld, payoutsPending, paymentsFailed, fraudAlertsOpen,
+    subscriptionRevenue, revenue, weeklyJobs, activeStaff,
+  ] = await Promise.all([
+    query('select count(*)::int as total from users'),
+    query(`select count(*)::int as total from users
+             where role in ('customer','fundi','company_admin')
+             and updated_at > now() - interval '15 minutes'`),
+    query(`select count(*)::int as total from fundis where approval_status = 'approved'`),
+    query(`select count(*)::int as total from fundis where approval_status = 'pending'`),
+    query(`select count(*)::int as total from fundis where approval_status = 'rejected'`),
+    query(`select count(*)::int as total from fundis where approval_status = 'suspended'`),
+    query(`select count(*)::int as total from fundis where online = true and approval_status = 'approved'`),
+    query(`select count(*)::int as total from company_profiles where status = 'approved'`),
+    query(`select count(*)::int as total from company_partner_applications where status in ('submitted','pending','in_review')`),
+    query(`select count(*)::int as total from jobs where status in ('pending','matching','searching','matched','accepted','assigned','on_the_way','arrived','in_progress','completion_requested','awaiting_confirmation')`),
+    query(`select count(*)::int as total from jobs where status = 'completed'`),
+    query(`select count(*)::int as total from jobs where status = 'cancelled'`),
+    query(`select count(*)::int as total from disputes where status = 'open'`),
+    query(`select coalesce(sum(amount),0)::numeric as total from payments where escrow_status in ('held','frozen')`),
+    query(`select coalesce(sum(amount),0)::numeric as total, count(*)::int as total_count from payouts where status in ('requested','processing')`),
+    query(`select count(*)::int as total from payments where status = 'failed'`),
+    query(`select count(*)::int as total from fraud_alerts where status = 'open'`),
+    query(`select coalesce(sum(amount),0)::numeric as total from subscriptions where status = 'active' and expires_at > now()`),
+    revenueSummaryQuery(),
+    query(`select to_char(d.day, 'Mon DD') as name,
+                  coalesce(j.cnt, 0)::int as jobs,
+                  coalesce(p.revenue, 0)::numeric as revenue
+             from generate_series(current_date - interval '13 days', current_date, interval '1 day') as d(day)
+             left join (
+               select date_trunc('day', created_at) as day, count(*) as cnt
+               from jobs where created_at > current_date - interval '14 days'
+               group by 1
+             ) j on j.day = d.day
+             left join (
+               select date_trunc('day', created_at) as day, sum(amount) as revenue
+               from payments where status = 'completed' and created_at > current_date - interval '14 days'
+               group by 1
+             ) p on p.day = d.day
+             order by d.day`),
+    query(`select count(*)::int as total from users where role like 'staff%' or role in ('support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor')`),
+  ]);
+
+  const [users, jobs, payments] = await Promise.all([
     query('select count(*)::int as total from users'),
     query('select count(*)::int as total from jobs'),
     query(`select coalesce(sum(amount),0)::numeric as total from payments where status = 'completed'`),
-    query(`select count(*)::int as total from disputes where status = 'open'`),
-    revenueSummaryQuery(),
-    query(`select count(*)::int as total from fundis where approval_status = 'approved'`),
-    query(`select count(*)::int as total from fundis where approval_status = 'pending'`),
   ]);
+
   res.json({
     success: true,
     stats: {
+      // Legacy keys (kept for compatibility)
       users: users.rows[0].total,
       jobs: jobs.rows[0].total,
+      fundis: fundisApproved.rows[0].total,
+      pendingFundis: fundisPending.rows[0].total,
       // Use revenue_ledger (commission + fees) as the authoritative platform revenue.
       // Falls back to payment sum if revenue_ledger has no entries (fresh install).
       revenue: revenue.totals.lifetimeRevenue > 0
@@ -110,11 +160,39 @@ export async function dashboard(req, res) {
         : Number(payments.rows[0].total),
       platformRevenue: revenue.totals.lifetimeRevenue,
       netProfit: revenue.totals.netProfit,
-      openDisputes: disputes.rows[0].total,
+      openDisputes: disputesOpen.rows[0].total,
       revenueBreakdown: revenue,
-      fundis: fundis.rows[0].total,
-      pendingFundis: pendingFundis.rows[0].total,
+      // Command-center metric set (spec §33/§34) — camelCase for the UI
+      totalUsers: usersTotal.rows[0].total,
+      customersOnline: customersOnline.rows[0].total,
+      activeFundis: fundisOnline.rows[0].total,
+      approvedFundis: fundisApproved.rows[0].total,
+      pendingVerifications: fundisPending.rows[0].total,
+      rejectedFundis: fundisRejected.rows[0].total,
+      suspendedFundis: fundisSuspended.rows[0].total,
+      totalFundis: fundisApproved.rows[0].total + fundisPending.rows[0].total,
+      activeCompanies: companiesApproved.rows[0].total,
+      pendingCompanyApprovals: companiesPending.rows[0].total,
+      activeJobs: jobsActive.rows[0].total,
+      completedJobs: jobsCompleted.rows[0].total,
+      cancelledJobs: jobsCancelled.rows[0].total,
+      escrowPending: Number(escrowHeld.rows[0].total || 0),
+      payoutsPending: Number(payoutsPending.rows[0].total || 0),
+      payoutsPendingCount: payoutsPending.rows[0].total_count || 0,
+      failedPayments: paymentsFailed.rows[0].total,
+      fraudAlerts: fraudAlertsOpen.rows[0].total,
+      bypassAlerts: fraudAlertsOpen.rows[0].total,
+      subscriptionRevenue: Number(subscriptionRevenue.rows[0].total || 0),
+      totalRevenue: revenue.totals.lifetimeRevenue > 0
+        ? revenue.totals.lifetimeRevenue
+        : Number(payments.rows[0].total),
+      staffAccounts: activeStaff.rows[0].total,
     },
+    chartData: weeklyJobs.rows.map((r) => ({
+      name: r.name,
+      jobs: Number(r.jobs || 0),
+      revenue: Number(r.revenue || 0),
+    })),
   });
 }
 

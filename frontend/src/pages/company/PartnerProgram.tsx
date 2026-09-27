@@ -224,7 +224,7 @@ export default function PartnerProgram() {
                   <Row k="Contact" v={`${form.contactName} · ${form.contactEmail}`} />
                   <Row k="Categories" v={form.businessCategories.join(", ")} />
                   <Row k="Service areas" v={form.serviceAreas} />
-                  <Row k="Technicians" v={form.technicianCount || "—"} />
+                  <Row k="Technicians" v={form.technicianCount || "Not provided"} />
                   <p className="text-xs text-muted-foreground pt-2">
                     By submitting you confirm the information is accurate. Applications move
                     through review by PataFundi staff; you will be notified of the decision.
@@ -274,7 +274,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-4 border-b pb-2">
       <span className="text-muted-foreground">{k}</span>
-      <span className="font-medium text-right">{v || "—"}</span>
+      <span className="font-medium text-right">{v || "Not provided"}</span>
     </div>
   );
 }

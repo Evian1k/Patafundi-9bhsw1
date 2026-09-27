@@ -89,7 +89,7 @@ export default function PortalDashboard() {
     { label: "Awaiting confirmation", value: s.awaiting_confirmation, icon: BadgeCheck, tone: "text-orange-600 bg-orange-500/10" },
     { label: "Completed", value: s.completed, icon: CheckCircle2, tone: "text-primary bg-primary/10" },
     { label: "Available technicians", value: s.availableTechnicians, icon: Users, tone: "text-sky-600 bg-sky-500/10" },
-    { label: "Rating", value: s.rating ? s.rating.toFixed(1) : "—", icon: Star, tone: "text-amber-600 bg-amber-500/10" },
+    { label: "Rating", value: s.rating ? s.rating.toFixed(1) : "New", icon: Star, tone: "text-amber-600 bg-amber-500/10" },
     { label: "Pending settlements (KES)", value: (s.pendingSettlements ?? 0).toLocaleString(), icon: Wallet, tone: "text-primary bg-primary/10" },
   ];
 

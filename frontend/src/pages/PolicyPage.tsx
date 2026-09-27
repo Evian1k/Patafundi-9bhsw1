@@ -42,17 +42,25 @@ export default function PolicyPage({ slug: slugProp }: { slug?: string }) {
         ) : policy ? (
           <div>
             <h1 className="text-4xl font-display font-bold mb-2">{policy.title}</h1>
-            <p className="text-sm text-muted-foreground mb-8">Version {policy.version}</p>
+            {policy.version && <p className="text-sm text-muted-foreground mb-8">Version {policy.version}</p>}
             <div className="space-y-8">
-              {policy.sections?.map((s) => (
+              {(policy.sections || []).map((s) => (
                 <div key={s.id} className="p-6 bg-card rounded-2xl border border-border/50">
                   <h2 className="text-xl font-semibold mb-4">{s.title}</h2>
                   <Markdown content={s.content} />
                 </div>
               ))}
+              {(!policy.sections || policy.sections.length === 0) && (
+                <p className="text-muted-foreground text-sm">This policy is being updated. Contact support@patafundi.com for details.</p>
+              )}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="text-center py-16">
+            <h1 className="text-2xl font-display font-bold mb-3">Policy not found</h1>
+            <p className="text-muted-foreground text-sm">The page you are looking for does not exist or has been moved.</p>
+          </div>
+        )}
       </div>
     </SiteLayout>
   );

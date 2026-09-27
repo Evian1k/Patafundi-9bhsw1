@@ -79,7 +79,7 @@ export default function AdminPayouts() {
 
   const providerOf = (p: Payout) => ({
     type: p.provider_type || (p.company_name ? "company" : "fundi"),
-    name: p.provider_name || (p.company_name ? p.company_name : p.fundi_name) || "—",
+    name: p.provider_name || (p.company_name ? p.company_name : p.fundi_name) || "Unknown payee",
     email: p.provider_email || (p.company_name ? "" : p.fundi_email) || "",
   });
 
@@ -184,7 +184,7 @@ export default function AdminPayouts() {
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[p.status] || "bg-muted"}`}>{p.status}</span>
                         </td>
-                        <td className="p-3 text-xs text-muted-foreground">{p.reference || p.destination || p.mpesa_number || "—"}</td>
+                        <td className="p-3 text-xs text-muted-foreground">{p.reference || p.destination || p.mpesa_number || "Not recorded"}</td>
                         <td className="p-3 text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString()}</td>
                         <td className="p-3 text-right">
                           {actionable ? (
@@ -192,7 +192,7 @@ export default function AdminPayouts() {
                               <BadgeCheck className="w-3.5 h-3.5 mr-1.5" />Complete
                             </Button>
                           ) : (
-                            <span className="text-xs text-muted-foreground">{p.provider_reference || "—"}</span>
+                            <span className="text-xs text-muted-foreground">{p.provider_reference || "Not recorded"}</span>
                           )}
                         </td>
                       </tr>

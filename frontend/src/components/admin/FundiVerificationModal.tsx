@@ -95,15 +95,15 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
           <div className="grid grid-cols-3 gap-3">
             <div className="p-4 bg-gray-50 rounded-xl text-center">
               <p className="text-xs text-gray-500 mb-1">Face Match</p>
-              <p className={`text-2xl font-bold ${scoreColor(faceMatch)}`}>{faceMatch != null ? `${faceMatch}%` : "—"}</p>
+              <p className={`text-2xl font-bold ${scoreColor(faceMatch)}`}>{faceMatch != null ? `${faceMatch}%` : "Not analyzed"}</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-xl text-center">
               <p className="text-xs text-gray-500 mb-1">Liveness</p>
-              <p className={`text-2xl font-bold ${scoreColor(liveness)}`}>{liveness != null ? `${liveness}%` : "—"}</p>
+              <p className={`text-2xl font-bold ${scoreColor(liveness)}`}>{liveness != null ? `${liveness}%` : "Not analyzed"}</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-xl text-center">
               <p className="text-xs text-gray-500 mb-1">Fraud Risk</p>
-              <p className={`text-2xl font-bold ${scoreColor(fraudRisk, true)}`}>{fraudRisk != null ? `${fraudRisk}%` : "—"}</p>
+              <p className={`text-2xl font-bold ${scoreColor(fraudRisk, true)}`}>{fraudRisk != null ? `${fraudRisk}%` : "Not analyzed"}</p>
             </div>
           </div>
 
@@ -115,7 +115,7 @@ export default function FundiVerificationModal({ fundi, onClose }: FundiVerifica
               ].map(([label, value]) => (
                 <div key={label as string} className="p-3 bg-gray-50 rounded-xl">
                   <p className="text-xs text-gray-500 mb-0.5">{label as string}</p>
-                  <p className="font-medium">{(value as string) || "—"}</p>
+                  <p className="font-medium">{(value as string) || "Not provided"}</p>
                 </div>
               ))}
             </div>

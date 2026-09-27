@@ -75,13 +75,13 @@ export default function StaffOverview() {
 
   const cards: Array<{ label: string; value: string | number; icon: React.ElementType; href?: string; perm?: string }> = [];
   if (role === "super_admin" || permissions.has("can_view_metrics")) {
-    cards.push({ label: "Total Fundis", value: stats.fundis ?? "—", icon: Wrench, href: "/staff/admin/fundis", perm: "can_view_fundis" });
-    cards.push({ label: "Total Jobs", value: stats.jobs ?? "—", icon: Package, href: "/staff/admin/jobs", perm: "can_view_all_jobs" });
-    cards.push({ label: "Revenue (KES)", value: stats.revenue?.toLocaleString() ?? "—", icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
-    cards.push({ label: "Users", value: stats.users ?? "—", icon: Users, href: "/staff/admin/users", perm: "can_view_users" });
+    cards.push({ label: "Total Fundis", value: String(stats.fundis ?? 0), icon: Wrench, href: "/staff/admin/fundis", perm: "can_view_fundis" });
+    cards.push({ label: "Total Jobs", value: String(stats.jobs ?? 0), icon: Package, href: "/staff/admin/jobs", perm: "can_view_all_jobs" });
+    cards.push({ label: "Revenue (KES)", value: stats.revenue?.toLocaleString() ?? "0", icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
+    cards.push({ label: "Users", value: String(stats.users ?? 0), icon: Users, href: "/staff/admin/users", perm: "can_view_users" });
   }
   if (permissions.has("can_view_fraud_dashboard")) {
-    cards.push({ label: "Open Fraud Alerts", value: stats.fraudAlerts ?? "—", icon: AlertTriangle, href: "/staff/fraud" });
+    cards.push({ label: "Open Fraud Alerts", value: String(stats.fraudAlerts ?? 0), icon: AlertTriangle, href: "/staff/fraud" });
   }
 
   const containerVariants = reduceMotion ? {} : stagger;
