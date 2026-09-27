@@ -470,3 +470,26 @@ Work Log:
 
 Stage Summary:
 - Fundis and customers can now report problems, contact support and read safety/rules without ever leaving their dashboard; disputes are filed against real bookings picked from a dropdown, never typed IDs.
+
+---
+Task ID: 22 (ultimate production build pass - full master-spec sweep)
+Agent: Super Z (main agent)
+Task: User demanded the full 86-section master production spec be executed end-to-end: audit everything, fix every bug, no placeholders, no dead buttons, complete workflows for customers/fundis/companies/admin/staff, on web AND mobile apps.
+
+Work Log:
+- Full 3-agent parallel audit (backend 409 routes / frontend route map + api client / both mobile apps) against the master spec; baseline healthy (typecheck 0, 124/124 tests, build ok)
+- Rebuilt corrupted dev PGlite (block-read failure during 017), re-ran ensure-dev-db (041+042 applied) + seed-takeover; stack healthy on :4000/:3000
+- Backend bug fixes: SMS gate env mismatch (notificationService now uses smsService.isSmsConfigured + provider auto-detect); POST /company/applications/:id/submit had been aliased to the ADMIN review handler - now a dedicated owner-checked submit with reviewer notifications
+- Dispute parity (spec 37): company members + assigned technicians can open/see/evidence disputes (mirrors chat access); listDisputes SQL extended accordingly
+- Refund UNDER_REVIEW state (spec 38) via decide action "review" + customer notification; support tickets gained waiting_customer, staff assignment, persisted internal_notes, and a dedicated 8/15min rate limit on the public endpoint (spec 71)
+- Subscriptions lifecycle (spec 22-24): GET /subscriptions/mine, /status, /cancel (audit-logged); fundi Pro flag returned in public search with subscribed-first ordering (paid visibility never overrides verification/eligibility)
+- Admin content CRUD (spec 46-47): blog + careers create/edit/publish/delete with auditLog; migration 042 adds under_review + waiting_customer CHECK states
+- Web: new public Blog (index + article), Careers (with real application dialog -> career_applications), Admin Content manager (/admin/content); Save/heart toggle on fundi profiles (favorites finally usable end-to-end); refunds surfaced in Dispute Center; full /notifications page + bell View-all; FundiDashboard shows active plan + days left + cancel
+- Fundi mobile app: complete disputes flow (list, report-a-problem with real job picker + photo evidence, fundi-side reasons), notifications screen, in-app support tickets replacing mailto-only help, forgot-password screen, deep-link config (patafundi-fundi:// + universal links)
+- Customer mobile app: Report a Problem button on job tracking, first-run onboarding wired (AsyncStorage gate), push notifications via expo-notifications + expo-device (permission, FCM token -> /devices/register) in BOTH apps, fixed fragile cross-tab "See all" nav
+- Verification: typecheck 0, 124/124 unit tests, vite build ok, api contract probe 181/181 OK, live probes (subscriptions/mine 401->200 authed, refunds/mine, disputes, admin blog 401, support ticket 201 through new limiter, blog + careers seeded data); mobile tsc clean except pre-existing shared-package resolution errors (verified identical on stashed baseline); em/en-dash sweep clean (comments only)
+- Commit e89ff7a pushed to origin/main (Vercel + Render auto-deploy; Render boot applies 042)
+
+Stage Summary:
+- Master-spec gaps closed: refund + support workflow states, dispute participation for companies/technicians, subscription lifecycle + entitlement visibility, DB-backed blog/careers with admin tooling, in-app support for fundis, push architecture wired end-to-end, deep links on both apps.
+- Every new surface uses real database data with honest empty states; zero mock, zero dead buttons introduced; existing functionality preserved.
