@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import BackBar from "@/components/layout/BackBar";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
 import { bootstrapAuthSessionFromUser, resolveAuthRole } from "@/lib/authSession";
 import { classifyCustomerBooking, isQuotePhase, statusLabel } from "@/lib/bookingStatus";
 
@@ -73,7 +74,7 @@ function JobCard({ job }: { job: JobRow }) {
             </span>
           )}
           {job.estimated_price != null && (
-            <span className="text-xs text-muted-foreground">KES {Number(job.estimated_price).toLocaleString()}</span>
+            <span className="text-xs text-muted-foreground">{formatMoney(job.estimated_price)}</span>
           )}
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </div>

@@ -8,32 +8,33 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { apiClient } from '@/lib/api';
-import { isApiConfigured } from '@/config/env';
+import { formatMoney } from '@/lib/money';
 import ServiceUnavailableState from '@/components/system/ServiceUnavailableState';
 import { DisputeForm } from '@/components/support/ReportProblemModal';
 import { HelpLinksInline } from '@/components/support/HelpKit';
 
-type DisputeStatus = 'open' | 'investigating' | 'customer_won' | 'fundi_won' | 'resolved' | 'escalated';
+// Backend dispute statuses (disputeController): open, under_review, resolved.
+type DisputeStatus = 'open' | 'under_review' | 'resolved';
 
+// listDisputes returns raw DB rows: snake_case columns + joined job fields.
 interface Dispute {
   id: string;
-  jobId: string;
-  jobTitle?: string;
+  job_id: string;
+  job_title?: string | null;
+  booking_number?: string | null;
+  service_category?: string | null;
   reason: string;
   status: DisputeStatus;
-  createdAt: string;
-  updatedAt?: string;
-  resolution?: string;
+  created_at: string;
+  updated_at?: string;
+  resolution?: string | null;
   amount?: number;
 }
 
 const STATUS_CONFIG: Record<DisputeStatus, { label: string; color: string; icon: React.ReactNode }> = {
   open: { label: 'Open', color: 'bg-yellow-100 text-yellow-800', icon: <Clock className="w-3.5 h-3.5" /> },
-  investigating: { label: 'Investigating', color: 'bg-blue-100 text-blue-800', icon: <AlertOctagon className="w-3.5 h-3.5" /> },
-  customer_won: { label: 'Resolved - Customer', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  fundi_won: { label: 'Resolved - Fundi', color: 'bg-purple-100 text-purple-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  resolved: { label: 'Resolved', color: 'bg-gray-100 text-gray-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
-  escalated: { label: 'Escalated', color: 'bg-red-100 text-red-800', icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-800', icon: <AlertOctagon className="w-3.5 h-3.5" /> },
+  resolved: { label: 'Resolved', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3.5 h-3.5" /> },
 };
 
 interface RefundRequest {
@@ -195,10 +196,15 @@ export default function DisputeCenter() {
                     <Card className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{dispute.jobTitle || `Job ${dispute.jobId?.substring(0, 8)}...`}</p>
+                          <p className="font-semibold text-sm truncate">
+                            {dispute.job_title || dispute.service_category?.replace(/_/g, ' ') || 'Job'}
+                            {dispute.booking_number ? (
+                              <span className="font-mono text-xs text-muted-foreground font-normal"> · {dispute.booking_number}</span>
+                            ) : null}
+                          </p>
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{dispute.reason}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(dispute.createdAt).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {dispute.created_at ? new Date(dispute.created_at).toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
                           </p>
                         </div>
                         <span className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${cfg.color}`}>
@@ -236,9 +242,9 @@ export default function DisputeCenter() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm">
-                          KES {Number(refund.amount).toLocaleString()}
+                          {formatMoney(refund.amount)}
                           {refund.service_category ? (
-                            <span className="font-normal text-muted-foreground"> - {refund.service_category}</span>
+                            <span className="font-normal text-muted-foreground"> - {refund.service_category.replace(/_/g, ' ')}</span>
                           ) : null}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{refund.reason}</p>

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function AdminDashboard() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [statsError, setStatsError] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -65,9 +67,11 @@ export default function AdminDashboard() {
       setStats({ ...DEFAULT_STATS, ...response.stats });
       setChartData(response.chartData || []);
       setLastRefresh(new Date());
+      setStatsError(false);
     } catch (error) {
       console.error('Dashboard fetch error:', error);
-      // Don't clear existing stats on error
+      // Keep prior values on screen, but say so - silent zeros look like data.
+      setStatsError(true);
     } finally {
       setLoading(false);
     }
@@ -79,16 +83,13 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount || 0);
-
   const statCards = [
     { icon: Users, title: "Total Users", value: stats.totalUsers.toLocaleString(), color: "text-blue-600 bg-blue-50", action: () => navigate('/admin/customers') },
     { icon: Shield, title: "Approved Fundis", value: stats.approvedFundis.toLocaleString(), color: "text-green-600 bg-green-50", action: () => navigate('/admin/fundis') },
     { icon: AlertCircle, title: "Pending Reviews", value: stats.pendingVerifications.toLocaleString(), color: "text-yellow-600 bg-yellow-50", action: () => navigate('/admin/fundis'), urgent: stats.pendingVerifications > 0 },
     { icon: Activity, title: "Active Jobs", value: stats.activeJobs.toLocaleString(), color: "text-purple-600 bg-purple-50", action: () => navigate('/admin/jobs') },
     { icon: Briefcase, title: "Completed Jobs", value: stats.completedJobs.toLocaleString(), color: "text-cyan-600 bg-cyan-50" },
-    { icon: Wallet, title: "Total Revenue", value: formatCurrency(stats.totalRevenue), color: "text-emerald-600 bg-emerald-50", action: () => navigate('/admin/payments') },
+    { icon: Wallet, title: "Total Revenue", value: formatMoney(stats.totalRevenue), color: "text-emerald-600 bg-emerald-50", action: () => navigate('/admin/payments') },
     { icon: AlertOctagon, title: "Bypass Alerts", value: (stats.bypassAlerts || 0).toLocaleString(), color: "text-red-600 bg-red-50", action: () => navigate('/admin/security'), urgent: (stats.bypassAlerts || 0) > 0 },
     { icon: Clock, title: "Escrow Queue", value: (stats.escrowPending || 0).toLocaleString(), color: "text-orange-600 bg-orange-50", action: () => navigate('/admin/payments') },
     { icon: Scale, title: "Open Disputes", value: (stats.openDisputes || 0).toLocaleString(), color: (stats.openDisputes || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/disputes'), urgent: (stats.openDisputes || 0) > 0 },
@@ -100,7 +101,7 @@ export default function AdminDashboard() {
     { icon: Building2, title: "Pending Company Approvals", value: (stats.pendingCompanyApprovals || 0).toLocaleString(), color: "text-amber-600 bg-amber-50", action: () => navigate('/admin/companies'), urgent: (stats.pendingCompanyApprovals || 0) > 0 },
     { icon: XCircle, title: "Failed Payments", value: (stats.failedPayments || 0).toLocaleString(), color: (stats.failedPayments || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/payments') },
     { icon: Ban, title: "Cancelled Jobs", value: (stats.cancelledJobs || 0).toLocaleString(), color: "text-gray-600 bg-gray-50", action: () => navigate('/admin/jobs') },
-    { icon: CreditCard, title: "Subscription Revenue", value: formatCurrency(stats.subscriptionRevenue || 0), color: "text-teal-600 bg-teal-50" },
+    { icon: CreditCard, title: "Subscription Revenue", value: formatMoney(stats.subscriptionRevenue || 0), color: "text-teal-600 bg-teal-50" },
     { icon: Banknote, title: "Payouts Pending", value: (stats.payoutsPendingCount || 0).toLocaleString(), color: "text-orange-500 bg-orange-50", action: () => navigate('/admin/payouts') },
     { icon: UserCog, title: "Staff Accounts", value: (stats.staffAccounts || 0).toLocaleString(), color: "text-slate-600 bg-slate-100" },
     { icon: ShieldAlert, title: "Fraud Alerts", value: (stats.fraudAlerts || 0).toLocaleString(), color: (stats.fraudAlerts || 0) > 0 ? "text-red-600 bg-red-50" : "text-gray-600 bg-gray-50", action: () => navigate('/admin/security'), urgent: (stats.fraudAlerts || 0) > 0 },
@@ -127,6 +128,12 @@ export default function AdminDashboard() {
             Refresh
           </Button>
         </div>
+
+        {statsError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            Live metrics could not be refreshed just now - the cards below may show stale or zero values. Retry with the Refresh button.
+          </div>
+        )}
 
         {/* Priority alerts */}
         {!loading && (stats.pendingVerifications > 0 || (stats.bypassAlerts || 0) > 0 || (stats.openDisputes || 0) > 0) && (
@@ -205,14 +212,14 @@ export default function AdminDashboard() {
             </Card>
 
             <Card className="p-5">
-              <h3 className="font-semibold mb-1 text-gray-900">Revenue (KES)</h3>
+              <h3 className="font-semibold mb-1 text-gray-900">Revenue</h3>
               <p className="text-xs text-gray-400 mb-4">Platform earnings</p>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => `KES ${v.toLocaleString()}`} />
+                  <Tooltip formatter={(v: number) => formatMoney(v)} />
                   <Bar dataKey="revenue" fill="hsl(174 72% 40%)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

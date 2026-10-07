@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Brain, AlertTriangle, TrendingUp, DollarSign, Shield, Users,
-  Activity, RefreshCw, CheckCircle, XCircle, Eye, Sparkles,
+  Activity, CheckCircle, XCircle, Eye, Sparkles,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
@@ -65,6 +65,7 @@ export default function AICommandCenter() {
   const [running, setRunning] = useState(false);
   const [role, setRole] = useState("");
   const [filter, setFilter] = useState<string>("pending");
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -84,12 +85,15 @@ export default function AICommandCenter() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiClient.request("/ai/dashboard", { includeAuth: true }) as AIDashboard;
-      setDashboard(data);
+      // aiController.aiDashboard() wraps the payload: { success, dashboard }.
+      const data = await apiClient.request("/ai/dashboard", { includeAuth: true }) as { dashboard?: AIDashboard };
+      setDashboard(data.dashboard || null);
       const recs = await apiClient.request(`/ai/recommendations?status=${filter}`, { includeAuth: true }) as { recommendations: AIRecommendation[] };
       setRecommendations(recs.recommendations || []);
+      setLoadError(false);
     } catch {
-      // ignore
+      // Surface the failure instead of rendering a lying empty state.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -102,8 +106,9 @@ export default function AICommandCenter() {
   const runAnalysis = async () => {
     setRunning(true);
     try {
-      const result = await apiClient.request("/ai/run", { method: "POST", includeAuth: true }) as { totalRecommendations: number };
-      toast.success(`AI analysis complete - ${result.totalRecommendations} recommendations generated`);
+      // aiController.run() returns { success, result: { totalRecommendations } }.
+      const data = await apiClient.request("/ai/run", { method: "POST", includeAuth: true }) as { result?: { totalRecommendations?: number } };
+      toast.success(`AI analysis complete - ${data.result?.totalRecommendations ?? 0} recommendations generated`);
       fetchData();
     } catch {
       toast.error("AI analysis failed");
@@ -127,7 +132,7 @@ export default function AICommandCenter() {
   };
 
   if (role !== "super_admin") {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">Verifying access…</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-muted/40 text-muted-foreground">Verifying access…</div>;
   }
 
   const containerVariants = reduceMotion ? {} : stagger;
@@ -142,8 +147,8 @@ export default function AICommandCenter() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">AI Command Center</h1>
-              <p className="text-slate-500 text-sm">Advisory only - AI recommends, super_admin decides</p>
+              <h1 className="text-2xl font-bold text-foreground">AI Command Center</h1>
+              <p className="text-muted-foreground text-sm">Advisory only - AI recommends, super_admin decides</p>
             </div>
           </div>
           <Button onClick={runAnalysis} disabled={running}>
@@ -162,24 +167,31 @@ export default function AICommandCenter() {
           </div>
         </motion.div>
 
+        {loadError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 flex items-center justify-between gap-3">
+            <span>AI metrics could not be loaded just now - figures below may be incomplete.</span>
+            <Button variant="outline" size="sm" onClick={fetchData}>Retry</Button>
+          </div>
+        )}
+
         {/* Stats */}
         {dashboard && (
           <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-              <div className="text-2xl font-bold text-slate-900">{dashboard.pending?.total || 0}</div>
-              <div className="text-xs text-slate-500">Pending Recommendations</div>
+            <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
+              <div className="text-2xl font-bold text-foreground">{dashboard.pending?.total || 0}</div>
+              <div className="text-xs text-muted-foreground">Pending Recommendations</div>
             </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+            <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
               <div className="text-2xl font-bold text-red-600">{dashboard.pending?.critical || 0}</div>
-              <div className="text-xs text-slate-500">Critical Alerts</div>
+              <div className="text-xs text-muted-foreground">Critical Alerts</div>
             </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+            <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
               <div className="text-2xl font-bold text-orange-600">{dashboard.pending?.high || 0}</div>
-              <div className="text-xs text-slate-500">High Priority</div>
+              <div className="text-xs text-muted-foreground">High Priority</div>
             </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+            <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
               <div className="text-2xl font-bold text-emerald-600">{dashboard.stats?.actioned || 0}</div>
-              <div className="text-xs text-slate-500">Actions Taken</div>
+              <div className="text-xs text-muted-foreground">Actions Taken</div>
             </div>
           </motion.div>
         )}
@@ -194,12 +206,12 @@ export default function AICommandCenter() {
                   key={cat.category}
                   onClick={() => setFilter(cat.category === filter ? "pending" : cat.category)}
                   className={`p-3 rounded-xl border text-left transition-colors ${
-                    filter === cat.category ? "bg-primary/10 border-primary" : "bg-white border-slate-100 hover:bg-slate-50"
+                    filter === cat.category ? "bg-primary/10 border-primary" : "bg-card border-border/60 hover:bg-muted/40"
                   }`}
                 >
-                  <Icon className="w-4 h-4 text-slate-600 mb-1" />
-                  <div className="text-sm font-medium text-slate-900 capitalize">{cat.category.replace(/_/g, " ")}</div>
-                  <div className="text-xs text-slate-500">{cat.pending} pending / {cat.count} total</div>
+                  <Icon className="w-4 h-4 text-muted-foreground mb-1" />
+                  <div className="text-sm font-medium text-foreground capitalize">{cat.category.replace(/_/g, " ")}</div>
+                  <div className="text-xs text-muted-foreground">{cat.pending} pending / {cat.count} total</div>
                 </button>
               );
             })}
@@ -209,14 +221,14 @@ export default function AICommandCenter() {
         {/* Recommendations */}
         <motion.div variants={fadeUp}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Recommendations</h2>
+            <h2 className="text-lg font-semibold text-foreground">Recommendations</h2>
             <div className="flex gap-2">
               {["pending", "reviewed", "dismissed", "actioned"].map((s) => (
                 <button
                   key={s}
                   onClick={() => setFilter(s)}
                   className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    filter === s ? "bg-primary text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    filter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
                   }`}
                 >
                   {s}
@@ -226,9 +238,9 @@ export default function AICommandCenter() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8 text-slate-400">Loading recommendations…</div>
+            <div className="text-center py-8 text-muted-foreground">Loading recommendations…</div>
           ) : recommendations.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center text-slate-400 border border-slate-100">
+            <div className="bg-card rounded-2xl p-8 text-center text-muted-foreground border border-border/60">
               <CheckCircle className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
               No recommendations in this category. Run AI analysis to generate new insights.
             </div>
@@ -238,24 +250,24 @@ export default function AICommandCenter() {
                 const Icon = CATEGORY_ICONS[rec.category] || Activity;
                 const severityClass = SEVERITY_COLORS[rec.severity] || SEVERITY_COLORS.info;
                 return (
-                  <div key={rec.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                  <div key={rec.id} className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-5 h-5 text-slate-600" />
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-slate-900">{rec.title}</h3>
+                          <h3 className="font-semibold text-foreground">{rec.title}</h3>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${severityClass}`}>
                             {rec.severity}
                           </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
                             {rec.confidence}% confidence
                           </span>
                         </div>
-                        <p className="text-sm text-slate-600 mb-2">{rec.description}</p>
+                        <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
                         <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
-                          <p className="text-sm text-slate-700">
+                          <p className="text-sm text-foreground">
                             <strong className="text-primary">AI recommends:</strong> {rec.recommendation}
                           </p>
                         </div>
@@ -273,7 +285,7 @@ export default function AICommandCenter() {
                           </div>
                         )}
                         {rec.status !== "pending" && (
-                          <div className="text-xs text-slate-400 mt-2 capitalize">
+                          <div className="text-xs text-muted-foreground mt-2 capitalize">
                             Status: {rec.status}
                           </div>
                         )}

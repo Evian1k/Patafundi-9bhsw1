@@ -441,15 +441,31 @@ export async function listCustomers(_req, res) {
 export async function searchFundis(req, res) {
   const status = req.query.status ? String(req.query.status) : null;
   const q = req.query.q ? `%${String(req.query.q).toLowerCase()}%` : null;
+  // Honor real paging so large verification queues are never silently truncated.
+  const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit || '50'), 10) || 50));
+  const offset = (page - 1) * limit;
+  const countResult = await query(
+    `select count(*)::int as total
+     from fundis f join users u on u.id = f.user_id
+     where ($1::text is null or f.approval_status = $1)
+       and ($2::text is null or lower(u.full_name) like $2 or lower(u.email) like $2 or u.phone like $2)`,
+    [status, q],
+  );
+  const total = countResult.rows[0]?.total || 0;
   const result = await query(
     `${tableSelects.fundis}
      where ($1::text is null or f.approval_status = $1)
        and ($2::text is null or lower(u.full_name) like $2 or lower(u.email) like $2 or u.phone like $2)
-     order by f.created_at desc limit 100`,
+     order by f.created_at desc limit ${limit} offset ${offset}`,
     [status, q],
   );
   const fundis = result.rows.map(publicFundi);
-  res.json({ success: true, fundis, pagination: { page: 1, limit: 100, total: fundis.length, pages: 1 } });
+  res.json({
+    success: true,
+    fundis,
+    pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+  });
 }
 
 export async function getFundi(req, res) {

@@ -32,6 +32,8 @@ function publicUser(user) {
     role: user.role,
     status: user.status,
     trustScore: user.trust_score,
+    // 2FA state drives the Security Center badge; never fabricate it client-side.
+    totpEnabled: !!user.totp_enabled,
   };
 }
 

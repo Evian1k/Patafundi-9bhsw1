@@ -6,19 +6,24 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, Calculator, History, Save } from "lucide-react";
+import { Calculator, History, Save } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import { SERVICE_CATALOG } from "@/config/services";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const CATEGORIES = ["plumbing", "electrical", "cleaning", "painting", "mechanic", "carpentry", "moving", "hvac"];
+// Real bookable categories from the shared service catalog - never a hand-
+// typed list that drifts from what jobs can actually be created with.
+const CATEGORIES = SERVICE_CATALOG.map((s) => s.id);
 
 export default function CommissionControl() {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
 
   // Simulator state
   const [simAmount, setSimAmount] = useState("10000");
@@ -37,8 +42,9 @@ export default function CommissionControl() {
     try {
       const data = await apiClient.request("/admin/commission/history", { includeAuth: true }) as { history: any[] };
       setHistory(data.history || []);
+      setHistoryError(false);
     } catch {
-      // ignore
+      setHistoryError(true);
     } finally {
       setLoading(false);
     }
@@ -96,34 +102,34 @@ export default function CommissionControl() {
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <motion.div initial="hidden" animate="visible" variants={containerVariants}>
         <motion.div variants={fadeUp} className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Commission Control Center</h1>
-          <p className="text-slate-500 text-sm mt-1">Set commission rates, simulate revenue, and audit changes</p>
+          <h1 className="text-2xl font-bold text-foreground">Commission Control Center</h1>
+          <p className="text-muted-foreground text-sm mt-1">Set commission rates, simulate revenue, and audit changes</p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Revenue Simulator */}
-          <motion.div variants={fadeUp} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <motion.div variants={fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
             <div className="flex items-center gap-2 mb-4">
               <Calculator className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold text-slate-900">Revenue Simulator</h2>
+              <h2 className="font-semibold text-foreground">Revenue Simulator</h2>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-500">Job Amount (KES)</label>
+                <label className="text-xs text-muted-foreground">Job Amount (KSh)</label>
                 <input type="number" value={simAmount} onChange={(e) => setSimAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1" />
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
               <div>
-                <label className="text-xs text-slate-500">Category</label>
+                <label className="text-xs text-muted-foreground">Category</label>
                 <select value={simCategory} onChange={(e) => setSimCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1">
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1">
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500">Commission Rate (%)</label>
+                <label className="text-xs text-muted-foreground">Commission Rate (%)</label>
                 <input type="number" value={simRate} onChange={(e) => setSimRate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1" />
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
               <Button className="w-full" onClick={runSimulation}>
                 <Calculator className="w-4 h-4 mr-2" /> Simulate
@@ -132,20 +138,20 @@ export default function CommissionControl() {
                 <div className="mt-4 p-4 bg-primary/5 rounded-xl border border-primary/10">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <div className="text-slate-500 text-xs">Job Amount</div>
-                      <div className="font-bold text-slate-900">KES {simResult.jobAmount.toLocaleString()}</div>
+                      <div className="text-muted-foreground text-xs">Job Amount</div>
+                      <div className="font-bold text-foreground">{formatMoney(simResult.jobAmount)}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500 text-xs">Commission Rate</div>
-                      <div className="font-bold text-slate-900">{simResult.commissionPercent}</div>
+                      <div className="text-muted-foreground text-xs">Commission Rate</div>
+                      <div className="font-bold text-foreground">{simResult.commissionPercent}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500 text-xs">Platform Earnings</div>
-                      <div className="font-bold text-emerald-600">KES {simResult.platformEarnings.toLocaleString()}</div>
+                      <div className="text-muted-foreground text-xs">Platform Earnings</div>
+                      <div className="font-bold text-emerald-600">{formatMoney(simResult.platformEarnings)}</div>
                     </div>
                     <div>
-                      <div className="text-slate-500 text-xs">Fundi Earnings</div>
-                      <div className="font-bold text-blue-600">KES {simResult.fundiEarnings.toLocaleString()}</div>
+                      <div className="text-muted-foreground text-xs">Fundi Earnings</div>
+                      <div className="font-bold text-blue-600">{formatMoney(simResult.fundiEarnings)}</div>
                     </div>
                   </div>
                 </div>
@@ -154,39 +160,39 @@ export default function CommissionControl() {
           </motion.div>
 
           {/* Update Rate */}
-          <motion.div variants={fadeUp} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+          <motion.div variants={fadeUp} className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
             <div className="flex items-center gap-2 mb-4">
               <Save className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold text-slate-900">Update Commission Rate</h2>
+              <h2 className="font-semibold text-foreground">Update Commission Rate</h2>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-500">Scope</label>
+                <label className="text-xs text-muted-foreground">Scope</label>
                 <select value={updateScope} onChange={(e) => setUpdateScope(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1">
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1">
                   <option value="global">Global (all categories)</option>
                   <option value="category">Per Category</option>
                 </select>
               </div>
               {updateScope === "category" && (
                 <div>
-                  <label className="text-xs text-slate-500">Category</label>
+                  <label className="text-xs text-muted-foreground">Category</label>
                   <select value={updateCategory} onChange={(e) => setUpdateCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1">
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1">
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}
                   </select>
                 </div>
               )}
               <div>
-                <label className="text-xs text-slate-500">New Rate (%)</label>
+                <label className="text-xs text-muted-foreground">New Rate (%)</label>
                 <input type="number" value={updateRate} onChange={(e) => setUpdateRate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1" />
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
               <div>
-                <label className="text-xs text-slate-500">Reason (optional)</label>
+                <label className="text-xs text-muted-foreground">Reason (optional)</label>
                 <input type="text" value={updateReason} onChange={(e) => setUpdateReason(e.target.value)}
                   placeholder="e.g. Promotional discount for cleaning"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg mt-1" />
+                  className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
               <Button className="w-full" onClick={saveRate}>
                 <Save className="w-4 h-4 mr-2" /> Save & Audit
@@ -197,37 +203,39 @@ export default function CommissionControl() {
         </div>
 
         {/* Change History */}
-        <motion.div variants={fadeUp} className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-            <History className="w-5 h-5 text-slate-600" />
-            <h2 className="font-semibold text-slate-900">Change History</h2>
+        <motion.div variants={fadeUp} className="mt-6 bg-card rounded-2xl shadow-sm border border-border/60 overflow-hidden">
+          <div className="p-4 border-b border-border/60 flex items-center gap-2">
+            <History className="w-5 h-5 text-muted-foreground" />
+            <h2 className="font-semibold text-foreground">Change History</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
+              <thead className="bg-muted/40 border-b border-border/60">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">Scope</th>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">Old Rate</th>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">New Rate</th>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">Reason</th>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">Changed By</th>
-                  <th className="text-left px-4 py-2 font-medium text-slate-600">Date</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Scope</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Old Rate</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">New Rate</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Reason</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Changed By</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Loading…</td></tr>
+                ) : historyError ? (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-amber-600">Change history could not be loaded. <button onClick={fetchHistory} className="underline">Retry</button></td></tr>
                 ) : history.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No changes yet</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No changes yet</td></tr>
                 ) : (
                   history.map((h) => (
-                    <tr key={h.id} className="border-b border-slate-50">
+                    <tr key={h.id} className="border-b border-border/40">
                       <td className="px-4 py-2 capitalize">{h.scope}{h.scope_value ? ` (${h.scope_value})` : ""}</td>
                       <td className="px-4 py-2">{h.old_rate ? (Number(h.old_rate) * 100).toFixed(1) + "%" : "Initial rate"}</td>
                       <td className="px-4 py-2 font-medium text-primary">{(Number(h.new_rate) * 100).toFixed(1)}%</td>
-                      <td className="px-4 py-2 text-slate-500">{h.reason || "Not recorded"}</td>
-                      <td className="px-4 py-2 text-slate-500">{h.changed_by_name || "System"}</td>
-                      <td className="px-4 py-2 text-slate-500">{new Date(h.created_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{h.reason || "Not recorded"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{h.changed_by_name || "System"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{new Date(h.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))
                 )}

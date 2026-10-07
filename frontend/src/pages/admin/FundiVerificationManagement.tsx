@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Search, CheckCircle, XCircle, AlertCircle, Loader2, Eye } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,6 @@ interface PaginationInfo {
 }
 
 export default function FundiVerificationManagement() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [fundis, setFundis] = useState<Fundi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,8 +152,12 @@ export default function FundiVerificationManagement() {
           </div>
         ) : fundis.length === 0 ? (
           <Card className="p-12 text-center">
-            <p className="font-semibold text-lg mb-1">No {statusFilter} Fundis</p>
-            <p className="text-muted-foreground text-sm">All fundis have been processed!</p>
+            <p className="font-semibold text-lg mb-1">No {statusFilter || "matching"} Fundis</p>
+            <p className="text-muted-foreground text-sm">
+              {searchQuery.trim()
+                ? `No fundis match "${searchQuery.trim()}" with the current filter. Try a different name, email, or phone.`
+                : "No fundis match this filter right now."}
+            </p>
           </Card>
         ) : (
           <>

@@ -18,6 +18,8 @@ export default function LiveOperations() {
   const [fundis, setFundis] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [pollDisabled, setPollDisabled] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -28,14 +30,17 @@ export default function LiveOperations() {
       ]);
       setFundis(fundiData.fundis || []);
       setJobs(jobData.jobs || []);
+      setLoadError(false);
     } catch (err: unknown) {
       const status = (err as any)?.status;
       if (status === 403 || status === 401) {
         // Permission denied or token expired — STOP polling entirely.
         // Don't retry, don't loop. The user needs to re-login or they
         // don't have permission for this page.
+        setPollDisabled(true);
         return;
       }
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -61,14 +66,15 @@ export default function LiveOperations() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  // Auto-refresh every 15s, but ONLY if data was successfully loaded.
-  // If we got a 403/401, we never set fundis/jobs, so this never starts.
+  // Auto-refresh every 15s unless auth/permission failures stopped polling.
+  // A quiet platform must still stay live — an empty first load is not a
+  // reason to freeze updates.
   useEffect(() => {
-    if (fundis.length === 0 && jobs.length === 0) return;
+    if (pollDisabled) return;
     const interval = setInterval(fetchData, 15_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fundis.length, jobs.length]);
+  }, [pollDisabled]);
 
   // Realtime refresh (spec §34): live metric updates on job and payment
   // events instead of waiting for the next poll tick.
@@ -81,7 +87,8 @@ export default function LiveOperations() {
   }, [fetchData, fundis.length, jobs.length]);
 
   const onlineFundis = fundis.filter((f) => f.latitude && f.longitude);
-  const activeJobs = jobs.filter((j) => !["completed", "cancelled", "failed"].includes(j.status));
+  const activeJobs = jobs.filter((j) => !"completed cancelled failed expired".split(" ").includes(j.status));
+  const completedInView = jobs.filter((j) => ["completed", "closed"].includes(j.status)).length;
 
   const containerVariants = reduceMotion ? {} : stagger;
 
@@ -90,8 +97,8 @@ export default function LiveOperations() {
       <motion.div initial="hidden" animate="visible" variants={containerVariants}>
         <motion.div variants={fadeUp} className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Live Operations Center</h1>
-            <p className="text-slate-500 text-sm mt-1">Real-time view of online fundis and active jobs</p>
+            <h1 className="text-2xl font-bold text-foreground">Live Operations Center</h1>
+            <p className="text-muted-foreground text-sm mt-1">Real-time view of online fundis and active jobs</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
@@ -99,65 +106,77 @@ export default function LiveOperations() {
           </Button>
         </motion.div>
 
+        {loadError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 flex items-center justify-between gap-3">
+            <span>Live data could not be refreshed just now - lists below may be stale.</span>
+            <Button variant="outline" size="sm" onClick={fetchData}>Retry</Button>
+          </div>
+        )}
+        {pollDisabled && (
+          <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Your session or permissions do not allow live operations polling. Sign in again with a dispatch-capable staff account.
+          </div>
+        )}
+
         {/* Stat cards */}
         <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-3">
+          <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
               <Wrench className="w-5 h-5 text-green-600" />
             </div>
-            <div className="text-2xl font-bold text-slate-900">{onlineFundis.length}</div>
-            <div className="text-xs text-slate-500">Online Fundis</div>
+            <div className="text-2xl font-bold text-foreground">{onlineFundis.length}</div>
+            <div className="text-xs text-muted-foreground">Online Fundis</div>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center mb-3">
+          <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-3">
               <Briefcase className="w-5 h-5 text-orange-600" />
             </div>
-            <div className="text-2xl font-bold text-slate-900">{activeJobs.length}</div>
-            <div className="text-xs text-slate-500">Active Jobs</div>
+            <div className="text-2xl font-bold text-foreground">{activeJobs.length}</div>
+            <div className="text-xs text-muted-foreground">Active Jobs</div>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
+          <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
               <Activity className="w-5 h-5 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold text-slate-900">{jobs.length}</div>
-            <div className="text-xs text-slate-500">Total Jobs (50 max)</div>
+            <div className="text-2xl font-bold text-foreground">{jobs.length}</div>
+            <div className="text-xs text-muted-foreground">Total Jobs (50 max)</div>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-3">
+          <div className="bg-card rounded-2xl p-5 shadow-sm border border-border/60">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-3">
               <MapPin className="w-5 h-5 text-purple-600" />
             </div>
-            <div className="text-2xl font-bold text-slate-900">{onlineFundis.filter(f => f.distanceKm != null).length}</div>
-            <div className="text-xs text-slate-500">Fundis with GPS</div>
+            <div className="text-2xl font-bold text-foreground">{completedInView}</div>
+            <div className="text-xs text-muted-foreground">Completed (in view)</div>
           </div>
         </motion.div>
 
         {/* Online Fundis list */}
         <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+          <div className="bg-card rounded-2xl shadow-sm border border-border/60 overflow-hidden">
+            <div className="p-4 border-b border-border/60">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-green-600" /> Online Fundis ({onlineFundis.length})
               </h2>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {loading ? (
-                <div className="p-4 text-center text-slate-400">Loading…</div>
+                <div className="p-4 text-center text-muted-foreground">Loading…</div>
               ) : onlineFundis.length === 0 ? (
-                <div className="p-4 text-center text-slate-400">No fundis online</div>
+                <div className="p-4 text-center text-muted-foreground">No fundis online</div>
               ) : (
                 onlineFundis.map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 p-3 border-b border-slate-50">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <div key={f.id} className="flex items-center gap-3 p-3 border-b border-border/40">
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
                       <Wrench className="w-4 h-4 text-green-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-slate-900 truncate">{f.name}</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-sm font-medium text-foreground truncate">{f.name}</div>
+                      <div className="text-xs text-muted-foreground">
                         {f.skills?.join(", ") || "General"} · ⭐ {f.rating || "New"} · {f.qualityTier || "bronze"}
                       </div>
                     </div>
                     {f.distanceKm != null && (
-                      <div className="text-xs text-slate-400">{f.distanceKm.toFixed(1)}km</div>
+                      <div className="text-xs text-muted-foreground">{f.distanceKm.toFixed(1)}km</div>
                     )}
                   </div>
                 ))
@@ -166,29 +185,30 @@ export default function LiveOperations() {
           </div>
 
           {/* Active Jobs list */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+          <div className="bg-card rounded-2xl shadow-sm border border-border/60 overflow-hidden">
+            <div className="p-4 border-b border-border/60">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-orange-600" /> Active Jobs ({activeJobs.length})
               </h2>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {loading ? (
-                <div className="p-4 text-center text-slate-400">Loading…</div>
+                <div className="p-4 text-center text-muted-foreground">Loading…</div>
               ) : activeJobs.length === 0 ? (
-                <div className="p-4 text-center text-slate-400">No active jobs</div>
+                <div className="p-4 text-center text-muted-foreground">No active jobs</div>
               ) : (
                 activeJobs.map((job) => (
-                  <div key={job.id} className="flex items-center gap-3 p-3 border-b border-slate-50">
-                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <div key={job.id} className="flex items-center gap-3 p-3 border-b border-border/40">
+                    <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
                       <Briefcase className="w-4 h-4 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-slate-900 truncate capitalize">
-                        {job.service_category || job.serviceCategory}
+                      {/* /staff/jobs maps the field to `category` — serviceCategory never exists. */}
+                      <div className="text-sm font-medium text-foreground truncate capitalize">
+                        {job.category || "Job"}
                       </div>
-                      <div className="text-xs text-slate-500">
-                        {job.customerName || "Customer"} · {job.status}
+                      <div className="text-xs text-muted-foreground">
+                        {job.customerName || "Customer"} · {job.bookingNumber || job.booking_number || ""}
                       </div>
                     </div>
                     <div className={`text-xs px-2 py-0.5 rounded-full font-medium ${

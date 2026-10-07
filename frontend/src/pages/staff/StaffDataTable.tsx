@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { apiClient } from "@/lib/api";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useReducedMotion, fadeUp } from "@/lib/motion";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,7 +41,8 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
       try {
         // apiClient: absolute API URL + auth headers; throws ApiError with a
         // user-safe message on failure (never leaks raw server errors).
-        const data = await apiClient.request(ENDPOINTS[resource]) as Record<string, unknown>;
+        // limit=200: staff tables are operational views, not 10-row previews.
+        const data = await apiClient.request(`${ENDPOINTS[resource]}?limit=200`) as Record<string, unknown>;
         // Different endpoints return different keys — try common ones.
         const key = resource.replace("-", "_");
         const list = (data[key] || data.fundis || data.jobs || data.payments || data.disputes || data.logs || data.alerts || []) as Row[];
@@ -54,7 +56,14 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
     })();
   }, [resource]);
 
-  if (loading) return <div className="p-8 text-slate-400">Loading {title}…</div>;
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-4" aria-busy="true">
+        <Skeleton className="h-8 w-64 rounded-xl" />
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -72,17 +81,17 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
         initial={reduceMotion ? {} : "hidden"}
         animate="visible"
         variants={fadeUp}
-        className="text-2xl font-bold text-slate-900 mb-6"
+        className="text-2xl font-bold text-foreground mb-6"
       >
         {title}
       </motion.h1>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-border/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
+            <thead className="bg-muted/40 border-b border-border/60">
               <tr>
                 {columns.map((col) => (
-                  <th key={col.key} className="text-left px-4 py-3 font-medium text-slate-600">
+                  <th key={col.key} className="text-left px-4 py-3 font-medium text-muted-foreground">
                     {col.label}
                   </th>
                 ))}
@@ -91,15 +100,15 @@ export default function StaffDataTable({ resource, title, columns }: StaffDataTa
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                     No records found.
                   </td>
                 </tr>
               ) : (
                 rows.map((row, i) => (
-                  <tr key={row.id || i} className="border-b border-slate-50 hover:bg-slate-50">
+                  <tr key={row.id || i} className="border-b border-border/40 hover:bg-muted/40">
                     {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3 text-slate-700">
+                      <td key={col.key} className="px-4 py-3 text-foreground">
                         {col.render ? col.render(row) : String(row[col.key] ?? "Not recorded")}
                       </td>
                     ))}

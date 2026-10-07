@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getMaxGpsAccuracyMeters } from "@/lib/gps";
+import { formatMoney } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { ReportProblemModal } from "@/components/support/ReportProblemModal";
 import { HelpLinksInline } from "@/components/support/HelpKit";
@@ -43,6 +44,9 @@ export function FundiDashboard() {
   const [subPhone, setSubPhone] = useState("");
   const [subPlan, setSubPlan] = useState<"monthly" | "yearly">("monthly");
   const [subSubmitting, setSubSubmitting] = useState(false);
+  // Plan prices come from the subscription_plans table (migration 043) so
+  // admins can reprice without a redeploy. Keyed monthly/yearly for fundis.
+  const [planPrices, setPlanPrices] = useState<Record<string, number> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Weekly availability schedule (spec §12): same API as the mobile app
   // (GET/PUT /fundi/availability) so web and mobile stay in sync.
@@ -93,6 +97,29 @@ export function FundiDashboard() {
       setRefreshing(false);
     }
   }, [navigate]);
+
+  const openSubDialog = () => {
+    setSubPlan("monthly");
+    setSubDialogOpen(true);
+    // Prices are DB-driven (subscription_plans); fetch per open - cheap and
+    // always current. Fallback renders a dash instead of a made-up price.
+    apiClient.request("/subscriptions/plans")
+      .then((res) => {
+        const plans = (res as { plans?: { code: string; price: number }[] }).plans || [];
+        const map: Record<string, number> = {};
+        for (const p of plans) {
+          if (p.code === "fundi_pro_monthly") map.monthly = Number(p.price);
+          if (p.code === "fundi_pro_yearly") map.yearly = Number(p.price);
+        }
+        setPlanPrices(map);
+      })
+      .catch(() => setPlanPrices(null));
+  };
+
+  const planPrice = (plan: "monthly" | "yearly") =>
+    planPrices && planPrices[plan] != null ? formatMoney(planPrices[plan]) : null;
+
+  const closeSubDialog = () => setSubDialogOpen(false);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
@@ -383,7 +410,7 @@ export function FundiDashboard() {
               <div className="flex-1">
                 <p className="font-semibold text-yellow-800 text-sm">Subscription Inactive</p>
                 <p className="text-xs text-yellow-700 mt-0.5 mb-3">Activate to accept jobs and receive payments.</p>
-                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => { setSubPlan("monthly"); setSubDialogOpen(true); }}>
+                <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={openSubDialog}>
                   Activate Subscription
                 </Button>
               </div>
@@ -436,7 +463,7 @@ export function FundiDashboard() {
         {subDialogOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-label="Activate subscription">
             <div className="bg-card w-full max-w-sm rounded-3xl border border-border/50 p-6 relative">
-              <button onClick={() => setSubDialogOpen(false)} className="absolute right-4 top-4 p-1 rounded-lg hover:bg-muted" aria-label="Close">
+              <button onClick={closeSubDialog} className="absolute right-4 top-4 p-1 rounded-lg hover:bg-muted" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
               <div className="flex items-center gap-2 mb-1">
@@ -455,7 +482,7 @@ export function FundiDashboard() {
                     className={`rounded-xl border-2 p-3 text-left transition-colors ${subPlan === p ? "border-primary bg-primary/5" : "border-border"}`}
                   >
                     <p className="text-sm font-semibold capitalize">{p}</p>
-                    <p className="text-xs text-muted-foreground">KES {p === "monthly" ? "500" : "5,000"}</p>
+                    <p className="text-xs text-muted-foreground">{planPrice(p) ?? "Price loading…"}</p>
                   </button>
                 ))}
               </div>
@@ -491,7 +518,7 @@ export function FundiDashboard() {
                   }
                 }}
               >
-                {subSubmitting ? "Starting payment…" : `Pay KES ${subPlan === "monthly" ? "500" : "5,000"} via M-Pesa`}
+                {subSubmitting ? "Starting payment…" : `Pay ${planPrice(subPlan) ?? ""} via M-Pesa`}
               </Button>
               <p className="text-[11px] text-muted-foreground mt-3">
                 The subscription activates only after M-Pesa confirms the payment.
@@ -534,7 +561,7 @@ export function FundiDashboard() {
               </div>
               <ArrowUpRight className="w-3.5 h-3.5 text-green-500" />
             </div>
-            <p className="font-bold text-xl text-green-800">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</p>
+            <p className="font-bold text-xl text-green-800">{formatMoney(dashboard.walletBalance)}</p>
             <p className="text-xs text-green-600 mt-0.5">Available balance</p>
           </button>
 
@@ -577,7 +604,7 @@ export function FundiDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-green-700">KES {Number(dashboard.walletBalance || 0).toFixed(0)}</span>
+              <span className="text-sm font-bold text-green-700">{formatMoney(dashboard.walletBalance)}</span>
               <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
             </div>
           </button>

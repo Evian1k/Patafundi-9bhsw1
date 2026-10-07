@@ -16,7 +16,7 @@
  * frontend gating is UX only, not a security boundary.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -25,9 +25,11 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { apiClient } from "@/lib/api";
+import { realtimeService } from "@/services/realtime";
 import NotificationBell from "@/components/system/NotificationBell";
 import { useReducedMotion } from "@/lib/motion";
 import { SkipToContent } from "@/lib/a11y";
+import { toast } from "sonner";
 
 const STAFF_NAV = [
   {
@@ -37,7 +39,7 @@ const STAFF_NAV = [
       { label: "Live Operations", href: "/staff/operations", icon: Activity, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Fundis", href: "/staff/admin/fundis", icon: Wrench, permission: "can_view_fundis", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
       { label: "Jobs", href: "/staff/admin/jobs", icon: Package, permission: "can_view_all_jobs", roles: ["super_admin", "admin", "dispatch_team", "support_agent"] },
-      { label: "User Activity", href: "/staff/admin/users", icon: Users, permission: "can_view_users", roles: ["super_admin", "admin", "support_agent"] },
+      { label: "User Activity", href: "/staff/admin/users", icon: Users, permission: "can_view_logs", roles: ["super_admin", "admin", "auditor", "devops_engineer"] },
       { label: "Executive Dashboard", href: "/staff/executive", icon: TrendingUp, permission: "can_view_executive_dashboard", roles: ["super_admin"] },
     ],
   },
@@ -99,12 +101,26 @@ export default function StaffLayout() {
         }
         setRole(data.role);
         setPermissions(new Set(data.permissions || []));
+        // Staff pages (Live Operations) listen for realtime job/payment events.
+        // The socket is idempotent, so connecting here covers the whole shell.
+        const token = localStorage.getItem("auth_token");
+        if (token) realtimeService.connect(token);
       } catch {
         navigate("/auth");
       } finally {
         setLoading(false);
       }
     })();
+  }, [navigate]);
+
+  // Real sign-out: kill the server session + socket, not just the route.
+  const handleSignOut = useCallback(async () => {
+    try {
+      await apiClient.logout();
+      toast.success("Signed out");
+    } catch { /* session already gone */ }
+    realtimeService.disconnect();
+    navigate("/staff/login");
   }, [navigate]);
 
   const canSee = (item: { permission: string; roles: string[] }) => {
@@ -184,7 +200,7 @@ export default function StaffLayout() {
         </nav>
         <div className="p-4 border-t border-white/10 flex items-center justify-between">
           <button
-            onClick={() => navigate("/auth")}
+            onClick={handleSignOut}
             className="flex items-center gap-2 text-sm text-emerald-200/70 hover:text-white"
           >
             <LogOut className="w-4 h-4" /> Sign out

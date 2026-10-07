@@ -81,7 +81,7 @@ export async function optionalAuth(req, _res, next) {
       algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
-      'select id, email, full_name, phone, role, status, trust_score from users where id = $1',
+      'select id, email, full_name, phone, role, status, trust_score, totp_enabled from users where id = $1',
       [payload.sub],
     );
     if (result.rows[0]?.status === 'active') req.user = result.rows[0];
@@ -109,7 +109,7 @@ export async function authRequired(req, _res, next) {
       algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
-      'select id, email, full_name, phone, role, status, trust_score from users where id = $1',
+      'select id, email, full_name, phone, role, status, trust_score, totp_enabled from users where id = $1',
       [payload.sub],
     );
     if (!result.rows[0]) throw forbidden('User account not found');

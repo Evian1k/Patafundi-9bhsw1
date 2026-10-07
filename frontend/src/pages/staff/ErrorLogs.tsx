@@ -13,6 +13,7 @@ import { CheckCircle2, Filter, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiClient } from "@/lib/api";
+import { toast } from "sonner";
 
 interface ErrorLog {
   id: string;
@@ -87,7 +88,8 @@ export default function ErrorLogs() {
       await apiClient.request(`/staff/error-logs/${id}/resolve`, { method: "POST" });
       setErrors((prev) => prev.map((e) => (e.id === id ? { ...e, resolved: true } : e)));
     } catch {
-      // non-blocking — row stays unresolved, staff can retry
+      // Tell staff the click didn't take instead of silently keeping the row.
+      toast.error("Could not mark as resolved. Check your permissions and retry.");
     } finally {
       setResolving(null);
     }

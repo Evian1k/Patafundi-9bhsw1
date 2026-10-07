@@ -62,6 +62,11 @@ class RealtimeService {
   private isConnected = false;
   private lifecycleBound = false;
 
+  /** True while the Socket.IO channel is live (for honest status displays). */
+  get connected(): boolean {
+    return this.isConnected;
+  }
+
   connect(token?: string | null): void {
     const resolved = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null);
     if (!resolved) return;

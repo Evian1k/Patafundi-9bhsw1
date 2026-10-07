@@ -9,6 +9,8 @@ import {
   FileText, Star, TrendingUp, UserCheck, Users, Wallet,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import { statusLabel } from "@/lib/bookingStatus";
 import { useOutletContext } from "react-router-dom";
 import type { PortalMe } from "./CompanyPortalLayout";
 
@@ -26,22 +28,34 @@ interface Overview {
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600",
   matching: "bg-blue-500/10 text-blue-600",
+  quote_requested: "bg-violet-500/10 text-violet-600",
+  offered: "bg-teal-500/10 text-teal-600",
   accepted: "bg-violet-500/10 text-violet-600",
   assigned: "bg-sky-500/10 text-sky-600",
+  booking_confirmed: "bg-green-500/10 text-green-600",
+  scheduled: "bg-indigo-500/10 text-indigo-500",
   on_the_way: "bg-cyan-500/10 text-cyan-600",
   arrived: "bg-cyan-500/10 text-cyan-600",
   in_progress: "bg-primary/10 text-primary",
   completion_requested: "bg-orange-500/10 text-orange-600",
+  customer_confirmed_completion: "bg-orange-500/10 text-orange-600",
+  payment_pending: "bg-orange-500/10 text-orange-600",
+  payment_processing: "bg-orange-500/10 text-orange-600",
+  payment_confirmed: "bg-green-500/10 text-green-600",
   completed: "bg-primary/10 text-primary",
+  closed: "bg-primary/10 text-primary",
   cancelled: "bg-red-500/10 text-red-500",
-  scheduled: "bg-indigo-500/10 text-indigo-500",
-  offered: "bg-teal-500/10 text-teal-600",
+  failed: "bg-red-500/10 text-red-500",
+  expired: "bg-red-500/10 text-red-500",
+  disputed: "bg-red-500/10 text-red-500",
+  refund_requested: "bg-orange-500/10 text-orange-600",
+  refunded: "bg-orange-500/10 text-orange-600",
 };
 
 export function StatusChip({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium capitalize whitespace-nowrap ${STATUS_STYLES[status] || "bg-muted text-muted-foreground"}`}>
-      {status.replace(/_/g, " ")}
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${STATUS_STYLES[status] || "bg-muted text-muted-foreground"}`}>
+      {statusLabel(status)}
     </span>
   );
 }
@@ -91,14 +105,14 @@ export default function PortalDashboard() {
     { label: "Completed", value: s.completed, icon: CheckCircle2, tone: "text-primary bg-primary/10" },
     { label: "Available technicians", value: s.availableTechnicians, icon: Users, tone: "text-sky-600 bg-sky-500/10" },
     { label: "Rating", value: s.rating ? s.rating.toFixed(1) : "New", icon: Star, tone: "text-amber-600 bg-amber-500/10" },
-    { label: "Pending settlements (KES)", value: (s.pendingSettlements ?? 0).toLocaleString(), icon: Wallet, tone: "text-primary bg-primary/10" },
+    { label: "Pending settlements", value: formatMoney(s.pendingSettlements ?? 0), icon: Wallet, tone: "text-primary bg-primary/10" },
   ];
 
   return (
     <div className="space-y-6 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {ctx.myRole === "owner" ? "owner" : ctx.myRole}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {ctx.myRole}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {data.company.companyName}
             {(() => {
@@ -157,7 +171,7 @@ export default function PortalDashboard() {
               <Link key={j.id} to="/company/jobs" className="flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-sm truncate capitalize">{j.service_category?.replace("_", " ")}</p>
+                    <p className="font-medium text-sm truncate capitalize">{j.service_category?.replace(/_/g, " ")}</p>
                     {j.urgency === "emergency" && <span className="rounded-full bg-red-500/10 text-red-500 text-[10px] font-semibold px-2 py-0.5">EMERGENCY</span>}
                     <StatusChip status={j.status} />
                   </div>
@@ -165,7 +179,7 @@ export default function PortalDashboard() {
                     {j.customer_name || "Customer"}{j.technician_name ? ` · tech: ${j.technician_name}` : ""} · {new Date(j.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                {j.estimated_price ? <p className="text-sm font-semibold tabular-nums shrink-0">KES {Number(j.estimated_price).toLocaleString()}</p> : null}
+                {j.estimated_price ? <p className="text-sm font-semibold tabular-nums shrink-0">{formatMoney(j.estimated_price)}</p> : null}
               </Link>
             ))}
           </div>

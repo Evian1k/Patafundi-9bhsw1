@@ -221,8 +221,17 @@ export async function cleanupDemoData({ dryRun = DRY_RUN } = {}) {
 
 // CLI entry (not used when imported by the reset script).
 if (import.meta.url === `file://${process.argv[1]}`) {
-  cleanupDemoData().catch((err) => {
-    console.error('[cleanup] FAILED:', err.message);
-    process.exit(1);
-  });
+  cleanupDemoData()
+    .then(async () => {
+      // Flush PGlite's buffered pages to disk before exiting.
+      const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+      await closeEmbeddedDb();
+      process.exit(0);
+    })
+    .catch(async (err) => {
+      console.error('[cleanup] FAILED:', err.message);
+      const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+      await closeEmbeddedDb().catch(() => {});
+      process.exit(1);
+    });
 }

@@ -10,6 +10,8 @@ import {
   PackageCheck, Server, ShieldCheck, Users, Bug,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import { realtimeService } from "@/services/realtime";
 
 interface RoleHomeProps { role: string }
 
@@ -134,7 +136,7 @@ function DispatchHome() {
         render={(j) => (
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-medium capitalize truncate">{String(j.service_category || "service").replace(/_/g, " ")} · {String(j.location_name || "")}</p>
+              <p className="font-medium capitalize truncate">{String(j.category || j.service_category || "service").replace(/_/g, " ")} · {String(j.location_name || "")}</p>
               <p className="text-xs text-muted-foreground">{new Date(String(j.created_at)).toLocaleString()}</p>
             </div>
             <Chip status={String(j.status)} />
@@ -167,7 +169,7 @@ function FinanceHome() {
           render={(p, i) => (
             <div key={i} className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium">KES {Number(p.amount || 0).toLocaleString()} · {String(p.provider || "")}</p>
+                <p className="font-medium">{formatMoney(p.amount)} · {String(p.provider || "")}</p>
                 <p className="text-xs text-muted-foreground">{new Date(String(p.created_at)).toLocaleString()}</p>
               </div>
               <Chip status={String(p.status || "")} />
@@ -176,7 +178,7 @@ function FinanceHome() {
         <ListCard title="Payouts" items={payouts} emptyText="No payouts yet."
           render={(p, i) => (
             <div key={i} className="flex items-center justify-between gap-3">
-              <p className="font-medium">KES {Number(p.amount || p.net_amount || 0).toLocaleString()}</p>
+              <p className="font-medium">{formatMoney(p.amount ?? p.net_amount)}</p>
               <Chip status={String(p.status || "")} />
             </div>
           )} />
@@ -187,9 +189,11 @@ function FinanceHome() {
 
 // ── FRAUD ──
 function FraudHome() {
-  const { data, loading, error } = useData<never>(["/staff/fraud/alerts?limit=50", "/admin/fraud/dashboard"]);
+  // /staff/fraud/dashboard is permission-scoped (can_view_fraud_dashboard) so
+  // fraud_analysts pass; /admin/fraud/dashboard is admin-role-only.
+  const { data, loading, error } = useData<never>(["/staff/fraud/alerts?limit=50", "/staff/fraud/dashboard"]);
   const alerts = (data["/staff/fraud/alerts?limit=50"] as { alerts?: Record<string, unknown>[] } | undefined)?.alerts || [];
-  const dashboard = data["/admin/fraud/dashboard"] as { stats?: Record<string, number> } | undefined;
+  const dashboard = (data["/staff/fraud/dashboard"] as { dashboard?: { fraudAlerts?: { open?: number; critical?: number; total?: number }; fraudScores?: { monitored?: number }; suspiciousJobs?: number } } | undefined)?.dashboard;
   if (loading) return <SkeletonGrid />;
   if (error) return <ErrorBox message={error} />;
   return (
@@ -197,9 +201,9 @@ function FraudHome() {
       <Header title="Fraud & risk" subtitle="Alerts, suspicious activity and risk signals." />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Open alerts" value={alerts.filter((a) => !["resolved", "dismissed"].includes(String(a.status))).length} icon={AlertTriangle} tone="text-red-600 bg-red-500/10" />
-        <StatCard label="Total alerts" value={alerts.length} icon={AlertTriangle} tone="text-amber-600 bg-amber-500/10" />
+        <StatCard label="Alerts (30d)" value={dashboard?.fraudAlerts?.total ?? alerts.length} icon={AlertTriangle} tone="text-amber-600 bg-amber-500/10" sub={`${dashboard?.fraudAlerts?.critical ?? 0} critical`} />
         <StatCard label="High severity" value={alerts.filter((a) => ["high", "critical"].includes(String(a.severity))).length} icon={AlertTriangle} tone="text-red-600 bg-red-500/10" />
-        <StatCard label="Blocked actions (30d)" value={String(dashboard?.stats?.blockedActions ?? dashboard?.stats?.blocked_actions ?? 0)} icon={ShieldCheck} tone="text-emerald-600 bg-emerald-500/10" />
+        <StatCard label="Monitored users" value={dashboard?.fraudScores?.monitored ?? 0} icon={ShieldCheck} tone="text-emerald-600 bg-emerald-500/10" />
       </div>
       <ListCard title="Alerts" items={alerts} emptyText="No fraud alerts. All clear."
         render={(a) => (
@@ -242,21 +246,25 @@ function AuditHome() {
 function DevopsHome() {
   const { data, loading, error } = useData<never>(["/health", "/health/extended", "/staff/error-logs?resolved=false&limit=100"]);
   const health = data["/health"] as Record<string, unknown> | undefined;
-  const extended = data["/health/extended"] as Record<string, unknown> | undefined;
+  const extended = data["/health/extended"] as { db?: { ok?: boolean } } | undefined;
   const errorLogs = (data["/staff/error-logs?resolved=false&limit=100"] as { errors?: Record<string, unknown>[] } | undefined)?.errors || [];
   if (loading) return <SkeletonGrid />;
   if (error) return <ErrorBox message={error} />;
-  const dbOk = extended?.database ?? health?.database ?? (Object.keys(data).length > 0);
-  const integrations = (extended?.integrations || {}) as Record<string, string>;
+  // /health/extended runs a live DB query — a 200 with db.ok means connected.
+  // /health only answers when the API itself is up, so its presence IS the
+  // "Operational" signal. Realtime shows the actual socket state.
+  const apiOk = !!health;
+  const dbOk = extended?.db?.ok === true || !!health?.dbTime;
+  const realtimeOk = realtimeService.connected;
   const criticalErrors = errorLogs.filter((e) => Number(e.status_code) >= 500).length;
   return (
     <>
-      <Header title="System health" subtitle="Service status, integrations and error triage." />
+      <Header title="System health" subtitle="Service status and error triage." />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="API" value="Operational" icon={Server} tone="text-emerald-600 bg-emerald-500/10" />
+        <StatCard label="API" value={apiOk ? "Operational" : "Down"} icon={Server} tone={apiOk ? "text-emerald-600 bg-emerald-500/10" : "text-red-600 bg-red-500/10"} />
         <StatCard label="Database" value={dbOk ? "Connected" : "Down"} icon={Server} tone={dbOk ? "text-emerald-600 bg-emerald-500/10" : "text-red-600 bg-red-500/10"} />
         <StatCard label="Unresolved errors" value={errorLogs.length} icon={Bug} tone={errorLogs.length > 0 ? "text-amber-600 bg-amber-500/10" : "text-emerald-600 bg-emerald-500/10"} sub={`${criticalErrors} critical (5xx)`} />
-        <StatCard label="Realtime" value="Socket.io" icon={Activity} tone="text-violet-600 bg-violet-500/10" />
+        <StatCard label="Realtime" value={realtimeOk ? "Live" : "Polling"} icon={Activity} tone={realtimeOk ? "text-violet-600 bg-violet-500/10" : "text-muted-foreground bg-muted"} />
       </div>
       <Link
         to="/staff/devops/errors"
@@ -269,15 +277,6 @@ function DevopsHome() {
         </span>
         <span className="text-muted-foreground">→</span>
       </Link>
-      {Object.keys(integrations).length > 0 && (
-        <ListCard title="Integrations" items={Object.entries(integrations).map(([k, v]) => ({ k, v }))} emptyText=""
-          render={(row) => (
-            <div className="flex items-center justify-between">
-              <span className="font-medium capitalize">{String(row.k)}</span>
-              <Chip status={String(row.v).toLowerCase().includes("ok") || String(row.v).toLowerCase().includes("active") ? "resolved" : String(row.v)} />
-            </div>
-          )} />
-      )}
     </>
   );
 }
@@ -318,15 +317,19 @@ function OpsHome() {
   if (loading) return <SkeletonGrid />;
   if (error) return <ErrorBox message={error} />;
   const stats = (dash?.stats || dash || {}) as Record<string, unknown>;
-  const num = (k: string) => (typeof stats[k] === "number" ? (stats[k] as number) : (stats[k] != null ? Number(stats[k]) : 0));
+  const num = (k: string) => {
+    const v = stats[k];
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
   return (
     <>
       <Header title="Operations" subtitle="Platform-wide operational picture." />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total users" value={num("totalUsers") ?? num("total_users")} icon={Users} tone="text-sky-600 bg-sky-500/10" />
-        <StatCard label="Active jobs" value={num("activeJobs") ?? num("active_jobs")} icon={Activity} tone="text-cyan-600 bg-cyan-500/10" />
-        <StatCard label="Completed jobs" value={num("completedJobs") ?? num("completed_jobs")} icon={PackageCheck} tone="text-emerald-600 bg-emerald-500/10" />
-        <StatCard label="Revenue (KES)" value={typeof num("totalRevenue") === "number" ? Number(num("totalRevenue")).toLocaleString() : num("totalRevenue") ?? num("total_revenue")} icon={DollarSign} tone="text-amber-600 bg-amber-500/10" />
+        <StatCard label="Total users" value={num("totalUsers")} icon={Users} tone="text-sky-600 bg-sky-500/10" />
+        <StatCard label="Active jobs" value={num("activeJobs")} icon={Activity} tone="text-cyan-600 bg-cyan-500/10" />
+        <StatCard label="Completed jobs" value={num("completedJobs")} icon={PackageCheck} tone="text-emerald-600 bg-emerald-500/10" />
+        <StatCard label="Revenue" value={formatMoney(num("totalRevenue"))} icon={DollarSign} tone="text-amber-600 bg-amber-500/10" />
       </div>
       <div className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
         <ScrollText className="h-4 w-4 inline mr-1.5 text-emerald-600" />

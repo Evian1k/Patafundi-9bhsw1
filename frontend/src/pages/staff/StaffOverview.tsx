@@ -8,6 +8,8 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Wrench, Package, DollarSign, AlertTriangle, Users, Activity } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 
 interface Stats {
@@ -24,6 +26,7 @@ export default function StaffOverview() {
   const [role, setRole] = useState("");
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -47,7 +50,7 @@ export default function StaffOverview() {
                 const stats = (d as { stats?: Record<string, number> }).stats;
                 setStats((s) => ({ ...s, fundis: stats?.fundis, jobs: stats?.jobs, revenue: stats?.revenue, users: stats?.users }));
               })
-              .catch(() => {})
+              .catch(() => { setStatsError(true); })
           );
         }
         if (perms.has("can_view_fraud_dashboard")) {
@@ -57,7 +60,7 @@ export default function StaffOverview() {
                 const dashboard = (d as { dashboard?: { fraudAlerts?: { open?: number } } }).dashboard;
                 setStats((s) => ({ ...s, fraudAlerts: dashboard?.fraudAlerts?.open }));
               })
-              .catch(() => {})
+              .catch(() => { setStatsError(true); })
           );
         }
         await Promise.all(promises);
@@ -70,15 +73,23 @@ export default function StaffOverview() {
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-muted-foreground">Loading…</div>;
+    return (
+      <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-4" aria-busy="true">
+        <Skeleton className="h-8 w-56 rounded-xl" />
+        <Skeleton className="h-4 w-80 rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+        </div>
+      </div>
+    );
   }
 
   const cards: Array<{ label: string; value: string | number; icon: React.ElementType; href?: string; perm?: string }> = [];
   if (role === "super_admin" || permissions.has("can_view_metrics")) {
     cards.push({ label: "Total Fundis", value: String(stats.fundis ?? 0), icon: Wrench, href: "/staff/admin/fundis", perm: "can_view_fundis" });
     cards.push({ label: "Total Jobs", value: String(stats.jobs ?? 0), icon: Package, href: "/staff/admin/jobs", perm: "can_view_all_jobs" });
-    cards.push({ label: "Revenue (KES)", value: stats.revenue?.toLocaleString() ?? "0", icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
-    cards.push({ label: "Users", value: String(stats.users ?? 0), icon: Users, href: "/staff/admin/users", perm: "can_view_users" });
+    cards.push({ label: "Revenue", value: formatMoney(stats.revenue), icon: DollarSign, href: "/staff/finance", perm: "can_view_revenue" });
+    cards.push({ label: "Users", value: String(stats.users ?? 0), icon: Users, href: "/staff/admin/users", perm: "can_view_logs" });
   }
   if (permissions.has("can_view_fraud_dashboard")) {
     cards.push({ label: "Open Fraud Alerts", value: String(stats.fraudAlerts ?? 0), icon: AlertTriangle, href: "/staff/fraud" });
@@ -96,6 +107,12 @@ export default function StaffOverview() {
         <motion.p variants={itemVariants} className="text-muted-foreground mb-8 capitalize">
           Welcome back. You are signed in as <strong>{role.replace("_", " ")}</strong>.
         </motion.p>
+
+        {statsError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            Some metrics could not be loaded just now - the cards below may show zeros. Refresh the page to retry.
+          </div>
+        )}
 
         <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {cards.map((card) => {

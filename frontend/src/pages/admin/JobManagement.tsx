@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, MapPin, Clock, DollarSign, Loader2, Filter } from "lucide-react";
+import { Search, MapPin, Clock, Loader2, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import { statusLabel } from "@/lib/bookingStatus";
 import { toast } from "sonner";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -36,12 +38,38 @@ interface PaginationInfo {
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
   matching: "bg-blue-100 text-blue-800 border-blue-300",
+  quote_requested: "bg-violet-100 text-violet-800 border-violet-300",
+  offered: "bg-violet-100 text-violet-800 border-violet-300",
   accepted: "bg-purple-100 text-purple-800 border-purple-300",
+  assigned: "bg-purple-100 text-purple-800 border-purple-300",
+  scheduled: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  on_the_way: "bg-purple-100 text-purple-800 border-purple-300",
+  arrived: "bg-cyan-100 text-cyan-800 border-cyan-300",
   in_progress: "bg-cyan-100 text-cyan-800 border-cyan-300",
+  completion_requested: "bg-amber-100 text-amber-800 border-amber-300",
+  customer_confirmed_completion: "bg-amber-100 text-amber-800 border-amber-300",
+  payment_pending: "bg-amber-100 text-amber-800 border-amber-300",
+  payment_processing: "bg-amber-100 text-amber-800 border-amber-300",
+  payment_confirmed: "bg-green-100 text-green-800 border-green-300",
+  booking_confirmed: "bg-green-100 text-green-800 border-green-300",
   completed: "bg-green-100 text-green-800 border-green-300",
+  closed: "bg-green-100 text-green-800 border-green-300",
   cancelled: "bg-red-100 text-red-800 border-red-300",
+  failed: "bg-red-100 text-red-800 border-red-300",
+  expired: "bg-red-100 text-red-800 border-red-300",
   disputed: "bg-orange-100 text-orange-800 border-orange-300",
+  refund_requested: "bg-orange-100 text-orange-800 border-orange-300",
+  refunded: "bg-orange-100 text-orange-800 border-orange-300",
 };
+
+// Full job lifecycle taxonomy so admins can filter every real state.
+const STATUS_FILTERS = [
+  "pending", "matching", "quote_requested", "offered", "accepted", "assigned",
+  "scheduled", "booking_confirmed", "on_the_way", "arrived", "in_progress",
+  "completion_requested", "customer_confirmed_completion", "payment_pending",
+  "payment_processing", "payment_confirmed", "completed", "closed",
+  "disputed", "refund_requested", "refunded", "cancelled", "failed", "expired",
+];
 
 export default function JobManagement() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -50,23 +78,28 @@ export default function JobManagement() {
   const [statusFilter, setStatusFilter] = useState("");
   const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 10, total: 0, pages: 1 });
 
+  // Refs keep the 15s auto-refresh consistent with what the admin is looking
+  // at: a stale closure here silently reset filters/page every interval tick.
+  const stateRef = useRef({ searchQuery: "", statusFilter: "", page: 1 });
+  stateRef.current = { searchQuery, statusFilter, page: pagination.page };
+
   const fetchJobs = async (page = 1) => {
     setLoading(true);
     try {
-      let endpoint = `/admin/jobs?page=${page}&limit=${pagination.limit}`;
-      if (searchQuery) endpoint += `&q=${encodeURIComponent(searchQuery)}`;
-      if (statusFilter) endpoint += `&status=${statusFilter}`;
+      const { searchQuery: q, statusFilter: sf } = stateRef.current;
+      let endpoint = `/admin/jobs?page=${page}&limit=20`;
+      if (q) endpoint += `&q=${encodeURIComponent(q)}`;
+      if (sf) endpoint += `&status=${sf}`;
       const response = await apiClient.request(endpoint, { includeAuth: true }) as { success?: boolean; jobs?: Job[]; pagination?: PaginationInfo };
       if (response?.success) {
         setJobs(response.jobs || []);
-        setPagination(response.pagination || { page, limit: 10, total: 0, pages: 1 });
+        setPagination(response.pagination || { page, limit: 20, total: 0, pages: 1 });
       } else {
         setJobs([]);
-        setPagination({ page, limit: 10, total: 0, pages: 1 });
+        setPagination({ page, limit: 20, total: 0, pages: 1 });
       }
     } catch (error) {
       console.error("Error fetching jobs:", error);
-      setJobs([]);
       toast.error("Failed to load jobs");
     } finally {
       setLoading(false);
@@ -75,12 +108,9 @@ export default function JobManagement() {
 
   useEffect(() => {
     fetchJobs(1);
-    const interval = setInterval(() => fetchJobs(pagination.page), 15000);
+    const interval = setInterval(() => fetchJobs(stateRef.current.page), 15000);
     return () => clearInterval(interval);
   }, []);
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(amount || 0);
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-KE", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -107,15 +137,11 @@ export default function JobManagement() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search jobs…" className="pl-10" />
             </div>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2 border rounded-lg bg-white text-sm">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2 border rounded-lg bg-card text-sm">
               <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="matching">Matching</option>
-              <option value="accepted">Accepted</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="disputed">Disputed</option>
+              {STATUS_FILTERS.map((s) => (
+                <option key={s} value={s}>{statusLabel(s)}</option>
+              ))}
             </select>
             <Button type="submit" disabled={loading}>
               <Filter className="w-4 h-4 mr-2" />
@@ -144,18 +170,18 @@ export default function JobManagement() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-semibold truncate">{job.title}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-800"}`}>
-                            {job.status.replace("_", " ").toUpperCase()}
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-800 border-gray-300"}`}>
+                            {statusLabel(job.status).toUpperCase()}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-1">{job.description}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      <div><p className="text-muted-foreground uppercase mb-0.5">Category</p><p className="font-medium">{job.category}</p></div>
+                      <div><p className="text-muted-foreground uppercase mb-0.5">Category</p><p className="font-medium capitalize">{(job.category || "").replace(/_/g, " ")}</p></div>
                       <div><p className="text-muted-foreground uppercase mb-0.5">Customer</p><p className="font-medium truncate">{job.customerName}</p></div>
                       <div><p className="text-muted-foreground uppercase mb-0.5">Fundi</p><p className="font-medium truncate">{job.fundiName || "Unassigned"}</p></div>
-                      <div><p className="text-muted-foreground uppercase mb-0.5">Price</p><p className="font-medium text-primary">{formatCurrency(job.finalPrice > 0 ? job.finalPrice : job.estimatedPrice)}</p></div>
+                      <div><p className="text-muted-foreground uppercase mb-0.5">Price</p><p className="font-medium text-primary">{formatMoney(job.finalPrice > 0 ? job.finalPrice : job.estimatedPrice)}</p></div>
                     </div>
                     <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground border-t pt-3">
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{sanitizeLocationText(job.location, LOCATION_FALLBACK)}</span>

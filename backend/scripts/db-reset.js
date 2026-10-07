@@ -41,7 +41,17 @@ async function main() {
   console.log('[db-reset] done. Development database is clean and has only the authorized demo fixture.');
 }
 
-main().catch((err) => {
-  console.error('[db-reset] FAILED:', err.message);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    // Flush PGlite's buffered pages to disk before exiting, or the tail of
+    // the reset silently never lands in .pgdata.
+    const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+    await closeEmbeddedDb();
+    process.exit(0);
+  })
+  .catch(async (err) => {
+    console.error('[db-reset] FAILED:', err.message);
+    const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+    await closeEmbeddedDb().catch(() => {});
+    process.exit(1);
+  });

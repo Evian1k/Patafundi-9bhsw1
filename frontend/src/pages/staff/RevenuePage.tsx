@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
 
 type Totals = {
   dailyRevenue: number;
@@ -15,8 +16,6 @@ type Totals = {
   refundCosts: number;
   netProfit: number;
 };
-
-const fmt = (n: number) => `KES ${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 /** Real revenue dashboard (spec §63) — reads /staff/revenue (revenue_ledger).
  * Every figure is server-computed; empty ledger renders honest zeros. */
@@ -85,7 +84,7 @@ export default function RevenuePage() {
             {cards.map((c) => (
               <div key={c.label} className="bg-card rounded-2xl border border-border/60 p-4">
                 <p className="text-xs text-muted-foreground">{c.label}</p>
-                <p className="font-display font-bold text-xl mt-1">{fmt(c.value ?? 0)}</p>
+                <p className="font-display font-bold text-xl mt-1">{formatMoney(c.value ?? 0)}</p>
                 {c.hint && <p className="text-[11px] text-muted-foreground mt-1">{c.hint}</p>}
               </div>
             ))}

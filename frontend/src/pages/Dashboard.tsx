@@ -2,9 +2,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Plus, Clock, CheckCircle, MapPin, LogOut, Settings,
-  Wrench, ChevronRight, AlertCircle, Trash2, RefreshCw,
-  Wallet, Scale, CalendarDays, Heart, LifeBuoy, Search, FileText,
+  Plus, CheckCircle, MapPin, LogOut, Settings,
+  Wrench, ChevronRight, Trash2, RefreshCw,
+  CalendarDays, Heart, LifeBuoy, Search, FileText,
   MessageSquareText, Flag, TrendingUp,
 } from "lucide-react";
 import { ReportProblemModal } from "@/components/support/ReportProblemModal";
@@ -18,7 +18,7 @@ import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
-import { SERVICE_CATALOG, CORE_SERVICE_IDS, findService, bookingPathForService } from "@/config/services";
+import { SERVICE_CATALOG, CORE_SERVICE_IDS, bookingPathForService } from "@/config/services";
 
 const LOCATION_ONBOARDING_KEY = "pf_location_onboarding";
 
@@ -48,6 +48,8 @@ function LocationOnboarding() {
     navigator.geolocation.getCurrentPosition(
       () => {
         localStorage.setItem("pf_location_label", "Current location");
+        // The dashboard header reads this label - notify it to re-render.
+        window.dispatchEvent(new Event("pf-location-label"));
         setState("granted");
         setTimeout(() => dismiss("granted"), 900);
       },
@@ -111,26 +113,27 @@ interface JobData {
   service_categories?: { name: string };
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  matching: "Finding Fundis",
-  accepted: "Accepted",
-  on_the_way: "On the Way",
-  arrived: "Arrived",
-  in_progress: "In Progress",
-  completed: "Completed",
-};
-
+// Status labels/colors come from lib/bookingStatus - the declared canon.
+// This map only styles; the fallback covers every lifecycle status.
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-600 border-yellow-200",
   matching: "bg-blue-500/10 text-blue-600 border-blue-200",
+  quote_requested: "bg-violet-500/10 text-violet-600 border-violet-200",
+  offered: "bg-violet-500/10 text-violet-600 border-violet-200",
   accepted: "bg-purple-500/10 text-purple-600 border-purple-200",
+  assigned: "bg-purple-500/10 text-purple-600 border-purple-200",
+  scheduled: "bg-indigo-500/10 text-indigo-600 border-indigo-200",
+  booking_confirmed: "bg-green-500/10 text-green-600 border-green-200",
   on_the_way: "bg-purple-500/10 text-purple-600 border-purple-200",
   arrived: "bg-indigo-500/10 text-indigo-600 border-indigo-200",
   in_progress: "bg-primary/10 text-primary border-primary/20",
+  completion_requested: "bg-amber-500/10 text-amber-600 border-amber-200",
+  customer_confirmed_completion: "bg-amber-500/10 text-amber-600 border-amber-200",
+  payment_pending: "bg-amber-500/10 text-amber-600 border-amber-200",
+  payment_processing: "bg-amber-500/10 text-amber-600 border-amber-200",
 };
 
-import { CUSTOMER_ACTIVE_STATUSES } from '@/lib/bookingStatus';
+import { CUSTOMER_ACTIVE_STATUSES, CUSTOMER_COMPLETED_STATUSES, statusLabel } from '@/lib/bookingStatus';
 
 function openJobTracking(navigate: ReturnType<typeof useNavigate>, jobId: string) {
   navigate(`/job/${jobId}/tracking`);
@@ -151,6 +154,18 @@ export default function Dashboard() {
   // Report-a-problem opens INLINE on this dashboard - the user never leaves.
   const [reportJob, setReportJob] = useState<JobData | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // Reactive location label: localStorage alone never triggers a re-render.
+  const [locationLabel, setLocationLabel] = useState<string>("");
+  useEffect(() => {
+    const sync = () => setLocationLabel(localStorage.getItem("pf_location_label") || "");
+    sync();
+    window.addEventListener("pf-location-label", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("pf-location-label", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const openReport = (job: JobData) => {
     setReportJob(job);
@@ -166,7 +181,7 @@ export default function Dashboard() {
       // Classification uses the shared taxonomy: a quoted booking is active,
       // never silently completed.
       setActiveJobs(jobs.filter((j) => CUSTOMER_ACTIVE_STATUSES.includes(j.status)));
-      setRecentJobs(jobs.filter((j) => ['payment_confirmed', 'completed', 'closed'].includes(j.status)).slice(0, 10));
+      setRecentJobs(jobs.filter((j) => CUSTOMER_COMPLETED_STATUSES.includes(j.status)).slice(0, 10));
     } catch (error) {
       console.error("Error fetching jobs:", error);
       setJobsError("Unable to load your jobs. Please try again.");
@@ -275,7 +290,7 @@ export default function Dashboard() {
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" />
-            {localStorage.getItem("pf_location_label") || "Set your location for nearby results"}
+            {locationLabel || "Set your location for nearby results"}
           </p>
         </div>
 
@@ -472,7 +487,7 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[job.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                          {STATUS_LABELS[job.status] || job.status}
+                          {statusLabel(job.status)}
                         </span>
                       </div>
                       <p className="font-semibold text-sm truncate">{job.title}</p>

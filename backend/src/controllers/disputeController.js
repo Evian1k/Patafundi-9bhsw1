@@ -80,7 +80,8 @@ export async function createDispute(req, res) {
 export async function listDisputes(req, res) {
   const status = req.query.status;
   const result = await query(
-    `select d.* from disputes d join jobs j on j.id = d.job_id
+    `select d.*, j.booking_number, j.service_category
+     from disputes d join jobs j on j.id = d.job_id
      where ($2::text is null or d.status = $2)
        and (
          $3::text in ('admin', 'super_admin')

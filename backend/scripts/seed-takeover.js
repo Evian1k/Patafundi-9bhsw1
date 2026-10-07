@@ -361,9 +361,17 @@ export async function seedTakeover() {
 const isDirectRun = process.argv[1] && process.argv[1].includes('seed-takeover');
 if (isDirectRun) {
   seedTakeover()
-    .then(() => process.exit(0))
-    .catch((error) => {
+    .then(async () => {
+      // Flush PGlite's buffered pages to disk before exiting, or the tail of
+      // the seed (and any DDL) silently never lands in .pgdata.
+      const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+      await closeEmbeddedDb();
+      process.exit(0);
+    })
+    .catch(async (error) => {
       console.error('[seed-takeover]', error);
+      const { closeEmbeddedDb } = await import('../src/pglite-instance.js');
+      await closeEmbeddedDb().catch(() => {});
       process.exit(1);
     });
 }

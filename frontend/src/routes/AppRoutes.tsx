@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedAdminRoute } from "@/routes/guards";
+import { formatMoney } from "@/lib/money";
 
 import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
@@ -241,12 +242,14 @@ export default function AppRoutes() {
         <Route path="admin/jobs" element={
           <StaffDataTable resource="jobs" title="Job Management"
             columns={[
-              { key: "service_category", label: "Category" },
-              { key: "status", label: "Status" },
+              // /staff/jobs (adminController.listJobs) maps fields to camelCase:
+              // category, estimatedPrice, createdAt — snake_case keys render blanks.
+              { key: "category", label: "Category", render: (r) => String(r.category || "Not recorded").replace(/_/g, " ") },
+              { key: "status", label: "Status", render: (r) => String(r.status || "").replace(/_/g, " ") || "Not recorded" },
               { key: "customerName", label: "Customer" },
               { key: "fundiName", label: "Fundi" },
-              { key: "estimated_price", label: "Price (KES)" },
-              { key: "created_at", label: "Created", render: (r) => new Date(r.created_at).toLocaleDateString() },
+              { key: "estimatedPrice", label: "Price (KSh)", render: (r) => r.estimatedPrice != null ? formatMoney(r.estimatedPrice) : "Not recorded" },
+              { key: "createdAt", label: "Created", render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "Not recorded" },
             ]}
           />
         } />

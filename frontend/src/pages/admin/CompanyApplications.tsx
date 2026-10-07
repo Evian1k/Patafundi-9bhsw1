@@ -7,6 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { formatMoney } from "@/lib/money";
+import AdminLayout from "@/components/admin/AdminLayout";
 
 interface Application {
   id: string; companyName: string; contactName: string; contactEmail: string;
@@ -87,7 +89,8 @@ export default function CompanyApplications() {
   };
 
   return (
-    <div className="space-y-4">
+    <AdminLayout>
+      <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Companies</h1>
@@ -136,7 +139,7 @@ export default function CompanyApplications() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
                       {(a.businessCategories || []).map((c) => (
-                        <span key={c} className="rounded-full border px-2 py-0.5 capitalize">{c.replace("_", " ")}</span>
+                        <span key={c} className="rounded-full border px-2 py-0.5 capitalize">{c.replace(/_/g, " ")}</span>
                       ))}
                       {(a.serviceAreas || []).slice(0, 4).map((s) => (
                         <span key={s} className="rounded-full bg-muted px-2 py-0.5">{s}</span>
@@ -196,7 +199,7 @@ export default function CompanyApplications() {
                   <td className="px-4 py-3 text-right tabular-nums">{c.jobCount}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{c.rating?.toFixed(1) || "Not provided"}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                    {c.pendingSettlementsKes ? `KES ${Number(c.pendingSettlementsKes).toLocaleString()}` : "KES 0"}
+                    {formatMoney(c.pendingSettlementsKes ?? 0)}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${c.status === "approved" ? "bg-emerald-500/10 text-emerald-600" : c.status === "suspended" ? "bg-red-500/10 text-red-500" : "bg-muted"}`}>
@@ -223,5 +226,6 @@ export default function CompanyApplications() {
         </div>
       )}
     </div>
+  </AdminLayout>
   );
 }

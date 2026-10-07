@@ -226,7 +226,12 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
         {/* Top bar */}
         <header className="h-14 bg-card border-b border-border/50 flex items-center px-4 gap-3 shrink-0">
           <button
-            onClick={() => { setSidebarOpen((s) => !s); setMobileOpen((s) => !s); }}
+            onClick={() => {
+              // One source of truth: on desktop toggle the collapsed rail,
+              // on mobile toggle the overlay - never both at once.
+              if (window.innerWidth >= 1024) setSidebarOpen((s) => !s);
+              else setMobileOpen((s) => !s);
+            }}
             className="p-2 hover:bg-muted rounded-lg transition-colors"
             aria-label="Toggle sidebar"
           >

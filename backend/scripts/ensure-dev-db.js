@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import pg from 'pg';
-import { getEmbeddedDb } from '../src/pglite-instance.js';
+import { getEmbeddedDb, closeEmbeddedDb } from '../src/pglite-instance.js';
 import { getPgPoolConfig, isLocalDatabaseUrl } from '../src/pg-config.js';
 import { maybeBootstrapOwnerFromEnv } from '../src/ownerBootstrap.js';
 
@@ -430,9 +430,17 @@ const isDirectRun = process.argv[1]
 
 if (isDirectRun) {
   ensureDevDatabase()
-    .then(() => process.exit(0))
-    .catch((error) => {
+    .then(async () => {
+      // Durability: PGlite buffers writes in its WASM VFS. process.exit()
+      // without close() loses the tail of the run (late DDL like constraint
+      // changes) — the root cause of "migration applied but absent" ghosts.
+      // Only the direct-run path closes: the server boot shares the instance.
+      await closeEmbeddedDb();
+      process.exit(0);
+    })
+    .catch(async (error) => {
       console.error('[PataFundi]', error.message);
+      await closeEmbeddedDb().catch(() => {});
       process.exit(1);
     });
 }
