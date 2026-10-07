@@ -64,6 +64,13 @@ export async function uploadCompanyDocument(req, res) {
   const { uploadPrivateFile } = await import('../services/storageService.js');
   if (!req.file && !req.body?.storageKey) throw badRequest('A document file is required');
   let storageKey = req.body?.storageKey || null;
+  // SECURITY: a client-supplied storage key may only reference this company's
+  // own verification namespace — never an arbitrary object key owned by
+  // someone else. Legitimate keys are always produced by uploadPrivateFile
+  // under verification/company/<companyId>/.
+  if (storageKey && !String(storageKey).startsWith(`verification/company/${company.id}/`)) {
+    throw badRequest('Invalid storage key. Upload the document file directly.');
+  }
   let mimeType = req.body?.mimeType || 'application/pdf';
   let fileSize = Number(req.body?.fileSize || 0);
   let originalName = req.body?.originalName || documentType;
@@ -399,8 +406,9 @@ export async function uploadCompanyBranding(req, res) {
       file,
       allowPdf: false,
     });
-    if (field === 'logo') updates.logo_url = stored.key;
-    else updates.profile_image_url = stored.key;
+    // uploadPrivateFile returns { r2Key } — store the real key, not undefined.
+    if (field === 'logo') updates.logo_url = stored.r2Key;
+    else updates.profile_image_url = stored.r2Key;
   }
   if (!Object.keys(updates).length) {
     throw badRequest('Attach a logo and/or cover image to upload');

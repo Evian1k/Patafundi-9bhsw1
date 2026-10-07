@@ -10,11 +10,24 @@ function resolveBaseUrl(): string {
   // 2) EXPO_PUBLIC_HOST         — LAN IP / hostname → http://<host>:4000 (local dev)
   // 3) fallback                 — the stable production backend (Render)
   const explicit = process.env.EXPO_PUBLIC_API_URL as string | undefined;
-  if (explicit) return explicit.replace(/\/$/, '');
+  if (explicit) {
+    // SECURITY: release builds must never talk plaintext HTTP. Only __DEV__
+    // may downgrade; production keeps an https origin.
+    if (!explicit.startsWith('https://') && !(typeof __DEV__ !== 'undefined' && __DEV__)) {
+      console.warn('[api] refusing non-https EXPO_PUBLIC_API_URL in production; using default');
+    } else {
+      return explicit.replace(/\/$/, '');
+    }
+  }
   const host = process.env.EXPO_PUBLIC_HOST as string | undefined;
   if (host) {
-    if (/^https?:\/\//i.test(host)) return host.replace(/\/$/, '');
-    return `http://${host}:4000`;
+    if (/^https:\/\//i.test(host)) return host.replace(/\/$/, '');
+    if (/^http:\/\//i.test(host)) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) return host.replace(/\/$/, '');
+      console.warn('[api] refusing plaintext http EXPO_PUBLIC_HOST in production; using default');
+    } else if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      return `http://${host}:4000`;
+    }
   }
   return 'https://patafundi-9bhsw1.onrender.com';
 }
@@ -91,12 +104,15 @@ class ApiClient {
     this.token = await readToken(STORAGE_KEYS.TOKEN);
     this.refreshToken = await readToken(STORAGE_KEYS.REFRESH_TOKEN);
   }
-  private async saveTokens(token: string, refreshToken: string): Promise<void> {
-    this.token = token; this.refreshToken = refreshToken;
-    await Promise.all([
-      writeToken(STORAGE_KEYS.TOKEN, token),
-      writeToken(STORAGE_KEYS.REFRESH_TOKEN, refreshToken),
-    ]);
+  private async saveTokens(token: string, refreshToken: string | null): Promise<void> {
+    this.token = token;
+    // SECURITY/correctness: never persist the ACCESS token under the refresh
+    // slot when the server did not issue a refresh token — replaying it at
+    // /auth/refresh is wrong semantics and keeps a second plaintext copy.
+    this.refreshToken = refreshToken || null;
+    await writeToken(STORAGE_KEYS.TOKEN, token);
+    if (refreshToken) await writeToken(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    else await deleteToken(STORAGE_KEYS.REFRESH_TOKEN);
   }
   private async clearTokens(): Promise<void> {
     this.token = null; this.refreshToken = null;
@@ -156,10 +172,10 @@ class ApiClient {
   // Auth
   async register(email: string, password: string, fullName: string, phone: string): Promise<AuthResponse & { devOtp?: string }> { return this.request<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, fullName, phone }) }); }
   async registerFundi(payload: FormData): Promise<AuthResponse> { return this.upload('/auth/register/fundi', payload); }
-  async login(email: string, password: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken || data.token); if (data.user) await this.cacheUser(data.user); } return data; }
+  async login(email: string, password: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? null); if (data.user) await this.cacheUser(data.user); } return data; }
   async logout(): Promise<void> { try { await this.request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: this.refreshToken }) }); } catch (error) { console.warn('[api] server logout failed; clearing local session anyway:', error); } await this.clearTokens(); this.disconnectSocket(); }
-  async refreshTokens(): Promise<boolean> { if (this.refreshPromise) return this.refreshPromise; this.refreshPromise = (async () => { try { if (!this.refreshToken) return false; const response = await fetch(`${this.baseUrl}/api/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: this.refreshToken }) }); if (!response.ok) return false; const data = await response.json(); if (data.token) { await this.saveTokens(data.token, data.refreshToken || this.refreshToken); return true; } return false; } catch { return false; } finally { this.refreshPromise = null; } })(); return this.refreshPromise; }
-  async verifyOtp(email: string, code: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/otp-verify', { method: 'POST', body: JSON.stringify({ email, code }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken || data.token); if (data.user) await this.cacheUser(data.user); } return data; }
+  async refreshTokens(): Promise<boolean> { if (this.refreshPromise) return this.refreshPromise; this.refreshPromise = (async () => { try { if (!this.refreshToken) return false; const response = await fetch(`${this.baseUrl}/api/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: this.refreshToken }) }); if (!response.ok) return false; const data = await response.json(); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? this.refreshToken); return true; } return false; } catch { return false; } finally { this.refreshPromise = null; } })(); return this.refreshPromise; }
+  async verifyOtp(email: string, code: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/otp-verify', { method: 'POST', body: JSON.stringify({ email, code }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? null); if (data.user) await this.cacheUser(data.user); } return data; }
   async resendOtp(email: string): Promise<{ success: boolean; devOtp?: string }> { return this.request('/auth/otp-resend', { method: 'POST', body: JSON.stringify({ email }) }); }
   async forgotPassword(email: string): Promise<{ success: boolean }> { return this.request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }); }
   async resetPassword(token: string, password: string): Promise<{ success: boolean }> { return this.request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }); }

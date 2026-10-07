@@ -577,3 +577,20 @@ Work Log:
 
 Stage Summary:
 - The commit chain is intact and the platform verified green end-to-end; the three staff-console type errors (one a real runtime crash path on the SystemSettings error banner) are fixed and committed.
+
+---
+Task ID: 26 (full security hardening + every-process verification)
+Agent: Super Z (main agent)
+Task: User asked to "complete everything, make everything secure, go through every process, ensure everything works correctly."
+
+Work Log:
+- Baseline green (f2b990a): 129/129 tests, stack healthy. Ran the existing security battery 19/19 PASS, then two parallel deep-audit agents (backend 8 surfaces vs 444 routes; frontend/mobile/shared tokens, XSS sinks, role gates, deep links).
+- HIGH — company team member account-linking hole (companyController.portalAddMember): the insert used `on conflict (email) do update`, so any company owner could silently attach ANY existing platform account to their company, leak the victim's PII via the team list, overwrite their full_name, and hijack their primary-company portal context (requireCompanyMember resolves primary by first-joined membership). Fixed: existing email now returns explicit 409 asking the owner to invite properly; name overwrite removed.
+- MEDIUM — 2FA disable + recovery-code regeneration accepted a bare session token (hijacker's first move). Now both require the current TOTP or a recovery code via verify2FALogin; web SecurityCenter gained a confirm-code step (mobile client already sent a code the backend ignored).
+- MEDIUM — Math.random minted company-staff temp passwords AND the ERR-reference codes gave an unauthenticated PRNG oracle. All credential material now uses crypto.randomBytes (temp password) and crypto.randomInt (ERR refs in routes.js + server.js). Directory tie-shuffle Math.random kept (not security material).
+- MEDIUM — fraud blacklist probe endpoints (/fraud/blacklist/check, /check-batch) leaked internal fraud reasons to any authenticated user; now gated behind can_view_fraud_prevention like every sibling.
+- MEDIUM — rate-limit gaps closed with 5 new limiters: paymentActionRateLimit (subscriptions/activate, payments/stk-push, payments/stripe/intent — STK-push harassment + payment-row churn), disputeRateLimit (/disputes), sosRateLimit (/sos/trigger pages every admin), publicSubmitRateLimit (careers/apply, company/applications), clientErrorRateLimit (/client-errors flood).
+- LOW/bugs — getActiveSessions no longer returns refresh-token hashes; client-supplied verification storageKey confined to the company's own namespace; /enterprise/hr/leave now requires can_manage_hr; partner-application status forced to 'submitted' server-side; company branding upload stored stored.r2Key instead of undefined stored.key (logo_url was being nulled).
+- Frontend/mobile — six logout/error paths now clear the cached role/user session via apiClient.setToken(null) instead of dropping only auth_token (stale sessionStorage role could route the next tab user into the wrong console); shared apiClient no longer persists the access token under the refresh-token slot and release builds refuse plaintext http origins (dev-only downgrade); dev-OTP displays gated behind import.meta.env.DEV / __DEV__ in Auth, FundiRegister, FundiOtpScreen, FundiRegisterScreen (string gone from prod bundles); isStaff() fails closed on expired JWTs; ?next= login redirect param validated to same-origin in-app paths; customer mobile WalletScreen now fetches REAL payments per booking (was hardwired empty) with an honest load-failure state; customer deep-link prefixes aligned with the registered patafundi-customer:// scheme.
+- E2E hardening: quote-flow script is now re-run-safe (skips the verification workflow when the demo company is already verified instead of failing on the backend's correct already-verified rejection).
+- Verified: 129/129 unit tests, tsc 0 errors, vite build ok, quote-flow E2E ALL PASS twice in a row (39 checks), security battery 19/19, api contract probe 193/193 paths vs 444 routes, mobile/shared typecheck shows only the documented pre-existing module-resolution baseline.

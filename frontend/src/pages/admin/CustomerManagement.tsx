@@ -53,7 +53,7 @@ export default function CustomerManagement() {
       console.error("Error fetching customers:", error);
       const msg = error instanceof Error ? error.message : "";
       if (msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("authentication required") || msg.toLowerCase().includes("invalid or expired token")) {
-        localStorage.removeItem("auth_token");
+        apiClient.setToken(null); // clears token + cached role/user session
         toast.error("Admin session expired. Please sign in again.");
         navigate("/admin/login");
         return;

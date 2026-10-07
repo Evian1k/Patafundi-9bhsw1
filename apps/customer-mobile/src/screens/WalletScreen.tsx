@@ -23,19 +23,29 @@ export function WalletScreen(): JSX.Element {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
     try {
-      const results = await Promise.allSettled([
-        apiClient.listJobs({ limit: 50 }),
-      ]);
-      if (results[0].status === 'fulfilled') {
-        // We don't have a direct payments endpoint, but listJobs + getPaymentForJob could be used.
-        // For simplicity, leave payments empty unless we fetch per job.
-        setPayments([]);
-      }
+      setLoadError(false);
+      const jobsRes = await apiClient.listJobs({ limit: 50 });
+      const jobs = jobsRes?.jobs ?? [];
+      // Fetch the real payment record for each booking. Jobs without a
+      // payment resolve to null — that is honest data, not an error.
+      const settled = await Promise.allSettled(
+        jobs.map((j) => apiClient.getPaymentForJob(j.id)),
+      );
+      const found: Payment[] = [];
+      settled.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value?.payment) found.push(r.value.payment);
+      });
+      // Most recent first.
+      found.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setPayments(found);
     } catch {
-      // ignore
+      // Distinguish "no payments yet" from "could not load" — never fake success.
+      setLoadError(true);
+      setPayments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -69,7 +79,11 @@ export function WalletScreen(): JSX.Element {
       <Text style={styles.title}>Wallet</Text>
 
       <Text style={styles.sectionTitle}>Payment history</Text>
-      {payments.length === 0 ? (
+      {loadError ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>Payments could not be loaded just now. Pull down to retry.</Text>
+        </View>
+      ) : payments.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>No payments yet.</Text>
         </View>

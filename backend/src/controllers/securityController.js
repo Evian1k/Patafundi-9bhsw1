@@ -24,12 +24,25 @@ export async function verify2FASetupReq(req, res) {
 }
 
 export async function disable2FAReq(req, res) {
+  // SECURITY: disabling 2FA is exactly what an account hijacker would do
+  // first. Require the current TOTP code (or a valid recovery code) so a
+  // stolen session alone cannot strip the second factor.
+  const { code } = req.body || {};
+  if (!code) throw badRequest('Enter a current authenticator code (or a recovery code) to disable 2FA');
+  const check = await verify2FALogin(req.user.id, code);
+  if (!check.valid) throw badRequest('Invalid code. 2FA was NOT disabled.');
   await disable2FA(req.user.id);
   await auditLog({ userId: req.user.id, action: 'security.2fa_disabled', entityType: 'user', entityId: req.user.id });
   res.json({ success: true });
 }
 
 export async function regenerateRecoveryReq(req, res) {
+  // Recovery codes are a bypass factor — regenerating them must also prove
+  // possession of the live second factor.
+  const { code } = req.body || {};
+  if (!code) throw badRequest('Enter a current authenticator code to regenerate recovery codes');
+  const check = await verify2FALogin(req.user.id, code);
+  if (!check.valid) throw badRequest('Invalid code. Recovery codes were NOT regenerated.');
   const codes = await regenerateRecoveryCodes(req.user.id);
   await auditLog({ userId: req.user.id, action: 'security.recovery_codes_regenerated', entityType: 'user', entityId: req.user.id });
   res.json({ success: true, recoveryCodes: codes });
@@ -51,8 +64,9 @@ export async function toggleFeatureFlag(req, res) {
 
 // ── Session Management ──
 export async function getActiveSessions(req, res) {
+  // token_hash is credential material — the sessions UI only needs metadata.
   const result = await query(
-    'select id, token_hash, expires_at, created_at from refresh_tokens where user_id = $1 and revoked_at is null and expires_at > now() order by created_at desc',
+    'select id, expires_at, created_at from refresh_tokens where user_id = $1 and revoked_at is null and expires_at > now() order by created_at desc',
     [req.user.id],
   );
   res.json({ success: true, sessions: result.rows });

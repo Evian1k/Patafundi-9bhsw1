@@ -54,3 +54,56 @@ export const supportRateLimit = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many support requests submitted. Please try again later.' },
 });
+
+// Money-triggering actions: each call can fire a real M-Pesa STK push / Stripe
+// intent or create payment rows. Keyed by the authenticated user so one
+// account cannot harass arbitrary phone numbers or churn payment records.
+export const paymentActionRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many payment attempts. Please wait a few minutes and try again.' },
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.user?.id || 'anon'}`,
+});
+
+// Dispute creation — honest for real users (disputes are rare), hostile to spam.
+export const disputeRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many disputes submitted. Please try again later.' },
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.user?.id || 'anon'}`,
+});
+
+// SOS pages every admin (notifications + socket broadcast). A stuck client
+// retry loop must not be able to alarm the whole ops floor.
+export const sosRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'SOS rate limit reached. Your earlier alerts are being handled.' },
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${req.user?.id || 'anon'}`,
+});
+
+// Public/guest submission forms (careers, company applications).
+export const publicSubmitRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many applications submitted. Please try again later.' },
+});
+
+// Unauthenticated client error reports — loose enough for genuine front-end
+// error bursts, tight enough to keep them from flooding error_logs and staff
+// notifications.
+export const clientErrorRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many error reports from this client.' },
+});

@@ -68,7 +68,7 @@ export default function CompanyPortalLayout() {
 
   const logout = async () => {
     try { await apiClient.request("/auth/logout", { method: "POST" }); } catch { /* ignore */ }
-    localStorage.removeItem("auth_token");
+    apiClient.setToken(null); // clears token + cached role/user session
     navigate("/");
   };
 

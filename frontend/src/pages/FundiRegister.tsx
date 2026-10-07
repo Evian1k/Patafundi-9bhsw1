@@ -76,7 +76,7 @@ export default function FundiRegister() {
 
       const res = await apiClient.registerFundiAccount(fd);
       setPendingEmail(res.email);
-      if (res.devOtp) toast.info(`Dev OTP: ${res.devOtp}`);
+      if (import.meta.env.DEV && res.devOtp) toast.info(`Dev OTP: ${res.devOtp}`);
       toast.success("Account created. Verify your email.");
       setStep(5);
     } catch (e) {

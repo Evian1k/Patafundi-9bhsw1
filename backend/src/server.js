@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -261,7 +262,7 @@ function makeErrorReference() {
   // Short, human-quotable reference, e.g. ERR-7F3K2Q. Avoids ambiguous chars.
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 6; i += 1) code += alphabet[crypto.randomInt(alphabet.length)];
   return `ERR-${code}`;
 }
 

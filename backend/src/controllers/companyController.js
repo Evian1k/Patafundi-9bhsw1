@@ -2,6 +2,7 @@
 // Takeover rebuild: full portal API (overview, profile, services, team,
 // jobs, dispatch, schedule, quality, finance) with organization isolation
 // enforced server-side on EVERY endpoint via requireCompanyMember.
+import crypto from 'node:crypto';
 import { query, transaction } from '../db.js';
 import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
@@ -90,7 +91,10 @@ export async function createPartnerApplication(req, res) {
       throw badRequest(`${field} is required`);
     }
   }
-  const status = APPLICATION_STATUSES.includes(body.status) ? body.status : 'submitted';
+  // SECURITY: application status is server-authoritative — a new application
+  // always enters the queue as 'submitted', never a client-chosen state
+  // (a caller could otherwise insert itself directly as 'approved').
+  const status = 'submitted';
   const result = await query(
     `insert into company_partner_applications
        (user_id, company_name, legal_name, contact_name, contact_email, contact_phone,
@@ -633,13 +637,22 @@ export async function portalAddMember(req, res) {
   }
   const permissions = validPermissions(b.permissions);
   const bcrypt = (await import('bcryptjs')).default;
-  const tempPassword = b.password || `Pf-${Math.random().toString(36).slice(2, 10)}!`;
+  // Credential material must never come from Math.random (state-recoverable PRNG).
+  const tempPassword = b.password || `Pf-${crypto.randomBytes(12).toString('base64url')}!A1`;
   const hash = await bcrypt.hash(tempPassword, 12);
+  // SECURITY: never silently link an existing platform account into this
+  // company. Creating a membership for a user who did not consent would leak
+  // their PII to the company and can hijack their primary-company portal
+  // context. Existing email -> explicit 409 so the owner can invite them
+  // through a proper acceptance flow instead.
+  const existing = await query(`select id, email from users where email = lower($1)`, [b.email]);
+  if (existing.rows.length > 0) {
+    throw Object.assign(new Error('An account with this email already exists. Ask them to sign in and request to join your company.'), { status: 409 });
+  }
   const member = await transaction(async (client) => {
     const userRes = await client.query(
       `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
        values (lower($1), $2, $3, $4, 'customer', 'active', now())
-       on conflict (email) do update set full_name = excluded.full_name
        returning id, email, full_name`,
       [b.email, hash, b.fullName, b.phone || null],
     );

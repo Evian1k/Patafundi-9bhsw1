@@ -38,17 +38,21 @@ export async function resolvePostLoginPath(
   user: MinimalUser,
   next?: string | null,
 ): Promise<string> {
-  if (!user) return next || "/dashboard";
+  // Hygiene: only accept same-origin in-app paths from the ?next= param.
+  // Blocks protocol-relative URLs (//evil.tld) and absolute origins.
+  const safeNext =
+    next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  if (!user) return safeNext || "/dashboard";
   bootstrapAuthSessionFromUser(user);
 
   const apiRole = String(user.role || "").toLowerCase();
 
   // Staff console roles first (resolveAuthRole doesn't bucket these).
-  if (STAFF_CONSOLE_ROLES.has(apiRole)) return next || "/staff";
+  if (STAFF_CONSOLE_ROLES.has(apiRole)) return safeNext || "/staff";
 
   const role = resolveAuthRole(user);
-  if (role === "admin") return next || "/admin/dashboard";
-  if (role === "fundi") return next || "/fundi";
+  if (role === "admin") return safeNext || "/admin/dashboard";
+  if (role === "fundi") return safeNext || "/fundi";
   if (role === "fundi_pending") {
     try {
       const s = (await apiClient.getFundiApprovalStatus()) as {
@@ -65,7 +69,7 @@ export async function resolvePostLoginPath(
   // membership probe (200 for everyone) — the portal overview itself is
   // member-gated and would log a 403 for regular customers.
   if (String(user.role || "").toLowerCase() === "company_admin") {
-    return next || "/company";
+    return safeNext || "/company";
   }
   // An explicit customer-app destination (mid-booking login) always wins over
   // membership probing — the user was booking, not opening a work console.
@@ -77,11 +81,11 @@ export async function resolvePostLoginPath(
       isMember?: boolean;
       myRole?: string | null;
     };
-    if (membership?.isMember && membership.myRole === "technician") return next || "/technician";
-    if (membership?.isMember) return next || "/company";
+    if (membership?.isMember && membership.myRole === "technician") return safeNext || "/technician";
+    if (membership?.isMember) return safeNext || "/company";
   } catch {
     // not a company member — fall through to the customer app
   }
 
-  return next || "/dashboard";
+  return safeNext || "/dashboard";
 }

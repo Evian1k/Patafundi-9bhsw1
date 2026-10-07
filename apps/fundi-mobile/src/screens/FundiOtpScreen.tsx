@@ -32,7 +32,7 @@ export function FundiOtpScreen({ route, navigation }: any): JSX.Element {
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
-    if (devOtp) {
+    if (__DEV__ && devOtp) {
       Alert.alert('Dev Mode OTP', `Your OTP is: ${devOtp}`);
     }
   }, [devOtp]);
@@ -106,7 +106,7 @@ export function FundiOtpScreen({ route, navigation }: any): JSX.Element {
     try {
       const data = await apiClient.resendOtp(email);
       setCooldown(RESEND_COOLDOWN);
-      if (data.devOtp) {
+      if (__DEV__ && data.devOtp) {
         Alert.alert('Dev Mode OTP', `Your new OTP is: ${data.devOtp}`);
       } else {
         Alert.alert('OTP Sent', `A new code has been sent to ${email}`);

@@ -75,33 +75,41 @@ async function main() {
     ok(up.status === 201 && upj.document?.id, `document uploaded: ${docType}`);
   }
 
-  const submitVer = await req('POST', '/company/verification/submit', { token: clogin0.json.token });
-  ok(submitVer.status === 200 && submitVer.json.company?.verification_status === 'under_review', 'submitted for verification (under_review)');
+  // Re-run safety: once a company is verified it stays verified (the backend
+  // correctly refuses re-submission). Only exercise the submit -> queue ->
+  // review -> verify path when the company is not verified yet.
+  const alreadyVerified = docsInfo.json.verificationStatus === 'verified';
+  if (!alreadyVerified) {
+    const submitVer = await req('POST', '/company/verification/submit', { token: clogin0.json.token });
+    ok(submitVer.status === 200 && submitVer.json.company?.verification_status === 'under_review', 'submitted for verification (under_review)');
 
-  // Admin sees the queue + a notification
-  const queue = await req('GET', '/admin/verification/companies?status=under_review', { token: adminToken });
-  ok(queue.status === 200 && (queue.json.companies || []).some((c) => c.id === companyId), 'company appears in admin verification queue');
-  const adminNotifs = await req('GET', '/notifications?limit=20', { token: adminToken });
-  ok((adminNotifs.json.notifications || []).some((n) => n.type === 'company_verification_submitted'), 'admin notification created');
+    // Admin sees the queue + a notification
+    const queue = await req('GET', '/admin/verification/companies?status=under_review', { token: adminToken });
+    ok(queue.status === 200 && (queue.json.companies || []).some((c) => c.id === companyId), 'company appears in admin verification queue');
+    const adminNotifs = await req('GET', '/notifications?limit=20', { token: adminToken });
+    ok((adminNotifs.json.notifications || []).some((n) => n.type === 'company_verification_submitted'), 'admin notification created');
 
-  // Admin verifies each document, then the company
-  const detail = await req('GET', `/admin/verification/companies/${companyId}`, { token: adminToken });
-  const pendingDocs = (detail.json.documents || []).filter((d) => !['verified', 'approved'].includes(d.status));
-  for (const doc of pendingDocs) {
-    const rev = await req('POST', `/admin/verification/documents/${doc.id}/review`, {
+    // Admin verifies each document, then the company
+    const detail = await req('GET', `/admin/verification/companies/${companyId}`, { token: adminToken });
+    const pendingDocs = (detail.json.documents || []).filter((d) => !['verified', 'approved'].includes(d.status));
+    for (const doc of pendingDocs) {
+      const rev = await req('POST', `/admin/verification/documents/${doc.id}/review`, {
+        token: adminToken,
+        body: { decision: 'verify' },
+      });
+      ok(rev.status === 200 && rev.json.document?.status === 'verified', `admin verified document: ${doc.documentType}`);
+    }
+    const verifyCo = await req('POST', `/admin/verification/companies/${companyId}/verify`, {
       token: adminToken,
       body: { decision: 'verify' },
     });
-    ok(rev.status === 200 && rev.json.document?.status === 'verified', `admin verified document: ${doc.documentType}`);
+    ok(verifyCo.status === 200 && verifyCo.json.company?.verification_status === 'verified', 'company VERIFIED by admin');
+    // Admin notification check happened above; company gets its own notification.
+    const coNotifs = await req('GET', '/notifications?limit=20', { token: clogin0.json.token });
+    ok((coNotifs.json.notifications || []).some((n) => n.type === 'company_verification_decision'), 'company received verification decision notification');
+  } else {
+    console.log('SKIP: verification workflow (company already verified by an earlier run)');
   }
-  const verifyCo = await req('POST', `/admin/verification/companies/${companyId}/verify`, {
-    token: adminToken,
-    body: { decision: 'verify' },
-  });
-  ok(verifyCo.status === 200 && verifyCo.json.company?.verification_status === 'verified', 'company VERIFIED by admin');
-  // Admin notification check happened above; company gets its own notification.
-  const coNotifs = await req('GET', '/notifications?limit=20', { token: clogin0.json.token });
-  ok((coNotifs.json.notifications || []).some((n) => n.type === 'company_verification_decision'), 'company received verification decision notification');
 
   const created = await req('POST', '/jobs', {
     token: customerToken,

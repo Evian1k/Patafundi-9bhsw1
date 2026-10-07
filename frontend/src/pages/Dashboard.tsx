@@ -208,7 +208,7 @@ export default function Dashboard() {
       await fetchUserJobs();
     } catch (error) {
       console.error("Failed to load user data:", error);
-      localStorage.removeItem("auth_token");
+      apiClient.setToken(null); // clears token + cached role/user session
       navigate("/auth");
     } finally {
       setLoading(false);

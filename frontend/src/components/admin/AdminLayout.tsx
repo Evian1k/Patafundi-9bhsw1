@@ -113,7 +113,7 @@ export default function AdminLayout({ children, disputeBadge }: AdminLayoutProps
           else navigate("/dashboard");
         }
       } catch {
-        localStorage.removeItem("auth_token");
+        apiClient.setToken(null); // clears token + cached role/user session
         navigate("/admin/login");
       }
     })();

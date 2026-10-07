@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import { query } from './db.js';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
 import { requireFundiAccount, requireApprovedFundi } from './middleware/fundiAccess.js';
@@ -30,7 +31,7 @@ import {
   requireProfilePhotoAccess,
 } from './middleware/storageAccess.js';
 import { asyncHandler } from './utils/http.js';
-import { aiRateLimit, supportRateLimit } from './middleware/rateLimit.js';
+import { aiRateLimit, supportRateLimit, paymentActionRateLimit, disputeRateLimit, sosRateLimit, publicSubmitRateLimit, clientErrorRateLimit } from './middleware/rateLimit.js';
 import { auditLog } from './services/auditService.js';
 
 export const router = express.Router();
@@ -92,7 +93,7 @@ router.get('/companies', asyncHandler(company.publicCompanyDirectory));
 router.get('/companies/:id', asyncHandler(company.publicCompanyProfileById));
 
 // ── Company partner applications ──
-router.post('/company/applications', authRequired, asyncHandler(company.createPartnerApplication));
+router.post('/company/applications', authRequired, publicSubmitRateLimit, asyncHandler(company.createPartnerApplication));
 router.get('/company/applications/me', authRequired, asyncHandler(company.listMyApplications));
 router.post('/company/applications/:id/submit', authRequired, asyncHandler(company.submitPartnerApplication));
 router.post('/company/applications/:id/review', authRequired, requireRole('admin'), asyncHandler(company.reviewPartnerApplication));
@@ -187,12 +188,12 @@ router.get('/refunds/mine', authRequired, asyncHandler(refunds.listMyRefundReque
 router.get('/admin/refund-requests', authRequired, requireRole('admin'), asyncHandler(refunds.listRefundRequests));
 router.post('/admin/refund-requests/:id/decision', authRequired, requireRole('admin'), asyncHandler(refunds.decideRefundRequest));
 
-router.post('/payments/stk-push', authRequired, asyncHandler(payments.stkPush));
+router.post('/payments/stk-push', authRequired, paymentActionRateLimit, asyncHandler(payments.stkPush));
 router.post('/payments/process/:jobId', authRequired, asyncHandler(payments.legacyProcess));
 router.post('/payments/webhook', asyncHandler(payments.webhook));
 router.post('/payments/daraja-callback', asyncHandler(payments.webhook));
 // Spec §26-27: card payments via Stripe (env-gated) + finance reconciliation (spec §28).
-router.post('/payments/stripe/intent', authRequired, asyncHandler(payments.stripeIntent));
+router.post('/payments/stripe/intent', authRequired, paymentActionRateLimit, asyncHandler(payments.stripeIntent));
 router.post('/payments/stripe/webhook', asyncHandler(payments.stripeWebhook));
 router.get('/admin/finance/reconciliation', authRequired, requireRole('admin'), asyncHandler(payments.financeReconciliation));
 router.get('/payments/job/:jobId', authRequired, asyncHandler(payments.paymentForJob));
@@ -203,7 +204,7 @@ router.post('/payouts/request', authRequired, requireApprovedFundi, asyncHandler
 router.post('/admin/refunds', authRequired, requireRole('admin'), asyncHandler(payouts.processRefund));
 router.post('/fundi/wallet/withdraw-request', authRequired, requireApprovedFundi, asyncHandler(payouts.requestPayout));
 
-router.post('/disputes', authRequired, asyncHandler(disputes.createDispute));
+router.post('/disputes', authRequired, disputeRateLimit, asyncHandler(disputes.createDispute));
 router.get('/disputes', authRequired, asyncHandler(disputes.listDisputes));
 router.post('/disputes/:id/evidence', authRequired, imageUpload.array('evidence', 5), asyncHandler(disputes.uploadEvidence));
 
@@ -367,7 +368,7 @@ router.post('/staff/error-logs/:id/resolve', authRequired, requirePermission('ca
 // technical detail — it lands in error_logs (source='client') and pings the
 // DevOps team. Input is strictly size-limited; no auth required because
 // crashes can happen pre-login.
-router.post('/client-errors', asyncHandler(async (req, res) => {
+router.post('/client-errors', clientErrorRateLimit, asyncHandler(async (req, res) => {
   const body = req.body || {};
   const message = typeof body.message === 'string' ? body.message.slice(0, 500) : 'Unknown client error';
   const stack = typeof body.stack === 'string' ? body.stack.slice(0, 4000) : null;
@@ -377,7 +378,7 @@ router.post('/client-errors', asyncHandler(async (req, res) => {
   // the user can quote it to support while staff investigate.
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 6; i += 1) code += alphabet[crypto.randomInt(alphabet.length)];
   const reference = `ERR-${code}`;
 
   // Respond immediately — reporting must never block or break the UI further.
@@ -498,7 +499,7 @@ router.post('/fundi/portfolio/upload', authRequired, requireFundiAccount, imageU
 router.delete('/fundi/portfolio/:id', authRequired, requireFundiAccount, asyncHandler(fundiEnh.deletePortfolioItem));
 
 // SOS Emergency
-router.post('/sos/trigger', authRequired, asyncHandler(fundiEnh.triggerSOS));
+router.post('/sos/trigger', authRequired, sosRateLimit, asyncHandler(fundiEnh.triggerSOS));
 router.get('/admin/sos', authRequired, requireRole('admin'), asyncHandler(fundiEnh.listSOS));
 router.post('/admin/sos/:id/resolve', authRequired, requireRole('admin'), asyncHandler(fundiEnh.resolveSOS));
 
@@ -600,7 +601,7 @@ router.get('/subscriptions/plans', asyncHandler(async (_req, res) => {
   res.json({ success: true, plans: rows.rows });
 }));
 
-router.post('/subscriptions/activate', authRequired, asyncHandler(async (req, res) => {
+router.post('/subscriptions/activate', authRequired, paymentActionRateLimit, asyncHandler(async (req, res) => {
   // Spec §7: companies subscribe like fundis. The paying principal is the
   // company owner/admin user; the subscription row records subscriber_type.
   if (!req.user || !['fundi', 'company_admin'].includes(req.user.role)) {
@@ -746,7 +747,7 @@ router.delete('/admin/careers/jobs/:id', authRequired, requireRole('admin'), asy
 router.get('/blog', asyncHandler(content.genericList('posts')));
 router.get('/blog/:slug', asyncHandler(content.blogPost));
 router.get('/careers/jobs', asyncHandler(content.genericList('jobs')));
-router.post('/careers/apply', asyncHandler(content.careerApply));
+router.post('/careers/apply', publicSubmitRateLimit, asyncHandler(content.careerApply));
 router.get('/admin/careers/applications', authRequired, requireRole('admin'), asyncHandler(content.listCareerApplications));
 router.get('/help', asyncHandler(content.help));
 router.get('/policies/:slug', asyncHandler(content.policy));
@@ -858,8 +859,10 @@ router.post('/fraud/gps-validate', authRequired, asyncHandler(fp.submitGpsValida
 router.get('/fraud/gps-history/:userId', authRequired, requirePerm('can_investigate_fraud'), asyncHandler(fp.getGpsHistory));
 
 // Blacklist
-router.post('/fraud/blacklist/check', authRequired, asyncHandler(fp.checkBlacklistHandler));
-router.post('/fraud/blacklist/check-batch', authRequired, asyncHandler(fp.checkBlacklistBatchHandler));
+// SECURITY: blacklist lookups expose internal fraud reasons/details — staff
+// permission required (they were reachable by ANY authenticated user).
+router.post('/fraud/blacklist/check', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.checkBlacklistHandler));
+router.post('/fraud/blacklist/check-batch', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.checkBlacklistBatchHandler));
 router.get('/fraud/blacklist', authRequired, requirePerm('can_view_fraud_prevention'), asyncHandler(fp.listBlacklistHandler));
 router.post('/fraud/blacklist', authRequired, requirePerm('can_manage_blacklist'), asyncHandler(fp.addBlacklistHandler));
 router.delete('/fraud/blacklist', authRequired, requirePerm('can_manage_blacklist'), asyncHandler(fp.removeBlacklistHandler));
@@ -954,7 +957,9 @@ router.post('/enterprise/queues/:id/retry', authRequired, requirePerm('can_manag
 // HR Management
 router.get('/enterprise/hr/employees', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.listEmployeesHandler));
 router.post('/enterprise/hr/employees', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.createEmployeeHandler));
-router.post('/enterprise/hr/leave', authRequired, asyncHandler(p2.requestLeaveHandler));
+// SECURITY: leave requests mutate internal HR data — same permission as the
+// rest of the HR module (it previously accepted any authenticated user).
+router.post('/enterprise/hr/leave', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.requestLeaveHandler));
 router.post('/enterprise/hr/leave/:id/approve', authRequired, requirePerm('can_manage_hr'), asyncHandler(p2.approveLeaveHandler));
 
 // Marketplace Intelligence

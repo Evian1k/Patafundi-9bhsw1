@@ -31,10 +31,10 @@ export default function AdminLogin() {
             return;
           }
           // Token exists but not admin — clear it
-          localStorage.removeItem("auth_token");
+          apiClient.setToken(null); // clears token + cached role/user session
         }
       } catch {
-        localStorage.removeItem("auth_token");
+        apiClient.setToken(null); // clears token + cached role/user session
       } finally {
         setCheckingSession(false);
       }

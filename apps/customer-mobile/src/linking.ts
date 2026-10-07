@@ -1,5 +1,8 @@
 export const linking = {
-  prefixes: ['patafundi://', 'https://patafundi-9bhsw1.vercel.app'],
+  // 'patafundi-customer://' matches the scheme registered in app.json —
+  // without it, Android intent filters generated from `scheme` never match
+  // the declared prefixes and the app silently fails to open links.
+  prefixes: ['patafundi-customer://', 'patafundi://', 'https://patafundi-9bhsw1.vercel.app'],
   config: {
     screens: {
       Login: 'login',

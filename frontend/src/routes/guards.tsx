@@ -21,6 +21,9 @@ export function isStaff(): boolean {
       ),
     );
     // Check both 'role' (single) and 'roles' (array) for backward compat.
+    // Fail closed on expired tokens — an expired staff token must not render
+    // the admin chrome even briefly (server still enforces everything).
+    if (typeof payload.exp === "number" && payload.exp * 1000 < Date.now()) return false;
     const role = payload.role;
     const roles = Array.isArray(payload.roles) ? payload.roles : [];
     return STAFF_ROLES.includes(role) || roles.some((r: string) => STAFF_ROLES.includes(r));

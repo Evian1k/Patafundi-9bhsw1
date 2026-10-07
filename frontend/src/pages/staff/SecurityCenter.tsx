@@ -20,6 +20,8 @@ export default function SecurityCenter() {
   const [verifyToken, setVerifyToken] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [disableCode, setDisableCode] = useState("");
   const [sessions, setSessions] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,12 +82,17 @@ export default function SecurityCenter() {
   };
 
   const disable2FA = async () => {
+    if (!disableCode.trim()) { toast.error("Enter a current authenticator code to disable 2FA"); return; }
     try {
-      await apiClient.request("/security/2fa/disable", { method: "POST", includeAuth: true });
+      await apiClient.request("/security/2fa/disable", {
+        method: "POST", body: JSON.stringify({ code: disableCode.trim() }), includeAuth: true,
+      });
       setEnabled(false);
       setRecoveryCodes(null);
+      setDisableCode("");
+      setDisableOpen(false);
       toast.success("2FA disabled");
-    } catch { toast.error("Failed to disable"); }
+    } catch { toast.error("Invalid code. 2FA was NOT disabled."); }
   };
 
   const terminateSession = async (id: string) => {
@@ -143,7 +150,19 @@ export default function SecurityCenter() {
           {enabled && (
             <div className="space-y-3">
               <p className="text-sm text-green-600">✓ 2FA is active. You'll need a code from your authenticator app to log in.</p>
-              <Button variant="outline" onClick={disable2FA}>Disable 2FA</Button>
+              {!disableOpen ? (
+                <Button variant="outline" onClick={() => setDisableOpen(true)}>Disable 2FA</Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Confirm it's really you — enter a current authenticator code (or a recovery code) to disable 2FA:</p>
+                  <div className="flex gap-2">
+                    <input value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="6-digit code" maxLength={10}
+                      className="flex-1 px-3 py-2 border border-border rounded-lg text-center font-mono text-lg tracking-widest bg-card" />
+                    <Button variant="destructive" onClick={disable2FA}>Confirm disable</Button>
+                    <Button variant="ghost" onClick={() => { setDisableOpen(false); setDisableCode(""); }}>Cancel</Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

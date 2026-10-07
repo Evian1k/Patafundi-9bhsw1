@@ -256,7 +256,7 @@ export function FundiRegisterScreen({ navigation }: any): JSX.Element {
         Alert.alert(
           'Registration Successful',
           'Your fundi account has been created. Please verify your email with the OTP sent to ' + email + '.',
-          [{ text: 'OK', onPress: () => navigation.navigate('Otp', { email: email.trim().toLowerCase(), devOtp: (data as any).devOtp }) }],
+          [{ text: 'OK', onPress: () => navigation.navigate('Otp', { email: email.trim().toLowerCase(), devOtp: __DEV__ ? (data as any).devOtp : undefined }) }],
         );
       } else {
         Alert.alert('Registration Failed', data.message || 'Something went wrong');

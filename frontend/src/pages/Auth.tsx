@@ -109,7 +109,7 @@ const Auth = () => {
         setResendCooldown(30);
         localStorage.setItem("pending_otp_email", validatedData.email);
         localStorage.setItem("pending_otp_purpose", "register");
-        if (reg?.devOtp) {
+        if (import.meta.env.DEV && reg?.devOtp) {
           setDevOtpHint(reg.devOtp);
           toast.success(`Development OTP: ${reg.devOtp}`, { duration: 30000 });
         } else {
@@ -179,7 +179,7 @@ const Auth = () => {
       setForgotStage("reset");
       setOtpCode("");
       setResendCooldown(30);
-      if (res?.devOtp) {
+      if (import.meta.env.DEV && res?.devOtp) {
         setDevOtpHint(res.devOtp);
         toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
       } else {
@@ -321,7 +321,7 @@ const Auth = () => {
               <p className="text-sm text-muted-foreground text-center">
                 Enter the code sent to <span className="font-medium text-foreground">{pendingEmail}</span>
               </p>
-              {devOtpHint && (
+              {import.meta.env.DEV && devOtpHint && (
                 <p className="text-xs text-center bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
                   Development OTP: <span className="font-mono font-bold">{devOtpHint}</span>
                 </p>
@@ -391,7 +391,7 @@ const Auth = () => {
                   try {
                     const res = await apiClient.otpResend(pendingEmail, "password_reset") as { devOtp?: string; message?: string };
                     setResendCooldown(30);
-                    if (res?.devOtp) {
+                    if (import.meta.env.DEV && res?.devOtp) {
                       setDevOtpHint(res.devOtp);
                       toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
                     } else {
@@ -424,7 +424,7 @@ const Auth = () => {
               <p className="text-sm text-muted-foreground text-center">
                 Enter the 6-digit code sent to <span className="font-medium text-foreground">{pendingEmail}</span>
               </p>
-              {devOtpHint && (
+              {import.meta.env.DEV && devOtpHint && (
                 <p className="text-xs text-center bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
                   Development OTP: <span className="font-mono font-bold">{devOtpHint}</span>
                 </p>
@@ -461,7 +461,7 @@ const Auth = () => {
                   try {
                     const res = await apiClient.otpResend(pendingEmail, "register") as { devOtp?: string; message?: string };
                     setResendCooldown(30);
-                    if (res?.devOtp) {
+                    if (import.meta.env.DEV && res?.devOtp) {
                       setDevOtpHint(res.devOtp);
                       toast.success(`Development OTP: ${res.devOtp}`, { duration: 30000 });
                     } else {
