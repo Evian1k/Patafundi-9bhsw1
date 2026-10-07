@@ -561,3 +561,19 @@ Stage Summary:
 - Every dashboard now renders only data the backend actually sends: no fake zeros, no Invalid Date, no undefined labels, no dead buttons; failures show honest retry banners.
 - Staff console gained real create-staff capability, working sign-out, live socket, and a single design language; status labels and money formatting all come from shared helpers.
 - Fresh-database seeding and PGlite persistence are durably fixed (046 + clean close), removing a whole class of "works in dev, breaks on rebuild" ghosts.
+
+---
+Task ID: 25 (continuation audit + TypeScript error repairs)
+Agent: Super Z (main agent)
+Task: User said "continue" after the compaction. Audited the whole chain (Tasks 20-24 all committed: 8ab9834, 040c7e7, e89ff7a, a61ada6, e459402, 0d3ea0e), then verified the platform end-to-end and fixed every error found.
+
+Work Log:
+- Chain audit: worklog confirms Tasks 21 (dispute UX + never-redirect help), 22/22-b (86-section master spec) and 23 (56-section critical production correction) were all completed and committed in prior sessions; the catch-all polish directive became Task 24 (commit 0d3ea0e). Nothing outstanding remained except error repair.
+- Cleaned a file-mode-only diff on migration 046 (no content change) so the tree is clean.
+- Found 6 REAL TypeScript errors in committed staff-console code (typecheck gate had drifted): realtime.ts declared the `get connected()` getter twice in RealtimeService (duplicate identifier); SystemSettings.tsx used <Button> without importing it (retry banner in the error state would crash at runtime); StaffRoleHome.tsx passed `unknown` payload values straight into formatMoney in the finance home (payments + payouts rows).
+- Fixes: removed the duplicate getter; added the missing Button import; added a type-safe moneyOf() coercion helper in StaffRoleHome so unknown amounts flow through formatMoney null-safely.
+- Live-stack repair: the auto-started backend was hot-looping at 60% CPU and unresponsive; a bare nohup backend was reaped by the sandbox right after boot (known sandbox behavior). Restarted via the double-forked .zscripts/stack-supervisor.py daemon - backend :4000 and frontend :3000 both healthy, all 46 migrations applied on a fresh DB, 12 demo accounts + 8 lifecycle jobs seeded.
+- Verification: tsc 0 errors, vite build ok, 129/129 unit tests, api contract probe OK (193 frontend paths vs 444 backend routes), quote-flow E2E ALL PASS (39 checks: verification workflow -> PF booking number -> quote sent -> quote never completes the booking -> accept -> booking_confirmed -> assign -> on-site states -> OTP completion -> DB stats -> open-pool 200).
+
+Stage Summary:
+- The commit chain is intact and the platform verified green end-to-end; the three staff-console type errors (one a real runtime crash path on the SystemSettings error banner) are fixed and committed.

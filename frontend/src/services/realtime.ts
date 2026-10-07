@@ -290,10 +290,6 @@ class RealtimeService {
     };
     this.emit('fundi:location:update', payload);
   }
-
-  get connected(): boolean {
-    return this.isConnected;
-  }
 }
 
 export const realtimeService = new RealtimeService();

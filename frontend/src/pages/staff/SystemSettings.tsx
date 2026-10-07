@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { ToggleLeft, ToggleRight, Plug, CheckCircle, XCircle, Zap } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export default function SystemSettings() {

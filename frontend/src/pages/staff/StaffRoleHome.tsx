@@ -15,6 +15,10 @@ import { realtimeService } from "@/services/realtime";
 
 interface RoleHomeProps { role: string }
 
+/** Coerce an unknown API value into something formatMoney accepts (it is null-safe). */
+const moneyOf = (v: unknown): number | string | null =>
+  typeof v === "number" || typeof v === "string" ? v : null;
+
 export default function StaffRoleHome({ role }: RoleHomeProps) {
   return (
     <div className="space-y-4">
@@ -169,7 +173,7 @@ function FinanceHome() {
           render={(p, i) => (
             <div key={i} className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium">{formatMoney(p.amount)} · {String(p.provider || "")}</p>
+                <p className="font-medium">{formatMoney(moneyOf(p.amount))} · {String(p.provider || "")}</p>
                 <p className="text-xs text-muted-foreground">{new Date(String(p.created_at)).toLocaleString()}</p>
               </div>
               <Chip status={String(p.status || "")} />
@@ -178,7 +182,7 @@ function FinanceHome() {
         <ListCard title="Payouts" items={payouts} emptyText="No payouts yet."
           render={(p, i) => (
             <div key={i} className="flex items-center justify-between gap-3">
-              <p className="font-medium">{formatMoney(p.amount ?? p.net_amount)}</p>
+              <p className="font-medium">{formatMoney(moneyOf(p.amount) ?? moneyOf(p.net_amount))}</p>
               <Chip status={String(p.status || "")} />
             </div>
           )} />
