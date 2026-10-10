@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { query } from './db.js';
 import { authRequired, signAccessToken } from './middleware/auth.js';
 import { hasPermission } from './middleware/rbac.js';
+import { refresh } from './controllers/authController.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { createJob } from './controllers/jobController.js';
 import { calculateSurgePricing, findNearbyFundis } from './services/geoMatchingService.js';
@@ -53,6 +54,19 @@ test('embedded database bootstrap and JWT session flow work', async () => {
 
   assert.equal(req.user.email, user.email);
   assert.equal(req.user.role, user.role);
+});
+
+test('expired refresh JWTs are classified as authentication failures', async () => {
+  const refreshToken = jwt.sign(
+    { sub: '00000000-0000-4000-8000-000000000001', type: 'refresh' },
+    config.refreshSecret || config.jwtSecret,
+    { expiresIn: -1, issuer: 'patafundi-api', audience: 'patafundi-web', algorithm: 'HS256' },
+  );
+
+  await assert.rejects(
+    () => refresh({ cookies: {}, body: { refreshToken } }, { json() {} }),
+    (error) => error.status === 403 && error.message === 'Invalid or expired refresh token',
+  );
 });
 
 test('customer access is denied for protected permissions while super admin remains authorized', async () => {

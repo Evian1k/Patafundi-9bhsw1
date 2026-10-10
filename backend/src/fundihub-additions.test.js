@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { buildFundiApprovalStatus } from './services/fundiApprovalStatusService.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(here, '..');
@@ -59,4 +60,18 @@ test('provider_type CHECK includes platform_match (spec §2)', async () => {
   assert.match(sql, /create table if not exists ai_events/);
   assert.match(sql, /provider_reply/);
   assert.match(sql, /verification_level/);
+});
+
+test('Fundi approval-status builder exposes a top-level decision and preserves the nested record', () => {
+  const result = buildFundiApprovalStatus({ approval_status: 'approved', rejection_reason: null });
+  assert.equal(result.status, 'approved');
+  assert.match(result.message, /Approved/);
+  assert.equal(result.fundi.approval_status, 'approved');
+});
+
+test('Fundi approval-status builder does not call an unregistered account pending', () => {
+  const result = buildFundiApprovalStatus(null);
+  assert.equal(result.status, 'not_registered');
+  assert.match(result.message, /No Fundi application/);
+  assert.equal(result.fundi.approval_status, 'not_registered');
 });
