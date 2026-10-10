@@ -284,11 +284,17 @@ export async function login(req, res) {
 export async function refresh(req, res) {
   const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
   if (!refreshToken) throw forbidden('Refresh token required');
-  const payload = jwt.verify(refreshToken, config.refreshSecret || config.jwtSecret, {
-    issuer: 'patafundi-api',
-    audience: 'patafundi-web',
-    algorithms: ['HS256'],
-  });
+  let payload;
+  try {
+    payload = jwt.verify(refreshToken, config.refreshSecret || config.jwtSecret, {
+      issuer: 'patafundi-api',
+      audience: 'patafundi-web',
+      algorithms: ['HS256'],
+    });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) throw forbidden('Invalid or expired refresh token');
+    throw error;
+  }
   const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const result = await query(
     `select u.id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score, u.email_verified_at

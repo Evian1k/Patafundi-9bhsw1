@@ -71,6 +71,10 @@ export async function adoptSession(
 }
 
 export function createBaseAuthState(set: AuthSet, get: AuthGet, guard: AuthGuard): BaseAuthState {
+  apiClient.setSessionExpiredHandler(() => {
+    set({ user: null, isLoggedIn: false, loading: false, error: null });
+  });
+
   return {
     user: null,
     isLoggedIn: false,
@@ -101,9 +105,10 @@ export function createBaseAuthState(set: AuthSet, get: AuthGet, guard: AuthGuard
           set({ user: null, isLoggedIn: false, error: guard.wrongAppError });
           return;
         }
-        set({ user: data.user, isLoggedIn: true });
-      } catch {
-        set({ user: null, isLoggedIn: false });
+        set({ user: data.user, isLoggedIn: true, error: null });
+      } catch (error) {
+        if (!apiClient.isLoggedIn()) set({ user: null, isLoggedIn: false });
+        throw error;
       }
     },
 
@@ -119,8 +124,19 @@ export function createBaseAuthState(set: AuthSet, get: AuthGet, guard: AuthGuard
         } else {
           set({ user: null, isLoggedIn: false });
         }
-      } catch {
-        set({ user: null, isLoggedIn: false });
+      } catch (error) {
+        if (apiClient.isLoggedIn()) {
+          const cachedUser = await apiClient.getCachedUser();
+          if (cachedUser && !guard.isAllowedRole(cachedUser.role)) {
+            await apiClient.logout();
+            set({ user: null, isLoggedIn: false, error: guard.wrongAppError });
+          } else {
+            set({ user: cachedUser, isLoggedIn: true, error: error instanceof Error ? error.message : 'Could not refresh your account.' });
+            apiClient.connectSocket();
+          }
+        } else {
+          set({ user: null, isLoggedIn: false });
+        }
       } finally {
         set({ loading: false });
       }

@@ -4,6 +4,7 @@ import { emitEvent } from '../realtime.js';
 import { getSignedAccessUrl, getSignedThumbUrl } from '../services/storageService.js';
 import { createFundiRegistration } from '../services/fundiRegistrationService.js';
 import { auditLog } from '../services/auditService.js';
+import { buildFundiApprovalStatus } from '../services/fundiApprovalStatusService.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const toRad = (v) => (v * Math.PI) / 180;
@@ -57,7 +58,7 @@ export async function profile(req, res) {
 
 export async function approvalStatus(req, res) {
   const result = await query('select approval_status, rejection_reason from fundis where user_id = $1', [req.user.id]);
-  res.json({ success: true, fundi: result.rows[0] || { approval_status: 'not_registered' } });
+  res.json({ success: true, ...buildFundiApprovalStatus(result.rows[0]) });
 }
 
 export async function updateProfile(req, res) {

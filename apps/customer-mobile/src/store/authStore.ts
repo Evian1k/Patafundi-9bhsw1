@@ -10,8 +10,8 @@ interface AuthState extends BaseAuthState {
 }
 
 const guard: AuthGuard = {
-  isAllowedRole: (role) => role !== 'fundi',
-  wrongAppError: 'This account is a fundi. Please use the Fundi app.',
+  isAllowedRole: (role) => role === 'customer',
+  wrongAppError: 'This account uses a different PataFundi workspace. Please use the workspace assigned to your role.',
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
