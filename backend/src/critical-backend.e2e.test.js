@@ -115,6 +115,8 @@ test('job creation and matching use the real database-backed workflow', async ()
       longitude: 36.8172,
       urgency: 'emergency',
       formattedAddress: 'Nairobi CBD',
+      estimatedPrice: 1,
+      estimated_price: 2,
     },
     ip: '127.0.0.1',
   }, res);
@@ -122,6 +124,7 @@ test('job creation and matching use the real database-backed workflow', async ()
   assert.equal(res.statusCode, 201);
   assert.ok(res.payload.job.id);
   assert.equal(res.payload.job.serviceCategory, 'plumbing');
+  assert.ok(res.payload.job.estimatedPrice > 2, 'server price engine must ignore client-supplied estimates');
 
   const matches = await findNearbyFundis({
     latitude: -1.2864,
@@ -135,6 +138,36 @@ test('job creation and matching use the real database-backed workflow', async ()
 
   const jobRow = (await query('select status from jobs where id = $1', [res.payload.job.id])).rows[0];
   assert.equal(jobRow.status, 'matching');
+});
+
+test('unlisted requests are persisted as quote-required Other and ignore client prices', async () => {
+  const customer = (await query('select id from users where email = $1', ['demo@patafundi.com'])).rows[0];
+  const res = {
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.payload = payload; return payload; },
+  };
+  await createJob({
+    user: { id: customer.id, role: 'customer' },
+    body: {
+      serviceCategory: 'rooftop rainwater pump service',
+      requestedService: 'rooftop rainwater pump service',
+      description: 'Please inspect and repair the rooftop rainwater pump system.',
+      latitude: -1.2864,
+      longitude: 36.8172,
+      formattedAddress: 'Nairobi CBD',
+      estimatedPrice: 999999,
+      estimated_price: 999999,
+    },
+    ip: '127.0.0.1',
+  }, res);
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.payload.job.serviceCategory, 'other');
+  assert.equal(res.payload.job.estimatedPrice, undefined);
+  const row = (await query('select service_category, description, estimated_price from jobs where id=$1', [res.payload.job.id])).rows[0];
+  assert.equal(row.service_category, 'other');
+  assert.match(row.description, /Requested service: rooftop rainwater pump service/);
+  assert.equal(row.estimated_price, null);
 });
 
 test('notifications remain scoped to their users and financial calculations protect payout math', async () => {

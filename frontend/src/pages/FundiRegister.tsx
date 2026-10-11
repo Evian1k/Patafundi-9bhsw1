@@ -6,12 +6,12 @@ import { ArrowLeft, ArrowRight, Upload, CheckCircle, AlertCircle, Loader, X, Eye
 import { Button } from "@/components/ui/button";
 import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 import { toast } from "sonner";
-
-const SKILLS = ["Plumbing", "Electrical", "AC & HVAC", "Cleaning", "Carpentry", "Auto Repair", "Painting", "Masonry", "Welding", "Roofing"];
 
 export default function FundiRegister() {
   const navigate = useNavigate();
+  const { services, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -148,9 +148,12 @@ export default function FundiRegister() {
               <LocationPicker value={locationSelection} onChange={onLocationChange} placeholder="Pin your service area" />
               <div>
                 <label className="text-xs font-medium block mb-2">Skills *</label>
+                {catalogLoading && <p className="text-xs text-muted-foreground" aria-live="polite">Loading available services…</p>}
+                {catalogError && <button type="button" onClick={retryCatalog} className="text-xs text-destructive underline">Service catalog unavailable. Tap to retry.</button>}
+                {!catalogLoading && !catalogError && services.length === 0 && <p className="text-xs text-muted-foreground">No service skills are currently available.</p>}
                 <div className="flex flex-wrap gap-2">
-                  {SKILLS.map(skill => (
-                    <button key={skill} type="button" onClick={() => setData(d => ({ ...d, skills: d.skills.includes(skill) ? d.skills.filter(s => s !== skill) : [...d.skills, skill] }))} className={`px-3 py-1.5 rounded-full text-xs border ${data.skills.includes(skill) ? "bg-primary text-white border-primary" : "border-border"}`}>{skill}</button>
+                  {services.map((service) => (
+                    <button key={service.slug} type="button" onClick={() => setData(d => ({ ...d, skills: d.skills.includes(service.slug) ? d.skills.filter(s => s !== service.slug) : [...d.skills, service.slug] }))} className={`px-3 py-1.5 rounded-full text-xs border ${data.skills.includes(service.slug) ? "bg-primary text-white border-primary" : "border-border"}`}>{service.title}</button>
                   ))}
                 </div>
               </div>

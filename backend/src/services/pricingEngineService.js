@@ -12,6 +12,7 @@
  */
 
 import { query } from '../db.js';
+import { badRequest } from '../utils/http.js';
 
 // ── Cache pricing config (refreshed every 5 min) ──────────────
 let configCache = null;
@@ -181,7 +182,7 @@ export async function calculateJobPrice(params) {
   ]);
 
   if (!service) {
-    throw new Error(`No pricing configured for service: ${serviceCategory}`);
+    throw badRequest('Automatic pricing is not configured for this service. Request a provider quote instead.');
   }
 
   // 1. Base price

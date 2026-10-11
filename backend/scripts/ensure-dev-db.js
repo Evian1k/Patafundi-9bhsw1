@@ -190,16 +190,20 @@ async function applyMigrations(db) {
   `);
 
   const applied = await db.query('select filename from schema_migrations order by filename');
-  if (!(await tableExists(db, 'users')) && applied.rows.length > 0) {
+  const appliedFiles = new Set(applied.rows.map((row) => row.filename));
+  if (!(await tableExists(db, 'users')) && appliedFiles.size > 0) {
     await db.query('delete from schema_migrations');
+    appliedFiles.clear();
   }
   const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
 
   for (const file of files) {
+    if (appliedFiles.has(file)) continue;
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
     console.log(`[migrate] apply ${file}`);
     await execSql(db, sql);
     await db.query('insert into schema_migrations (filename) values ($1) on conflict (filename) do nothing', [file]);
+    appliedFiles.add(file);
   }
 }
 
@@ -383,7 +387,7 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
 
 export async function ensureProductionDatabase() {
   if (process.env.NODE_ENV !== 'production') return true;
-  return bootstrapPostgresDatabase({ required: false });
+  return bootstrapPostgresDatabase({ required: true });
 }
 
 export async function ensureDevDatabase() {

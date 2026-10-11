@@ -157,7 +157,7 @@ export default function PortalTeam() {
               </p>
             </div>
           </div>
-          <Input id="new-skills" label="Skills (comma separated)" value={form.skills} onChange={(v) => setForm({ ...form, skills: v })} placeholder="plumbing, hvac" />
+          <Input id="new-skills" label="Skills (comma separated)" value={form.skills} onChange={(v) => setForm({ ...form, skills: v })} placeholder="Add this team member’s skills" />
           <button onClick={add} disabled={busy || !form.fullName || !form.email}
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />} Add member

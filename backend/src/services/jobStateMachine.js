@@ -222,18 +222,62 @@ export async function transitionJob(opts) {
   return job;
 }
 
-async function checkActor(kind, actor, job, toStatus) {
+/**
+ * Apply a lifecycle edge inside a caller-owned transaction. This variant is
+ * used where state and money/OTP records must commit together; realtime and
+ * notification side effects remain the caller's post-commit responsibility.
+ */
+export async function transitionJobInTransaction(client, opts) {
+  const {
+    jobId, toStatus, actor, actorKind, expectedFrom,
+    skipActorCheck = false, metadata = {},
+  } = opts;
+  if (!client?.query) throw badRequest('A transaction client is required');
+  if (!jobId) throw badRequest('jobId is required');
+  if (!toStatus) throw badRequest('Target status is required');
+
+  const currentResult = await client.query('select * from jobs where id = $1 for update', [jobId]);
+  const current = currentResult.rows[0];
+  if (!current) throw notFound('Job not found');
+  assertTransitionAllowed(current.status, toStatus);
+  if (expectedFrom && current.status !== expectedFrom) {
+    throw badRequest(`Job status changed concurrently (now ${current.status}) - reload and try again`);
+  }
+  if (!skipActorCheck) {
+    await checkActor(actorKind || JOB_STATUS_ACTORS[toStatus], actor, current, toStatus, client);
+  }
+
+  const updated = await client.query(
+    'update jobs set status = $2, updated_at = now() where id = $1 and status = $3 returning *',
+    [jobId, toStatus, current.status],
+  );
+  if (!updated.rows[0]) throw badRequest('Job status changed concurrently - reload and try again');
+
+  const timelineMetadata = { from: current.status, to: toStatus, ...metadata };
+  await client.query(
+    `insert into job_timeline (job_id, event_type, actor_id, actor_role, metadata)
+     values ($1, $2, $3, $4, $5::jsonb)`,
+    [jobId, `status_${toStatus}`, actor?.id || null, actor?.role || 'system', JSON.stringify(timelineMetadata)],
+  );
+  await client.query(
+    `insert into job_status_updates (job_id, status, actor_id, note)
+     values ($1, $2, $3, $4)`,
+    [jobId, toStatus, actor?.id || null, `Status transition: ${current.status} → ${toStatus}`],
+  );
+  return updated.rows[0];
+}
+
+async function checkActor(kind, actor, job, toStatus, client) {
   if (!actor) throw forbidden('An authenticated actor is required');
   if (actor.isAdmin || actor.role === 'super_admin' || actor.role === 'admin') return;
   const isCustomer = job.customer_id === actor.id;
   const isAssignedFundi = job.fundi_id === actor.id;
   const isTechnician = job.technician_user_id === actor.id;
-  // Company membership: explicit companyRoles on the actor, or resolved from
-  // the company_members table (covers endpoints that only carry the JWT).
+  // Resolve company membership from the database for the exact job company.
+  // Caller-provided companyRoles are not bound to a company and are not trusted.
   const resolveCompanyMember = async () => {
     if (!job.company_id) return false;
-    if (actor.companyRoles?.length) return true;
-    const m = await query(
+    const m = await client.query(
       `select 1 from company_members where company_id = $1 and user_id = $2 and status = 'active'`,
       [job.company_id, actor.id],
     );

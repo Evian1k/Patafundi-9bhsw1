@@ -7,15 +7,12 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, Save, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 import { toast } from "sonner";
-
-const SUGGESTED_SKILLS = [
-  "plumbing", "electrical", "carpentry", "cleaning", "painting",
-  "hvac", "roofing", "welding", "appliance_repair", "masonry", "gardening",
-];
 
 export default function FundiProfileEdit() {
   const navigate = useNavigate();
+  const { services: catalog, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,24 +96,32 @@ export default function FundiProfileEdit() {
                 <label className="text-sm font-medium">Your skills</label>
                 <p className="text-xs text-muted-foreground">Pick every category you can handle - this drives your job matches.</p>
               </div>
+              {catalogLoading && <p className="text-xs text-muted-foreground" aria-live="polite">Loading available services…</p>}
+              {catalogError && <button type="button" onClick={retryCatalog} className="text-xs text-destructive underline">Service catalog unavailable. Tap to retry.</button>}
+              {!catalogLoading && !catalogError && catalog.length === 0 && <p className="text-xs text-muted-foreground">No service skills are currently available.</p>}
               <div className="flex flex-wrap gap-2">
-                {SUGGESTED_SKILLS.map((skill) => {
-                  const active = skills.includes(skill);
+                {catalog.map((service) => {
+                  const active = skills.includes(service.slug);
                   return (
                     <button
-                      key={skill}
+                      key={service.slug}
                       type="button"
-                      onClick={() => toggleSkill(skill)}
+                      onClick={() => toggleSkill(service.slug)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                         active
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background text-muted-foreground border-border hover:border-primary/50"
                       }`}
                     >
-                      {skill.replace("_", " ")}
+                      {service.title}
                     </button>
                   );
                 })}
+                {skills.filter((skill) => !catalog.some((service) => service.slug === skill)).map((skill) => (
+                  <button key={`legacy-${skill}`} type="button" onClick={() => toggleSkill(skill)} className="px-3 py-1.5 rounded-full text-xs font-medium border bg-amber-50 text-amber-900 border-amber-200">
+                    Existing: {skill.replace(/[_-]/g, " ")} ×
+                  </button>
+                ))}
               </div>
             </div>
 

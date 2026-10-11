@@ -453,10 +453,12 @@ export async function verifyOtpWithLockout({ email, purpose, code, verifyFn }) {
   };
 }
 
-export async function verifyJobCompletionOtp({ jobId, otp, verifyHash }) {
-  const job = await query(
+export async function verifyJobCompletionOtp({ jobId, otp, verifyHash, client = null }) {
+  const db = client || { query };
+  const lockClause = client ? ' for update' : '';
+  const job = await db.query(
     `select id, customer_id, completion_otp_hash, completion_otp_attempts, completion_otp_locked_until
-     from jobs where id = $1`,
+     from jobs where id = $1${lockClause}`,
     [jobId],
   );
   const row = job.rows[0];
@@ -466,7 +468,7 @@ export async function verifyJobCompletionOtp({ jobId, otp, verifyHash }) {
   }
   const valid = row.completion_otp_hash && await verifyHash(row.completion_otp_hash, otp);
   if (valid) {
-    await query(
+    await db.query(
       `update jobs set completion_otp_attempts = 0, completion_otp_locked_until = null where id = $1`,
       [jobId],
     );
@@ -476,7 +478,7 @@ export async function verifyJobCompletionOtp({ jobId, otp, verifyHash }) {
   const lockedUntil = attempts >= MAX_OTP_ATTEMPTS
     ? new Date(Date.now() + OTP_LOCK_MINUTES * 60 * 1000).toISOString()
     : null;
-  await query(
+  await db.query(
     `update jobs set completion_otp_attempts = $2, completion_otp_locked_until = $3 where id = $1`,
     [jobId, attempts, lockedUntil],
   );

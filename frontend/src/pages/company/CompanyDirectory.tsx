@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { BadgeCheck, Building2, ChevronRight, MapPin, Search, Star, Users } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import BackBar from "@/components/layout/BackBar";
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 
 interface DirectoryCompany {
   id: string; companyName: string; description?: string; logoUrl?: string;
@@ -15,9 +16,8 @@ interface DirectoryCompany {
   verificationStatus?: string; branches?: { name?: string }[];
 }
 
-const CATEGORIES = ["all", "plumbing", "electrical", "hvac", "appliance_repair"];
-
 export default function CompanyDirectory() {
+  const { services: catalog, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [companies, setCompanies] = useState<DirectoryCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,15 +78,17 @@ export default function CompanyDirectory() {
             </p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
-            {CATEGORIES.map((c) => (
-              <button key={c} onClick={() => setCategory(c)}
+            {[{ slug: "all", title: "All" }, ...catalog.map((service) => ({ slug: service.slug, title: service.title }))].map((item) => (
+              <button key={item.slug} onClick={() => setCategory(item.slug)}
                 className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm capitalize transition-colors ${
-                  category === c ? "bg-primary text-primary-foreground border-emerald-600" : "hover:bg-muted"}`}>
-                {c.replace("_", " ")}
+                  category === item.slug ? "bg-primary text-primary-foreground border-emerald-600" : "hover:bg-muted"}`}>
+                {item.title}
               </button>
             ))}
           </div>
         </div>
+        {catalogLoading && <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Loading service filters…</p>}
+        {catalogError && <p className="mt-2 text-xs text-muted-foreground">Service filters unavailable. <button type="button" onClick={retryCatalog} className="underline">Retry</button></p>}
 
         {loading ? (
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
@@ -127,12 +129,10 @@ export default function CompanyDirectory() {
                     <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{c.teamSize} techs</span>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground line-clamp-2 flex-1">
-                  {c.description || "Professional services company."}
-                </p>
+                {c.description && <p className="mt-2 text-sm text-muted-foreground line-clamp-2 flex-1">{c.description}</p>}
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(c.businessCategories || []).slice(0, 3).map((b) => (
-                    <span key={b} className="rounded-full border px-2 py-0.5 text-[11px] capitalize text-muted-foreground">{b.replace("_", " ")}</span>
+                    <span key={b} className="rounded-full border px-2 py-0.5 text-[11px] capitalize text-muted-foreground">{catalog.find((service) => service.slug === b)?.title || b.replace(/[_-]/g, " ")}</span>
                   ))}
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs">

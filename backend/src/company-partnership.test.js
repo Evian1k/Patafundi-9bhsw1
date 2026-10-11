@@ -43,8 +43,9 @@ async function ensureSchema() {
     for (const file of files) {
       if (appliedSet.has(file)) continue;
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-      await db.exec(sql).catch(() => { /* already applied via statements */ });
-      await db.query('insert into schema_migrations (filename) values ($1) on conflict do nothing', [file]).catch(() => {});
+      await db.exec(sql);
+      await db.query('insert into schema_migrations (filename) values ($1) on conflict do nothing', [file]);
+      appliedSet.add(file);
     }
   }
 }

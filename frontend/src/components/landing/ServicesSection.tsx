@@ -1,30 +1,11 @@
 import { motion } from "framer-motion";
-import {
-  Wrench,
-  Zap,
-  Droplets,
-  Wind,
-  Hammer,
-  Sparkles,
-  Car,
-  PaintBucket,
-  ArrowRight
-} from "lucide-react";
+import { ArrowRight, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const services = [
-  { icon: Droplets, name: "Plumbing", description: "Leaks, pipes, installations", color: "from-blue-500 to-cyan-500", slug: "plumbing" },
-  { icon: Zap, name: "Electrical", description: "Wiring, repairs, installations", color: "from-yellow-500 to-orange-500", slug: "electrical" },
-  { icon: Wind, name: "AC & HVAC", description: "Cooling, heating, maintenance", color: "from-sky-500 to-blue-500", slug: "hvac" },
-  { icon: Sparkles, name: "Cleaning", description: "Home, office, deep cleaning", color: "from-emerald-500 to-teal-500", slug: "cleaning" },
-  { icon: Hammer, name: "Carpentry", description: "Furniture, repairs, custom work", color: "from-amber-500 to-yellow-600", slug: "carpentry" },
-  { icon: Car, name: "Auto Repair", description: "Mechanics, diagnostics, service", color: "from-red-500 to-rose-500", slug: "auto" },
-  { icon: PaintBucket, name: "Painting", description: "Interior, exterior, finishing", color: "from-purple-500 to-pink-500", slug: "painting" },
-  { icon: Wrench, name: "General Repair", description: "Handyman, misc repairs", color: "from-gray-500 to-slate-500", slug: "general" },
-];
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 
 const ServicesSection = () => {
   const navigate = useNavigate();
+  const { services, loading, error, retry } = useServiceCatalog();
 
   return (
     <section className="py-16 md:py-24" id="services">
@@ -43,23 +24,26 @@ const ServicesSection = () => {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {loading && <p className="text-center text-sm text-muted-foreground" aria-live="polite">Loading available services…</p>}
+        {error && <div className="text-center text-sm text-muted-foreground" role="status">Service categories could not be loaded. <button type="button" onClick={retry} className="underline">Retry</button></div>}
+        {!loading && !error && services.length === 0 && <p className="text-center text-sm text-muted-foreground">No services are currently available in this region.</p>}
+        {!loading && !error && services.length > 0 && <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {services.map((service, index) => (
             <motion.div
-              key={service.name}
+              key={service.slug}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05 }}
-              onClick={() => navigate(`/create-job?service=${encodeURIComponent(service.name)}`)}
+              onClick={() => navigate(`/create-job?service=${encodeURIComponent(service.slug)}`)}
               className="group cursor-pointer"
             >
               <div className="p-5 bg-card border border-border rounded-2xl hover:shadow-md transition-all hover:-translate-y-1 group-hover:border-primary/30">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center mb-3`}>
-                  <service.icon className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                  <Wrench className="w-6 h-6 text-primary" aria-hidden="true" />
                 </div>
-                <h3 className="font-semibold text-sm mb-1">{service.name}</h3>
-                <p className="text-xs text-muted-foreground mb-2">{service.description}</p>
+                <h3 className="font-semibold text-sm mb-1">{service.title}</h3>
+                {service.description && <p className="text-xs text-muted-foreground mb-2">{service.description}</p>}
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-primary">Find a professional</span>
                   <ArrowRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -67,7 +51,7 @@ const ServicesSection = () => {
               </div>
             </motion.div>
           ))}
-        </div>
+        </div>}
       </div>
     </section>
   );

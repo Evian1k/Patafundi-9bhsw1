@@ -59,6 +59,7 @@ import AdminRefunds from "@/pages/admin/AdminRefunds";
 import AdminSubscriptions from "@/pages/admin/AdminSubscriptions";
 import AdminReviews from "@/pages/admin/AdminReviews";
 import AdminContent from "@/pages/admin/AdminContent";
+import ServiceCatalogManagement from "@/pages/admin/ServiceCatalogManagement";
 import AdminNotificationCenter from "@/pages/admin/NotificationCenter";
 
 // Company ecosystem (takeover) — public directory + partner program + portal
@@ -199,6 +200,7 @@ export default function AppRoutes() {
       <Route path="/admin/subscriptions" element={<ProtectedAdminRoute element={<AdminSubscriptions />} />} />
       <Route path="/admin/reviews" element={<ProtectedAdminRoute element={<AdminReviews />} />} />
       <Route path="/admin/content" element={<ProtectedAdminRoute element={<AdminContent />} />} />
+      <Route path="/admin/service-catalog" element={<ProtectedAdminRoute element={<ServiceCatalogManagement />} />} />
       <Route path="/admin/notifications" element={<ProtectedAdminRoute element={<AdminNotificationCenter />} />} />
       <Route path="/admin/audit-logs" element={<ProtectedAdminRoute element={<AuditLogs />} />} />
       <Route path="/admin/disputes" element={<ProtectedAdminRoute element={<AdminDisputeManagement />} />} />
@@ -253,6 +255,7 @@ export default function AppRoutes() {
             ]}
           />
         } />
+        <Route path="admin/service-catalog" element={<ServiceCatalogManagement embedded />} />
         <Route path="admin/users" element={
           <StaffDataTable resource="audit-logs" title="User Activity"
             columns={[

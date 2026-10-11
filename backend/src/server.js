@@ -361,7 +361,8 @@ try {
 } catch (error) {
   console.error('[PataFundi API] Database bootstrap failed:', error.message);
   if (config.nodeEnv === 'production') {
-    console.error('[PataFundi API] Starting anyway — /health will report database status.');
+    console.error('[PataFundi API] Refusing to start in production with an unverified database schema.');
+    throw error;
   }
 }
 
@@ -545,6 +546,22 @@ server.listen(port, host, () => {
         const user = await query('select phone from users where id = $1', [payload.userId]);
         if (!user.rows[0]?.phone) return;
         await sendSms({ to: user.rows[0].phone, message: `${payload.title}\n${payload.body || ''}`.slice(0, 320) });
+      });
+
+      // Durable settlement retry: queue writes commit alongside OTP confirmation
+      // or verified payment callbacks; releaseJobEscrow remains idempotent.
+      registerQueueHandler('settlement_release', async (payload) => {
+        if (!payload?.jobId) throw new Error('Settlement queue payload is missing jobId');
+        const { releaseJobEscrow } = await import('./services/settlementService.js');
+        const result = await releaseJobEscrow({
+          jobId: payload.jobId,
+          paymentId: payload.paymentId || null,
+          actorRole: 'system',
+          source: payload.source || 'settlement_queue',
+        });
+        if (!result.released && !['no_held_escrow', 'already_released'].includes(result.reason)) {
+          throw new Error('Settlement release did not reach a terminal outcome');
+        }
       });
 
       startQueueWorker();

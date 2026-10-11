@@ -30,43 +30,90 @@ export function assertValidMpesaPhone(phone) {
 export async function getAccessToken() {
   requireMpesaConfig();
   const credentials = Buffer.from(`${config.mpesa.consumerKey}:${config.mpesa.consumerSecret}`).toString('base64');
-  const response = await fetch(`${config.mpesa.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${credentials}` },
-  });
-  if (!response.ok) throw new Error(`Daraja token request failed with ${response.status}`);
-  const data = await response.json();
-  return data.access_token;
+  let response;
+  try {
+    response = await fetch(`${config.mpesa.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+      headers: { Authorization: `Basic ${credentials}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    error.providerOutcome = 'not_dispatched';
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(`Daraja token request failed with ${response.status}`);
+    error.status = 502;
+    error.providerOutcome = 'not_dispatched';
+    throw error;
+  }
+  try {
+    const data = await response.json();
+    if (!data.access_token) throw new Error('Daraja token response was incomplete');
+    return data.access_token;
+  } catch (error) {
+    error.providerOutcome = 'not_dispatched';
+    throw error;
+  }
 }
 
 export async function initiateStkPush({ phone, amount, accountReference, transactionDesc }) {
-  const accessToken = await getAccessToken();
+  let accessToken;
+  try {
+    accessToken = await getAccessToken();
+  } catch (error) {
+    error.providerOutcome ||= 'not_dispatched';
+    throw error;
+  }
   const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
   const password = Buffer.from(`${config.mpesa.shortcode}${config.mpesa.passkey}${timestamp}`).toString('base64');
-  const response = await fetch(`${config.mpesa.baseUrl}/mpesa/stkpush/v1/processrequest`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      BusinessShortCode: config.mpesa.shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.round(Number(amount)),
-      PartyA: normalizePhone(phone),
-      PartyB: config.mpesa.shortcode,
-      PhoneNumber: normalizePhone(phone),
-      CallBackURL: config.mpesa.callbackUrl,
-      AccountReference: accountReference,
-      TransactionDesc: transactionDesc,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(`${config.mpesa.baseUrl}/mpesa/stkpush/v1/processrequest`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        BusinessShortCode: config.mpesa.shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: 'CustomerPayBillOnline',
+        Amount: Math.round(Number(amount)),
+        PartyA: normalizePhone(phone),
+        PartyB: config.mpesa.shortcode,
+        PhoneNumber: normalizePhone(phone),
+        CallBackURL: config.mpesa.callbackUrl,
+        AccountReference: accountReference,
+        TransactionDesc: transactionDesc,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    // The provider may have accepted the request before the connection timed
+    // out; do not mark it failed or allow an automatic second charge.
+    error.providerOutcome = 'unknown';
+    throw error;
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ResponseCode !== '0') {
     const error = new Error(data.errorMessage || data.ResponseDescription || 'Daraja STK push failed');
     error.status = 502;
     error.meta = data;
+    error.providerOutcome = data.ResponseCode != null && String(data.ResponseCode) !== '0'
+      ? 'rejected'
+      : 'unknown';
+    throw error;
+  }
+  if (!data.CheckoutRequestID || !data.MerchantRequestID) {
+    const error = new Error('Daraja accepted the request but returned incomplete tracking identifiers');
+    error.status = 502;
+    error.providerOutcome = 'unknown';
+    error.meta = {
+      ResponseCode: data.ResponseCode ?? null,
+      CheckoutRequestID: typeof data.CheckoutRequestID === 'string' ? data.CheckoutRequestID.slice(0, 128) : null,
+      MerchantRequestID: typeof data.MerchantRequestID === 'string' ? data.MerchantRequestID.slice(0, 128) : null,
+    };
     throw error;
   }
   return data;

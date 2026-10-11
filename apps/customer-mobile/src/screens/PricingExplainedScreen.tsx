@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   colors,
@@ -8,7 +8,7 @@ import {
   spacing,
   borderRadius,
   shadows,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
   ScreenHeader,
   InfoHero,
   InfoSectionCard,
@@ -68,6 +68,7 @@ const SURGE_SECTION: InfoSection = {
 };
 
 export function PricingExplainedScreen({ navigation }: any): JSX.Element {
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   return (
     <ScrollView
       style={styles.container}
@@ -112,10 +113,13 @@ export function PricingExplainedScreen({ navigation }: any): JSX.Element {
           <Text style={styles.factorsHeaderTitle}>Service categories</Text>
         </View>
         <View style={styles.categoryGrid}>
-          {SERVICE_CATEGORIES.map((cat) => (
+          {catalogLoading && <Text style={styles.categoryLabel}>Loading available services…</Text>}
+          {catalogError && <TouchableOpacity onPress={retryCatalog}><Text style={[styles.categoryLabel, { color: colors.error }]}>Catalog unavailable — tap to retry.</Text></TouchableOpacity>}
+          {!catalogLoading && !catalogError && serviceCategories.length === 0 && <Text style={styles.categoryLabel}>No services are currently available.</Text>}
+          {serviceCategories.map((cat) => (
             <View key={cat.slug} style={styles.categoryChip}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: cat.color + '20' }]}>
-                <Ionicons name={cat.icon as keyof typeof Ionicons.glyphMap} size={14} color={cat.color} />
+              <View style={[styles.categoryIconWrap, { backgroundColor: (cat.color || colors.primary) + '20' }]}>
+                <Ionicons name={cat.icon as keyof typeof Ionicons.glyphMap} size={14} color={cat.color || colors.primary} />
               </View>
               <Text style={styles.categoryLabel}>{cat.label}</Text>
             </View>

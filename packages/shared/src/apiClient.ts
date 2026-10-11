@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
-import type { AuthResponse, User, Job, Quote, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
+import type { AuthResponse, User, Job, Quote, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown, ServiceCategory } from './types';
 
 function resolveBaseUrl(): string {
   // Spec §32: endpoints are environment-driven — NEVER hardcoded localhost
@@ -211,7 +211,7 @@ class ApiClient {
   deleteSavedPlace(id: string): Promise<{ success: boolean }> { return this.request(`/users/saved-places/${id}`, { method: 'DELETE' }); }
 
   // Jobs
-  createJob(data: { serviceCategory: string; description: string; estimatedPrice?: number; urgency?: 'normal' | 'emergency'; latitude?: number; longitude?: number; address?: string; }): Promise<{ job: Job }> { return this.request('/jobs', { method: 'POST', body: JSON.stringify(data) }); }
+  createJob(data: { serviceCategory: string; description: string; urgency?: 'normal' | 'emergency'; latitude?: number; longitude?: number; address?: string; countryCode?: string; requestedService?: string; }): Promise<{ job: Job }> { return this.request('/jobs', { method: 'POST', body: JSON.stringify(data) }); }
   listJobs(filters?: { status?: string; limit?: number; offset?: number }): Promise<{ jobs: Job[] }> { const qs = filters ? '?' + new URLSearchParams(filters as any).toString() : ''; return this.request(`/jobs${qs}`); }
   getActiveJob(): Promise<{ job: Job | null }> { return this.request('/jobs/fundi/active'); }
   getJob(id: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}`); }
@@ -323,6 +323,10 @@ class ApiClient {
   createSupportTicket(data: { subject: string; message: string; category?: string; jobId?: string }): Promise<{ ticket: any }> { return this.request('/support/ticket', { method: 'POST', body: JSON.stringify(data) }); }
 
   // ── Content: Policies, Help, Blog, Services ───────────────
+  getServiceCategories(countryCode = 'KE', search = ''): Promise<{ success: boolean; countryCode: string; services: ServiceCategory[] }> {
+    const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : '';
+    return this.request(`/global/services/${encodeURIComponent(countryCode.toUpperCase())}${query}`);
+  }
   getPolicy(slug: string): Promise<{ policy: any }> { return this.request(`/policies/${slug}`); }
   getHelp(): Promise<{ help: any }> { return this.request('/help'); }
   listBlogPosts(): Promise<{ posts: any[] }> { return this.request('/blog'); }

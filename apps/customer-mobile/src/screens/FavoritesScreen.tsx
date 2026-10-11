@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -20,24 +20,18 @@ import {
   spacing,
   borderRadius,
   gradients,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
   ScreenHeader,
 } from '@patafundi/shared';
 import type { FundiPublic } from '@patafundi/shared';
 
-const CATEGORY_LABELS: Record<string, string> = SERVICE_CATEGORIES.reduce(
-  (acc, cat) => {
-    acc[cat.slug] = cat.label;
-    return acc;
-  },
-  {} as Record<string, string>,
-);
-
-function categoryLabel(slug: string): string {
-  return CATEGORY_LABELS[slug] ?? slug.charAt(0).toUpperCase() + slug.slice(1);
+function categoryLabel(slug: string, labels: Record<string, string>): string {
+  return labels[slug] ?? slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function FavoritesScreen({ navigation }: any): JSX.Element {
+  const { services: serviceCategories } = useServiceCatalog();
+  const categoryLabels = useMemo(() => Object.fromEntries(serviceCategories.map((service) => [service.slug, service.label])), [serviceCategories]);
   const [favorites, setFavorites] = useState<FundiPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,7 +119,7 @@ export function FavoritesScreen({ navigation }: any): JSX.Element {
                 <Ionicons name="shield-checkmark" size={14} color={colors.success} />
               ) : null}
             </View>
-            <Text style={styles.category}>{categoryLabel(item.serviceCategory)}</Text>
+            <Text style={styles.category}>{categoryLabel(item.serviceCategory, categoryLabels)}</Text>
             <View style={styles.metaRow}>
               <View style={styles.metaChip}>
                 <Ionicons name="star" size={12} color={colors.warning} />

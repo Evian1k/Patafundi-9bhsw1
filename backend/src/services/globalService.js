@@ -8,6 +8,7 @@
  */
 
 import { query } from '../db.js';
+import { getPublicServiceCategories } from './serviceCatalogService.js';
 
 // ── Country cache (5 min TTL) ─────────────────────────────────
 let countryCache = new Map();
@@ -127,14 +128,8 @@ export async function getCountryPricingConfig(countryCode) {
 }
 
 // ── Get country service categories ────────────────────────────
-export async function getCountryServiceCategories(countryCode) {
-  const result = await query(
-    `SELECT * FROM country_service_categories
-     WHERE country_code = $1 AND is_available = true
-     ORDER BY service_category`,
-    [countryCode],
-  );
-  return result.rows;
+export async function getCountryServiceCategories(countryCode, search = '') {
+  return getPublicServiceCategories(countryCode, search);
 }
 
 // ── Currency conversion ───────────────────────────────────────
