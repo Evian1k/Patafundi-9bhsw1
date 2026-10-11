@@ -8,25 +8,13 @@
  */
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { findService } from "@/config/services";
-
-function slugToName(slug: string): string {
-  const known = findService(slug);
-  if (known) return known.name;
-  // prettify unknown slugs: "water-heater-repair" → "Water Heater Repair"
-  return slug
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 export default function ServicePage() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate(`/create-job?service=${encodeURIComponent(slugToName(slug))}`, { replace: true });
+    navigate(`/create-job?service=${encodeURIComponent(slug)}`, { replace: true });
   }, [slug, navigate]);
 
   // Rendered for one frame at most while the redirect effect runs.

@@ -5,8 +5,9 @@ import { badRequest, forbidden, notFound, parseUuid } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
 import { logNonFatal } from '../utils/logError.js';
 import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
-import { transitionJob, assertTransitionAllowed, JOB_TRANSITIONS, ACTIVE_JOB_STATES, COMPLETED_JOB_STATES, STATUS_LABELS } from '../services/jobStateMachine.js';
+import { transitionJob, transitionJobInTransaction, assertTransitionAllowed, JOB_TRANSITIONS, ACTIVE_JOB_STATES, COMPLETED_JOB_STATES, STATUS_LABELS } from '../services/jobStateMachine.js';
 import { createQuote, decideQuote as decideQuoteEntity, getLiveQuoteForJob, addQuoteQuestion } from '../services/quoteService.js';
+import { resolvePublicServiceCategory } from '../services/serviceCatalogService.js';
 import {
   createExpectedCommission,
   markCommissionCustomerConfirmed,
@@ -201,9 +202,21 @@ function providerJobView(job) {
 
 export async function createJob(req, res) {
   const body = req.body || {};
-  const serviceCategory = body.serviceCategory || body.service_category || body.category;
-  const description = body.description || body.details;
-  if (!serviceCategory || !description) throw badRequest('Service category and description are required');
+  const requestedCategory = body.serviceCategory || body.service_category || body.category;
+  const descriptionInput = body.description || body.details;
+  if (typeof requestedCategory !== 'string' || typeof descriptionInput !== 'string' || !descriptionInput.trim()) {
+    throw badRequest('Service category and description are required');
+  }
+  const countryCode = body.countryCode || body.country_code || req.user.country_code || 'KE';
+  const serviceRecord = await resolvePublicServiceCategory(countryCode, requestedCategory);
+  if (!serviceRecord) throw badRequest('This service is not available in the selected country');
+  const serviceCategory = serviceRecord.slug;
+  const requestedService = typeof body.requestedService === 'string' ? body.requestedService.trim() : serviceRecord.requestedService;
+  if (requestedService && requestedService.length > 120) throw badRequest('Requested service name is too long');
+  let description = descriptionInput.trim();
+  if (requestedService && !description.toLowerCase().includes(requestedService.toLowerCase())) {
+    description = `Requested service: ${requestedService}\n\n${description}`;
+  }
   const latitude = body.latitude || body.customer_latitude || null;
   const longitude = body.longitude || body.customer_longitude || null;
   const scheduledAt = body.scheduledDate || body.scheduled_at || null;
@@ -252,13 +265,12 @@ export async function createJob(req, res) {
     if (providerType === 'company') providerType = 'fundi';
   }
 
-  // ── Server-authoritative pricing (spec §14): the customer never sets the
-  // price. The pricing engine computes the estimate from the category's
-  // configured pricing rules; the client's estimate is only a fallback for
-  // custom categories that have no pricing configuration yet.
+  // Server-authoritative pricing: client-supplied price values are never used.
+  // A category without an active price schedule remains quote-required and
+  // receives no fabricated estimated price.
   let finalPrice = null;
-  let pricingSource = 'client_estimate_fallback';
-  try {
+  let pricingSource = 'provider_quote_required';
+  if (serviceRecord.pricingMode === 'automatic') {
     const { calculateJobPrice } = await import('../services/pricingEngineService.js');
     const enginePrice = await calculateJobPrice({
       serviceCategory,
@@ -271,11 +283,6 @@ export async function createJob(req, res) {
     });
     finalPrice = enginePrice.total;
     pricingSource = 'pricing_engine';
-  } catch (pricingErr) {
-    // No pricing configured for this category — fall back to the client
-    // estimate (still validated/clamped downstream at completion/payment).
-    finalPrice = body.estimatedPrice || body.estimated_price || null;
-    logNonFatal('job.createJob.pricingFallback', pricingErr, { serviceCategory });
   }
 
   // Company jobs wait for company acceptance (or dispatcher assignment);
@@ -312,8 +319,8 @@ export async function createJob(req, res) {
   );
   const job = result.rows[0];
   await query(
-    `insert into job_status_updates (job_id, status, actor_id, note) values ($1, 'matching', $2, 'Job created')`,
-    [job.id, req.user.id],
+    `insert into job_status_updates (job_id, status, actor_id, note) values ($1, $2, $3, 'Job created')`,
+    [job.id, job.status, req.user.id],
   );
   await query(
     `update jobs set match_metadata = $2::jsonb where id = $1`,
@@ -757,68 +764,71 @@ export async function checkIn(req, res) {
 }
 
 export async function completeJob(req, res) {
-  const job = await loadJob(req.params.id);
-  // The assigned fundi - or, for company jobs, any active member of the
-  // owning company - may request completion (spec section 6).
-  if (job.company_id) {
-    const { getMembership } = await import('../middleware/companyAccess.js');
-    const membership = await getMembership(job.company_id, req.user.id);
-    if (!(req.user.isAdmin && (req.user.role === 'super_admin' || req.user.role === 'admin')) &&
-        !(membership && membership.status === 'active') && job.fundi_id !== req.user.id) {
-      throw forbidden('Only the assigned professional or the owning company can request completion');
-    }
-  } else {
-    requireAssignedFundi(req.user, job);
-  }
-  // State-machine enforcement (spec section 6): the provider marks completion
-  // REQUESTED. The customer verifies the work with the OTP; only then does
-  // payment finalize and the job complete. A provider can never self-complete.
-  if (job.status !== 'in_progress') {
-    throw badRequest('Job must be in progress before completion - start work first');
-  }
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = await bcrypt.hash(otp, 10);
-  // ── Server-authoritative final price (spec §17): the provider-suggested
-  // final price is clamped to ±25% of the approved estimate. Anything beyond
-  // that would require a fresh quote the customer has not approved.
-  const estimated = job.estimated_price != null ? Number(job.estimated_price) : null;
-  let finalPrice = req.body?.finalPrice != null ? Number(req.body.finalPrice) : null;
-  if (finalPrice != null && estimated != null && estimated > 0) {
-    const maxAllowed = Math.round(estimated * 1.25);
-    const minAllowed = Math.max(0, Math.round(estimated * 0.5));
-    if (finalPrice > maxAllowed) finalPrice = maxAllowed;
-    if (finalPrice < minAllowed) finalPrice = minAllowed;
-  }
-  const result = await query(
-    `update jobs set status = 'completion_requested', completion_otp_hash = $2,
-      final_price = coalesce($3, final_price, estimated_price), updated_at = now()
-     where id = $1 and status = 'in_progress' returning *`,
-    [req.params.id, otpHash, finalPrice],
-  );
-  if (!result.rows[0]) throw badRequest('Job status changed concurrently - reload and try again');
-  await recordTimelineEvent({
-    jobId: req.params.id,
-    eventType: 'work_completed',
-    actorId: req.user.id,
-    actorRole: req.user.role,
-    metadata: { status: 'completion_requested' },
+  const outcome = await transaction(async (client) => {
+    const selected = await client.query('select * from jobs where id = $1 for update', [req.params.id]);
+    const job = selected.rows[0];
+    if (!job) return null;
+    if (job.status !== 'in_progress') {
+      throw badRequest('Job must be in progress before completion - start work first');
+    }
+
+    // The state-machine actor check enforces assigned-provider/company-member
+    // ownership while the job row is locked.
+    await transitionJobInTransaction(client, {
+      jobId: job.id,
+      toStatus: 'completion_requested',
+      actor: req.user,
+      actorKind: 'provider',
+      metadata: { completionRequest: true },
+    });
+
+    // Server-authoritative final price: a provider may not exceed the approved
+    // estimate by more than 25%; otherwise a fresh customer-approved quote is needed.
+    const estimated = job.estimated_price != null ? Number(job.estimated_price) : null;
+    let finalPrice = req.body?.finalPrice != null ? Number(req.body.finalPrice) : null;
+    if (finalPrice != null && (!Number.isFinite(finalPrice) || finalPrice <= 0)) {
+      throw badRequest('Final price must be a positive amount');
+    }
+    if (finalPrice != null && estimated != null && estimated > 0) {
+      const maxAllowed = Math.round(estimated * 1.25);
+      const minAllowed = Math.max(0, Math.round(estimated * 0.5));
+      if (finalPrice > maxAllowed) finalPrice = maxAllowed;
+      if (finalPrice < minAllowed) finalPrice = minAllowed;
+    }
+
+    const updated = await client.query(
+      `update jobs set completion_otp_hash = $2,
+        final_price = coalesce($3, final_price, estimated_price), updated_at = now()
+       where id = $1 and status = 'completion_requested' returning *`,
+      [job.id, otpHash, finalPrice],
+    );
+    if (!updated.rows[0]) throw badRequest('Job status changed concurrently - reload and try again');
+    await client.query(
+      `insert into job_timeline (job_id, event_type, actor_id, actor_role, metadata)
+       values ($1, 'work_completed', $2, $3, '{"status":"completion_requested"}'::jsonb)`,
+      [job.id, req.user.id, req.user.role],
+    );
+    // The durable, user-scoped notification commits with the OTP hash and job
+    // state. The secret is emitted only to the customer's private room below.
+    await client.query(
+      `insert into notifications (user_id, type, title, body, data, category)
+       values ($1, 'job_completion_otp', 'Confirm the completed work', $2, $3::jsonb, 'customers')`,
+      [
+        job.customer_id,
+        `Your professional finished booking ${job.booking_number}. Verify the work and enter code ${otp} to confirm.`,
+        JSON.stringify({ jobId: job.id, otp, bookingNumber: job.booking_number }),
+      ],
+    );
+    return { job: updated.rows[0], otp };
   });
-  // Deliver the OTP to the customer ONLY on their private user room +
-  // notification. Never broadcast the completion OTP to the job room -
-  // the fundi is in that room and must not see the confirmation code.
-  await query(
-    `insert into notifications (user_id, type, title, body, data, category)
-     values ($1, 'job_completion_otp', 'Confirm the completed work', $2, $3::jsonb, 'customers')`,
-    [
-      job.customer_id,
-      `Your professional finished booking ${job.booking_number}. Verify the work and enter code ${otp} to confirm.`,
-      JSON.stringify({ jobId: job.id, otp, bookingNumber: job.booking_number }),
-    ],
-  );
+  if (!outcome) throw notFound('Job not found');
+
   emitEvent('job:completion:requested', { jobId: req.params.id }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'completion_requested', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
+  emitEvent('job:status', { jobId: req.params.id, status: 'completion_requested', job: publicJob(outcome.job) }, `job:${req.params.id}`);
+  emitEvent('job:completion:otp', { jobId: req.params.id, otp: outcome.otp }, `user:${outcome.job.customer_id}`);
+  res.json({ success: true, job: publicJob(outcome.job), completionOtpIssued: true });
 }
 
 // ── Resend completion code (customer-only): re-issues a fresh OTP while the
@@ -853,82 +863,109 @@ export async function resendCompletionCode(req, res) {
 export async function confirmCompletion(req, res) {
   const { otp } = req.body || {};
   if (!otp) throw badRequest('OTP is required');
-  const existing = await query('select * from jobs where id = $1', [req.params.id]);
-  const job = existing.rows[0];
-  if (!job) throw notFound('Job not found');
-  requireCustomer(req.user, job);
-  // Prevent double-confirmation — if already confirmed, return success without
-  // re-processing (idempotent). This prevents duplicate escrow releases
-  // and duplicate notifications.
-  if (job.customer_completion_confirmed) {
-    return res.json({ success: true, job: publicJob(job), alreadyConfirmed: true });
-  }
-  const otpResult = await verifyJobCompletionOtp({
-    jobId: req.params.id,
-    otp,
-    verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
-  });
-  if (!otpResult.ok) throw forbidden(otpResult.error);
-  // Clear the OTP hash so it can't be reused (one-time use). The customer
-  // verified the work: completion_requested (or legacy completed) ->
-  // customer_confirmed_completion via the central machine.
-  const result = await query(
-    `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
-      escrow_status = 'completion_requested', completion_otp_hash = null,
-      status = 'customer_confirmed_completion', updated_at = now()
-     where id = $1 and customer_completion_confirmed = false
-       and status in ('completion_requested', 'completed') returning *`,
-    [req.params.id],
-  );
-  // If no rows updated, another request confirmed it concurrently - return idempotent success
-  if (!result.rows[0]) {
-    const current = await query('select * from jobs where id = $1', [req.params.id]);
-    return res.json({ success: true, job: publicJob(current.rows[0]), alreadyConfirmed: true });
-  }
-  await markCommissionCustomerConfirmed(req.params.id);
-  await recordTimelineEvent({
-    jobId: req.params.id,
-    eventType: 'customer_confirmed',
-    actorId: req.user.id,
-    actorRole: req.user.role,
-  });
-  emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'customer_confirmed_completion', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  const confirmation = await transaction(async (client) => {
+    const selected = await client.query('select * from jobs where id = $1 for update', [req.params.id]);
+    const job = selected.rows[0];
+    if (!job) return { missing: true };
+    requireCustomer(req.user, job);
+    if (job.customer_completion_confirmed) {
+      const { enqueueSettlementRelease } = await import('../services/settlementService.js');
+      await enqueueSettlementRelease(client, { jobId: job.id, source: 'customer_confirmation_retry' });
+      return { job, alreadyConfirmed: true };
+    }
+    if (!['completion_requested', 'completed'].includes(job.status)) {
+      return { failure: 'Work is not awaiting customer confirmation.', invalidState: true };
+    }
 
-  // ── Auto-release escrow via the shared settlement service ─────────
-  // Server-authoritative split, fundi wallet credit OR company settlement,
-  // revenue ledger, notifications and audit are all handled atomically.
-  // On success the payment is confirmed and the booking completes (spec
-  // section 6: payment finalized -> COMPLETED). A settlement failure leaves
-  // the booking honestly at customer_confirmed_completion - never silently
-  // completed without payment.
-  let paymentFinalized = false;
+    const otpResult = await verifyJobCompletionOtp({
+      jobId: req.params.id,
+      otp,
+      verifyHash: (hash, code) => bcrypt.compare(String(code), hash),
+      client,
+    });
+    if (!otpResult.ok) return { failure: otpResult.error, invalidOtp: true };
+
+    let confirmedJob = job;
+    if (job.status === 'completion_requested') {
+      await transitionJobInTransaction(client, {
+        jobId: job.id,
+        toStatus: 'customer_confirmed_completion',
+        actor: req.user,
+        actorKind: 'completion',
+        metadata: { verificationMethod: 'completion_otp' },
+      });
+      const confirmed = await client.query(
+        `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
+          escrow_status = 'completion_requested', completion_otp_hash = null, updated_at = now()
+         where id = $1 and status = 'customer_confirmed_completion'
+           and customer_completion_confirmed = false returning *`,
+        [job.id],
+      );
+      if (!confirmed.rows[0]) throw badRequest('Job confirmation changed concurrently - reload and try again');
+      await client.query(
+        `insert into job_timeline (job_id, event_type, actor_id, actor_role, metadata)
+         values ($1, 'customer_confirmed', $2, $3, '{"verificationMethod":"completion_otp"}'::jsonb)`,
+        [job.id, req.user.id, req.user.role],
+      );
+      confirmedJob = await transitionJobInTransaction(client, {
+        jobId: job.id,
+        toStatus: 'payment_pending',
+        actor: req.user,
+        actorKind: 'system',
+        skipActorCheck: true,
+        metadata: { source: 'completion_otp' },
+      });
+    } else {
+      // Compatibility for legacy completed rows that predate the explicit
+      // customer-confirmation state. Do not rewrite their completed status.
+      const confirmed = await client.query(
+        `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
+          completion_otp_hash = null, updated_at = now()
+         where id = $1 and status = 'completed' and customer_completion_confirmed = false returning *`,
+        [job.id],
+      );
+      if (!confirmed.rows[0]) throw badRequest('Job confirmation changed concurrently - reload and try again');
+      confirmedJob = confirmed.rows[0];
+      await client.query(
+        `insert into job_timeline (job_id, event_type, actor_id, actor_role, metadata)
+         values ($1, 'customer_confirmed', $2, $3, '{"verificationMethod":"completion_otp","legacyStatus":true}'::jsonb)`,
+        [job.id, req.user.id, req.user.role],
+      );
+    }
+    await markCommissionCustomerConfirmed(job.id, client);
+    const { enqueueSettlementRelease } = await import('../services/settlementService.js');
+    await enqueueSettlementRelease(client, { jobId: job.id, source: 'customer_confirmation' });
+    return { job: confirmedJob, alreadyConfirmed: false };
+  });
+
+  if (confirmation.missing) throw notFound('Job not found');
+  if (confirmation.failure) {
+    if (confirmation.invalidOtp) throw forbidden(confirmation.failure);
+    throw badRequest(confirmation.failure);
+  }
+  if (!confirmation.alreadyConfirmed) {
+    emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(confirmation.job) }, `job:${req.params.id}`);
+    emitEvent('job:status', { jobId: req.params.id, status: confirmation.job.status, job: publicJob(confirmation.job) }, `job:${req.params.id}`);
+  }
+
+  // Settlement is idempotent and only completes the job when a provider-verified
+  // held payment exists. Missing/failed payment stays visibly pending.
   try {
     const { releaseJobEscrow } = await import('../services/settlementService.js');
     await releaseJobEscrow({ jobId: req.params.id, actorId: req.user.id, actorRole: req.user.role, source: 'customer_confirmation' });
-    paymentFinalized = true;
   } catch (err) {
-    console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
+    logNonFatal('job.confirmCompletion.settlement', err, { jobId: req.params.id });
   }
-  let finalJob = result.rows[0];
-  if (paymentFinalized) {
-    const done = await query(
-      `update jobs set status = 'completed', payment_status = 'payout_completed', updated_at = now()
-       where id = $1 and status = 'customer_confirmed_completion' returning *`,
-      [req.params.id],
-    );
-    if (done.rows[0]) {
-      finalJob = done.rows[0];
-      emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(finalJob) }, `job:${req.params.id}`);
-      emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
-      await recordTimelineEvent({
-        jobId: req.params.id, eventType: 'status_completed', actorId: req.user.id,
-        actorRole: req.user.role, metadata: { from: 'customer_confirmed_completion', to: 'completed' },
-      });
-    }
-  }
-
-  res.json({ success: true, job: publicJob(finalJob), paymentFinalized });
+  const current = await query('select * from jobs where id = $1', [req.params.id]);
+  const finalJob = current.rows[0] || confirmation.job;
+  const paymentFinalized = finalJob.status === 'completed' && finalJob.escrow_status === 'released';
+  res.status(paymentFinalized ? 200 : 202).json({
+    success: true,
+    job: publicJob(finalJob),
+    paymentFinalized,
+    paymentPending: !paymentFinalized,
+    alreadyConfirmed: confirmation.alreadyConfirmed,
+  });
 }
 
 export async function activeFundiJob(req, res) {

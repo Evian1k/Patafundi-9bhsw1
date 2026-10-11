@@ -19,12 +19,13 @@ import {
   spacing,
   borderRadius,
   gradients,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
   Input,
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
 export function EditProfileScreen({ navigation }: any): JSX.Element {
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const user = useAuthStore((s) => s.user);
   const fetchUser = useAuthStore((s) => s.fetchUser);
   const [fullName, setFullName] = useState(user?.fullName ?? '');
@@ -135,8 +136,10 @@ export function EditProfileScreen({ navigation }: any): JSX.Element {
         />
 
         <Text style={styles.label}>Service category</Text>
+        {catalogLoading && <Text style={styles.hint} accessibilityLiveRegion="polite">Loading services…</Text>}
+        {catalogError && <TouchableOpacity onPress={retryCatalog} accessibilityRole="button"><Text style={[styles.hint, { color: colors.error }]}>Could not load services. Tap to retry.</Text></TouchableOpacity>}
         <View style={styles.categoryRow}>
-          {SERVICE_CATEGORIES.map((cat) => {
+          {serviceCategories.map((cat) => {
             const active = serviceCategory === cat.slug;
             return (
               <TouchableOpacity
@@ -144,7 +147,7 @@ export function EditProfileScreen({ navigation }: any): JSX.Element {
                 style={[styles.categoryChip, active ? styles.categoryChipActive : null]}
                 onPress={() => setServiceCategory(cat.slug)}
               >
-                <Text style={styles.categoryChipIcon}>{cat.icon}</Text>
+                <Text style={styles.categoryChipIcon}>{cat.label.slice(0, 1)}</Text>
                 <Text
                   style={[
                     styles.categoryChipText,
@@ -235,6 +238,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 6,
     fontWeight: '500',
+  },
+  hint: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   categoryRow: {
     flexDirection: 'row',

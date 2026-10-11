@@ -18,7 +18,7 @@ import {
   spacing,
   borderRadius,
   gradients,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
 } from '@patafundi/shared';
@@ -55,6 +55,7 @@ function formatKes(value: number | null): string {
 
 export function HomeScreen({ navigation }: any): JSX.Element {
   const user = useAuthStore((s) => s.user);
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, ServicePrice>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -126,10 +127,21 @@ export function HomeScreen({ navigation }: any): JSX.Element {
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Services</Text>
+      {catalogLoading && <Text style={styles.emptyText} accessibilityLiveRegion="polite">Loading available services…</Text>}
+      {catalogError && (
+        <TouchableOpacity onPress={retryCatalog} accessibilityRole="button" style={styles.emptyCard}>
+          <Text style={styles.emptyText}>Service catalog could not be loaded. Tap to retry.</Text>
+        </TouchableOpacity>
+      )}
+      {!catalogLoading && !catalogError && serviceCategories.length === 0 && (
+        <View style={styles.emptyCard}><Text style={styles.emptyText}>No services are currently available in this country.</Text></View>
+      )}
       <View style={styles.grid}>
-        {SERVICE_CATEGORIES.map((cat) => {
+        {serviceCategories.map((cat) => {
           const price = priceMap[cat.slug];
-          const fromLabel = price
+          const fromLabel = cat.pricingMode === 'quote_required'
+            ? 'Provider quote required'
+            : price
             ? formatKes(price.minimumPrice ?? price.basePrice)
             : '';
           return (
@@ -138,7 +150,7 @@ export function HomeScreen({ navigation }: any): JSX.Element {
               style={styles.categoryCard}
               onPress={() => navigation.navigate('CreateJob', { category: cat.slug })}
             >
-              <Text style={styles.categoryIcon}>{cat.icon}</Text>
+              <Ionicons name={cat.icon as keyof typeof Ionicons.glyphMap} size={24} color={cat.color || colors.primary} style={{ marginBottom: spacing.sm }} />
               <Text style={styles.categoryLabel}>{cat.label}</Text>
               {fromLabel ? (
                 <Text style={styles.categoryPrice} numberOfLines={1}>{fromLabel}</Text>

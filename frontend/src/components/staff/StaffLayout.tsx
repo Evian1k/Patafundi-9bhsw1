@@ -62,6 +62,7 @@ const STAFF_NAV = [
     section: "Administration",
     items: [
       { label: "Staff Management", href: "/staff/staff-mgmt", icon: Users, permission: "can_manage_roles", roles: ["super_admin"] },
+      { label: "Service Catalog", href: "/staff/admin/service-catalog", icon: Wrench, permission: "can_manage_service_catalog", roles: ["super_admin", "admin"] },
       { label: "AI Command Center", href: "/staff/ai", icon: AlertTriangle, permission: "can_view_fraud_dashboard", roles: ["super_admin"] },
       { label: "Security Center", href: "/staff/security", icon: Shield, permission: "can_view_logs", roles: ["super_admin", "admin", "auditor", "devops_engineer"] },
       { label: "System Settings", href: "/staff/system", icon: Shield, permission: "can_manage_system", roles: ["super_admin"] },

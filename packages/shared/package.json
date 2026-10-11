@@ -11,7 +11,7 @@
     "socket.io-client": ">=4.0.0",
     "expo-linear-gradient": ">=13.0.0",
     "@expo/vector-icons": ">=14.0.0",
-    "expo-secure-store": ">=55.0.0"
+    "expo-secure-store": ">=15.0.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {

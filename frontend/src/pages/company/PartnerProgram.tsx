@@ -10,12 +10,13 @@ import {
   MapPin, ShieldCheck, Users, Wrench,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 
-const CATEGORIES = ["plumbing", "electrical", "hvac", "appliance_repair", "carpentry", "cleaning", "painting", "welding"];
 const STEPS = ["Business", "Services", "Team", "Review"];
 
 export default function PartnerProgram() {
   const navigate = useNavigate();
+  const { services: catalog, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +95,7 @@ export default function PartnerProgram() {
 
   const canNext =
     (step === 0 && form.companyName && form.contactName && form.contactEmail && form.contactPhone) ||
-    (step === 1 && form.businessCategories.length > 0 && form.serviceAreas) ||
+    (step === 1 && form.businessCategories.length > 0 && form.serviceAreas && !catalogLoading && !catalogError && catalog.length > 0) ||
     step === 2 || step === 3;
 
   return (
@@ -183,14 +184,17 @@ export default function PartnerProgram() {
                 <>
                   <div>
                     <p className="text-sm font-medium mb-2">Service categories *</p>
+                    {catalogLoading && <p className="mb-2 text-xs text-muted-foreground" aria-live="polite">Loading available services…</p>}
+                    {catalogError && <button type="button" onClick={retryCatalog} className="mb-2 text-xs text-destructive underline">Service catalog unavailable. Tap to retry.</button>}
+                    {!catalogLoading && !catalogError && catalog.length === 0 && <p className="mb-2 text-xs text-muted-foreground">No service categories are currently available.</p>}
                     <div className="flex flex-wrap gap-2">
-                      {CATEGORIES.map((c) => (
-                        <button key={c} type="button" onClick={() => toggleCategory(c)}
+                      {catalog.map((service) => (
+                        <button key={service.slug} type="button" onClick={() => toggleCategory(service.slug)}
                           className={`rounded-full border px-3.5 py-1.5 text-sm capitalize transition-colors ${
-                            form.businessCategories.includes(c)
+                            form.businessCategories.includes(service.slug)
                               ? "bg-primary text-primary-foreground border-emerald-600"
                               : "hover:bg-muted"}`}>
-                          {c.replace("_", " ")}
+                          {service.title}
                         </button>
                       ))}
                     </div>

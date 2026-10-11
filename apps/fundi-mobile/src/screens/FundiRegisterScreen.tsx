@@ -40,7 +40,7 @@ import {
   spacing,
   fontSize,
   borderRadius,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
 } from '@patafundi/shared';
 
 const { width } = Dimensions.get('window');
@@ -53,6 +53,7 @@ const KENYAN_COUNTIES = [
 ];
 
 export function FundiRegisterScreen({ navigation }: any): JSX.Element {
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -380,8 +381,14 @@ export function FundiRegisterScreen({ navigation }: any): JSX.Element {
 
             <Text style={styles.label}>Service Categories</Text>
             <Text style={styles.hint}>Select all that apply</Text>
+            {catalogLoading && <Text style={styles.hint} accessibilityLiveRegion="polite">Loading services…</Text>}
+            {catalogError && (
+              <TouchableOpacity onPress={retryCatalog} accessibilityRole="button">
+                <Text style={[styles.hint, { color: colors.error }]}>Could not load services. Tap to retry.</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.skillsGrid}>
-              {SERVICE_CATEGORIES.map(cat => {
+              {serviceCategories.map(cat => {
                 const selected = selectedSkills.includes(cat.slug);
                 return (
                   <TouchableOpacity

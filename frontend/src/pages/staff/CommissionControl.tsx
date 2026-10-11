@@ -9,14 +9,10 @@ import { motion } from "framer-motion";
 import { Calculator, History, Save } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
-import { SERVICE_CATALOG } from "@/config/services";
+import type { ServiceCategory } from "@/config/services";
 import { useReducedMotion, fadeUp, stagger } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-// Real bookable categories from the shared service catalog - never a hand-
-// typed list that drifts from what jobs can actually be created with.
-const CATEGORIES = SERVICE_CATALOG.map((s) => s.id);
 
 export default function CommissionControl() {
   const navigate = useNavigate();
@@ -24,16 +20,19 @@ export default function CommissionControl() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyError, setHistoryError] = useState(false);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
 
   // Simulator state
   const [simAmount, setSimAmount] = useState("10000");
-  const [simCategory, setSimCategory] = useState("plumbing");
+  const [simCategory, setSimCategory] = useState("");
   const [simRate, setSimRate] = useState("15");
   const [simResult, setSimResult] = useState<any>(null);
 
   // Rate update state
   const [updateScope, setUpdateScope] = useState("global");
-  const [updateCategory, setUpdateCategory] = useState("plumbing");
+  const [updateCategory, setUpdateCategory] = useState("");
   const [updateRate, setUpdateRate] = useState("15");
   const [updateReason, setUpdateReason] = useState("");
 
@@ -50,6 +49,24 @@ export default function CommissionControl() {
     }
   }, []);
 
+  const loadCategories = useCallback(async () => {
+    setCatalogLoading(true);
+    setCatalogError(false);
+    try {
+      const response = await apiClient.getServiceCategories("KE") as { services?: ServiceCategory[] };
+      const next = (response.services || []).filter((service) => service.pricingMode === "automatic");
+      setCategories(next);
+      if (next.length) {
+        setSimCategory((current) => current || next[0].slug);
+        setUpdateCategory((current) => current || next[0].slug);
+      }
+    } catch {
+      setCatalogError(true);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -57,8 +74,9 @@ export default function CommissionControl() {
         if (me?.user?.role !== "super_admin") { navigate("/staff"); return; }
       } catch { navigate("/staff/login"); return; }
       fetchHistory();
+      void loadCategories();
     })();
-  }, [navigate, fetchHistory]);
+  }, [navigate, fetchHistory, loadCategories]);
 
   const runSimulation = async () => {
     try {
@@ -121,17 +139,18 @@ export default function CommissionControl() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Category</label>
-                <select value={simCategory} onChange={(e) => setSimCategory(e.target.value)}
+                <select value={simCategory} onChange={(e) => setSimCategory(e.target.value)} disabled={catalogLoading || categories.length === 0}
                   className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1">
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}
+                  {catalogLoading ? <option value="">Loading catalog…</option> : categories.map((service) => <option key={service.slug} value={service.slug}>{service.title}</option>)}
                 </select>
+                {catalogError && <p className="mt-1 text-xs text-destructive" role="alert">Catalog unavailable. <button type="button" className="underline" onClick={() => void loadCategories()}>Retry</button></p>}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Commission Rate (%)</label>
                 <input type="number" value={simRate} onChange={(e) => setSimRate(e.target.value)}
                   className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
-              <Button className="w-full" onClick={runSimulation}>
+              <Button className="w-full" onClick={runSimulation} disabled={!simCategory || catalogLoading}>
                 <Calculator className="w-4 h-4 mr-2" /> Simulate
               </Button>
               {simResult && (
@@ -177,9 +196,9 @@ export default function CommissionControl() {
               {updateScope === "category" && (
                 <div>
                   <label className="text-xs text-muted-foreground">Category</label>
-                  <select value={updateCategory} onChange={(e) => setUpdateCategory(e.target.value)}
+                    <select value={updateCategory} onChange={(e) => setUpdateCategory(e.target.value)} disabled={catalogLoading || categories.length === 0}
                     className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1">
-                    {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}
+                    {catalogLoading ? <option value="">Loading catalog…</option> : categories.map((service) => <option key={service.slug} value={service.slug}>{service.title}</option>)}
                   </select>
                 </div>
               )}
@@ -194,7 +213,7 @@ export default function CommissionControl() {
                   placeholder="e.g. Promotional discount for cleaning"
                   className="w-full px-3 py-2 border border-border bg-card rounded-lg mt-1" />
               </div>
-              <Button className="w-full" onClick={saveRate}>
+              <Button className="w-full" onClick={saveRate} disabled={updateScope === "category" && !updateCategory}>
                 <Save className="w-4 h-4 mr-2" /> Save & Audit
               </Button>
               <p className="text-xs text-amber-600">⚠️ Changes are audit-logged and cannot be deleted.</p>

@@ -334,6 +334,15 @@ export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
         ) : null}
       </View>
 
+      {payment?.status === 'reconciliation_required' ? (
+        <View style={[styles.card, { borderWidth: 1, borderColor: colors.warning }]} accessibilityRole="alert">
+          <Text style={[styles.jobCategory, { color: colors.warning }]}>Payment needs review</Text>
+          <Text style={styles.jobDesc}>
+            We could not confirm whether M-Pesa completed this payment. Do not pay again while our finance team reviews the provider status.
+          </Text>
+        </View>
+      ) : null}
+
       {/* Quote review card (spec section 3) - a quote NEVER completes the job */}
       {job.status === 'offered' ? (
         <View style={styles.card}>

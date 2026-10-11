@@ -1,6 +1,7 @@
 export type UserRole = 'customer' | 'fundi' | 'admin' | 'staff';
 export type UserStatus = 'active' | 'pending' | 'suspended' | 'banned';
 export interface User { id: string; email: string; fullName: string; phone: string | null; role: UserRole; status: UserStatus; trustScore: number; avatarUrl?: string | null; createdAt?: string; }
+export interface ServiceCategory { id: string; slug: string; title: string; label: string; name: string; canonicalTitle?: string; displayName?: string; description: string | null; icon: string; color: string | null; aliases: string[]; sortOrder: number; isActive: boolean; countryCode: string | null; isAvailable: boolean; pricingMode: 'automatic' | 'quote_required'; basePrice: number | null; minimumPrice: number | null; maximumPrice: number | null; estimatedDurationMinutes: number | null; updatedAt?: string | null; }
 export type JobStatus =
   | 'pending' | 'matching' | 'quote_requested' | 'offered' | 'accepted'
   | 'booking_confirmed' | 'assigned' | 'scheduled'
@@ -36,7 +37,7 @@ export interface JobLocation { jobId: string; latitude: number; longitude: numbe
 export interface Message { id: string; jobId: string; senderId: string; senderName?: string; text: string; type: 'text' | 'image' | 'system'; readAt?: string | null; createdAt: string; }
 export interface SavedPlace { id: string; label: string; address: string; latitude: number; longitude: number; }
 export interface Notification { id: string; userId: string; title: string; message: string; body?: string; type: string; isRead: boolean; createdAt: string; jobId?: string | null; data?: Record<string, unknown> | null; }
-export interface Payment { id: string; jobId: string; amount: number; status: 'pending' | 'processing' | 'completed' | 'failed'; method: 'mpesa' | 'card' | 'wallet'; phoneNumber?: string; mpesaRef?: string; createdAt: string; }
+export interface Payment { id: string; jobId: string; amount: number; status: 'pending' | 'processing' | 'completed' | 'failed' | 'reconciliation_required'; method: 'mpesa' | 'card' | 'wallet'; phoneNumber?: string; mpesaRef?: string; createdAt: string; }
 export interface WalletBalance { available: number; pending: number; currency: string; }
 export interface WalletTransaction { id: string; type: 'credit' | 'debit' | 'payout' | 'commission' | 'refund'; amount: number; description: string; status: 'pending' | 'completed' | 'failed'; createdAt: string; }
 export interface PayoutRequest { id: string; amount: number; status: 'pending' | 'processing' | 'completed' | 'failed'; method: string; createdAt: string; }

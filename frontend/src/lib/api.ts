@@ -490,6 +490,26 @@ class ApiClient {
     });
   }
 
+  // ── Shared database-backed service catalog ───────────────────────────────
+  async getServiceCategories(countryCode = 'KE', search = '') {
+    const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : '';
+    return this.request(`/global/services/${encodeURIComponent(countryCode.toUpperCase())}${query}`, { includeAuth: false });
+  }
+  async adminListServiceCategories(countryCode = 'KE', search = '') {
+    const params = new URLSearchParams({ countryCode, includeInactive: 'true' });
+    if (search.trim()) params.set('q', search.trim());
+    return this.request(`/admin/service-categories?${params.toString()}`);
+  }
+  async adminCreateServiceCategory(payload: Record<string, unknown>) {
+    return this.request('/admin/service-categories', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  async adminUpdateServiceCategory(slug: string, payload: Record<string, unknown>) {
+    return this.request(`/admin/service-categories/${encodeURIComponent(slug)}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  }
+  async adminDeactivateServiceCategory(slug: string) {
+    return this.request(`/admin/service-categories/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+  }
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   async createJob(jobData: Record<string, unknown>) {
     return this.request('/jobs', { method: 'POST', body: JSON.stringify(jobData) });

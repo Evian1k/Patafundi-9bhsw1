@@ -18,7 +18,7 @@ import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
 import ServiceUnavailableState from "@/components/system/ServiceUnavailableState";
 import NotificationBell from "@/components/system/NotificationBell";
 import { BrandLogo } from "@/assets/logo";
-import { SERVICE_CATALOG, CORE_SERVICE_IDS, bookingPathForService } from "@/config/services";
+import { bookingPathForService, type ServiceCategory } from "@/config/services";
 
 const LOCATION_ONBOARDING_KEY = "pf_location_onboarding";
 
@@ -149,6 +149,9 @@ export default function Dashboard() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [showAllServices, setShowAllServices] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceCategory[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   // Counts come from the database (spec section 7) - never from UI state.
   const [dbStats, setDbStats] = useState<{ activeJobs?: number; completedJobs?: number; pendingQuotes?: number; totalBookings?: number } | null>(null);
   // Report-a-problem opens INLINE on this dashboard - the user never leaves.
@@ -156,6 +159,19 @@ export default function Dashboard() {
   const [reportOpen, setReportOpen] = useState(false);
   // Reactive location label: localStorage alone never triggers a re-render.
   const [locationLabel, setLocationLabel] = useState<string>("");
+  const loadServiceCatalog = useCallback(async () => {
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const response = await apiClient.getServiceCategories("KE") as { services?: ServiceCategory[] };
+      setServiceCatalog(response.services || []);
+    } catch (cause) {
+      setCatalogError(cause instanceof Error ? cause.message : "Service catalog is unavailable.");
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+  useEffect(() => { void loadServiceCatalog(); }, [loadServiceCatalog]);
   useEffect(() => {
     const sync = () => setLocationLabel(localStorage.getItem("pf_location_label") || "");
     sync();
@@ -373,7 +389,7 @@ export default function Dashboard() {
               onChange={(e) => setServiceQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && serviceQuery.trim()) {
-                  navigate(`/create-job?service=${encodeURIComponent(serviceQuery.trim())}`);
+                  navigate(`/create-job?service=other&problem=${encodeURIComponent(serviceQuery.trim())}`);
                 }
               }}
               placeholder="Search for a service, e.g. water heater repair"
@@ -381,35 +397,38 @@ export default function Dashboard() {
               className="w-full h-11 pl-10 pr-4 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
+          {catalogLoading && <p className="mb-3 text-sm text-muted-foreground" role="status">Loading available services…</p>}
+          {catalogError && <div className="mb-3 flex items-center gap-2 text-sm text-destructive" role="alert"><span>Could not load the service catalog.</span><button type="button" className="underline" onClick={() => void loadServiceCatalog()}>Retry</button></div>}
+          {!catalogLoading && !catalogError && serviceCatalog.length === 0 && <p className="mb-3 text-sm text-muted-foreground">No services are currently available in this country.</p>}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {(showAllServices
-              ? SERVICE_CATALOG
-              : SERVICE_CATALOG.filter((s) => (CORE_SERVICE_IDS as readonly string[]).includes(s.id))
+              ? serviceCatalog
+              : serviceCatalog.slice(0, 8)
             )
-              .filter((s) => !serviceQuery.trim() || s.name.toLowerCase().includes(serviceQuery.trim().toLowerCase()))
+              .filter((s) => !serviceQuery.trim() || [s.title, s.slug, ...(s.aliases || [])].some((value) => value.toLowerCase().includes(serviceQuery.trim().toLowerCase())))
               .map((s) => (
               <Link
-                key={s.id}
-                to={bookingPathForService(s.name)}
+                key={s.slug}
+                to={bookingPathForService(s.slug)}
                 className="bg-card rounded-2xl border border-border/50 p-4 hover:border-primary/40 hover:shadow-md transition-all"
               >
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-2`}>
-                  <s.icon className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: s.color || "#1E9E8A" }}>
+                  <Wrench className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-sm font-semibold leading-tight">{s.name}</p>
+                <p className="text-sm font-semibold leading-tight">{s.title}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Book now</p>
               </Link>
             ))}
-            {serviceQuery.trim() &&
-              SERVICE_CATALOG.filter((s) => s.name.toLowerCase().includes(serviceQuery.trim().toLowerCase())).length === 0 && (
+            {!catalogLoading && !catalogError && serviceQuery.trim() &&
+              !serviceCatalog.some((s) => [s.title, s.slug, ...(s.aliases || [])].some((value) => value.toLowerCase().includes(serviceQuery.trim().toLowerCase()))) && (
               <Link
-                to={`/create-job?service=${encodeURIComponent(serviceQuery.trim())}`}
+                to={`/create-job?service=other&problem=${encodeURIComponent(serviceQuery.trim())}`}
                 className="md:col-span-3 col-span-1 bg-card rounded-2xl border border-dashed border-primary/40 p-4 flex items-center gap-3 hover:bg-primary/5 transition-colors"
               >
                 <Plus className="w-5 h-5 text-primary" />
                 <div>
                   <p className="text-sm font-semibold">Can't find “{serviceQuery.trim()}”?</p>
-                  <p className="text-[11px] text-muted-foreground">Describe what you need and we'll match you with the right professional.</p>
+                  <p className="text-[11px] text-muted-foreground">Submit a custom request; provider availability and a quote must be confirmed.</p>
                 </div>
               </Link>
             )}
@@ -419,7 +438,7 @@ export default function Dashboard() {
             onClick={() => setShowAllServices((v) => !v)}
             className="mt-3 text-sm font-medium text-primary hover:underline"
           >
-            {showAllServices ? "Show fewer services" : `View all services (${SERVICE_CATALOG.length})`}
+            {showAllServices ? "Show fewer services" : `View all services (${serviceCatalog.length})`}
           </button>
         </div>
 

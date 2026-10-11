@@ -102,8 +102,8 @@ const HeroSection = () => {
               transition={{ delay: 0.15 }}
               className="text-muted-foreground text-lg leading-relaxed mb-8"
             >
-              Find a trusted professional or service company near you - for plumbing, electrical, cleaning,
-              repairs and more. Book, track and pay securely in one app.
+              Find a trusted professional or service company near you. Describe the work, compare real options,
+              and book, track and pay securely in one place.
             </motion.p>
 
             {/* Problem input */}

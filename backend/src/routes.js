@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import { query } from './db.js';
 import { authRequired, optionalAuth, requireRole } from './middleware/auth.js';
+import { requirePermission, requireAnyPermission, requireStaff } from './middleware/rbac.js';
 import { requireFundiAccount, requireApprovedFundi } from './middleware/fundiAccess.js';
 import { requireApprovedWorker } from './middleware/workerAccess.js';
 import { imageUpload } from './middleware/upload.js';
@@ -14,6 +15,7 @@ import * as disputes from './controllers/disputeController.js';
 import * as fundi from './controllers/fundiController.js';
 import * as admin from './controllers/adminController.js';
 import * as content from './controllers/contentController.js';
+import * as serviceCatalog from './controllers/serviceCatalogController.js';
 import * as chargebacks from './controllers/chargebackController.js';
 import * as chat from './controllers/chatController.js';
 import * as maps from './controllers/mapsController.js';
@@ -196,6 +198,8 @@ router.post('/payments/daraja-callback', asyncHandler(payments.webhook));
 router.post('/payments/stripe/intent', authRequired, paymentActionRateLimit, asyncHandler(payments.stripeIntent));
 router.post('/payments/stripe/webhook', asyncHandler(payments.stripeWebhook));
 router.get('/admin/finance/reconciliation', authRequired, requireRole('admin'), asyncHandler(payments.financeReconciliation));
+router.get('/admin/payments/reconciliation', authRequired, requirePermission('can_reconcile_payments'), asyncHandler(payments.listPaymentReconciliations));
+router.post('/admin/payments/:paymentId/reconciliation-review', authRequired, requirePermission('can_reconcile_payments'), asyncHandler(payments.reviewPaymentReconciliation));
 router.get('/payments/job/:jobId', authRequired, asyncHandler(payments.paymentForJob));
 router.get('/payments/escrow/:jobId', authRequired, asyncHandler(payments.escrowForJob));
 router.get('/payments/wallet/balance', authRequired, asyncHandler(payments.walletBalance));
@@ -277,7 +281,6 @@ router.put('/admin/settings', authRequired, requireRole('admin'), asyncHandler(a
 // ============================================================
 // Enterprise RBAC — permission-scoped staff endpoints
 // ============================================================
-import { requirePermission, requireAnyPermission, requireStaff } from './middleware/rbac.js';
 import * as rbac from './controllers/rbacController.js';
 
 // Any staff member can list their own permissions (for frontend UI gating).
@@ -1047,7 +1050,7 @@ router.get('/global/payments/:countryCode', asyncHandler(globalCtrl.getPaymentMe
 router.get('/global/verification/:countryCode', asyncHandler(globalCtrl.getVerificationReqs));
 router.get('/global/emergency/:countryCode', asyncHandler(globalCtrl.getEmergencyContacts));
 router.get('/global/pricing/:countryCode', asyncHandler(globalCtrl.getPricingConfig));
-router.get('/global/services/:countryCode', asyncHandler(globalCtrl.getCountryServices));
+router.get('/global/services/:countryCode', asyncHandler(serviceCatalog.listPublic));
 router.get('/global/exchange-rates', asyncHandler(globalCtrl.getRates));
 router.get('/global/convert', asyncHandler(globalCtrl.convertAmount));
 router.get('/global/detect-country', asyncHandler(globalCtrl.detectCountry));
@@ -1058,3 +1061,7 @@ router.put('/global/countries/:code', authRequired, requireRole('admin'), asyncH
 router.post('/global/exchange-rates', authRequired, requireRole('admin'), asyncHandler(globalCtrl.updateRates));
 router.get('/global/analytics', authRequired, requireRole('admin'), asyncHandler(globalCtrl.getAnalytics));
 router.get('/global/dashboard', authRequired, requireRole('admin'), asyncHandler(globalCtrl.getGlobalDashboard));
+router.get('/admin/service-categories', authRequired, requirePermission('can_manage_service_catalog'), asyncHandler(serviceCatalog.listAdmin));
+router.post('/admin/service-categories', authRequired, requirePermission('can_manage_service_catalog'), asyncHandler(serviceCatalog.create));
+router.patch('/admin/service-categories/:slug', authRequired, requirePermission('can_manage_service_catalog'), asyncHandler(serviceCatalog.update));
+router.delete('/admin/service-categories/:slug', authRequired, requirePermission('can_manage_service_catalog'), asyncHandler(serviceCatalog.deactivate));

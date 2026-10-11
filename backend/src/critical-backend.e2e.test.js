@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { query } from './db.js';
 import { authRequired, signAccessToken } from './middleware/auth.js';
 import { hasPermission } from './middleware/rbac.js';
+import { refresh } from './controllers/authController.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { createJob } from './controllers/jobController.js';
 import { calculateSurgePricing, findNearbyFundis } from './services/geoMatchingService.js';
@@ -55,6 +56,19 @@ test('embedded database bootstrap and JWT session flow work', async () => {
   assert.equal(req.user.role, user.role);
 });
 
+test('expired refresh JWTs are classified as authentication failures', async () => {
+  const refreshToken = jwt.sign(
+    { sub: '00000000-0000-4000-8000-000000000001', type: 'refresh' },
+    config.refreshSecret || config.jwtSecret,
+    { expiresIn: -1, issuer: 'patafundi-api', audience: 'patafundi-web', algorithm: 'HS256' },
+  );
+
+  await assert.rejects(
+    () => refresh({ cookies: {}, body: { refreshToken } }, { json() {} }),
+    (error) => error.status === 403 && error.message === 'Invalid or expired refresh token',
+  );
+});
+
 test('customer access is denied for protected permissions while super admin remains authorized', async () => {
   const customer = (await query('select id, role from users where email = $1', ['demo@patafundi.com'])).rows[0];
   const admin = (await query('select id, role from users where email = $1', ['admin@patafundi.com'])).rows[0];
@@ -101,6 +115,8 @@ test('job creation and matching use the real database-backed workflow', async ()
       longitude: 36.8172,
       urgency: 'emergency',
       formattedAddress: 'Nairobi CBD',
+      estimatedPrice: 1,
+      estimated_price: 2,
     },
     ip: '127.0.0.1',
   }, res);
@@ -108,6 +124,7 @@ test('job creation and matching use the real database-backed workflow', async ()
   assert.equal(res.statusCode, 201);
   assert.ok(res.payload.job.id);
   assert.equal(res.payload.job.serviceCategory, 'plumbing');
+  assert.ok(res.payload.job.estimatedPrice > 2, 'server price engine must ignore client-supplied estimates');
 
   const matches = await findNearbyFundis({
     latitude: -1.2864,
@@ -121,6 +138,36 @@ test('job creation and matching use the real database-backed workflow', async ()
 
   const jobRow = (await query('select status from jobs where id = $1', [res.payload.job.id])).rows[0];
   assert.equal(jobRow.status, 'matching');
+});
+
+test('unlisted requests are persisted as quote-required Other and ignore client prices', async () => {
+  const customer = (await query('select id from users where email = $1', ['demo@patafundi.com'])).rows[0];
+  const res = {
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.payload = payload; return payload; },
+  };
+  await createJob({
+    user: { id: customer.id, role: 'customer' },
+    body: {
+      serviceCategory: 'rooftop rainwater pump service',
+      requestedService: 'rooftop rainwater pump service',
+      description: 'Please inspect and repair the rooftop rainwater pump system.',
+      latitude: -1.2864,
+      longitude: 36.8172,
+      formattedAddress: 'Nairobi CBD',
+      estimatedPrice: 999999,
+      estimated_price: 999999,
+    },
+    ip: '127.0.0.1',
+  }, res);
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.payload.job.serviceCategory, 'other');
+  assert.equal(res.payload.job.estimatedPrice, undefined);
+  const row = (await query('select service_category, description, estimated_price from jobs where id=$1', [res.payload.job.id])).rows[0];
+  assert.equal(row.service_category, 'other');
+  assert.match(row.description, /Requested service: rooftop rainwater pump service/);
+  assert.equal(row.estimated_price, null);
 });
 
 test('notifications remain scoped to their users and financial calculations protect payout math', async () => {

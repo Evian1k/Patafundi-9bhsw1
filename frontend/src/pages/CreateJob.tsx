@@ -24,7 +24,7 @@ import LiveTrackingMap from "@/components/maps/LiveTrackingMap";
 import AddressDisplay from "@/components/maps/AddressDisplay";
 import LocationPicker, { type LocationSelection } from "@/components/maps/LocationPicker";
 import { sanitizeLocationText, LOCATION_FALLBACK } from "@/lib/maps/geocoding";
-import { SERVICE_CATALOG, bookingPathForService } from "@/config/services";
+import type { ServiceCategory } from "@/config/services";
 import { formatMoney } from "@/lib/money";
 
 interface PhotoData {
@@ -62,10 +62,6 @@ interface AiAnalysis {
 
 interface CompanyServiceItem { id: string; name: string; category: string; description?: string; basePrice?: string | number }
 interface SelectedCompany { id: string; companyName: string; logoUrl?: string | null }
-
-// Spec §22: the full global catalog — customers can also type any custom
-// service in the search box (step 1) and PataFundi routes the request.
-const services = SERVICE_CATALOG;
 
 const providerChoices = [
   {
@@ -207,11 +203,16 @@ const CreateJob = () => {
   const [loading, setLoading] = useState(false);
   const [locationSelection, setLocationSelection] = useState<LocationSelection | null>(null);
   const [serviceSearch, setServiceSearch] = useState("");
+  const [services, setServices] = useState<ServiceCategory[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   // The selected company persists across every step of the wizard (spec §16):
   // a banner + its service catalog are shown so the customer never "lands
   // back at the start" mid-booking.
   const [companyInfo, setCompanyInfo] = useState<SelectedCompany | null>(null);
   const [companyServices, setCompanyServices] = useState<CompanyServiceItem[]>([]);
+  const [companyServiceId, setCompanyServiceId] = useState<string | null>(null);
   const [jobData, setJobData] = useState<JobFormData>({
     service: searchParams.get("service") || "",
     problem: searchParams.get("problem") || "",
@@ -234,6 +235,39 @@ const CreateJob = () => {
   // Answers to the AI's follow-up questions (spec §12: intelligent intake).
   const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
 
+  useEffect(() => {
+    let active = true;
+    setCatalogLoading(true);
+    setCatalogError(null);
+    apiClient.getServiceCategories("KE")
+      .then((response) => {
+        if (active) setServices((response as { services?: ServiceCategory[] }).services || []);
+      })
+      .catch((cause: unknown) => {
+        if (active) setCatalogError(cause instanceof Error ? cause.message : "Service catalog is unavailable.");
+      })
+      .finally(() => { if (active) setCatalogLoading(false); });
+    return () => { active = false; };
+  }, [catalogAttempt]);
+
+  useEffect(() => {
+    const requested = searchParams.get("service");
+    if (!requested || services.length === 0) return;
+    const normalized = requested.trim().toLowerCase();
+    const matched = services.find((service) => [service.slug, service.title, service.label, ...service.aliases]
+      .some((value) => value.toLowerCase() === normalized));
+    if (matched) {
+      setJobData((previous) => ({ ...previous, service: matched.slug }));
+    } else if (normalized !== "other" && services.some((service) => service.slug === "other")) {
+      setJobData((previous) => ({
+        ...previous,
+        service: "other",
+        problem: previous.problem || requested,
+        description: previous.description || `Requested service: ${requested}`,
+      }));
+    }
+  }, [searchParams, services]);
+
   const runAiAnalysis = async () => {
     if (jobData.description.trim().length < 10) {
       toast.error("Write a few words about the problem first.");
@@ -247,10 +281,10 @@ const CreateJob = () => {
         setAiAnswers({});
         // Auto-suggest the category when the AI recognized a known one.
         const cat = (res.analysis.category || "").toLowerCase();
-        const known = services.find((s) => s.id === cat || s.name.toLowerCase().includes(cat));
-        if (known && known.id !== jobData.service) {
-          setJobData((prev) => ({ ...prev, service: known.name }));
-          toast.success(`PataFundi AI suggests: ${known.name}`);
+        const known = services.find((service) => service.slug === cat || service.title.toLowerCase() === cat);
+        if (known && known.slug !== jobData.service) {
+          setJobData((prev) => ({ ...prev, service: known.slug }));
+          toast.success(`PataFundi AI suggests: ${known.title}`);
         }
         if (res.analysis.suggestedProviderType === "company" && jobData.providerChoice === "platform_match") {
           toast("Tip: PataFundi AI suggests a service company for this job.", { duration: 5000 });
@@ -279,9 +313,11 @@ const CreateJob = () => {
   // customer books from the services the company ACTUALLY offers (spec §16).
   useEffect(() => {
     const companyId = jobData.companyId;
+    setCompanyServiceId(null);
     if (!companyId) {
       setCompanyInfo(null);
       setCompanyServices([]);
+      setCompanyServiceId(null);
       return;
     }
     let cancelled = false;
@@ -358,12 +394,25 @@ const CreateJob = () => {
       toast.error("Please select or capture your location before submitting.");
       return;
     }
+    if (!services.some((service) => service.slug === jobData.service)) {
+      toast.error("Choose a currently available service from the catalog before submitting.");
+      setStep(1);
+      return;
+    }
     setLoading(true);
     try {
+      const selectedService = services.find((service) => service.slug === jobData.service);
+      const serviceLabel = selectedService?.title || "Custom service";
+      const submittedDescription = jobData.service === "other" && jobData.problem
+        && !jobData.description.toLowerCase().includes(jobData.problem.toLowerCase())
+        ? `Requested service: ${jobData.problem}\n\n${jobData.description}`
+        : jobData.description;
       const payload = {
-        title: `${jobData.service} - ${jobData.problem || jobData.description.slice(0, 40)}`,
-        description: jobData.description,
+        title: `${serviceLabel} - ${jobData.problem || jobData.description.slice(0, 40)}`,
+        description: submittedDescription,
         category: jobData.service,
+        requestedService: jobData.service === "other" ? jobData.problem || undefined : undefined,
+        countryCode: "KE",
         locationName: locationSelection?.formattedAddress || jobData.location,
         formattedAddress: locationSelection?.formattedAddress || jobData.location,
         latitude: jobData.latitude,
@@ -389,7 +438,9 @@ const CreateJob = () => {
         }
       }
 
-      toast.success("Job created! Finding fundis near you...");
+      toast.success(services.find((service) => service.slug === jobData.service)?.pricingMode === "quote_required"
+        ? "Request submitted. Provider availability and a quote must be confirmed."
+        : "Request submitted. You can follow provider updates in the app.");
       navigate(`/job/${res?.job?.id}/tracking`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create job");
@@ -475,9 +526,20 @@ const CreateJob = () => {
                       <button
                         key={cs.id}
                         type="button"
-                        onClick={() => setJobData((prev) => ({ ...prev, service: cs.name }))}
+                        onClick={() => {
+                          setCompanyServiceId(cs.id);
+                          const normalized = (cs.category || "").trim().toLowerCase();
+                          const matched = services.find((service) => [service.slug, service.title, ...service.aliases]
+                            .some((value) => value.toLowerCase() === normalized));
+                          setJobData((prev) => ({
+                            ...prev,
+                            service: matched?.slug || "other",
+                            problem: matched ? prev.problem : cs.name,
+                            description: matched ? prev.description : (prev.description || `Requested company service: ${cs.name}`),
+                          }));
+                        }}
                         className={`px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all text-left ${
-                          jobData.service === cs.name
+                          companyServiceId === cs.id
                             ? "border-primary bg-primary/5 shadow-md"
                             : "border-border bg-card hover:border-primary/30"
                         }`}
@@ -492,60 +554,64 @@ const CreateJob = () => {
                 </div>
               )}
 
-              {/* Search — custom services the catalog may not list (spec §23) */}
+              {catalogLoading && <p className="mb-4 text-sm text-muted-foreground" role="status">Loading available services…</p>}
+              {catalogError && <p className="mb-4 text-sm text-destructive" role="alert">Catalog unavailable. <button type="button" className="underline" onClick={() => setCatalogAttempt((value) => value + 1)}>Retry</button></p>}
               {!companyInfo && (
-                <div className="relative mb-5">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && serviceSearch.trim()) {
-                        setJobData((prev) => ({ ...prev, service: serviceSearch.trim() }));
+                <>
+                  <div className="relative mb-5">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      value={serviceSearch}
+                      onChange={(event) => setServiceSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" || !serviceSearch.trim()) return;
+                        event.preventDefault();
+                        const query = serviceSearch.trim();
+                        const normalized = query.toLowerCase();
+                        const matched = services.find((service) => [service.slug, service.title, ...service.aliases]
+                          .some((value) => value.toLowerCase() === normalized));
+                        const other = services.find((service) => service.slug === "other");
+                        if (matched) setJobData((previous) => ({ ...previous, service: matched.slug }));
+                        else if (other) setJobData((previous) => ({ ...previous, service: "other", problem: query, description: previous.description || `Requested service: ${query}` }));
+                        else { toast.error("No custom-service category is currently configured. Please retry the catalog or contact support."); return; }
                         setStep(2);
-                      }
-                    }}
-                    placeholder="Type a service, e.g. water heater repair"
-                    aria-label="Search for a service"
-                    className="w-full h-11 pl-10 pr-4 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              )}
-
-              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
-                {services
-                  .filter((s) => !serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase()))
-                  .map((service) => (
-                  <button
-                    key={service.id}
-                    onClick={() => setJobData((prev) => ({ ...prev, service: service.name }))}
-                    className={`p-4 rounded-2xl border-2 transition-all text-left ${
-                      jobData.service === service.name
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : "border-border bg-card hover:border-primary/30"
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${service.color} flex items-center justify-center mb-3`}>
-                      <service.icon className="w-5 h-5 text-white" />
-                    </div>
-                    <p className="font-medium text-sm">{service.name}</p>
-                  </button>
-                ))}
-              </div>
-              {serviceSearch.trim() && !services.some((s) => s.name.toLowerCase().includes(serviceSearch.trim().toLowerCase())) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setJobData((prev) => ({ ...prev, service: serviceSearch.trim() }));
-                    setStep(2);
-                  }}
-                  className="mt-4 w-full p-4 rounded-2xl border border-dashed border-primary/40 bg-card text-left hover:bg-primary/5 transition-colors flex items-center gap-3"
-                >
-                  <Sparkles className="w-5 h-5 text-primary shrink-0" />
-                  <span className="text-sm">
-                    Can't find your service? Request <span className="font-semibold">“{serviceSearch.trim()}”</span> and we'll match you with the right professional.
-                  </span>
-                </button>
+                      }}
+                      placeholder="Search services or describe something not listed"
+                      aria-label="Search for a service"
+                      className="w-full h-11 pl-10 pr-4 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
+                    {services
+                      .filter((service) => !serviceSearch.trim() || [service.title, service.slug, ...service.aliases].some((value) => value.toLowerCase().includes(serviceSearch.trim().toLowerCase())))
+                      .map((service) => (
+                        <button
+                          key={service.slug}
+                          type="button"
+                          onClick={() => setJobData((previous) => ({ ...previous, service: service.slug }))}
+                          className={`p-4 rounded-2xl border-2 transition-all text-left ${jobData.service === service.slug ? "border-primary bg-primary/5 shadow-md" : "border-border bg-card hover:border-primary/30"}`}
+                        >
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: service.color || "#1E9E8A" }}>
+                            <Wrench className="w-5 h-5 text-white" />
+                          </div>
+                          <p className="font-medium text-sm">{service.title}</p>
+                        </button>
+                      ))}
+                  </div>
+                  {serviceSearch.trim() && !services.some((service) => [service.title, service.slug, ...service.aliases].some((value) => value.toLowerCase().includes(serviceSearch.trim().toLowerCase()))) && services.some((service) => service.slug === "other") && (
+                    <button type="button" onClick={() => {
+                      const query = serviceSearch.trim();
+                      setJobData((previous) => ({ ...previous, service: "other", problem: query, description: previous.description || `Requested service: ${query}` }));
+                      setStep(2);
+                    }} className="mt-4 w-full p-4 rounded-2xl border border-dashed border-primary/40 bg-card text-left hover:bg-primary/5 transition-colors flex items-center gap-3">
+                      <Sparkles className="w-5 h-5 text-primary shrink-0" />
+                      <span className="text-sm">Request “<span className="font-semibold">{serviceSearch.trim()}</span>” as a custom service. Provider availability and a quote must be confirmed.</span>
+                    </button>
+                  )}
+                  {serviceSearch.trim() && !services.some((service) => [service.title, service.slug, ...service.aliases].some((value) => value.toLowerCase().includes(serviceSearch.trim().toLowerCase()))) && !services.some((service) => service.slug === "other") && (
+                    <p className="mt-4 text-sm text-muted-foreground">The custom-service category is not enabled in this country. Retry the catalog or contact support.</p>
+                  )}
+                </>
               )}
             </motion.div>
           )}
@@ -743,7 +809,7 @@ const CreateJob = () => {
               )}
               {jobData.providerChoice === "company" && !jobData.companyId && (
                 <CompanyPickerInline
-                  service={jobData.service}
+                  service={services.find((service) => service.slug === jobData.service)?.title || jobData.service}
                   onPick={(id, name) => {
                     setJobData((prev) => ({ ...prev, companyId: id }));
                     setCompanyInfo({ id, companyName: name });
@@ -847,7 +913,7 @@ const CreateJob = () => {
                       <Wrench className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-semibold">{jobData.service}</p>
+                      <p className="font-semibold">{services.find((service) => service.slug === jobData.service)?.title || jobData.problem || jobData.service}</p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {jobData.urgency} • {urgencyOptions.find(u => u.id === jobData.urgency)?.description}
                       </p>

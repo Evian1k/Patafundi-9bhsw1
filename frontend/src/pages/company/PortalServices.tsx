@@ -2,10 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Wrench, X } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { useServiceCatalog } from "@/hooks/useServiceCatalog";
 
 interface Service { id: string; name: string; category: string; description?: string; base_price?: string | number; duration_minutes?: number; is_active: boolean }
 
 export default function PortalServices() {
+  const { services: catalog, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +15,7 @@ export default function PortalServices() {
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
-  const [form, setForm] = useState({ name: "", category: "plumbing", description: "", basePrice: "", durationMinutes: "" });
+  const [form, setForm] = useState({ name: "", category: "", description: "", basePrice: "", durationMinutes: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,8 +33,15 @@ export default function PortalServices() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!form.category && catalog.length > 0) setForm((current) => ({ ...current, category: catalog[0].slug }));
+  }, [form.category, catalog]);
 
   const add = async () => {
+    if (catalogLoading || catalogError || !catalog.some((item) => item.slug === form.category)) {
+      setNotice("Load the active service catalog and select a valid category before publishing.");
+      return;
+    }
     setBusy(true); setNotice(null);
     try {
       await apiClient.request("/company/portal/services", {
@@ -44,7 +53,7 @@ export default function PortalServices() {
         },
       });
       setAddOpen(false);
-      setForm({ name: "", category: "plumbing", description: "", basePrice: "", durationMinutes: "" });
+      setForm({ name: "", category: catalog[0]?.slug || "", description: "", basePrice: "", durationMinutes: "" });
       setNotice("Service published."); await load();
     } catch (e: unknown) {
       setNotice(e instanceof Error ? e.message : "Could not add service");
@@ -99,12 +108,15 @@ export default function PortalServices() {
             </div>
             <div>
               <label className="text-sm font-medium">Category *</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+              <select value={form.category} disabled={catalogLoading || !!catalogError || catalog.length === 0} onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm capitalize">
-                {["plumbing", "electrical", "hvac", "appliance_repair", "carpentry", "cleaning", "painting", "welding"].map((c) => (
-                  <option key={c} value={c}>{c.replace("_", " ")}</option>
+                {catalog.map((service) => (
+                  <option key={service.slug} value={service.slug}>{service.title}</option>
                 ))}
               </select>
+              {catalogLoading && <p className="mt-1 text-xs text-muted-foreground">Loading available categories…</p>}
+              {catalogError && <button type="button" onClick={retryCatalog} className="mt-1 text-xs text-destructive underline">Catalog unavailable. Tap to retry.</button>}
+              {!catalogLoading && !catalogError && catalog.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No active categories are available.</p>}
             </div>
             <div>
               <label className="text-sm font-medium">Base price (KES)</label>
@@ -122,7 +134,7 @@ export default function PortalServices() {
             <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="mt-1.5 w-full rounded-xl border bg-background px-3 py-2 text-sm" />
           </div>
-          <button onClick={add} disabled={busy || !form.name}
+          <button onClick={add} disabled={busy || !form.name || catalogLoading || !!catalogError || catalog.length === 0}
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Publish service
           </button>

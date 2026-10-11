@@ -32,7 +32,7 @@ import {
   spacing,
   borderRadius,
   gradients,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
   ScreenHeader,
 } from '@patafundi/shared';
 import type { PriceBreakdown } from '@patafundi/shared';
@@ -52,7 +52,12 @@ const COMPLEXITY_OPTIONS = [
 
 export function CreateJobScreen({ navigation, route }: any): JSX.Element {
   const preselected: string | undefined = route?.params?.category;
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
+  const [serviceSearch, setServiceSearch] = useState('');
   const [category, setCategory] = useState<string | null>(preselected ?? null);
+  const [customServiceName, setCustomServiceName] = useState('');
+  const selectedService = serviceCategories.find((service) => service.slug === category);
+  const quoteRequired = selectedService?.pricingMode === 'quote_required';
   const [description, setDescription] = useState('');
   const [complexity, setComplexity] = useState<'simple' | 'medium' | 'complex' | 'expert'>('simple');
   const [urgency, setUrgency] = useState<'normal' | 'emergency'>('normal');
@@ -69,8 +74,21 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
   const [priceAccepted, setPriceAccepted] = useState(false);
 
   useEffect(() => {
-    if (preselected) setCategory(preselected);
-  }, [preselected]);
+    if (!preselected || serviceCategories.length === 0) return;
+    const normalized = preselected.trim().toLowerCase();
+    const match = serviceCategories.find((service) =>
+      [service.slug, service.title, service.label, ...service.aliases].some((value) => value.toLowerCase() === normalized),
+    );
+    if (match) setCategory(match.slug);
+    else {
+      const other = serviceCategories.find((service) => service.slug === 'other');
+      if (other) {
+        setCategory(other.slug);
+        setCustomServiceName(preselected);
+        setDescription((current) => current || `Requested service: ${preselected}`);
+      }
+    }
+  }, [preselected, serviceCategories]);
 
   const detectLocation = async (): Promise<void> => {
     setLocating(true);
@@ -129,8 +147,12 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
 
   // ── Calculate platform price ──────────────────────────────
   const calculateQuote = async (): Promise<void> => {
-    if (!category) {
+    if (!category || !selectedService) {
       Alert.alert('Select category', 'Please choose a service category.');
+      return;
+    }
+    if (quoteRequired) {
+      Alert.alert('Provider quote required', 'This service has no configured automatic price. Submit the request to receive a provider quote.');
       return;
     }
     if (!description.trim()) {
@@ -162,8 +184,16 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
 
   // ── Post the job with accepted price ──────────────────────
   const handleSubmit = async (): Promise<void> => {
-    if (!priceQuote || !priceAccepted) {
+    if (!selectedService || catalogLoading || catalogError) {
+      Alert.alert('Service unavailable', 'Load the current service catalog and choose an available category before submitting.');
+      return;
+    }
+    if (!quoteRequired && (!priceQuote || !priceAccepted)) {
       Alert.alert('Accept price', 'Please calculate and accept the price first.');
+      return;
+    }
+    if (!category || !description.trim() || !coords) {
+      Alert.alert('Missing details', 'Choose a service, describe the work, and provide a location.');
       return;
     }
     setSubmitting(true);
@@ -175,6 +205,8 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
         latitude: coords!.latitude,
         longitude: coords!.longitude,
         address: address.trim() || undefined,
+        countryCode: 'KE',
+        requestedService: category === 'other' ? customServiceName.trim() || undefined : undefined,
       });
       if (photos.length > 0) {
         try {
@@ -183,7 +215,9 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
           // photos optional
         }
       }
-      Alert.alert('Job posted', 'Your job has been posted. We are matching a fundi.', [
+      Alert.alert('Request posted', quoteRequired
+        ? `Your ${selectedService.title} request is recorded. Provider availability and a quote must be confirmed.`
+        : 'Your request is posted. You can follow provider updates in the app.', [
         { text: 'Track', onPress: () => navigation.replace('JobTracking', { jobId: job.id }) },
       ]);
     } catch (e) {
@@ -194,7 +228,11 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
     }
   };
 
-  const canCalculate = category && description.trim() && coords;
+  const canCalculate = Boolean(category && selectedService && !catalogLoading && !catalogError && description.trim() && coords);
+  const filteredServices = serviceCategories.filter((service) =>
+    !serviceSearch.trim() || [service.title, service.slug, ...service.aliases].some((value) => value.toLowerCase().includes(serviceSearch.trim().toLowerCase())),
+  );
+  const otherService = serviceCategories.find((service) => service.slug === 'other');
 
   return (
     <ScrollView
@@ -205,27 +243,49 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       <ScreenHeader title="New Job" onBack={() => navigation.goBack()} />
 
       <Text style={styles.label}>Service category</Text>
+      <TextInput style={{ backgroundColor: colors.card, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, color: colors.text, marginBottom: spacing.sm }} value={serviceSearch} onChangeText={setServiceSearch} placeholder="Search services or describe something not listed" placeholderTextColor={colors.textSecondary} accessibilityLabel="Search services" />
+      {catalogLoading && <Text style={styles.hint} accessibilityLiveRegion="polite">Loading available services…</Text>}
+      {catalogError && <TouchableOpacity onPress={retryCatalog} accessibilityRole="button"><Text style={[styles.hint, { color: colors.error }]}>Service catalog unavailable. Tap to retry.</Text></TouchableOpacity>}
+      {!catalogLoading && !catalogError && serviceCategories.length === 0 && <Text style={styles.hint}>No services are currently available.</Text>}
       <View style={styles.grid}>
-        {SERVICE_CATEGORIES.map((cat) => {
+        {filteredServices.map((cat) => {
           const selected = category === cat.slug;
           return (
             <TouchableOpacity
               key={cat.slug}
               style={[styles.categoryCard, selected ? styles.categorySelected : null]}
-              onPress={() => { setCategory(cat.slug); setPriceQuote(null); }}
+              onPress={() => {
+                setCategory(cat.slug);
+                setCustomServiceName(cat.slug === 'other' ? serviceSearch.trim() : '');
+                setPriceQuote(null);
+                setPriceAccepted(false);
+              }}
             >
               <Ionicons
                 name={cat.icon as any}
                 size={24}
-                color={selected ? colors.primary : cat.color}
+                color={selected ? colors.primary : cat.color || colors.textSecondary}
               />
               <Text style={[styles.categoryLabel, selected ? styles.categoryLabelSelected : null]}>
                 {cat.label}
               </Text>
+              {cat.pricingMode === 'quote_required' && <Text style={styles.hint}>Provider quote required</Text>}
             </TouchableOpacity>
           );
         })}
       </View>
+      {!catalogLoading && !catalogError && serviceSearch.trim() && filteredServices.length === 0 && otherService && (
+        <TouchableOpacity style={{ backgroundColor: colors.card, borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.primary, marginBottom: spacing.md }} onPress={() => {
+          setCategory(otherService.slug);
+          setCustomServiceName(serviceSearch.trim());
+          setDescription((current) => current.trim() ? current : `Requested service: ${serviceSearch.trim()}`);
+          setPriceQuote(null);
+          setPriceAccepted(false);
+        }} accessibilityRole="button">
+          <Text style={styles.categoryLabel}>Request “{serviceSearch.trim()}” as a custom service</Text>
+          <Text style={styles.hint}>A provider must confirm availability and send a quote; no price is estimated here.</Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.label}>Description</Text>
       <TextInput
@@ -240,7 +300,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       />
 
       <Text style={styles.label}>Complexity</Text>
-      <Text style={styles.hint}>Affects the base price - be honest for accurate quotes</Text>
+      <Text style={styles.hint}>{quoteRequired ? 'Share the details a provider will need to prepare a quote.' : 'Affects the base price - be honest for accurate quotes.'}</Text>
       <View style={styles.complexityGrid}>
         {COMPLEXITY_OPTIONS.map((opt) => {
           const selected = complexity === opt.value;
@@ -354,7 +414,19 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
       ) : null}
 
       {/* ── Action Buttons ──────────────────────────────────── */}
-      {!priceQuote ? (
+      {quoteRequired ? (
+        <View>
+          <View style={styles.priceCard}>
+            <Text style={styles.priceTitle}>Provider quote required</Text>
+            <Text style={styles.priceTrust}>This service has no configured automatic price. Your request will not be shown as priced until an eligible provider sends a quote.</Text>
+          </View>
+          <TouchableOpacity onPress={handleSubmit} disabled={!canCalculate || submitting} activeOpacity={0.85}>
+            <LinearGradient colors={canCalculate ? [gradients.primary.start, gradients.primary.end] : ['#E7E5E4', '#E7E5E4']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.btn}>
+              {submitting ? <ActivityIndicator color={colors.primaryForeground} /> : <><Ionicons name="send-outline" size={20} color={colors.textLight} /><Text style={styles.btnText}>Request provider quote</Text></>}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : !priceQuote ? (
         <TouchableOpacity onPress={calculateQuote} disabled={!canCalculate || calculating} activeOpacity={0.85}>
           <LinearGradient
             colors={canCalculate ? [gradients.accent.start, gradients.accent.end] : ['#E7E5E4', '#E7E5E4']}
@@ -424,7 +496,7 @@ export function CreateJobScreen({ navigation, route }: any): JSX.Element {
 
       <Text style={styles.platformNote}>
         <Ionicons name="shield-checkmark-outline" size={12} color={colors.textSecondary} />
-        {'  '}Final price includes everything. No hidden fees, no surprises.
+        {'  '}{quoteRequired ? 'No price is shown until a provider sends a quote.' : 'Final price includes everything. No hidden fees, no surprises.'}
       </Text>
     </ScrollView>
   );

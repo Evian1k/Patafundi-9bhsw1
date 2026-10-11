@@ -10,7 +10,7 @@ import {
   Repeat,
   Star,
   Building2,
-  Newspaper
+  Newspaper, Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import NotificationBell from "@/components/system/NotificationBell";
@@ -48,6 +48,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: AlertTriangle, label: "Security", path: "/admin/security", color: "text-red-500" },
   { icon: BarChart3, label: "Reports", path: "/admin/reports", color: "text-cyan-500" },
   { icon: Newspaper, label: "Content", path: "/admin/content", color: "text-pink-500" },
+  { icon: Wrench, label: "Service Catalog", path: "/admin/service-catalog", color: "text-teal-500" },
   { icon: Settings, label: "Settings", path: "/admin/settings", color: "text-muted-foreground" },
   { icon: FileText, label: "Audit Logs", path: "/admin/audit-logs", color: "text-indigo-500" },
 ];

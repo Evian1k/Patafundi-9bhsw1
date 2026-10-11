@@ -13,6 +13,7 @@ import { config } from '../config.js';
 import { emitEvent } from '../realtime.js';
 import { recordTimelineEvent } from '../services/timelineService.js';
 import { sanitizePaymentForParty } from '../services/financialConfidentialityService.js';
+import { logNonFatal } from '../utils/logError.js';
 import {
   markCommissionPaymentReceived,
   isWebhookReplay,
@@ -34,21 +35,122 @@ function callbackMetadataValue(callback, name) {
   return metadata.find((item) => item.Name === name)?.Value;
 }
 
+export async function recordUnexpectedSuccessfulPayment(client, {
+  payment,
+  receipt = null,
+  providerAmount = null,
+  reason = 'another payment is already applied or the job cannot accept payment',
+  force = false,
+  providerResponse,
+  checkoutRequestId,
+  rawBody,
+}) {
+  const jobResult = await client.query('select * from jobs where id = $1 for update', [payment.job_id]);
+  const job = jobResult.rows[0];
+  if (!job) throw notFound('Job not found for confirmed payment');
+  const otherPayment = await client.query(
+    `select id from payments
+     where job_id = $1 and id <> $2 and status in ('completed', 'reconciliation_required')
+     order by created_at limit 1 for update`,
+    [payment.job_id, payment.id],
+  );
+  const jobAlreadyPaid = ['escrow_held', 'payout_processing', 'payout_completed', 'refunded'].includes(job.payment_status)
+    || ['held', 'released', 'refunded'].includes(job.escrow_status)
+    || ['cancelled', 'failed'].includes(job.status)
+    || otherPayment.rows.length > 0;
+  if (!force && !jobAlreadyPaid) return null;
+
+  const previousProviderResponse = typeof payment.provider_response === 'string'
+    ? JSON.parse(payment.provider_response || '{}')
+    : (payment.provider_response || {});
+  const storedProviderResponse = {
+    ...previousProviderResponse,
+    providerCallback: providerResponse && typeof providerResponse === 'object' ? providerResponse : null,
+    reconciliationReason: reason,
+  };
+
+  const updated = await client.query(
+    `update payments set status = 'reconciliation_required', escrow_status = 'pending',
+       mpesa_receipt_number = case when exists (
+         select 1 from payments p where p.mpesa_receipt_number = $2 and p.id <> $1
+       ) then null else $2 end,
+       provider_amount = $3, provider_response = $4::jsonb, paid_at = now(), updated_at = now()
+     where id = $1 and status = $5 returning *`,
+    [payment.id, receipt, providerAmount, JSON.stringify(storedProviderResponse), payment.status],
+  );
+  if (!updated.rows[0]) throw new Error('Confirmed payment could not be moved to reconciliation');
+
+  const data = JSON.stringify({ jobId: payment.job_id, paymentId: payment.id });
+  await client.query(
+    `insert into notifications (user_id, type, title, body, data)
+     values ($1, 'payment_reconciliation_required', 'Payment needs review',
+       'We received a payment but could not apply it to this job. Do not pay again; our finance team will review it.', $2::jsonb)`,
+    [payment.customer_id, data],
+  );
+  await client.query(
+    `insert into notifications (user_id, type, title, body, data)
+     select u.id, 'payment_reconciliation_required', 'Payment needs reconciliation',
+       'A provider-confirmed payment could not be applied to its job. Review the payment before any refund or settlement.',
+       $1::jsonb
+     from users u
+     where u.status = 'active'
+       and (u.role in ('admin', 'super_admin') or exists (
+         select 1 from role_permissions rp
+         where rp.role = u.role and rp.permission_code = 'can_reconcile_payments'
+       ))`,
+    [data],
+  );
+  await client.query(
+    `insert into audit_logs (user_id, action, entity_type, entity_id, metadata)
+     values (null, 'payment.reconciliation_required', 'payment', $1, $2::jsonb)`,
+    [payment.id, JSON.stringify({ jobId: payment.job_id, expectedAmount: payment.amount, providerAmount, reason })],
+  );
+  const receiptAlreadyRecorded = await client.query(
+    `select id from processed_webhook_callbacks
+     where mpesa_receipt_number = $1 and checkout_request_id <> $2 limit 1`,
+    [receipt, checkoutRequestId],
+  );
+  await recordWebhookProcessed({
+    checkoutRequestId,
+    receipt: receiptAlreadyRecorded.rows[0] ? null : receipt,
+    paymentId: payment.id,
+    rawBody,
+    client,
+  });
+  return { ...updated.rows[0], reconciliationRequired: true };
+}
+
 export async function stkPush(req, res) {
   const { jobId, mpesaNumber, amount, idempotencyKey = req.get('Idempotency-Key') } = req.body || {};
   if (!jobId || !mpesaNumber) throw badRequest('Job and M-Pesa number are required');
   const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
   const key = idempotencyKey || crypto.randomUUID();
-  const payment = await transaction(async (client) => {
+  const reservation = await transaction(async (client) => {
     const duplicate = await client.query('select * from payments where idempotency_key = $1', [key]);
-    if (duplicate.rows[0]) return duplicate.rows[0];
+    if (duplicate.rows[0]) {
+      if (String(duplicate.rows[0].job_id) !== String(jobId)
+          || (duplicate.rows[0].customer_id !== req.user.id && req.user.role !== 'admin')) {
+        throw forbidden('This idempotency key belongs to another payment request');
+      }
+      return { payment: duplicate.rows[0], duplicate: true };
+    }
     const jobResult = await client.query('select * from jobs where id = $1 for update', [jobId]);
     const job = jobResult.rows[0];
     if (!job) throw notFound('Job not found');
     if (job.customer_id !== req.user.id && req.user.role !== 'admin') throw forbidden('Only the job customer can pay for this job');
     if (['cancelled', 'failed'].includes(job.status)) throw badRequest('Cannot pay for a cancelled or failed job');
-    if (['escrow_held', 'payout_processing', 'payout_completed'].includes(job.payment_status)) {
+    if (['escrow_held', 'payout_processing', 'payout_completed', 'refunded'].includes(job.payment_status)
+        || ['released', 'refunded'].includes(job.escrow_status)) {
       throw badRequest('This job has already been paid');
+    }
+    const activePayment = await client.query(
+      `select id, status from payments
+       where job_id = $1 and status in ('pending', 'completed', 'reconciliation_required')
+       order by created_at desc limit 1 for update`,
+      [jobId],
+    );
+    if (activePayment.rows[0]) {
+      throw badRequest('A payment attempt is already pending or has been received. Do not start another payment.');
     }
     const expectedAmount = parsePositiveAmount(job.final_price || job.estimated_price || amount);
     const requestedAmount = parsePositiveAmount(amount || expectedAmount);
@@ -81,8 +183,31 @@ export async function stkPush(req, res) {
         JSON.stringify(commission.details),
       ],
     );
-    return inserted.rows[0];
+    return { payment: inserted.rows[0], duplicate: false };
   });
+  const { payment, duplicate } = reservation;
+
+  if (duplicate) {
+    if (payment.status === 'pending') {
+      return res.status(202).json({
+        success: true, paymentId: payment.id, status: payment.status,
+        checkoutRequestId: payment.checkout_request_id || null, duplicate: true,
+      });
+    }
+    if (payment.status === 'completed') {
+      return res.status(200).json({ success: true, paymentId: payment.id, status: payment.status, alreadyPaid: true });
+    }
+    if (payment.status === 'reconciliation_required') {
+      return res.status(202).json({
+        success: true, paymentId: payment.id, status: payment.status,
+        message: 'This payment is under review. Do not start another payment for this job.',
+      });
+    }
+    return res.status(409).json({
+      success: false, paymentId: payment.id, status: payment.status,
+      message: payment.failure_reason || 'This payment attempt ended. Start a new attempt if you still need to pay.',
+    });
+  }
 
   // ── Development payment provider (honest, clearly-labelled simulator) ──
   // When M-Pesa/Daraja credentials are absent OUTSIDE production, the payment
@@ -129,12 +254,67 @@ export async function stkPush(req, res) {
     });
   }
 
-  const daraja = await initiateStkPush({
-    phone: mpesaNumber,
-    amount: payment.amount,
-    accountReference: `JOB-${jobId}`,
-    transactionDesc: `PataFundi escrow payment for job ${jobId}`,
-  });
+  let daraja;
+  try {
+    daraja = await initiateStkPush({
+      phone: mpesaNumber,
+      amount: payment.amount,
+      accountReference: `JOB-${jobId}`,
+      transactionDesc: `PataFundi escrow payment for job ${jobId}`,
+    });
+  } catch (error) {
+    const outcome = ['not_dispatched', 'rejected'].includes(error.providerOutcome)
+      ? error.providerOutcome
+      : 'unknown';
+    const unresolved = outcome === 'unknown';
+    const nextStatus = unresolved ? 'reconciliation_required' : 'failed';
+    const safeMessage = unresolved
+      ? 'We could not confirm whether M-Pesa accepted this payment request. Do not try again until its status has been reviewed.'
+      : 'M-Pesa did not accept this payment request. You can safely try again.';
+    const checkoutRequestId = typeof error.meta?.CheckoutRequestID === 'string' && error.meta.CheckoutRequestID.length <= 128
+      ? error.meta.CheckoutRequestID
+      : null;
+    const merchantRequestId = typeof error.meta?.MerchantRequestID === 'string' && error.meta.MerchantRequestID.length <= 128
+      ? error.meta.MerchantRequestID
+      : null;
+    const providerResponse = JSON.stringify({
+      provider: 'mpesa',
+      stage: 'stk_initiation',
+      outcome,
+      providerCode: error.meta?.ResponseCode ?? error.meta?.errorCode ?? null,
+      checkoutRequestId,
+      merchantRequestId,
+      message: String(error.message || 'Provider request failed').slice(0, 200),
+    });
+    await transaction(async (client) => {
+      const locked = await client.query('select * from payments where id = $1 for update', [payment.id]);
+      if (!locked.rows[0] || locked.rows[0].status !== 'pending') return;
+      await client.query(
+        `update payments set status = $2, failure_reason = $3, provider_response = $4::jsonb,
+           checkout_request_id = coalesce($5, checkout_request_id),
+           merchant_request_id = coalesce($6, merchant_request_id), updated_at = now()
+         where id = $1`,
+        [payment.id, nextStatus, safeMessage, providerResponse, checkoutRequestId, merchantRequestId],
+      );
+      if (unresolved) {
+        await client.query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'payment_review_required', 'Payment status needs review', $2, $3::jsonb)`,
+          [payment.customer_id, safeMessage, JSON.stringify({ jobId, paymentId: payment.id, status: nextStatus })],
+        );
+      }
+      await client.query(
+        `insert into audit_logs (user_id, action, entity_type, entity_id, metadata)
+         values ($1, $2, 'payment', $3, $4::jsonb)`,
+        [req.user.id, unresolved ? 'payment.stk_outcome_unknown' : 'payment.stk_rejected', payment.id,
+          JSON.stringify({ jobId, outcome, providerCode: error.meta?.ResponseCode ?? error.meta?.errorCode ?? null })],
+      );
+    });
+    if (unresolved) {
+      return res.status(202).json({ success: false, paymentId: payment.id, status: nextStatus, message: safeMessage });
+    }
+    return res.status(502).json({ success: false, paymentId: payment.id, status: nextStatus, message: safeMessage });
+  }
 
   await query(
     `update payments set checkout_request_id = $2, merchant_request_id = $3, provider_response = $4, updated_at = now()
@@ -166,7 +346,23 @@ export async function webhook(req, res) {
   const payment = await transaction(async (client) => {
     if (await isWebhookReplay({ checkoutRequestId, receipt: receiptPreview, rawBody: req.rawBody, client })) {
       const existing = await client.query('select * from payments where checkout_request_id = $1', [checkoutRequestId]);
+      if (existing.rows[0]?.job_id && existing.rows[0]?.status === 'completed') {
+        const { enqueueSettlementRelease } = await import('../services/settlementService.js');
+        await enqueueSettlementRelease(client, {
+          jobId: existing.rows[0].job_id,
+          paymentId: existing.rows[0].id,
+          source: 'verified_payment_webhook_replay',
+        });
+      }
       return existing.rows[0] || { status: 'completed' };
+    }
+    const paymentLookup = await client.query(
+      'select id, job_id from payments where checkout_request_id = $1',
+      [checkoutRequestId],
+    );
+    if (paymentLookup.rows[0]?.job_id) {
+      // Keep lock ordering consistent with settlement: job first, then payment.
+      await client.query('select id from jobs where id = $1 for update', [paymentLookup.rows[0].job_id]);
     }
     const paymentResult = await client.query('select * from payments where checkout_request_id = $1 for update', [checkoutRequestId]);
     let row = paymentResult.rows[0];
@@ -221,20 +417,55 @@ export async function webhook(req, res) {
       );
       return { status: 'failed', subscription: true, fundiId: sub.fundi_id };
     }
-    if (row.status === 'completed') return row;
-    if (row.status !== 'pending') return row;
+    if (row.status === 'completed') {
+      const { enqueueSettlementRelease } = await import('../services/settlementService.js');
+      await enqueueSettlementRelease(client, {
+        jobId: row.job_id,
+        paymentId: row.id,
+        source: 'verified_payment_webhook_replay',
+      });
+      return row;
+    }
+    const providerResponse = typeof row.provider_response === 'string'
+      ? JSON.parse(row.provider_response || '{}')
+      : (row.provider_response || {});
+    const isUncertainInitiation = row.status === 'reconciliation_required'
+      && providerResponse.stage === 'stk_initiation'
+      && providerResponse.outcome === 'unknown';
+    const noChargeReviews = Array.isArray(providerResponse.reconciliationReviews)
+      ? providerResponse.reconciliationReviews.filter((review) => review.action === 'confirm_no_charge')
+      : [];
+    const wasClearedForRetry = row.status === 'failed'
+      && providerResponse.stage === 'stk_initiation'
+      && noChargeReviews.length > 0;
+    if (row.status !== 'pending' && !isUncertainInitiation && !wasClearedForRetry) return row;
     if (resultCode === 0) {
       const receipt = callbackMetadataValue(callback, 'MpesaReceiptNumber') || callback.MpesaReceiptNumber;
-      const paidAmount = Number(callbackMetadataValue(callback, 'Amount') ?? callback.Amount ?? row.amount);
-      if (!receipt) throw badRequest('MpesaReceiptNumber missing');
-      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - Number(row.amount)) > 0.01) {
-        throw badRequest('Callback amount does not match pending payment');
-      }
+      const rawPaidAmount = callbackMetadataValue(callback, 'Amount') ?? callback.Amount;
+      const paidAmount = rawPaidAmount == null ? Number.NaN : Number(rawPaidAmount);
+      const reconciliationReason = !receipt
+        ? 'provider_receipt_missing'
+        : !Number.isFinite(paidAmount) || paidAmount <= 0
+          ? 'provider_amount_missing_or_invalid'
+          : Math.abs(paidAmount - Number(row.amount)) > 0.01
+            ? 'provider_amount_mismatch'
+            : null;
+      const reconciliation = await recordUnexpectedSuccessfulPayment(client, {
+        payment: row,
+        receipt,
+        providerAmount: Number.isFinite(paidAmount) ? paidAmount : null,
+        reason: reconciliationReason || (wasClearedForRetry ? 'late_success_after_no_charge_review' : undefined),
+        force: Boolean(reconciliationReason || wasClearedForRetry),
+        providerResponse: req.body,
+        checkoutRequestId,
+        rawBody: req.rawBody,
+      });
+      if (reconciliation) return reconciliation;
       const updated = await client.query(
         `update payments set status = 'completed', escrow_status = 'held', mpesa_receipt_number = $2,
-          provider_response = $3, paid_at = now(), updated_at = now()
-         where id = $1 and status = 'pending' returning *`,
-        [row.id, receipt, JSON.stringify(req.body)],
+          provider_amount = $3, provider_response = $4, paid_at = now(), updated_at = now()
+         where id = $1 and status = any($5::text[]) returning *`,
+        [row.id, receipt, paidAmount, JSON.stringify(req.body), [row.status]],
       );
       if (!updated.rows[0]) return row;
       await client.query(
@@ -290,14 +521,24 @@ export async function webhook(req, res) {
          values ($1, 'payment_made', $2::jsonb)`,
         [row.job_id, JSON.stringify({ paymentId: row.id, amount: row.amount, receipt })],
       );
+      const { enqueueSettlementRelease } = await import('../services/settlementService.js');
+      await enqueueSettlementRelease(client, {
+        jobId: row.job_id,
+        paymentId: row.id,
+        source: 'verified_payment_webhook',
+      });
       return updated.rows[0];
     }
     const failed = await client.query(
       `update payments set status = 'failed', failure_reason = $2, provider_response = $3, updated_at = now()
-       where id = $1 returning *`,
-      [row.id, callback.ResultDesc || 'M-Pesa payment failed', JSON.stringify(req.body)],
+       where id = $1 and status = any($4::text[]) returning *`,
+      [row.id, callback.ResultDesc || 'M-Pesa payment failed', JSON.stringify(req.body), [row.status]],
     );
-    return failed.rows[0];
+    if (failed.rows[0]) {
+      await recordWebhookProcessed({ checkoutRequestId, receipt: receiptPreview, paymentId: row.id, rawBody: req.rawBody, client });
+      return failed.rows[0];
+    }
+    return row;
   });
 
   if (payment.subscription) {
@@ -316,9 +557,43 @@ export async function webhook(req, res) {
     return res.json({ success: true });
   }
 
+  if (payment.status === 'reconciliation_required' || payment.reconciliationRequired) {
+    emitEvent('payment:reconciliation_required', {
+      jobId: payment.job_id,
+      paymentId: payment.id,
+      status: 'reconciliation_required',
+    }, `user:${payment.customer_id}`);
+    return res.status(202).json({
+      success: true,
+      paymentId: payment.id,
+      status: 'reconciliation_required',
+      message: 'The payment was received but needs review before it can be applied. Do not pay again for this job.',
+    });
+  }
+
   if (payment.status === 'completed') {
     emitEvent('payment:confirmed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
     emitEvent('escrow:held', { jobId: payment.job_id, paymentId: payment.id, amount: payment.amount }, `job:${payment.job_id}`);
+    if (payment.job_id) {
+      const job = (await query(
+        'select status, customer_completion_confirmed, escrow_status from jobs where id = $1',
+        [payment.job_id],
+      )).rows[0];
+      if (job?.customer_completion_confirmed && job.escrow_status !== 'released'
+          && ['payment_pending', 'customer_confirmed_completion', 'completed'].includes(job.status)) {
+        try {
+          const { releaseJobEscrow } = await import('../services/settlementService.js');
+          await releaseJobEscrow({
+            jobId: payment.job_id,
+            paymentId: payment.id,
+            actorRole: 'system',
+            source: 'verified_payment_webhook',
+          });
+        } catch (error) {
+          logNonFatal('payments.webhook.completionSettlement', error, { jobId: payment.job_id });
+        }
+      }
+    }
   } else {
     emitEvent('payment:failed', { jobId: payment.job_id, payment }, `job:${payment.job_id}`);
   }
@@ -561,4 +836,104 @@ export async function financeReconciliation(req, res) {
     completedPaymentsMissingEscrow: mismatchCount.rows[0]?.total || 0,
     note: 'Completed payments must each have exactly one escrow hold. Investigate any day where commission booked does not match payment commission.',
   });
+}
+
+// ── Explicit human review for provider-unknown or unapplied payments ─────────
+export async function listPaymentReconciliations(_req, res) {
+  const result = await query(
+    `select p.id, p.job_id, j.booking_number, p.customer_id,
+            coalesce(u.full_name, u.email) as customer_name,
+            p.amount, p.currency, p.provider, p.provider_amount, p.escrow_status,
+            p.provider_response->>'stage' as provider_stage,
+            p.provider_response->>'outcome' as provider_outcome,
+            p.provider_response->>'reconciliationReason' as reconciliation_reason,
+            p.provider_response->>'message' as provider_message,
+            p.created_at
+       from payments p
+       left join jobs j on j.id = p.job_id
+       left join users u on u.id = p.customer_id
+      where p.status = 'reconciliation_required'
+      order by p.created_at asc
+      limit 200`,
+  );
+  res.json({ success: true, reconciliations: result.rows });
+}
+
+export async function reviewPaymentReconciliation(req, res) {
+  const { action, evidenceReference, notes } = req.body || {};
+  if (!['record_review', 'confirm_no_charge'].includes(action)) {
+    throw badRequest('action must be record_review or confirm_no_charge');
+  }
+  const evidence = String(evidenceReference || '').trim();
+  if (evidence.length < 3 || evidence.length > 200) {
+    throw badRequest('A provider or case evidence reference between 3 and 200 characters is required');
+  }
+  const reviewNotes = String(notes || '').trim().slice(0, 1000);
+
+  const updated = await transaction(async (client) => {
+    const selected = await client.query('select * from payments where id = $1 for update', [req.params.paymentId]);
+    const payment = selected.rows[0];
+    if (!payment) throw notFound('Payment not found');
+    if (payment.status !== 'reconciliation_required') throw badRequest('This payment is not awaiting reconciliation');
+    if (action === 'confirm_no_charge') {
+      const response = typeof payment.provider_response === 'string'
+        ? JSON.parse(payment.provider_response || '{}')
+        : (payment.provider_response || {});
+      const callback = response.providerCallback?.Body?.stkCallback
+        || response.providerCallback?.stkCallback
+        || response.providerCallback
+        || response.Body?.stkCallback
+        || response.stkCallback
+        || response;
+      if (String(callback.ResultCode ?? callback.resultCode ?? '') === '0') {
+        throw badRequest('The provider already reported this charge as successful; it cannot be marked unpaid');
+      }
+      if (['held', 'released', 'refunded'].includes(payment.escrow_status)) {
+        throw badRequest('A payment with an escrow movement cannot be marked as unpaid');
+      }
+      const held = await client.query(
+        `select 1 from escrow_transactions where payment_id = $1 and type = 'hold' and status in ('held', 'released') limit 1`,
+        [payment.id],
+      );
+      if (held.rows[0]) throw badRequest('A payment with a recorded escrow hold cannot be marked as unpaid');
+    }
+
+    const response = typeof payment.provider_response === 'string'
+      ? JSON.parse(payment.provider_response || '{}')
+      : (payment.provider_response || {});
+    const review = {
+      action,
+      evidenceReference: evidence,
+      notes: reviewNotes || null,
+      reviewedBy: req.user.id,
+      reviewedAt: new Date().toISOString(),
+    };
+    const reviews = Array.isArray(response.reconciliationReviews) ? response.reconciliationReviews : [];
+    const nextResponse = { ...response, reconciliationReviews: [...reviews, review].slice(-20) };
+    const nextStatus = action === 'confirm_no_charge' ? 'failed' : 'reconciliation_required';
+    const failureReason = action === 'confirm_no_charge'
+      ? 'Finance verified that the provider did not charge this payment; a new attempt is allowed.'
+      : payment.failure_reason;
+    const row = await client.query(
+      `update payments set status = $2, failure_reason = $3, provider_response = $4::jsonb, updated_at = now()
+       where id = $1 returning id, job_id, customer_id, status, amount, currency, provider_amount, updated_at`,
+      [payment.id, nextStatus, failureReason, JSON.stringify(nextResponse)],
+    );
+    await client.query(
+      `insert into audit_logs (user_id, action, entity_type, entity_id, metadata)
+       values ($1, 'payment.reconciliation_reviewed', 'payment', $2, $3::jsonb)`,
+      [req.user.id, payment.id, JSON.stringify({ decision: action, evidenceReference: evidence, notes: reviewNotes || null, previousStatus: payment.status, newStatus: nextStatus })],
+    );
+    if (action === 'confirm_no_charge') {
+      await client.query(
+        `insert into notifications (user_id, type, title, body, data)
+         values ($1, 'payment_review_resolved', 'Payment review complete',
+           'Finance confirmed that no M-Pesa charge was made. You may start a new payment request.', $2::jsonb)`,
+        [payment.customer_id, JSON.stringify({ jobId: payment.job_id, paymentId: payment.id, status: nextStatus })],
+      );
+    }
+    return row.rows[0];
+  });
+
+  res.json({ success: true, payment: updated });
 }

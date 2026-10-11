@@ -1,6 +1,6 @@
 # PataFundi
 
-A production-grade on-demand home services marketplace connecting customers with verified individual fundis and professional service companies across Kenya. **One project. One codebase. One ecosystem.**
+A Kenya-first on-demand home services marketplace connecting customers with individual fundis and professional service companies. **One monorepo. Shared platform core. Separate web and native mobile experiences.**
 
 ## Project Structure (one monorepo)
 
@@ -11,7 +11,7 @@ patafundi/
 │   ├── src/routes.js         All /api/* routes
 │   ├── src/controllers/      Auth, jobs, payments, companies, staff, admin…
 │   ├── src/services/         Money, matching, fraud, errors, notifications…
-│   └── migrations/           33 SQL migrations (001–033)
+│   └── migrations/           46 SQL migration files
 ├── frontend/                 React 18 + Vite + shadcn/ui + Tailwind — THE web app
 │   └── src/
 │       ├── pages/            Customer, Fundi, Company portal, Technician, Staff
@@ -64,7 +64,7 @@ npm run dev          # backend :4000 + frontend :3000 concurrently
 Demo login for every role (password `PataFundi#2026`):
 `customer.demo@` `fundi.demo@` `company.demo@` `dispatcher.demo@` `technician.demo@` `operations.demo@` `support.demo@` `finance.demo@` `fraud.demo@` `devops.demo@` `auditor.demo@` `admin.demo@patafundi.test` — full list in [DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md).
 
-## The five experiences (one app, role-aware)
+## Product experiences on the shared platform
 
 | Experience | Entry | Highlights |
 |---|---|---|
@@ -87,9 +87,11 @@ Staff triage everything in **Staff Portal → DevOps → Error Logs**.
 | Command | What it does |
 |---|---|
 | `npm run dev` | backend (:4000) + frontend (:3000) together |
-| `npm test` | backend unit suite (82 tests) |
+| `npm test` | sequential backend suite against a disposable PGlite database |
 | `npm run test:e2e` | end-to-end API suite |
 | `npm run typecheck` | TypeScript check for the frontend |
+| `cd apps/customer-mobile && npm run typecheck` | Customer Expo app TypeScript check |
+| `cd apps/fundi-mobile && npm run typecheck` | Fundi Expo app TypeScript check |
 | `npm run build` | production frontend bundle |
 | `npm run db:push` | migrate + seed demo data (run BEFORE `dev`, server stopped) |
 

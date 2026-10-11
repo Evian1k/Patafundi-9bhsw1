@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { isLocalDatabaseUrl } from './pg-config.js';
 
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+const isTestMode = process.env.PATAFUNDI_TEST_MODE === '1';
 
 // ── .env resolution is cwd-INDEPENDENT ────────────────────────────────
 // The backend can now be started from two places:
@@ -29,7 +30,7 @@ const CWD_ENV_PATH = path.join(process.cwd(), '.env');
  * secrets come from Render's dashboard.
  */
 function ensureDevEnvFile() {
-  if (isProduction) return;
+  if (isProduction || isTestMode) return;
   // Auto-create ONLY at the repo root (never a stray backend/.env), and only
   // when no .env exists anywhere we would look.
   const envPath = ROOT_ENV_PATH;
@@ -72,7 +73,7 @@ ensureDevEnvFile();
 
 // Load .env with override: true so .env values beat inherited env vars.
 // Repo-root .env loads first; a cwd-local .env (backend/ dev override) layers on top.
-if (!isProduction) {
+if (!isProduction && !isTestMode) {
   dotenv.config({ override: true, path: ROOT_ENV_PATH });
   if (CWD_ENV_PATH !== ROOT_ENV_PATH && fs.existsSync(CWD_ENV_PATH)) {
     dotenv.config({ override: true, path: CWD_ENV_PATH });

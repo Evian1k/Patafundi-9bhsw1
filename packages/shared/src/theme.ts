@@ -230,36 +230,8 @@ export const animations = {
   screen: { duration: 300, type: 'slide' as const },
 } as const;
 
-// ── Service Categories (premium Ionicons names, NO emoji) ─────
-// Each icon maps to @expo/vector-icons Ionicons name.
-export const SERVICE_CATEGORIES = [
-  { slug: 'plumbing',           label: 'Plumbing',          icon: 'water',          color: '#3B82F6' },
-  { slug: 'electrical',         label: 'Electrical',        icon: 'flash',          color: '#F59E0B' },
-  { slug: 'carpentry',          label: 'Carpentry',         icon: 'build',          color: '#92400E' },
-  { slug: 'cleaning',           label: 'Cleaning',          icon: 'sparkles',       color: '#1E9E8A' },
-  { slug: 'painting',           label: 'Painting',          icon: 'color-palette',  color: '#8B5CF6' },
-  { slug: 'hvac',               label: 'AC & HVAC',         icon: 'snow',           color: '#06B6D4' },
-  { slug: 'roofing',            label: 'Roofing',           icon: 'home',           color: '#DC2626' },
-  { slug: 'welding',            label: 'Welding',           icon: 'flame',          color: '#EA580C' },
-  { slug: 'appliance-repair',   label: 'Appliance Repair',  icon: 'construct',      color: '#64748B' },
-  { slug: 'pest-control',       label: 'Pest Control',      icon: 'bug',            color: '#84CC16' },
-  { slug: 'masonry',            label: 'Masonry',           icon: 'cube',           color: '#78716C' },
-  { slug: 'gardening',          label: 'Gardening',         icon: 'leaf',           color: '#27A35F' },
-  { slug: 'moving-services',    label: 'Moving',            icon: 'cube-box',       color: '#F97316' },
-  { slug: 'vehicle-services',   label: 'Vehicle',           icon: 'car',            color: '#0EA5E9' },
-] as const;
 
 // ── Job Status ────────────────────────────────────────────────
-export const JOB_STATUS_LABELS: Record<string, string> = {
-  matching: 'Finding Fundi',
-  accepted: 'Fundi On The Way',
-  in_progress: 'Work In Progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  failed: 'Failed',
-  disputed: 'Disputed',
-} as const;
-
 export const JOB_STATUS_COLORS: Record<string, string> = {
   pending: '#F59E0B',
   matching: '#F59E0B',

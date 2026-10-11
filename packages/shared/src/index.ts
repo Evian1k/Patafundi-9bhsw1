@@ -3,6 +3,7 @@ export * from './theme';
 export * from './types';
 export * from './socketEvents';
 export * from './authStore';
+export * from './useServiceCatalog';
 export * from './components/ui';
 export * from './components/ScreenHeader';
 export * from './components/InfoPageScreen';

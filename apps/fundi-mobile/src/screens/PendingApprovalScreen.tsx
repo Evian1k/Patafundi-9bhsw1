@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiClient, colors, fonts, fontSize, spacing, borderRadius, gradients } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-type ApprovalState = 'checking' | 'pending' | 'rejected' | 'error';
+type ApprovalState = 'checking' | 'pending' | 'rejected' | 'not_registered' | 'error';
 
 export function PendingApprovalScreen(): JSX.Element {
   const logout = useAuthStore((s) => s.logout);
@@ -35,11 +35,16 @@ export function PendingApprovalScreen(): JSX.Element {
       } else if (status === 'rejected') {
         setState('rejected');
         setMessage(data?.message ?? 'Your application was not approved. Please contact support.');
+      } else if (status === 'not_registered') {
+        setState('not_registered');
+        setMessage(data?.message ?? 'No Fundi application is associated with this account. Sign out and register as a Fundi, or contact support.');
       } else {
         setState('pending');
         setMessage(data?.message ?? 'Our team is reviewing your application.');
       }
-    } catch {
+    } catch (error) {
+      const apiError = error as { code?: string; status?: number };
+      if (apiError.code === 'SESSION_EXPIRED' || apiError.status === 401) return;
       setState('error');
       setMessage('Could not reach the server. Tap refresh to try again.');
     } finally {
@@ -68,8 +73,12 @@ export function PendingApprovalScreen(): JSX.Element {
     ]);
   };
 
-  const heading = state === 'rejected' ? 'Application Not Approved' : 'Application Under Review';
-  const accentColor = state === 'rejected' ? colors.error : colors.warning;
+  const heading = state === 'rejected'
+    ? 'Application Not Approved'
+    : state === 'not_registered'
+      ? 'Fundi Application Not Found'
+      : 'Application Under Review';
+  const accentColor = state === 'rejected' || state === 'not_registered' ? colors.error : colors.warning;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1, padding: spacing.lg }}>
@@ -96,7 +105,7 @@ export function PendingApprovalScreen(): JSX.Element {
           <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
           <Text style={styles.statusLabel}>Status</Text>
           <Text style={[styles.statusValue, { color: accentColor }]}>
-            {state === 'rejected' ? 'Rejected' : state === 'error' ? 'Unknown' : 'Pending'}
+            {state === 'rejected' ? 'Rejected' : state === 'not_registered' ? 'Not found' : state === 'error' ? 'Unknown' : 'Pending'}
           </Text>
         </View>
       </View>

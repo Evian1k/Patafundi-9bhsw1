@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, CLIENT_EVENTS } from './socketEvents';
-import type { AuthResponse, User, Job, Quote, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown } from './types';
+import type { AuthResponse, User, Job, Quote, JobLocation, Message, SavedPlace, Notification, Payment, WalletBalance, WalletTransaction, PayoutRequest, Dispute, Review, FundiDashboard, FundiPublic, GeoFindFundisResult, SurgePricingResult, PriceBreakdown, ServiceCategory } from './types';
 
 function resolveBaseUrl(): string {
   // Spec §32: endpoints are environment-driven — NEVER hardcoded localhost
@@ -33,6 +33,7 @@ function resolveBaseUrl(): string {
 }
 const DEFAULT_API_URL = resolveBaseUrl();
 const STORAGE_KEYS = { TOKEN: 'auth_token', REFRESH_TOKEN: 'refresh_token', USER: 'cached_user' } as const;
+type RefreshResult = 'refreshed' | 'expired' | 'unavailable';
 
 // ── Secure token storage (spec §48) ──────────────────────────────────────────
 // Tokens belong in the device Keychain/Keystore (expo-secure-store), not
@@ -93,11 +94,13 @@ class ApiClient {
   private refreshToken: string | null = null;
   private socket: Socket | null = null;
   private tokensLoaded: Promise<void>;
-  private refreshPromise: Promise<boolean> | null = null;
+  private refreshPromise: Promise<RefreshResult> | null = null;
+  private onSessionExpired: (() => void) | null = null;
 
   constructor() { this.baseUrl = DEFAULT_API_URL; this.tokensLoaded = this.loadTokens(); }
   async ensureTokensLoaded(): Promise<void> { await this.tokensLoaded; }
   setBaseUrl(url: string) { if (url) this.baseUrl = url.replace(/\/$/, ''); }
+  setSessionExpiredHandler(handler: (() => void) | null): void { this.onSessionExpired = handler; }
   getBaseUrl(): string { return this.baseUrl; }
 
   private async loadTokens(): Promise<void> {
@@ -122,6 +125,22 @@ class ApiClient {
       AsyncStorage.removeItem(STORAGE_KEYS.USER),
     ]);
   }
+  private async expireSession(): Promise<never> {
+    await this.clearTokens();
+    this.disconnectSocket();
+    this.onSessionExpired?.();
+    throw Object.assign(new Error('Session expired'), { status: 401, code: 'SESSION_EXPIRED' });
+  }
+  private async refreshSessionOrThrow(): Promise<void> {
+    const result = this.refreshToken ? await this.refreshTokens() : 'expired';
+    if (result === 'expired') await this.expireSession();
+    if (result === 'unavailable') {
+      throw Object.assign(new Error('We could not verify your session. Please try again.'), {
+        status: 503,
+        code: 'SESSION_REFRESH_UNAVAILABLE',
+      });
+    }
+  }
   async cacheUser(user: User | null): Promise<void> { if (user) await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)); else await AsyncStorage.removeItem(STORAGE_KEYS.USER); }
   async getCachedUser(): Promise<User | null> { try { const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER); return raw ? (JSON.parse(raw) as User) : null; } catch { return null; } }
   getToken(): string | null { return this.token; }
@@ -132,10 +151,11 @@ class ApiClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'application/json', ...((options.headers as Record<string, string>) || {}) };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     let response = await fetch(url, { ...options, headers });
-    if (response.status === 401 && this.token && this.refreshToken) {
-      const refreshed = await this.refreshTokens();
-      if (refreshed) { headers['Authorization'] = `Bearer ${this.token}`; response = await fetch(url, { ...options, headers }); }
-      else { await this.clearTokens(); const err = new Error('Session expired') as any; err.status = 401; err.code = 'SESSION_EXPIRED'; throw err; }
+    if (response.status === 401 && this.token) {
+      await this.refreshSessionOrThrow();
+      headers['Authorization'] = `Bearer ${this.token}`;
+      response = await fetch(url, { ...options, headers });
+      if (response.status === 401) await this.expireSession();
     }
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: response.statusText }));
@@ -160,10 +180,11 @@ class ApiClient {
     const headers: Record<string, string> = { ...((options.headers as Record<string, string>) || {}) };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     let response = await fetch(url, { ...options, method: options.method || 'POST', headers, body: formData });
-    if (response.status === 401 && this.token && this.refreshToken) {
-      const refreshed = await this.refreshTokens();
-      if (refreshed) { headers['Authorization'] = `Bearer ${this.token}`; response = await fetch(url, { ...options, method: options.method || 'POST', headers, body: formData }); }
-      else { await this.clearTokens(); throw Object.assign(new Error('Session expired'), { status: 401 }); }
+    if (response.status === 401 && this.token) {
+      await this.refreshSessionOrThrow();
+      headers['Authorization'] = `Bearer ${this.token}`;
+      response = await fetch(url, { ...options, method: options.method || 'POST', headers, body: formData });
+      if (response.status === 401) await this.expireSession();
     }
     if (!response.ok) { const error = await response.json().catch(() => ({ message: response.statusText })); throw Object.assign(new Error(error.message || 'Upload failed'), { status: response.status, payload: error }); }
     return response.json();
@@ -174,7 +195,7 @@ class ApiClient {
   async registerFundi(payload: FormData): Promise<AuthResponse> { return this.upload('/auth/register/fundi', payload); }
   async login(email: string, password: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? null); if (data.user) await this.cacheUser(data.user); } return data; }
   async logout(): Promise<void> { try { await this.request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: this.refreshToken }) }); } catch (error) { console.warn('[api] server logout failed; clearing local session anyway:', error); } await this.clearTokens(); this.disconnectSocket(); }
-  async refreshTokens(): Promise<boolean> { if (this.refreshPromise) return this.refreshPromise; this.refreshPromise = (async () => { try { if (!this.refreshToken) return false; const response = await fetch(`${this.baseUrl}/api/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: this.refreshToken }) }); if (!response.ok) return false; const data = await response.json(); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? this.refreshToken); return true; } return false; } catch { return false; } finally { this.refreshPromise = null; } })(); return this.refreshPromise; }
+  async refreshTokens(): Promise<RefreshResult> { if (this.refreshPromise) return this.refreshPromise; this.refreshPromise = (async () => { try { if (!this.refreshToken) return 'expired'; const response = await fetch(`${this.baseUrl}/api/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: this.refreshToken }) }); if (response.status === 401 || response.status === 403) return 'expired'; if (!response.ok) return 'unavailable'; const data = await response.json(); if (!data.token) return 'unavailable'; await this.saveTokens(data.token, data.refreshToken ?? this.refreshToken); return 'refreshed'; } catch { return 'unavailable'; } finally { this.refreshPromise = null; } })(); return this.refreshPromise; }
   async verifyOtp(email: string, code: string): Promise<AuthResponse> { const data = await this.request<AuthResponse>('/auth/otp-verify', { method: 'POST', body: JSON.stringify({ email, code }) }); if (data.token) { await this.saveTokens(data.token, data.refreshToken ?? null); if (data.user) await this.cacheUser(data.user); } return data; }
   async resendOtp(email: string): Promise<{ success: boolean; devOtp?: string }> { return this.request('/auth/otp-resend', { method: 'POST', body: JSON.stringify({ email }) }); }
   async forgotPassword(email: string): Promise<{ success: boolean }> { return this.request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }); }
@@ -190,7 +211,7 @@ class ApiClient {
   deleteSavedPlace(id: string): Promise<{ success: boolean }> { return this.request(`/users/saved-places/${id}`, { method: 'DELETE' }); }
 
   // Jobs
-  createJob(data: { serviceCategory: string; description: string; estimatedPrice?: number; urgency?: 'normal' | 'emergency'; latitude?: number; longitude?: number; address?: string; }): Promise<{ job: Job }> { return this.request('/jobs', { method: 'POST', body: JSON.stringify(data) }); }
+  createJob(data: { serviceCategory: string; description: string; urgency?: 'normal' | 'emergency'; latitude?: number; longitude?: number; address?: string; countryCode?: string; requestedService?: string; }): Promise<{ job: Job }> { return this.request('/jobs', { method: 'POST', body: JSON.stringify(data) }); }
   listJobs(filters?: { status?: string; limit?: number; offset?: number }): Promise<{ jobs: Job[] }> { const qs = filters ? '?' + new URLSearchParams(filters as any).toString() : ''; return this.request(`/jobs${qs}`); }
   getActiveJob(): Promise<{ job: Job | null }> { return this.request('/jobs/fundi/active'); }
   getJob(id: string): Promise<{ job: Job }> { return this.request(`/jobs/${id}`); }
@@ -302,6 +323,10 @@ class ApiClient {
   createSupportTicket(data: { subject: string; message: string; category?: string; jobId?: string }): Promise<{ ticket: any }> { return this.request('/support/ticket', { method: 'POST', body: JSON.stringify(data) }); }
 
   // ── Content: Policies, Help, Blog, Services ───────────────
+  getServiceCategories(countryCode = 'KE', search = ''): Promise<{ success: boolean; countryCode: string; services: ServiceCategory[] }> {
+    const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : '';
+    return this.request(`/global/services/${encodeURIComponent(countryCode.toUpperCase())}${query}`);
+  }
   getPolicy(slug: string): Promise<{ policy: any }> { return this.request(`/policies/${slug}`); }
   getHelp(): Promise<{ help: any }> { return this.request('/help'); }
   listBlogPosts(): Promise<{ posts: any[] }> { return this.request('/blog'); }

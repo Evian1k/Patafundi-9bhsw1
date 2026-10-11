@@ -3,11 +3,41 @@
 //   payment(held) → escrow release → fundi wallet credit OR company settlement
 //   → revenue ledger → audit. Used by auto-release (customer confirmation)
 //   and by the admin manual release path.
-import { transaction, query } from '../db.js';
+import { transaction } from '../db.js';
 import { auditLog } from './auditService.js';
+import { transitionJobInTransaction } from './jobStateMachine.js';
 
 function money(n) {
   return Math.round(Number(n || 0) * 100) / 100;
+}
+
+/** Persist an idempotent settlement task in the existing PostgreSQL queue. */
+export async function enqueueSettlementRelease(client, { jobId, paymentId = null, source = 'customer_confirmation' }) {
+  if (!client?.query || !jobId) throw new Error('A transaction client and jobId are required');
+  const result = await client.query(
+    `select status, customer_completion_confirmed, escrow_status
+       from jobs where id = $1 for update`,
+    [jobId],
+  );
+  const job = result.rows[0];
+  if (!job || !job.customer_completion_confirmed || job.escrow_status === 'released'
+      || !['payment_pending', 'customer_confirmed_completion', 'completed'].includes(job.status)) {
+    return false;
+  }
+
+  const idempotencyKey = paymentId
+    ? `settlement_release:${jobId}:payment:${paymentId}`
+    : `settlement_release:${jobId}:completion`;
+  await client.query(
+    `insert into job_queue (queue_name, payload, priority, idempotency_key)
+     values ('settlement_release', $1::jsonb, 20, $2)
+     on conflict (idempotency_key) where idempotency_key is not null
+     do update set status = 'pending', attempts = 0, error_message = null,
+       next_run_at = null, scheduled_at = now(), started_at = null, completed_at = null
+     where job_queue.status in ('failed', 'completed')`,
+    [JSON.stringify({ jobId, paymentId, source }), idempotencyKey],
+  );
+  return true;
 }
 
 /**
@@ -16,13 +46,26 @@ function money(n) {
  * Company jobs produce a company_settlements row (pending payout);
  * individual jobs credit the fundi wallet and create a payout record.
  */
-export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'system', source = 'customer_confirmation' }) {
+export async function releaseJobEscrow({ jobId, paymentId = null, actorId = null, actorRole = 'system', source = 'customer_confirmation' }) {
   const released = await transaction(async (client) => {
     const jobRes = await client.query('select * from jobs where id = $1 for update', [jobId]);
-    const job = jobRes.rows[0];
+    let job = jobRes.rows[0];
     if (!job) throw new Error('Job not found');
-    if (job.status !== 'completed' || !job.customer_completion_confirmed) {
+    if (!['payment_pending', 'customer_confirmed_completion', 'completed'].includes(job.status) || !job.customer_completion_confirmed) {
       throw new Error('Escrow can only be released after customer-confirmed completion');
+    }
+    if (job.escrow_status === 'released') {
+      return { released: false, reason: 'already_released', job };
+    }
+    if (job.status === 'customer_confirmed_completion') {
+      job = await transitionJobInTransaction(client, {
+        jobId,
+        toStatus: 'payment_pending',
+        actor: { id: actorId, role: actorRole },
+        actorKind: 'system',
+        skipActorCheck: true,
+        metadata: { source, completionConfirmed: true },
+      });
     }
     const disputeRes = await client.query(
       `select id from disputes where job_id = $1 and status in ('open', 'under_review') limit 1`,
@@ -31,11 +74,16 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
     if (disputeRes.rows[0]) throw new Error('Escrow cannot be released while a dispute is open');
 
     const paymentRes = await client.query(
-      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
-      [jobId],
+      `select * from payments
+       where job_id = $1 and escrow_status = 'held' and ($2::uuid is null or id = $2)
+       order by created_at desc limit 2 for update`,
+      [jobId, paymentId],
     );
+    if (!paymentId && paymentRes.rows.length > 1) {
+      throw new Error('Multiple held payments require finance reconciliation; refusing ambiguous settlement');
+    }
     const payment = paymentRes.rows[0];
-    if (!payment) return { released: false, reason: 'no_held_escrow' };
+    if (!payment) return { released: false, reason: 'no_held_escrow', job };
 
     // ── Server-authoritative split (never trust client values) ──
     const jobValue = money(job.final_price || job.estimated_price || payment.amount);
@@ -73,6 +121,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
 
     let settlement = null;
     let payout = null;
+    let notificationTarget = null;
 
     if (job.company_id) {
       // ── Company settlement (company keeps its own technician payroll) ──
@@ -138,6 +187,67 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
        `Escrow released via ${source}`],
     );
 
+    // The payment and escrow release are verified, but a separate provider
+    // payout can still be processing. Complete the job without claiming that
+    // the payout itself has completed.
+    const completedJob = job.status === 'completed' ? job : await transitionJobInTransaction(client, {
+      jobId,
+      toStatus: 'completed',
+      actor: { id: actorId, role: actorRole },
+      actorKind: 'system',
+      skipActorCheck: true,
+      metadata: { source, escrowReleased: true },
+    });
+    await client.query(
+      `insert into job_timeline (job_id, event_type, actor_id, actor_role, metadata)
+       values ($1, 'escrow_released', $2, $3, $4::jsonb)`,
+      [jobId, actorId, actorRole, JSON.stringify({ paymentId: payment.id, source })],
+    );
+
+    // Durable notifications and the audit record commit with the financial
+    // ledger. The queue can safely treat an already-released payment as done.
+    if (settlement) {
+      const owner = await client.query(
+        `select owner_user_id from company_profiles where id = $1`,
+        [settlement.company_id],
+      );
+      if (owner.rows[0]?.owner_user_id) {
+        notificationTarget = { type: 'company', userId: owner.rows[0].owner_user_id };
+        await client.query(
+          `insert into notifications (user_id, type, title, body, data)
+           values ($1, 'settlement_created', 'Settlement Created', $2, $3::jsonb)`,
+          [notificationTarget.userId,
+           `${currency} ${Number(settlement.net_amount).toLocaleString()} has been added to your pending settlements.`,
+           JSON.stringify({ jobId, settlementId: settlement.id })],
+        );
+      }
+    } else if (job.fundi_id) {
+      notificationTarget = { type: 'fundi', userId: job.fundi_id };
+      await client.query(
+        `insert into notifications (user_id, type, title, body, data)
+         values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
+        [job.fundi_id,
+         `${currency} ${providerAmount.toLocaleString()} has been credited to your wallet for the completed job.`,
+         JSON.stringify({ jobId, amount: providerAmount })],
+      );
+    }
+    await auditLog({
+      client,
+      userId: actorId,
+      action: 'escrow.release',
+      entityType: 'job',
+      entityId: jobId,
+      metadata: {
+        source,
+        actorRole,
+        paymentId: payment.id,
+        commission: commissionAmount,
+        providerAmount,
+        settlementId: settlement?.id || null,
+        payoutId: payout?.id || null,
+      },
+    });
+
     return {
       released: true,
       jobValue,
@@ -147,57 +257,27 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       settlement,
       payout,
       payment,
-      job,
+      job: completedJob,
+      notificationTarget,
     };
   });
 
   if (!released.released) return released;
 
-  // ── Post-transaction: notifications + audit + realtime ──
+  // ── Post-transaction: ephemeral realtime events only ──
   const { emitEvent } = await import('../realtime.js');
-
-  if (released.settlement) {
-    await query(
-      `insert into notifications (user_id, type, title, body, data)
-       select owner_user_id, 'settlement_created', 'Settlement Created', $2, $3::jsonb
-       from company_profiles where id = $1`,
-      [released.settlement.company_id,
-       `${released.currency} ${released.settlement.net_amount.toLocaleString()} has been added to your pending settlements.`,
-       JSON.stringify({ jobId, settlementId: released.settlement.id })],
-    );
-    const owner = await query(
-      `select owner_user_id from company_profiles where id = $1`,
-      [released.settlement.company_id],
-    );
-    if (owner.rows[0]) {
-      emitEvent('payment:confirmed', { jobId, settlement: released.settlement }, `user:${owner.rows[0].owner_user_id}`);
+  try {
+    if (released.notificationTarget?.type === 'company') {
+      emitEvent('payment:confirmed', { jobId, settlement: released.settlement }, `user:${released.notificationTarget.userId}`);
+    } else if (released.notificationTarget?.type === 'fundi') {
+      emitEvent('payment:confirmed', { jobId, fundiEarnings: released.providerAmount }, `user:${released.notificationTarget.userId}`);
     }
-  } else if (released.job?.fundi_id) {
-    await query(
-      `insert into notifications (user_id, type, title, body, data)
-       values ($1, 'payment_received', 'Payment Received', $2, $3::jsonb)`,
-      [released.job.fundi_id,
-       `${released.currency} ${released.providerAmount.toLocaleString()} has been credited to your wallet for the completed job.`,
-       JSON.stringify({ jobId, amount: released.providerAmount })],
-    );
-    emitEvent('payment:confirmed', { jobId, fundiEarnings: released.providerAmount }, `user:${released.job.fundi_id}`);
+    emitEvent('escrow:released', { jobId, amount: released.providerAmount }, `job:${jobId}`);
+    emitEvent('job:status', { jobId, status: 'completed' }, `job:${jobId}`);
+    emitEvent('job:completed', { jobId }, `job:${jobId}`);
+  } catch (error) {
+    console.error('[settlement] Realtime event failed after committed settlement', { jobId, message: error.message });
   }
-
-  emitEvent('escrow:released', { jobId, amount: released.providerAmount }, `job:${jobId}`);
-  await auditLog({
-    userId: actorId,
-    action: 'escrow.release',
-    entityType: 'job',
-    entityId: jobId,
-    metadata: {
-      source,
-      actorRole,
-      commission: released.commissionAmount,
-      providerAmount: released.providerAmount,
-      settlementId: released.settlement?.id || null,
-      payoutId: released.payout?.id || null,
-    },
-  });
 
   return released;
 }

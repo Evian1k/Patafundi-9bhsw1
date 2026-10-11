@@ -19,7 +19,7 @@ import {
   spacing,
   borderRadius,
   gradients,
-  SERVICE_CATEGORIES,
+  useServiceCatalog,
 } from '@patafundi/shared';
 
 const { width } = Dimensions.get('window');
@@ -39,9 +39,9 @@ const SLIDES: Slide[] = [
   },
   {
     icon: 'grid-outline',
-    title: '500+ Services',
+    title: 'Services that fit your needs',
     subtitle:
-      'From plumbing to cleaning, electrical to carpentry - we\u2019ve got you covered',
+      'Browse services available in your country, or describe a service that is not listed.',
   },
   {
     icon: 'shield-checkmark',
@@ -56,6 +56,7 @@ interface OnboardingScreenProps {
 }
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps): JSX.Element {
+  const { services: serviceCategories, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useServiceCatalog();
   const [active, setActive] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -114,9 +115,11 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps): JSX.Ele
 
             {idx === 1 ? (
               <View style={styles.serviceGrid}>
-                {SERVICE_CATEGORIES.slice(0, 8).map((cat) => (
+                {catalogLoading ? <Text style={styles.serviceChipText} accessibilityLiveRegion="polite">Loading services…</Text> : null}
+                {catalogError ? <TouchableOpacity onPress={retryCatalog}><Text style={styles.serviceChipText}>Catalog unavailable — tap to retry</Text></TouchableOpacity> : null}
+                {serviceCategories.slice(0, 8).map((cat) => (
                   <View key={cat.slug} style={styles.serviceChip}>
-                    <Ionicons name={cat.icon as keyof typeof Ionicons.glyphMap} size={16} color={cat.color} />
+                    <Ionicons name={cat.icon as keyof typeof Ionicons.glyphMap} size={16} color={cat.color || colors.primary} />
                     <Text style={styles.serviceChipText}>{cat.label}</Text>
                   </View>
                 ))}
