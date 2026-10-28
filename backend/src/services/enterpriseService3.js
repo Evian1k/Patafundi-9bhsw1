@@ -148,16 +148,16 @@ export async function resolveIncident(id, { rootCause, lessonsLearned, postmorte
 export async function getCustomerCRM(userId) {
   const [user, jobs, payments, reviews, disputes, tickets, wallet, notes, devices, logins, notifications, fraudScore] = await Promise.all([
     query('select id, email, full_name, phone, role, status, trust_score, created_at, last_login_at from users where id = $1', [userId]),
-    query('select id, service_category, status, estimated_price, final_price, created_at from jobs where customer_id = $1 order by created_at desc limit 20', [userId]),
-    query('select id, amount, status, escrow_status, mpesa_receipt_number, created_at from payments where user_id = $1 order by created_at desc limit 20', [userId]).catch(() => ({ rows: [] })),
-    query('select r.*, j.service_category from reviews r join jobs j on j.id = r.job_id where r.reviewer_id = $1 order by r.created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
+    query('select id, service_category, status, estimated_price, final_price, created_at from jobs where customer_id = $1 and is_demo = false order by created_at desc limit 20', [userId]),
+    query('select id, amount, status, escrow_status, mpesa_receipt_number, created_at from payments where user_id = $1 and is_demo = false order by created_at desc limit 20', [userId]).catch(() => ({ rows: [] })),
+    query('select r.*, j.service_category from reviews r join jobs j on j.id = r.job_id where r.reviewer_id = $1 and r.is_demo = false and j.is_demo = false order by r.created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
     query('select * from disputes where customer_id = $1 order by created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
     query('select * from support_tickets where email = (select email from users where id = $1) order by created_at desc limit 10', [userId]).catch(() => ({ rows: [] })),
-    query('select * from wallets where user_id = $1', [userId]).catch(() => ({ rows: [] })),
+    query('select * from wallets where user_id = $1 and is_demo = false', [userId]).catch(() => ({ rows: [] })),
     query('select n.*, u.full_name as author_name from crm_notes n left join users u on u.id = n.author_id where n.entity_type = $1 and n.entity_id = $2 order by n.created_at desc', ['customer', userId]),
     query('select * from device_fingerprints where user_id = $1 order by last_seen desc limit 10', [userId]).catch(() => ({ rows: [] })),
     query('select * from login_history where user_id = $1 order by created_at desc limit 20', [userId]).catch(() => ({ rows: [] })),
-    query('select count(*)::int as total, count(*) filter (where created_at > now() - interval \'7 days\')::int as recent from notifications where user_id = $1', [userId]),
+    query('select count(*)::int as total, count(*) filter (where created_at > now() - interval \'7 days\')::int as recent from notifications where user_id = $1 and is_demo = false', [userId]),
     query('select * from behavioral_risk_scores where user_id = $1', [userId]).catch(() => ({ rows: [] })),
   ]);
 
@@ -181,9 +181,9 @@ export async function getFundiCRM(fundiUserId) {
   const [user, fundi, jobs, reviews, wallet, portfolio, quality, notes, devices, logins] = await Promise.all([
     query('select id, email, full_name, phone, role, status, trust_score, created_at from users where id = $1', [fundiUserId]),
     query('select * from fundis where user_id = $1', [fundiUserId]),
-    query('select id, service_category, status, estimated_price, final_price, created_at from jobs where fundi_id = $1 order by created_at desc limit 30', [fundiUserId]),
-    query('select r.*, j.service_category, cu.full_name as customer_name from reviews r join jobs j on j.id = r.job_id join users cu on cu.id = j.customer_id where r.fundi_id = $1 order by r.created_at desc limit 20', [fundiUserId]).catch(() => ({ rows: [] })),
-    query('select * from wallets where user_id = $1', [fundiUserId]).catch(() => ({ rows: [] })),
+    query('select id, service_category, status, estimated_price, final_price, created_at from jobs where fundi_id = $1 and is_demo = false order by created_at desc limit 30', [fundiUserId]),
+    query('select r.*, j.service_category, cu.full_name as customer_name from reviews r join jobs j on j.id = r.job_id join users cu on cu.id = j.customer_id where r.fundi_id = $1 and r.is_demo = false and j.is_demo = false and cu.is_demo = false order by r.created_at desc limit 20', [fundiUserId]).catch(() => ({ rows: [] })),
+    query('select * from wallets where user_id = $1 and is_demo = false', [fundiUserId]).catch(() => ({ rows: [] })),
     query('select * from fundi_portfolios where fundi_id = $1 order by created_at desc', [fundiUserId]).catch(() => ({ rows: [] })),
     query('select * from fundi_quality_scores where fundi_id = $1', [fundiUserId]).catch(() => ({ rows: [] })),
     query('select n.*, u.full_name as author_name from crm_notes n left join users u on u.id = n.author_id where n.entity_type = $1 and n.entity_id = $2 order by n.created_at desc', ['fundi', fundiUserId]),
@@ -258,14 +258,14 @@ export async function getBusinessAnalytics(period = '30d') {
   const [summary, daily, topServices, topCounties, topFundis, topCustomers] = await Promise.all([
     query(`
       select
-        (select count(*)::int from users where created_at > now() - interval '${interval}') as new_users,
-        (select count(*)::int from users where status = 'active') as active_users,
-        (select count(*)::int from fundis where approval_status = 'approved') as approved_fundis,
-        (select count(*)::int from jobs where created_at > now() - interval '${interval}') as new_jobs,
-        (select count(*)::int from jobs where status = 'completed' and created_at > now() - interval '${interval}') as completed_jobs,
-        (select count(*)::int from jobs where status = 'cancelled' and created_at > now() - interval '${interval}') as cancelled_jobs,
-        (select coalesce(sum(amount), 0)::numeric from payments where status = 'completed' and created_at > now() - interval '${interval}') as revenue,
-        (select coalesce(sum(platform_commission), 0)::numeric from payments where status = 'completed' and created_at > now() - interval '${interval}') as commission,
+        (select count(*)::int from users where is_demo = false and created_at > now() - interval '${interval}') as new_users,
+        (select count(*)::int from users where is_demo = false and status = 'active') as active_users,
+        (select count(*)::int from fundis where is_demo = false and approval_status = 'approved') as approved_fundis,
+        (select count(*)::int from jobs where is_demo = false and created_at > now() - interval '${interval}') as new_jobs,
+        (select count(*)::int from jobs where is_demo = false and status = 'completed' and created_at > now() - interval '${interval}') as completed_jobs,
+        (select count(*)::int from jobs where is_demo = false and status = 'cancelled' and created_at > now() - interval '${interval}') as cancelled_jobs,
+        (select coalesce(sum(amount), 0)::numeric from payments where is_demo = false and status = 'completed' and created_at > now() - interval '${interval}') as revenue,
+        (select coalesce(sum(platform_commission), 0)::numeric from payments where is_demo = false and status = 'completed' and created_at > now() - interval '${interval}') as commission,
         (select count(*)::int from disputes where created_at > now() - interval '${interval}') as new_disputes,
         (select count(*)::int from disputes where status = 'open') as open_disputes
     `),
@@ -275,32 +275,33 @@ export async function getBusinessAnalytics(period = '30d') {
              count(*) filter (where status = 'completed')::int as completed,
              count(*) filter (where status = 'cancelled')::int as cancelled,
              coalesce(sum(estimated_price), 0)::numeric as revenue
-      from jobs where created_at > now() - interval '${interval}'
+      from jobs where is_demo = false and created_at > now() - interval '${interval}'
       group by 1 order by 1
     `),
     query(`
       select service_category, count(*)::int as jobs, coalesce(sum(estimated_price), 0)::numeric as revenue
-      from jobs where created_at > now() - interval '${interval}'
+      from jobs where is_demo = false and created_at > now() - interval '${interval}'
       group by service_category order by jobs desc limit 10
     `),
     query(`
       select coalesce(nullif(location_name, ''), 'Unknown') as county, count(*)::int as jobs
-      from jobs where created_at > now() - interval '${interval}'
+      from jobs where is_demo = false and created_at > now() - interval '${interval}'
       group by location_name order by jobs desc limit 10
     `).catch(() => ({ rows: [] })),
     query(`
       select f.user_id, u.full_name, count(j.id)::int as jobs, coalesce(avg(r.rating), 0)::numeric(3,2) as rating
       from fundis f
       join users u on u.id = f.user_id
-      left join jobs j on j.fundi_id = f.user_id and j.created_at > now() - interval '${interval}'
-      left join reviews r on r.job_id = j.id
+      left join jobs j on j.fundi_id = f.user_id and j.is_demo = false and j.created_at > now() - interval '${interval}'
+      left join reviews r on r.job_id = j.id and r.is_demo = false
+      where f.is_demo = false and u.is_demo = false
       group by f.user_id, u.full_name order by jobs desc limit 10
     `),
     query(`
       select u.id, u.full_name, count(j.id)::int as jobs, coalesce(sum(j.estimated_price), 0)::numeric as spent
       from users u
-      left join jobs j on j.customer_id = u.id and j.created_at > now() - interval '${interval}'
-      where u.role = 'customer'
+      left join jobs j on j.customer_id = u.id and j.is_demo = false and j.created_at > now() - interval '${interval}'
+      where u.role = 'customer' and u.is_demo = false
       group by u.id, u.full_name order by spent desc limit 10
     `),
   ]);
@@ -709,14 +710,14 @@ export async function generateCEOReport() {
   const [stats, fraud, incidents, support, systemHealth] = await Promise.all([
     query(`
       select
-        (select coalesce(sum(amount), 0)::numeric from payments where status = 'completed' and created_at::date = $1::date) as revenue,
-        (select coalesce(sum(platform_commission), 0)::numeric from payments where status = 'completed' and created_at::date = $1::date) as commission,
-        (select count(*)::int from jobs where status = 'completed' and created_at::date = $1::date) as completed_jobs,
-        (select count(*)::int from jobs where status = 'cancelled' and created_at::date = $1::date) as cancelled_jobs,
-        (select coalesce(sum(amount), 0)::numeric from payments where status = 'refunded' and created_at::date = $1::date) as refunds,
-        (select count(*)::int from users where created_at::date = $1::date) as new_users,
-        (select count(*)::int from users where last_login_at::date = $1::date) as active_users,
-        (select count(*)::int from fundis where approval_status = 'approved') as approved_fundis
+        (select coalesce(sum(amount), 0)::numeric from payments where is_demo = false and status = 'completed' and created_at::date = $1::date) as revenue,
+        (select coalesce(sum(platform_commission), 0)::numeric from payments where is_demo = false and status = 'completed' and created_at::date = $1::date) as commission,
+        (select count(*)::int from jobs where is_demo = false and status = 'completed' and created_at::date = $1::date) as completed_jobs,
+        (select count(*)::int from jobs where is_demo = false and status = 'cancelled' and created_at::date = $1::date) as cancelled_jobs,
+        (select coalesce(sum(amount), 0)::numeric from payments where is_demo = false and status = 'refunded' and created_at::date = $1::date) as refunds,
+        (select count(*)::int from users where is_demo = false and created_at::date = $1::date) as new_users,
+        (select count(*)::int from users where is_demo = false and last_login_at::date = $1::date) as active_users,
+        (select count(*)::int from fundis where is_demo = false and approval_status = 'approved') as approved_fundis
     `, [yesterdayStr]),
     query(`select count(*)::int as total, count(*) filter (where severity = 'critical')::int as critical from fraud_alerts where created_at::date = $1::date`, [yesterdayStr]).catch(() => ({ rows: [{ total: 0, critical: 0 }] })),
     query(`select count(*)::int as total, count(*) filter (where severity in ('sev0','sev1'))::int as critical from incidents where created_at::date = $1::date`, [yesterdayStr]).catch(() => ({ rows: [{ total: 0, critical: 0 }] })),

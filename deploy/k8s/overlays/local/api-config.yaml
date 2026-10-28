@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patafundi-api-config
+data:
+  NODE_ENV: development
+  FRONTEND_ORIGIN: http://localhost:8080
+  CORS_ORIGINS: http://localhost:8080
+  COOKIE_SECURE: "false"

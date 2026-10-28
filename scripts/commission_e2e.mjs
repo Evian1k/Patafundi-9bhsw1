@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from './demo-password.mjs';
 /**
  * Commission System E2E — verifies the full money lifecycle.
  *
@@ -105,7 +106,7 @@ async function main() {
   r = await request('POST', '/api/auth/register/fundi', {
     formData: [
       { name: 'email', value: fundiEmail },
-      { name: 'password', value: 'Fundi@2024' },
+      { name: 'password', value: getDemoPassword() },
       { name: 'fullName', value: 'CommFundi' },
       { name: 'phone', value: '254712000555' },
       { name: 'skills', value: JSON.stringify(['plumbing']) },
@@ -118,7 +119,7 @@ async function main() {
   saveJar('fundi_pending');
 
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: getDemoPassword() } });
   saveJar('admin');
   loadJar('admin');
   await request('POST', `/api/admin/fundis/${fundiId}/approve`);
@@ -229,7 +230,7 @@ async function main() {
   // ── Verify finance team can see payments ──
   console.log('\n— Step 9: Finance team access —');
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'finance@patafundi.com', password: 'Finance@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'finance@patafundi.com', password: getDemoPassword() } });
   saveJar('finance');
   loadJar('finance');
   r = await request('GET', '/api/staff/payments');

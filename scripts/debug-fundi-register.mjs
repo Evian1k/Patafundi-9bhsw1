@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 // Debug: replicate fundi registration to surface the failing INSERT stack.
 import { createFundiRegistration } from '../backend/src/services/fundiRegistrationService.js';
 
@@ -8,7 +9,7 @@ const fakePng = Buffer.from(
 
 const body = {
   email: `debug-fundi-${Date.now()}@test.local`,
-  password: 'Fundi@2024',
+  password: getDemoPassword(),
   fullName: 'Debug Fundi',
   phone: '254700999888',
   skills: JSON.stringify(['plumbing']),

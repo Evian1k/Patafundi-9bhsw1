@@ -94,10 +94,8 @@ import LiveOperations from "@/pages/staff/LiveOperations";
 import SecurityCenter from "@/pages/staff/SecurityCenter";
 import SystemSettings from "@/pages/staff/SystemSettings";
 
-// Demo page is dev-only. In production builds, the route returns 404
-// and the DemoPage component (with demo credentials) is tree-shaken out
-// of the bundle via the dynamic import + SHOW_DEMO guard.
-const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
+// Demo page is development-only and cannot be exposed by a production build flag.
+const SHOW_DEMO = import.meta.env.DEV;
 const DemoPage = SHOW_DEMO ? lazy(() => import("@/pages/DemoPage")) : null;
 
 export default function AppRoutes() {

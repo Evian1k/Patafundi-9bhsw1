@@ -13,6 +13,17 @@ a step-by-step checklist — no decisions to make in the moment, just execute.
 | [Fraud Response](./fraud-response.md) | When a fraud alert fires or a user reports being scammed |
 | [Fundi Verification](./fundi-verification.md) | Daily review of pending fundi applications |
 
+## Current engineering and deployment references
+
+| Document | Purpose |
+|---|---|
+| [Architecture](./ARCHITECTURE.md) | Current components, data flows, and trust boundaries |
+| [Container deployment](./CONTAINER_DEPLOYMENT.md) | Windows PowerShell Docker Compose runbook and verified status |
+| [Kubernetes deployment](./KUBERNETES_DEPLOYMENT.md) | Kustomize overlays and local-cluster limitations |
+| [Security audit](./SECURITY_AUDIT.md) | Dependency and application-security findings |
+| [Database and migrations](./DATABASE_AND_MIGRATIONS.md) | Safe migration, test, backup, and restore guidance |
+| [Production readiness](./PRODUCTION_READINESS.md) | Release blockers and evidence |
+
 ## Quick reference
 
 | What | Where |

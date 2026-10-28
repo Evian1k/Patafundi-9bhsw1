@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 /**
  * PataFundi Full E2E Test — Multi-user, multi-location, varied ratings
  * Uses existing demo accounts + creates new test users with delays
@@ -44,25 +45,25 @@ console.log('\n=== PATAFUNDI FULL E2E TEST ===\n');
 // ── PHASE 1: Login existing demo accounts ─────────────────────
 console.log('— Phase 1: Login Demo Accounts —');
 
-const SA_TOKEN = await login('admin@patafundi.com', 'Admin@2024!');
+const SA_TOKEN = await login('admin@patafundi.com', getDemoPassword());
 log(Boolean(SA_TOKEN), 'Super Admin login');
 
-const CUST_TOKEN = await login('demo@patafundi.com', 'Demo@2024!');
+const CUST_TOKEN = await login('demo@patafundi.com', getDemoPassword());
 log(Boolean(CUST_TOKEN), 'Customer login (demo@patafundi.com)');
 
 // Try fundi login
-const FUNDI_TOKEN = await login('fundi@patafundi.com', 'Fundi@2024!');
+const FUNDI_TOKEN = await login('fundi@patafundi.com', getDemoPassword());
 log(Boolean(FUNDI_TOKEN), 'Fundi login (fundi@patafundi.com)');
 
 // Try all staff roles
 const staffRoles = [
-  { email: 'ops@patafundi.com', pw: 'Ops@2024!', role: 'ops_manager' },
-  { email: 'support@patafundi.com', pw: 'Support@2024!', role: 'support_agent' },
-  { email: 'fraud@patafundi.com', pw: 'Fraud@2024!', role: 'fraud_analyst' },
-  { email: 'finance@patafundi.com', pw: 'Finance@2024!', role: 'finance_team' },
-  { email: 'dispatch@patafundi.com', pw: 'Dispatch@2024!', role: 'dispatch_team' },
-  { email: 'devops@patafundi.com', pw: 'Devops@2024!', role: 'devops_engineer' },
-  { email: 'auditor@patafundi.com', pw: 'Auditor@2024!', role: 'auditor' },
+  { email: 'ops@patafundi.com', pw: getDemoPassword(), role: 'ops_manager' },
+  { email: 'support@patafundi.com', pw: getDemoPassword(), role: 'support_agent' },
+  { email: 'fraud@patafundi.com', pw: getDemoPassword(), role: 'fraud_analyst' },
+  { email: 'finance@patafundi.com', pw: getDemoPassword(), role: 'finance_team' },
+  { email: 'dispatch@patafundi.com', pw: getDemoPassword(), role: 'dispatch_team' },
+  { email: 'devops@patafundi.com', pw: getDemoPassword(), role: 'devops_engineer' },
+  { email: 'auditor@patafundi.com', pw: getDemoPassword(), role: 'auditor' },
 ];
 
 for (const s of staffRoles) {

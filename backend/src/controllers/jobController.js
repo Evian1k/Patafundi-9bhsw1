@@ -28,7 +28,7 @@ async function findNearestFundis(latitude, longitude, skill, limit = 5) {
   // SECURITY: same visibility filters as searchFundis — enforced server-side.
   //   u.role = 'fundi' + u.status = 'active' + f.approval_status = 'approved' + f.online = true
   // A disabled/banned/pending fundi can NEVER receive a job match.
-  const baseWhere = `u.role = 'fundi' and u.status = 'active' and f.approval_status = 'approved' and f.online = true`;
+  const baseWhere = `u.role = 'fundi' and u.status = 'active' and u.is_demo = false and f.is_demo = false and f.approval_status = 'approved' and f.online = true`;
 
   // Fallback used when the customer has no coordinates OR no geo candidates:
   // return globally top-rated matching fundis (distance unknown, not fake).
@@ -219,7 +219,8 @@ export async function createJob(req, res) {
   if (preferredFundiId) {
     const fundiRes = await query(
       `select f.user_id, f.online, f.approval_status, u.status as user_status
-       from fundis f join users u on u.id = f.user_id where f.user_id = $1`,
+       from fundis f join users u on u.id = f.user_id
+       where f.user_id = $1 and f.is_demo = false and u.is_demo = false`,
       [preferredFundiId],
     );
     const f = fundiRes.rows[0];
@@ -233,7 +234,7 @@ export async function createJob(req, res) {
   let companyId = body.companyId || body.company_id || null;
   if (companyId) {
     const companyRes = await query(
-      `select id, company_name, status, verification_status from company_profiles where id = $1`,
+      `select id, company_name, status, verification_status from company_profiles where id = $1 and is_demo = false`,
       [companyId],
     );
     const co = companyRes.rows[0];

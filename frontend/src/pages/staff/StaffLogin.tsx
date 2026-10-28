@@ -180,7 +180,6 @@ export default function StaffLogin() {
                 <div>devops.demo@patafundi.test</div>
                 <div>auditor.demo@patafundi.test</div>
                 <div>operations.demo@patafundi.test</div>
-                <div className="col-span-2 text-center text-emerald-100/50">password: PataFundi#2026</div>
               </div>
               <div className="mt-3 text-center">
                 <Link to="/demo" className="text-xs text-primary hover:underline">

@@ -1,29 +1,26 @@
 # PataFundi — Demo Accounts (DEVELOPMENT ONLY)
 
 > ⚠️ **These credentials are for local development and demo environments ONLY.**
-> They are seeded by `backend/scripts/seed-takeover.js` and `ensure-dev-db.js`,
-> which **refuse to run against production** (`NODE_ENV=production` aborts).
-> Never reuse them for real accounts. The `.test` / `patafundi.com` demo domains
-> are reserved for this purpose.
+> They are seeded only by explicit development/test actions. Production
+> startup never seeds demo accounts. Use a unique local-only
+> `PATAFUNDI_DEMO_SEED_PASSWORD`; never reuse it for real accounts.
 
 ## Platform owner (all environments)
 
-Spec §3 names the authorized owner account. In dev it is seeded like the demo
-accounts; in production it is created **only** by
+Spec §3 names the authorized owner account. In development/test it is
+provisioned only when an explicit `OWNER_PASSWORD` is set; in production it is created **only** by
 `backend/scripts/bootstrap-owner.js` with a password you supply via the
 `OWNER_PASSWORD` environment variable (never committed, never printed to logs).
-The dev seed password is local-only and is hard-refused for production
-seeded accounts — see `ensure-dev-db.js`.
+The password is never stored in source control.
 
 | Account | Email | Password | Role |
 |---|---|---|---|
-| Emmanuel Evian | `emmanuelevian@gmail.com` | set via `OWNER_PASSWORD` at bootstrap (dev: see seed script) | super_admin |
+| Emmanuel Evian | `emmanuelevian@gmail.com` | set via protected `OWNER_PASSWORD` at bootstrap | super_admin |
 
-## Unified demo password
-
-```
-PataFundi#2026
-```
+For isolated development only, set a unique `PATAFUNDI_DEMO_SEED_PASSWORD`
+outside source control before running the seed command. The same configured
+password is applied to created demo users; do not use an existing user's
+password.
 
 ## Takeover demo ecosystem (`@patafundi.test`)
 
@@ -53,18 +50,19 @@ PataFundi#2026
 
 ## PataFundi-branded core accounts (`@patafundi.com`)
 
-Seeded by `ensure-dev-db.js` at boot, shown on `/demo`:
+Seeded only by explicit local/test setup; production startup does not create
+these accounts:
 
-`demo@patafundi.com` / `Demo@2024!` (customer) · `fundi@patafundi.com` / `Fundi@2024!` ·
-`company@patafundi.com` / `Company@2024!` · `admin@patafundi.com` / `Admin@2024!` (super_admin) ·
-plus `ops@ / support@ / fraud@ / finance@ / dispatch@ / devops@ / auditor@`
-(each with its own documented password in `backend/scripts/ensure-dev-db.js`).
+`demo@patafundi.com` (customer) · `fundi@patafundi.com` ·
+`company@patafundi.com` · `admin@patafundi.com` (development-only role) ·
+plus the documented operations/support/fraud/finance/dispatch/devops/auditor
+roles. The configured seed password is shared across seeded demos.
 
 ## Legacy demo accounts (`@patafundi.com` / `@patafundi.test`)
 
-Still seeded and working for backward compatibility — same passwords as their
-PataFundi-branded twins (`PataFundi#2026` was the legacy unified password).
-They are no longer listed on `/demo`.
+Legacy demo accounts are retained for isolated test compatibility. Their
+passwords are generated/configured outside source and they are not real
+marketplace users.
 
 ## Demo company — "Apex Home Services Ltd"
 

@@ -7,7 +7,6 @@ if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true, force: true });
 const db = new PGlite(tmp);
 await db.waitReady;
 console.log('db ready', tmp);
-await db.exec('create extension if not exists pgcrypto;');
 await db.exec(`create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   email text not null unique,

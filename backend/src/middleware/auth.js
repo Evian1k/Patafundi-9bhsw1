@@ -81,10 +81,11 @@ export async function optionalAuth(req, _res, next) {
       algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
-      'select id, email, full_name, phone, role, status, trust_score, totp_enabled from users where id = $1',
+      'select id, email, full_name, phone, role, status, trust_score, totp_enabled, is_demo from users where id = $1',
       [payload.sub],
     );
-    if (result.rows[0]?.status === 'active') req.user = result.rows[0];
+    if (result.rows[0]?.status === 'active'
+      && !(process.env.NODE_ENV === 'production' && result.rows[0].is_demo)) req.user = result.rows[0];
     next();
   } catch (error) {
     // A malformed/expired token simply means "anonymous request". Anything
@@ -109,11 +110,14 @@ export async function authRequired(req, _res, next) {
       algorithms: ['HS256'], // pin algorithm to prevent alg:none and RS256 confusion
     });
     const result = await query(
-      'select id, email, full_name, phone, role, status, trust_score, totp_enabled from users where id = $1',
+      'select id, email, full_name, phone, role, status, trust_score, totp_enabled, is_demo from users where id = $1',
       [payload.sub],
     );
     if (!result.rows[0]) throw forbidden('User account not found');
     if (result.rows[0].status !== 'active') throw forbidden('Account is not active');
+    if (process.env.NODE_ENV === 'production' && result.rows[0].is_demo) {
+      throw forbidden('Demo accounts are disabled in production');
+    }
     req.user = result.rows[0];
 
     // Super Admin allowlist (spec §39): fail-closed. If a super_admin role

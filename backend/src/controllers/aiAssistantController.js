@@ -141,20 +141,20 @@ export async function analyzeJob(req, res) {
 export async function summarizeDispute(req, res) {
   const disputeId = String(req.body?.disputeId || '');
   if (!disputeId) throw badRequest('disputeId is required');
-  const disputeRes = await query('select * from disputes where id = $1', [disputeId]);
+  const disputeRes = await query('select * from disputes where id = $1 and is_demo = false', [disputeId]);
   const dispute = disputeRes.rows[0];
   if (!dispute) throw notFound('Dispute not found');
 
   // Server-side authorized data pull — the model only sees what admin may see.
-  const jobRes = await query('select id, service_category, description, status, final_price, estimated_price, provider_type, company_id from jobs where id = $1', [dispute.job_id]);
+  const jobRes = await query('select id, service_category, description, status, final_price, estimated_price, provider_type, company_id from jobs where id = $1 and is_demo = false', [dispute.job_id]);
   const timeline = await query(
-    `select event_type, actor_role, metadata, created_at from job_timeline where job_id = $1 order by created_at asc limit 40`,
+    `select event_type, actor_role, metadata, created_at from job_timeline where job_id = $1 and is_demo = false order by created_at asc limit 40`,
     [dispute.job_id],
   ).catch(() => ({ rows: [] }));
   const messages = await query(
     `select u.role as sender_role, cm.body, cm.created_at
      from chat_messages cm join users u on u.id = cm.sender_id
-     where cm.job_id = $1 and cm.body is not null
+     where cm.job_id = $1 and cm.is_demo = false and u.is_demo = false and cm.body is not null
      order by cm.created_at asc limit 40`,
     [dispute.job_id],
   ).catch(() => ({ rows: [] }));

@@ -35,7 +35,7 @@ The following checks were run successfully in the current environment:
 3. Demo login check
    - Endpoint: http://127.0.0.1:4000/api/auth/login
    - Email: demo@patafundi.com
-   - Password: Demo@2024!
+   - Password: [redacted from archived report]
    - Status: HTTP 200
    - Observation: login succeeded and returned a valid JWT + customer user object
 

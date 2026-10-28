@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from '../../scripts/demo-password.mjs';
 /**
  * PataFundi end-to-end audit.
  */
@@ -113,7 +114,7 @@ async function main() {
   const fundiEmail = `fundi-${Date.now()}@patafundi-test.com`;
   const fundiForm = [
     { name: 'email', value: fundiEmail },
-    { name: 'password', value: 'Fundi@2024' },
+    { name: 'password', value: getDemoPassword() },
     { name: 'fullName', value: 'Test Fundi' },
     { name: 'phone', value: '254712000222' },
     { name: 'skills', value: JSON.stringify(['plumbing']) },
@@ -163,7 +164,7 @@ async function main() {
 
   console.log('\n-- Admin approval flow --');
   cookies = {};
-  r = await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
+  r = await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: getDemoPassword() } });
   check('admin login returns 200', r.status === 200, `got ${r.status}: ${r.body}`);
   check('admin role returned', r.json?.user?.role === 'admin', JSON.stringify(r.json?.user));
   saveJar('admin');

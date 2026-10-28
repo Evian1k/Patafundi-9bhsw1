@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 import { getEmbeddedDb } from '../backend/src/pglite-instance.js';
 import { query as wrappedQuery } from '../backend/src/db.js';
 import bcrypt from 'bcryptjs';
@@ -32,7 +33,7 @@ for (const sql of [
     console.log('SQL:', sql);
     console.log('rows:', res.rows.length, JSON.stringify(res.rows[0] || null));
     if (res.rows[0]) {
-      console.log('bcrypt compare', await bcrypt.compare('Demo@2024!', res.rows[0].password_hash));
+      console.log('bcrypt compare', await bcrypt.compare(getDemoPassword(), res.rows[0].password_hash));
     }
   } catch (err) {
     console.error('SQL failed:', sql);

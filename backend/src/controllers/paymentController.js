@@ -10,6 +10,7 @@ import {
 import { auditLog } from '../services/auditService.js';
 import { calculateCommission, getPaymentSettings } from '../services/financeService.js';
 import { config } from '../config.js';
+import { isSafeDemoSeedDatabase } from '../demoDataPolicy.js';
 import { emitEvent } from '../realtime.js';
 import { recordTimelineEvent } from '../services/timelineService.js';
 import { sanitizePaymentForParty } from '../services/financialConfidentialityService.js';
@@ -39,18 +40,41 @@ export async function stkPush(req, res) {
   if (!jobId || !mpesaNumber) throw badRequest('Job and M-Pesa number are required');
   const normalizedPhone = assertValidMpesaPhone(mpesaNumber);
   const key = idempotencyKey || crypto.randomUUID();
+  const mpesaConfigured = Boolean(config.mpesa?.consumerKey && config.mpesa?.consumerSecret);
+  const simulatorEnabled = process.env.PATAFUNDI_ENABLE_PAYMENT_SIMULATOR === 'true'
+    && ['development', 'test'].includes(config.nodeEnv)
+    && (process.env.PATAFUNDI_EMBEDDED_DB === '1' || isSafeDemoSeedDatabase(config.databaseUrl));
+  const devSimulated = !mpesaConfigured && simulatorEnabled;
+  if (!mpesaConfigured && !devSimulated) {
+    const error = new Error('M-Pesa is not configured; payment was not created or marked successful');
+    error.status = 503;
+    throw error;
+  }
   const payment = await transaction(async (client) => {
     const duplicate = await client.query('select * from payments where idempotency_key = $1', [key]);
-    if (duplicate.rows[0]) return duplicate.rows[0];
-    const jobResult = await client.query('select * from jobs where id = $1 for update', [jobId]);
+    if (duplicate.rows[0]) {
+      if (Boolean(duplicate.rows[0].is_demo) !== devSimulated) {
+        throw badRequest('Idempotency key is already used');
+      }
+      return duplicate.rows[0];
+    }
+    const jobResult = await client.query(
+      'select * from jobs where id = $1 and is_demo = $2 for update',
+      [jobId, devSimulated],
+    );
     const job = jobResult.rows[0];
     if (!job) throw notFound('Job not found');
+    if (devSimulated && !req.user.is_demo) {
+      throw forbidden('The payment simulator is restricted to synthetic demo accounts');
+    }
     if (job.customer_id !== req.user.id && req.user.role !== 'admin') throw forbidden('Only the job customer can pay for this job');
     if (['cancelled', 'failed'].includes(job.status)) throw badRequest('Cannot pay for a cancelled or failed job');
     if (['escrow_held', 'payout_processing', 'payout_completed'].includes(job.payment_status)) {
       throw badRequest('This job has already been paid');
     }
     const expectedAmount = parsePositiveAmount(job.final_price || job.estimated_price || amount);
+    const currency = String(job.currency_code || 'KES').toUpperCase();
+    if (currency !== 'KES') throw badRequest('M-Pesa payments are only supported in KES');
     const requestedAmount = parsePositiveAmount(amount || expectedAmount);
     if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
       throw badRequest('Payment amount does not match the job amount');
@@ -62,15 +86,15 @@ export async function stkPush(req, res) {
       settings,
     });
     const inserted = await client.query(
-      `insert into payments (job_id, customer_id, amount, currency, country_code, provider, mpesa_number,
+      `insert into payments (job_id, customer_id, amount, currency, currency_code, country_code, provider, mpesa_number,
         status, escrow_status, idempotency_key, commission_rate, commission_type,
-        platform_commission, fundi_amount, commission_details)
-       values ($1, $2, $3, $4, $5, 'mpesa', $6, 'pending', 'pending', $7, $8, $9, $10, $11, $12::jsonb) returning *`,
+        platform_commission, fundi_amount, commission_details, is_demo)
+       values ($1, $2, $3, $4, $4, $5, 'mpesa', $6, 'pending', 'pending', $7, $8, $9, $10, $11, $12::jsonb, $13) returning *`,
       [
         jobId,
         req.user.id,
         expectedAmount,
-        job.currency_code || 'KES',
+        currency,
         job.country_code || null,
         normalizedPhone,
         key,
@@ -79,20 +103,13 @@ export async function stkPush(req, res) {
         commission.platformCommission,
         commission.fundiAmount,
         JSON.stringify(commission.details),
+        devSimulated,
       ],
     );
     return inserted.rows[0];
   });
 
-  // ── Development payment provider (honest, clearly-labelled simulator) ──
-  // When M-Pesa/Daraja credentials are absent OUTSIDE production, the payment
-  // is processed by the built-in dev provider: escrow hold is applied exactly
-  // like the real webhook would. Real money never moves; production requires
-  // MPESA_CONSUMER_KEY/SECRET (CREDENTIAL REQUIRED).
-  const mpesaConfigured = Boolean(
-    config.mpesa?.consumerKey && config.mpesa?.consumerSecret,
-  );
-  if (!mpesaConfigured && config.nodeEnv !== 'production') {
+  if (devSimulated) {
     await transaction(async (client) => {
       const locked = await client.query('select * from payments where id = $1 for update', [payment.id]);
       if (locked.rows[0].status === 'pending') {
@@ -165,17 +182,17 @@ export async function webhook(req, res) {
 
   const payment = await transaction(async (client) => {
     if (await isWebhookReplay({ checkoutRequestId, receipt: receiptPreview, rawBody: req.rawBody, client })) {
-      const existing = await client.query('select * from payments where checkout_request_id = $1', [checkoutRequestId]);
+      const existing = await client.query('select * from payments where checkout_request_id = $1 and is_demo = false', [checkoutRequestId]);
       return existing.rows[0] || { status: 'completed' };
     }
-    const paymentResult = await client.query('select * from payments where checkout_request_id = $1 for update', [checkoutRequestId]);
+    const paymentResult = await client.query('select * from payments where checkout_request_id = $1 and is_demo = false for update', [checkoutRequestId]);
     let row = paymentResult.rows[0];
     if (!row) {
       // Not a job payment — check whether it is a fundi subscription payment
       // (checkout_request_id stored in subscriptions.metadata by /subscriptions/activate).
       const subResult = await client.query(
         `select * from subscriptions
-          where metadata->>'checkout_request_id' = $1
+          where metadata->>'checkout_request_id' = $1 and is_demo = false
           for update`,
         [checkoutRequestId],
       );
@@ -194,10 +211,13 @@ export async function webhook(req, res) {
         // Server-controlled entitlement grant: money confirmed -> subscription active.
         // Duration is derived from the SERVER-side plan table (never client
         // input); the legacy 30/365 heuristic covers pre-043 rows.
-        const planLookup = await client.query(
-          `select duration_days from subscription_plans where code = $1 and is_active = true`,
+          const planLookup = await client.query(
+            `select duration_days, currency from subscription_plans where code = $1 and is_active = true`,
           [sub.plan],
         );
+          if (planLookup.rows[0]?.currency && planLookup.rows[0].currency !== 'KES') {
+            throw badRequest('M-Pesa subscription callbacks are only supported for KES plans');
+          }
         const days = planLookup.rows[0]?.duration_days
           ?? (sub.plan === 'yearly' || sub.plan === 'fundi_pro_yearly' || sub.plan === 'company_growth_yearly' ? 365 : 30);
         const activated = await client.query(
@@ -224,6 +244,9 @@ export async function webhook(req, res) {
     if (row.status === 'completed') return row;
     if (row.status !== 'pending') return row;
     if (resultCode === 0) {
+      if (String(row.currency || row.currency_code || 'KES').toUpperCase() !== 'KES') {
+        throw badRequest('M-Pesa callback currency does not match the KES payment');
+      }
       const receipt = callbackMetadataValue(callback, 'MpesaReceiptNumber') || callback.MpesaReceiptNumber;
       const paidAmount = Number(callbackMetadataValue(callback, 'Amount') ?? callback.Amount ?? row.amount);
       if (!receipt) throw badRequest('MpesaReceiptNumber missing');

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from './demo-password.mjs';
 /**
  * Full E2E user journeys — customer, fundi, admin, all staff roles.
  * Verifies every critical path works end-to-end.
@@ -83,16 +84,16 @@ async function main() {
   // ────────────────────────────────────────────────────────────────
   console.log('— 1. Demo Logins (all 10 roles) —');
   const logins = [
-    ['demo@patafundi.com', 'Demo@2024!', 'customer'],
-    ['fundi@patafundi.com', 'Fundi@2024!', 'fundi'],
-    ['admin@patafundi.com', 'Admin@2024!', 'super_admin|admin'], // allowlist demotes non-SUPER_ADMIN_EMAILS admins after first request
-    ['ops@patafundi.com', 'Ops@2024!', 'admin'],
-    ['support@patafundi.com', 'Support@2024!', 'support_agent'],
-    ['fraud@patafundi.com', 'Fraud@2024!', 'fraud_analyst'],
-    ['finance@patafundi.com', 'Finance@2024!', 'finance_team'],
-    ['dispatch@patafundi.com', 'Dispatch@2024!', 'dispatch_team'],
-    ['devops@patafundi.com', 'Devops@2024!', 'devops_engineer'],
-    ['auditor@patafundi.com', 'Auditor@2024!', 'auditor'],
+    ['demo@patafundi.com', getDemoPassword(), 'customer'],
+    ['fundi@patafundi.com', getDemoPassword(), 'fundi'],
+    ['admin@patafundi.com', getDemoPassword(), 'super_admin|admin'], // allowlist demotes non-SUPER_ADMIN_EMAILS admins after first request
+    ['ops@patafundi.com', getDemoPassword(), 'admin'],
+    ['support@patafundi.com', getDemoPassword(), 'support_agent'],
+    ['fraud@patafundi.com', getDemoPassword(), 'fraud_analyst'],
+    ['finance@patafundi.com', getDemoPassword(), 'finance_team'],
+    ['dispatch@patafundi.com', getDemoPassword(), 'dispatch_team'],
+    ['devops@patafundi.com', getDemoPassword(), 'devops_engineer'],
+    ['auditor@patafundi.com', getDemoPassword(), 'auditor'],
   ];
   for (const [email, pw, expectedRole] of logins) {
     const r = await login(email, pw);
@@ -141,7 +142,7 @@ async function main() {
   r = await request('POST', '/api/auth/register/fundi', {
     formData: [
       { name: 'email', value: fundiEmail },
-      { name: 'password', value: 'Fundi@2024' },
+      { name: 'password', value: getDemoPassword() },
       { name: 'fullName', value: 'E2E Fundi' },
       { name: 'phone', value: '254712000222' },
       { name: 'skills', value: JSON.stringify(['plumbing']) },
@@ -169,7 +170,7 @@ async function main() {
   // ────────────────────────────────────────────────────────────────
   console.log('\n— 4. Admin Journey —');
   cookies = {};
-  r = await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
+  r = await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: getDemoPassword() } });
   // admin@patafundi.com is NOT in SUPER_ADMIN_EMAILS — the server must demote
   // it to 'admin' (security task 14). Expect the demoted role here.
   check('admin login (allowlist converges role)', r.status === 200 && ['super_admin', 'admin'].includes(r.json?.user?.role), r.body);
@@ -233,7 +234,7 @@ async function main() {
   loadJar('support');
   // Re-login support
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'support@patafundi.com', password: 'Support@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'support@patafundi.com', password: getDemoPassword() } });
   saveJar('support');
   loadJar('support');
   r = await request('GET', '/api/staff/me/permissions');
@@ -247,7 +248,7 @@ async function main() {
 
   // Finance team
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'finance@patafundi.com', password: 'Finance@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'finance@patafundi.com', password: getDemoPassword() } });
   saveJar('finance');
   loadJar('finance');
   r = await request('GET', '/api/staff/payments');
@@ -257,7 +258,7 @@ async function main() {
 
   // Auditor (read-only)
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'auditor@patafundi.com', password: 'Auditor@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'auditor@patafundi.com', password: getDemoPassword() } });
   saveJar('auditor');
   loadJar('auditor');
   r = await request('GET', '/api/staff/audit-logs');

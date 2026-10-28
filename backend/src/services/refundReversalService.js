@@ -25,7 +25,7 @@ export async function executeRefundReversal({ jobId, reason, amount: customAmoun
   const result = await transaction(async (client) => {
     // Lock the payment row
     const payment = await client.query(
-      `select * from payments where job_id = $1 and status = 'completed' order by created_at desc limit 1 for update`,
+      `select * from payments where job_id = $1 and is_demo = false and status = 'completed' order by created_at desc limit 1 for update`,
       [jobId],
     );
     if (!payment.rows[0]) throw badRequest('No completed payment found for this job');
@@ -33,6 +33,9 @@ export async function executeRefundReversal({ jobId, reason, amount: customAmoun
     const refundAmount = customAmount ? Number(customAmount) : Number(payment.rows[0].amount);
     if (!Number.isFinite(refundAmount) || refundAmount <= 0) throw badRequest('Refund amount is invalid');
     if (refundAmount > Number(payment.rows[0].amount) + 0.001) throw badRequest('Refund amount exceeds the amount paid');
+    if (refundAmount + 0.001 < Number(payment.rows[0].amount)) {
+      throw badRequest('Partial refunds are not supported; refund the full payment amount');
+    }
 
     // Check if fundi was already credited — if so, debit their wallet
     const walletTx = await client.query(
@@ -69,9 +72,16 @@ export async function executeRefundReversal({ jobId, reason, amount: customAmoun
 
     // Record revenue ledger entry
     await client.query(
-      `insert into revenue_ledger (job_id, transaction_type, amount, currency, user_id, notes)
-       values ($1, 'refund', $2, 'KES', $3, $4)`,
-      [jobId, refundAmount, payment.rows[0].customer_id, `Refund: ${reason}`],
+      `insert into revenue_ledger (job_id, payment_id, entry_type, transaction_type, amount, currency, user_id, notes)
+       values ($1, $2, 'refund', 'refund', $3, $4, $5, $6)`,
+      [
+        jobId,
+        payment.rows[0].id,
+        refundAmount,
+        payment.rows[0].currency || 'KES',
+        payment.rows[0].customer_id,
+        `Refund: ${reason}`,
+      ],
     );
 
     // Update job

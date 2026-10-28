@@ -1,30 +1,10 @@
 /**
  * Demo Accounts Page — /demo
  *
- * Shows every demo account with copy-to-clipboard buttons and one-click
- * login (dev only). Hidden in production by default — guarded by a
- * VITE_DEV_DEMO flag and NODE_ENV check.
+ * Shows development-only demo accounts. The shared seed password is entered
+ * locally and is never embedded in the client bundle.
  *
- * Core accounts (seeded automatically at dev boot by ensure-dev-db.js):
- *   demo@patafundi.com / Demo@2024!         → customer
- *   fundi@patafundi.com / Fundi@2024!       → fundi (approved)
- *   admin@patafundi.com / Admin@2024!       → admin (demo owner — real super_admin is allowlisted)
- *   ops@patafundi.com / Ops@2024!           → admin (ops manager)
- *   support@patafundi.com / Support@2024!   → support_agent
- *   fraud@patafundi.com / Fraud@2024!       → fraud_analyst
- *   finance@patafundi.com / Finance@2024!   → finance_team
- *   dispatch@patafundi.com / Dispatch@2024! → dispatch_team
- *   devops@patafundi.com / Devops@2024!     → devops_engineer
- *   auditor@patafundi.com / Auditor@2024!   → auditor
- *
- * Takeover ecosystem (seeded automatically at dev boot by seed-takeover.js
- * — see DEMO_ACCOUNTS.md):
- *   customer.demo@patafundi.test            → customer
- *   fundi.demo@patafundi.test               → fundi (John Kamau)
- *   company.demo@patafundi.test             → company_admin (Apex owner)
- *   dispatcher.demo@patafundi.test          → company dispatcher
- *   technician.demo@patafundi.test          → company technician
- *   admin.demo@patafundi.test               → super_admin
+ * Accounts are created only by explicit isolated development/test seeding.
  */
 
 import { useState } from "react";
@@ -42,7 +22,6 @@ import { resolvePostLoginPath } from "@/lib/postLoginRoute";
 
 interface DemoAccount {
   email: string;
-  password: string;
   role: string;
   label: string;
   description: string;
@@ -53,7 +32,6 @@ interface DemoAccount {
 const DEMO_ACCOUNTS: DemoAccount[] = [
   {
     email: "demo@patafundi.com",
-    password: "Demo@2024!",
     role: "customer",
     label: "Customer",
     description: "Create jobs, hire fundis, pay, review",
@@ -62,7 +40,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "fundi@patafundi.com",
-    password: "Fundi@2024!",
     role: "fundi",
     label: "Fundi (Approved)",
     description: "Accept jobs, track location, earn money",
@@ -71,7 +48,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "admin@patafundi.com",
-    password: "Admin@2024!",
     role: "admin",
     label: "Admin (demo)",
     description: "Admin tools - super_admin is reserved for the allowlisted owner",
@@ -80,7 +56,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "ops@patafundi.com",
-    password: "Ops@2024!",
     role: "admin",
     label: "Ops Manager",
     description: "Approve fundis, manage jobs (no role management)",
@@ -89,7 +64,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "support@patafundi.com",
-    password: "Support@2024!",
     role: "support_agent",
     label: "Support Agent",
     description: "View disputes, tickets, users",
@@ -98,7 +72,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "fraud@patafundi.com",
-    password: "Fraud@2024!",
     role: "fraud_analyst",
     label: "Fraud Analyst",
     description: "Fraud dashboard, flag, suspend, ban",
@@ -107,7 +80,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "finance@patafundi.com",
-    password: "Finance@2024!",
     role: "finance_team",
     label: "Finance Team",
     description: "Payments, escrow, payouts, revenue",
@@ -116,7 +88,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "dispatch@patafundi.com",
-    password: "Dispatch@2024!",
     role: "dispatch_team",
     label: "Dispatch Team",
     description: "Assign jobs, approve fundis",
@@ -125,7 +96,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "devops@patafundi.com",
-    password: "Devops@2024!",
     role: "devops_engineer",
     label: "DevOps Engineer",
     description: "Logs, metrics, system health",
@@ -134,7 +104,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "auditor@patafundi.com",
-    password: "Auditor@2024!",
     role: "auditor",
     label: "Auditor (Read-Only)",
     description: "Read-only compliance view",
@@ -144,7 +113,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   // ── Takeover demo ecosystem (@patafundi.test) — see DEMO_ACCOUNTS.md ──
   {
     email: "customer.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "customer",
     label: "Customer (Takeover Demo)",
     description: "Book companies & fundis, properties, pay, review",
@@ -153,7 +121,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "fundi.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "fundi",
     label: "Fundi - John Kamau (Takeover Demo)",
     description: "Verified individual fundi with wallet",
@@ -162,7 +129,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "company.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "company_admin",
     label: "Apex Home Services Owner (Takeover Demo)",
     description: "Full company portal: dispatch, team, finance",
@@ -171,7 +137,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "dispatcher.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "company",
     label: "Apex Dispatcher (Takeover Demo)",
     description: "Accept + assign jobs (no finance access)",
@@ -180,7 +145,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "technician.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "technician",
     label: "Apex Technician (Takeover Demo)",
     description: "Assigned jobs, status updates",
@@ -189,7 +153,6 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: "admin.demo@patafundi.test",
-    password: "PataFundi#2026",
     role: "super_admin",
     label: "Super Admin (Takeover Demo)",
     description: "Command center incl. company approvals",
@@ -203,6 +166,7 @@ export default function DemoPage() {
   const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState<string | null>(null);
+  const [demoPassword, setDemoPassword] = useState("");
 
   const copyToClipboard = async (text: string, id: string) => {
     try {
@@ -215,18 +179,17 @@ export default function DemoPage() {
     }
   };
 
-  const copyCredentials = (account: DemoAccount) => {
-    const text = `Email: ${account.email}\nPassword: ${account.password}`;
-    copyToClipboard(text, `full-${account.email}`);
-  };
-
   const quickLogin = async (account: DemoAccount) => {
+    if (!demoPassword) {
+      toast.error("Enter the local demo seed password first");
+      return;
+    }
     setLoggingIn(account.email);
     try {
       // Use apiClient.login() so the token is stored in localStorage
       // and the auth session is set. Without this, the dashboard pages
       // can't make authenticated API calls (they'd get 401/403).
-      const data = await apiClient.login(account.email, account.password) as {
+      const data = await apiClient.login(account.email, demoPassword) as {
         success?: boolean;
         message?: string;
         user?: Record<string, unknown>;
@@ -260,15 +223,29 @@ export default function DemoPage() {
           <motion.div variants={itemVariants} className="text-center mb-10">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Demo Accounts</h1>
             <p className="text-slate-600">
-              PataFundi has {DEMO_ACCOUNTS.length} demo accounts covering every role - customers, fundis, the
-              company portal (owner, dispatcher, technician) and all staff consoles. Click any card to log in instantly,
-              or copy the credentials to use on the login page.
+              PataFundi has {DEMO_ACCOUNTS.length} demo accounts for local development. They are created only in an
+              explicitly isolated development or test database.
             </p>
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
               <AlertTriangle className="w-3 h-3" />
-              Dev only - these accounts are seeded by the dev database. Do not use in production.
+              Development only. The shared demo password is entered locally and is not shown or stored in this page.
             </div>
           </motion.div>
+
+          <div className="mb-6">
+            <label htmlFor="demo-seed-password" className="block text-sm font-medium text-slate-700 mb-2">
+              Local demo seed password
+            </label>
+            <input
+              id="demo-seed-password"
+              type="password"
+              autoComplete="off"
+              value={demoPassword}
+              onChange={(event) => setDemoPassword(event.target.value)}
+              placeholder="Enter PATAFUNDI_DEMO_SEED_PASSWORD"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
+            />
+          </div>
 
           <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {DEMO_ACCOUNTS.map((account) => {
@@ -313,19 +290,6 @@ export default function DemoPage() {
                             {copied === `email-${account.email}` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-slate-400 w-16 text-xs">Password</span>
-                          <code className="flex-1 text-slate-700 bg-slate-50 px-2 py-1 rounded text-xs truncate">
-                            {account.password}
-                          </code>
-                          <button
-                            onClick={() => copyToClipboard(account.password, `pwd-${account.email}`)}
-                            className="p-1 text-slate-400 hover:text-slate-700"
-                            title="Copy password"
-                          >
-                            {copied === `pwd-${account.email}` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
                       </div>
 
                       <div className="flex gap-2">
@@ -351,11 +315,11 @@ export default function DemoPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => copyCredentials(account)}
+                          onClick={() => copyToClipboard(account.email, `email-${account.email}`)}
                           className="flex items-center gap-2"
                         >
-                          {copied === `full-${account.email}` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                          Copy All
+                          {copied === `email-${account.email}` ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          Copy Email
                         </Button>
                       </div>
                     </div>

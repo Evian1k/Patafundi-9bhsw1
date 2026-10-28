@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 // Security spot-check battery (spec §31) — runs against localhost:4000
 const BASE = 'http://localhost:4000/api';
 let pass = 0, fail = 0;
@@ -11,7 +12,7 @@ const api = async (path, { method='GET', token, body } = {}) => {
   let json = null; try { json = await res.json(); } catch {}
   return { status: res.status, json };
 };
-const login = async (email, password='PataFundi#2026') => (await api('/auth/login', { method:'POST', body:{ email, password } })).json?.token;
+const login = async (email, password=getDemoPassword()) => (await api('/auth/login', { method:'POST', body:{ email, password } })).json?.token;
 
 const customer = await login('customer.demo@patafundi.test');
 const fundi = await login('fundi.demo@patafundi.test');

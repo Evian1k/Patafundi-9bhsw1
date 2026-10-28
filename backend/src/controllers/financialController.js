@@ -38,38 +38,38 @@ export async function ceoFinancialDashboard(req, res) {
     avgOrderValue,
   ] = await Promise.all([
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'commission_earned' AND created_at::date = now()::date`),
+           WHERE is_demo = false AND transaction_type = 'commission_earned' AND created_at::date = now()::date`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'commission_earned' AND created_at > now() - interval '7 days'`),
+           WHERE is_demo = false AND transaction_type = 'commission_earned' AND created_at > now() - interval '7 days'`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'commission_earned' AND date_trunc('month', created_at) = date_trunc('month', now())`),
+           WHERE is_demo = false AND transaction_type = 'commission_earned' AND date_trunc('month', created_at) = date_trunc('month', now())`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'commission_earned' AND date_trunc('year', created_at) = date_trunc('year', now())`),
+           WHERE is_demo = false AND transaction_type = 'commission_earned' AND date_trunc('year', created_at) = date_trunc('year', now())`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'escrow_held'`),
-    query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM payouts WHERE status = 'pending'`),
+           WHERE is_demo = false AND transaction_type = 'escrow_held'`),
+    query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM payouts WHERE is_demo = false AND status = 'pending'`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'commission_earned'`),
+           WHERE is_demo = false AND transaction_type = 'commission_earned'`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'gateway_fee'`),
+           WHERE is_demo = false AND transaction_type = 'gateway_fee'`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'refund'`),
+           WHERE is_demo = false AND transaction_type = 'refund'`),
     query(`SELECT COALESCE(SUM(amount),0)::numeric(12,2) as total FROM revenue_ledger
-           WHERE transaction_type = 'chargeback'`),
+           WHERE is_demo = false AND transaction_type = 'chargeback'`),
     query(`SELECT j.customer_address, COALESCE(SUM(rl.amount),0) as profit
            FROM revenue_ledger rl LEFT JOIN jobs j ON j.id = rl.job_id
-           WHERE rl.transaction_type = 'commission_earned'
+           WHERE rl.is_demo = false AND (j.is_demo = false OR j.id IS NULL) AND rl.transaction_type = 'commission_earned'
            GROUP BY j.customer_address ORDER BY profit DESC LIMIT 10`),
     query(`SELECT j.service_category, COALESCE(SUM(rl.amount),0) as profit
            FROM revenue_ledger rl LEFT JOIN jobs j ON j.id = rl.job_id
-           WHERE rl.transaction_type = 'commission_earned'
+           WHERE rl.is_demo = false AND (j.is_demo = false OR j.id IS NULL) AND rl.transaction_type = 'commission_earned'
            GROUP BY j.service_category ORDER BY profit DESC LIMIT 10`),
     query(`SELECT f.tier, COALESCE(SUM(rl.amount),0) as profit
            FROM revenue_ledger rl LEFT JOIN fundis f ON f.user_id = rl.fundi_id
-           WHERE rl.transaction_type = 'commission_earned'
+           WHERE rl.is_demo = false AND (f.is_demo = false OR f.id IS NULL) AND rl.transaction_type = 'commission_earned'
            GROUP BY f.tier ORDER BY profit DESC`),
     query(`SELECT COALESCE(AVG(customer_paid),0)::numeric(12,2) as avg
-           FROM revenue_ledger WHERE transaction_type = 'customer_payment'`),
+           FROM revenue_ledger WHERE is_demo = false AND transaction_type = 'customer_payment'`),
   ]);
 
   res.json({

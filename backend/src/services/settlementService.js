@@ -18,7 +18,7 @@ function money(n) {
  */
 export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'system', source = 'customer_confirmation' }) {
   const released = await transaction(async (client) => {
-    const jobRes = await client.query('select * from jobs where id = $1 for update', [jobId]);
+    const jobRes = await client.query('select * from jobs where id = $1 and is_demo = false for update', [jobId]);
     const job = jobRes.rows[0];
     if (!job) throw new Error('Job not found');
     if (job.status !== 'completed' || !job.customer_completion_confirmed) {
@@ -31,7 +31,7 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
     if (disputeRes.rows[0]) throw new Error('Escrow cannot be released while a dispute is open');
 
     const paymentRes = await client.query(
-      `select * from payments where job_id = $1 and escrow_status = 'held' order by created_at desc limit 1 for update`,
+      `select * from payments where job_id = $1 and is_demo = false and escrow_status = 'held' order by created_at desc limit 1 for update`,
       [jobId],
     );
     const payment = paymentRes.rows[0];
@@ -125,18 +125,6 @@ export async function releaseJobEscrow({ jobId, actorId = null, actorRole = 'sys
       );
       payout = payoutRes.rows[0] || null;
     }
-
-    // 3. revenue ledger (platform commission earned) — 005 entry_type + 029
-    // transaction_type column families coexist, so write both.
-    await client.query(
-      `insert into revenue_ledger (payment_id, job_id, user_id, entry_type, amount, currency,
-        transaction_type, customer_paid, commission_amount, platform_fee_amount, fundi_payout,
-        net_revenue, payment_method, notes)
-       values ($1, $2, $3, 'commission', $4, $5, 'commission_earned', $6, $4, $4, $7, $4, $8, $9)`,
-      [payment.id, jobId, job.customer_id, commissionAmount, currency, jobValue, providerAmount,
-       payment.provider || 'mpesa',
-       `Escrow released via ${source}`],
-    );
 
     return {
       released: true,

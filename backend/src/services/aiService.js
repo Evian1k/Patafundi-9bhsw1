@@ -197,13 +197,13 @@ export async function analyzeFraudPatterns() {
 // ============================================================
 export async function analyzeRevenue() {
   const [today, week, month, byCategory] = await Promise.all([
-    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where entry_type = 'commission' and created_at > now() - interval '1 day'`),
-    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where entry_type = 'commission' and created_at > now() - interval '7 days'`),
-    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where entry_type = 'commission' and created_at > now() - interval '30 days'`),
+    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where is_demo = false and entry_type = 'commission' and created_at > now() - interval '1 day'`),
+    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where is_demo = false and entry_type = 'commission' and created_at > now() - interval '7 days'`),
+    query(`select coalesce(sum(amount), 0)::numeric as total from revenue_ledger where is_demo = false and entry_type = 'commission' and created_at > now() - interval '30 days'`),
     query(
       `select j.service_category, count(*)::int as jobs, coalesce(sum(rl.amount), 0)::numeric as revenue
        from revenue_ledger rl join jobs j on j.id = rl.job_id
-       where rl.entry_type = 'commission' and rl.created_at > now() - interval '30 days'
+       where rl.is_demo = false and j.is_demo = false and rl.entry_type = 'commission' and rl.created_at > now() - interval '30 days'
        group by j.service_category order by revenue desc`,
     ),
   ]);
@@ -304,12 +304,12 @@ export async function analyzeCommissionRates() {
 // ============================================================
 export async function analyzePlatformHealth() {
   const [users, fundis, jobs, disputes, fraudAlerts, pendingPayouts] = await Promise.all([
-    query(`select count(*)::int as total, count(*) filter (where status = 'active')::int as active, count(*) filter (where created_at > now() - interval '7 days')::int as new from users`),
-    query(`select count(*)::int as total, count(*) filter (where approval_status = 'approved')::int as approved, count(*) filter (where approval_status = 'pending')::int as pending, count(*) filter (where online = true and approval_status = 'approved')::int as online from fundis`),
-    query(`select count(*)::int as total, count(*) filter (where status = 'completed')::int as completed, count(*) filter (where status not in ('completed', 'cancelled', 'failed'))::int as active from jobs`),
+    query(`select count(*)::int as total, count(*) filter (where status = 'active')::int as active, count(*) filter (where created_at > now() - interval '7 days')::int as new from users where is_demo = false`),
+    query(`select count(*)::int as total, count(*) filter (where approval_status = 'approved')::int as approved, count(*) filter (where approval_status = 'pending')::int as pending, count(*) filter (where online = true and approval_status = 'approved')::int as online from fundis where is_demo = false`),
+    query(`select count(*)::int as total, count(*) filter (where status = 'completed')::int as completed, count(*) filter (where status not in ('completed', 'cancelled', 'failed'))::int as active from jobs where is_demo = false`),
     query(`select count(*)::int as total, count(*) filter (where status = 'open')::int as open from disputes`),
     query(`select count(*)::int as total, count(*) filter (where resolved_at is null)::int as open, count(*) filter (where severity = 'critical' and resolved_at is null)::int as critical_open from fraud_alerts`),
-    query(`select count(*)::int as total, coalesce(sum(amount), 0)::numeric as amount from payouts where status in ('requested', 'processing')`),
+    query(`select count(*)::int as total, coalesce(sum(amount), 0)::numeric as amount from payouts where is_demo = false and status in ('requested', 'processing')`),
   ]);
 
   const recommendations = [];

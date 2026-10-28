@@ -1,6 +1,7 @@
 /**
  * PataFundi FINAL REAL-WORLD E2E AUDIT
- * Usage: VERIFY_API_URL=https://patafundi-9bhsw1.onrender.com/api VERIFY_SOCKET_URL=https://patafundi-9bhsw1.onrender.com node backend/scripts/e2e-production-audit.js
+ * Usage: configure an isolated test API, test accounts, and
+ * VERIFY_ALLOW_MUTATIONS=true before running. Never target production.
  */
 import crypto from 'node:crypto';
 
@@ -19,9 +20,13 @@ async function loadSocketIo() {
   }
 }
 
-const API_ROOT = (process.env.VERIFY_API_URL || 'https://patafundi-9bhsw1.onrender.com/api').replace(/\/$/, '');
+const API_ROOT = (process.env.VERIFY_API_URL || '').replace(/\/$/, '');
 const SOCKET_URL = process.env.VERIFY_SOCKET_URL || API_ROOT.replace(/\/api$/, '');
-const FRONTEND = process.env.VERIFY_FRONTEND_URL || 'https://patafundi-9bhsw1.vercel.app';
+const FRONTEND = process.env.VERIFY_FRONTEND_URL || '';
+const DEMO_PASSWORD = process.env.PATAFUNDI_DEMO_SEED_PASSWORD || '';
+const CUSTOMER_EMAIL = process.env.VERIFY_CUSTOMER_EMAIL || 'demo@patafundi.com';
+const FUNDI_EMAIL = process.env.VERIFY_FUNDI_EMAIL || 'fundi@patafundi.com';
+const ADMIN_EMAIL = process.env.VERIFY_ADMIN_EMAIL || 'admin@patafundi.com';
 
 const results = [];
 
@@ -150,7 +155,7 @@ async function testAuth() {
   // Demo login
   const demo = new Session();
   try {
-    res = await loginAs(demo, 'demo@patafundi.com', 'Demo@2024!');
+    res = await loginAs(demo, CUSTOMER_EMAIL, DEMO_PASSWORD);
     record('auth', 'Login (demo customer)', 'PASS', `role=${demo.user?.role}`);
   } catch (e) {
     record('auth', 'Login (demo customer)', 'FAIL', e.message);
@@ -178,7 +183,7 @@ async function testAuth() {
 async function testCustomerFlows() {
   console.log('\n=== CUSTOMER ===');
   const customer = new Session();
-  try { await loginAs(customer, 'demo@patafundi.com', 'Demo@2024!'); } catch (e) {
+  try { await loginAs(customer, CUSTOMER_EMAIL, DEMO_PASSWORD); } catch (e) {
     record('customer', 'Customer session', 'FAIL', e.message);
     return null;
   }
@@ -205,7 +210,7 @@ async function testCustomerFlows() {
 
   // Track fundi — create active job with fundi
   const fundi = new Session();
-  try { await loginAs(fundi, 'fundi@patafundi.com', 'Fundi@2024!'); } catch (e) {
+  try { await loginAs(fundi, FUNDI_EMAIL, DEMO_PASSWORD); } catch (e) {
     record('customer', 'Fundi session for tracking', 'FAIL', e.message);
     return jobId;
   }
@@ -250,7 +255,7 @@ async function testFundiFlows() {
   console.log('\n=== FUNDI ===');
   const fundi = new Session();
   try {
-    await loginAs(fundi, 'fundi@patafundi.com', 'Fundi@2024!');
+    await loginAs(fundi, FUNDI_EMAIL, DEMO_PASSWORD);
     record('fundi', 'Fundi login', 'PASS', fundi.user?.role);
   } catch (e) {
     record('fundi', 'Fundi login', 'FAIL', e.message);
@@ -275,7 +280,7 @@ async function testFundiFlows() {
 async function testAdminFlows() {
   console.log('\n=== ADMIN ===');
   const admin = new Session();
-  try { await loginAs(admin, 'admin@patafundi.com', 'Admin@2024!'); } catch (e) {
+  try { await loginAs(admin, ADMIN_EMAIL, DEMO_PASSWORD); } catch (e) {
     record('admin', 'Admin login', 'FAIL', e.message);
     return;
   }
@@ -316,7 +321,7 @@ async function testSecurity() {
   console.log('\n=== SECURITY (ATTACKER) ===');
   const anon = new Session();
   const customer = new Session();
-  try { await loginAs(customer, 'demo@patafundi.com', 'Demo@2024!'); } catch { /* */ }
+  try { await loginAs(customer, CUSTOMER_EMAIL, DEMO_PASSWORD); } catch { /* */ }
 
   // SQL injection
   let res = await anon.req('POST', '/auth/login', { email: "' OR '1'='1", password: "x" }, { auth: false });
@@ -351,8 +356,8 @@ async function testSecurity() {
   const attacker = new Session();
   const victim = new Session();
   try {
-    await loginAs(attacker, 'demo@patafundi.com', 'Demo@2024!');
-    await loginAs(victim, 'fundi@patafundi.com', 'Fundi@2024!');
+    await loginAs(attacker, CUSTOMER_EMAIL, DEMO_PASSWORD);
+    await loginAs(victim, FUNDI_EMAIL, DEMO_PASSWORD);
   } catch { /* */ }
 
   const io = await loadSocketIo();
@@ -396,6 +401,22 @@ async function testSecurity() {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
+  if (!API_ROOT) throw new Error('VERIFY_API_URL must explicitly identify an isolated test API');
+  if (!DEMO_PASSWORD) throw new Error('PATAFUNDI_DEMO_SEED_PASSWORD must be set for the isolated test accounts');
+  if (process.env.VERIFY_ALLOW_MUTATIONS !== 'true') {
+    throw new Error('This audit creates and changes test records; set VERIFY_ALLOW_MUTATIONS=true only for an isolated test API');
+  }
+  const apiUrl = new URL(API_ROOT);
+  if (!['http:', 'https:'].includes(apiUrl.protocol)) {
+    throw new Error('VERIFY_API_URL must use HTTP or HTTPS');
+  }
+  if (['patafundi-9bhsw1.onrender.com', 'patafundi-9bhsw1.vercel.app'].includes(apiUrl.hostname)) {
+    throw new Error('Refusing to run mutating verification against a production hostname');
+  }
+  if (!['localhost', '127.0.0.1', '::1'].includes(apiUrl.hostname)
+    && process.env.VERIFY_ALLOW_REMOTE_MUTATIONS !== 'true') {
+    throw new Error('Remote test APIs require VERIFY_ALLOW_REMOTE_MUTATIONS=true');
+  }
   console.log('PataFundi FINAL REAL-WORLD E2E AUDIT');
   console.log(`API: ${API_ROOT}`);
   console.log(`Socket: ${SOCKET_URL}`);

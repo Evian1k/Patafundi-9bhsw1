@@ -249,17 +249,6 @@ export const SERVICE_CATEGORIES = [
   { slug: 'vehicle-services',   label: 'Vehicle',           icon: 'car',            color: '#0EA5E9' },
 ] as const;
 
-// ── Job Status ────────────────────────────────────────────────
-export const JOB_STATUS_LABELS: Record<string, string> = {
-  matching: 'Finding Fundi',
-  accepted: 'Fundi On The Way',
-  in_progress: 'Work In Progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  failed: 'Failed',
-  disputed: 'Disputed',
-} as const;
-
 export const JOB_STATUS_COLORS: Record<string, string> = {
   pending: '#F59E0B',
   matching: '#F59E0B',

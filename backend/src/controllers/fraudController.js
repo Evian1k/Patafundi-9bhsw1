@@ -47,7 +47,7 @@ export async function fraudDashboard(req, res) {
     ),
     query(
       `select coalesce(sum(amount), 0)::numeric as total from revenue_ledger
-       where entry_type = 'commission' and created_at between $1 and $2`,
+       where is_demo = false and entry_type = 'commission' and created_at between $1 and $2`,
       [from, to],
     ),
   ]);
@@ -155,7 +155,7 @@ export async function fraudReports(req, res) {
     ),
     query(
       `select coalesce(sum(amount),0)::numeric as total from revenue_ledger
-       where entry_type = 'commission' and created_at between $1 and $2`,
+       where is_demo = false and entry_type = 'commission' and created_at between $1 and $2`,
       [from, to],
     ),
   ]);

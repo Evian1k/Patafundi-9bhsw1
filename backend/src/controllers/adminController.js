@@ -100,26 +100,26 @@ export async function dashboard(req, res) {
     escrowHeld, payoutsPending, paymentsFailed, fraudAlertsOpen,
     subscriptionRevenue, revenue, weeklyJobs, activeStaff,
   ] = await Promise.all([
-    query('select count(*)::int as total from users'),
+    query('select count(*)::int as total from users where is_demo = false'),
     query(`select count(*)::int as total from users
-             where role in ('customer','fundi','company_admin')
+             where is_demo = false and role in ('customer','fundi','company_admin')
              and updated_at > now() - interval '15 minutes'`),
-    query(`select count(*)::int as total from fundis where approval_status = 'approved'`),
-    query(`select count(*)::int as total from fundis where approval_status = 'pending'`),
-    query(`select count(*)::int as total from fundis where approval_status = 'rejected'`),
-    query(`select count(*)::int as total from fundis where approval_status = 'suspended'`),
-    query(`select count(*)::int as total from fundis where online = true and approval_status = 'approved'`),
-    query(`select count(*)::int as total from company_profiles where status = 'approved'`),
-    query(`select count(*)::int as total from company_partner_applications where status in ('submitted','pending','in_review')`),
-    query(`select count(*)::int as total from jobs where status in ('pending','matching','searching','matched','accepted','assigned','on_the_way','arrived','in_progress','completion_requested','awaiting_confirmation')`),
-    query(`select count(*)::int as total from jobs where status = 'completed'`),
-    query(`select count(*)::int as total from jobs where status = 'cancelled'`),
-    query(`select count(*)::int as total from disputes where status = 'open'`),
-    query(`select coalesce(sum(amount),0)::numeric as total from payments where escrow_status in ('held','frozen')`),
-    query(`select coalesce(sum(amount),0)::numeric as total, count(*)::int as total_count from payouts where status in ('requested','processing')`),
-    query(`select count(*)::int as total from payments where status = 'failed'`),
-    query(`select count(*)::int as total from fraud_alerts where status = 'open'`),
-    query(`select coalesce(sum(amount),0)::numeric as total from subscriptions where status = 'active' and expires_at > now()`),
+    query(`select count(*)::int as total from fundis where is_demo = false and approval_status = 'approved'`),
+    query(`select count(*)::int as total from fundis where is_demo = false and approval_status = 'pending'`),
+    query(`select count(*)::int as total from fundis where is_demo = false and approval_status = 'rejected'`),
+    query(`select count(*)::int as total from fundis where is_demo = false and approval_status = 'suspended'`),
+    query(`select count(*)::int as total from fundis where is_demo = false and online = true and approval_status = 'approved'`),
+    query(`select count(*)::int as total from company_profiles where is_demo = false and status = 'approved'`),
+    query(`select count(*)::int as total from company_partner_applications where is_demo = false and status in ('submitted','pending','in_review')`),
+    query(`select count(*)::int as total from jobs where is_demo = false and status in ('pending','matching','searching','matched','accepted','assigned','on_the_way','arrived','in_progress','completion_requested','awaiting_confirmation')`),
+    query(`select count(*)::int as total from jobs where is_demo = false and status = 'completed'`),
+    query(`select count(*)::int as total from jobs where is_demo = false and status = 'cancelled'`),
+    query(`select count(*)::int as total from disputes where is_demo = false and status = 'open'`),
+    query(`select coalesce(sum(amount),0)::numeric as total from payments where is_demo = false and escrow_status in ('held','frozen')`),
+    query(`select coalesce(sum(amount),0)::numeric as total, count(*)::int as total_count from payouts where is_demo = false and status in ('requested','processing')`),
+    query(`select count(*)::int as total from payments where is_demo = false and status = 'failed'`),
+    query(`select count(*)::int as total from fraud_alerts where is_demo = false and status = 'open'`),
+    query(`select coalesce(sum(amount),0)::numeric as total from subscriptions where is_demo = false and status = 'active' and expires_at > now()`),
     revenueSummaryQuery(),
     query(`select to_char(d.day, 'Mon DD') as name,
                   coalesce(j.cnt, 0)::int as jobs,
@@ -127,22 +127,24 @@ export async function dashboard(req, res) {
              from generate_series(current_date - interval '13 days', current_date, interval '1 day') as d(day)
              left join (
                select date_trunc('day', created_at) as day, count(*) as cnt
-               from jobs where created_at > current_date - interval '14 days'
+               from jobs where is_demo = false and created_at > current_date - interval '14 days'
                group by 1
              ) j on j.day = d.day
              left join (
-               select date_trunc('day', created_at) as day, sum(amount) as revenue
-               from payments where status = 'completed' and created_at > current_date - interval '14 days'
+               select date_trunc('day', created_at) as day,
+                      sum(amount) filter (where entry_type in ('commission', 'withdrawal_fee', 'subscription'))
+                        - sum(amount) filter (where entry_type = 'refund') as revenue
+               from revenue_ledger
+               where is_demo = false and created_at > current_date - interval '14 days'
                group by 1
              ) p on p.day = d.day
              order by d.day`),
-    query(`select count(*)::int as total from users where role like 'staff%' or role in ('support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor')`),
+    query(`select count(*)::int as total from users where is_demo = false and (role like 'staff%' or role in ('support_agent','fraud_analyst','finance_team','dispatch_team','devops_engineer','auditor'))`),
   ]);
 
-  const [users, jobs, payments] = await Promise.all([
-    query('select count(*)::int as total from users'),
-    query('select count(*)::int as total from jobs'),
-    query(`select coalesce(sum(amount),0)::numeric as total from payments where status = 'completed'`),
+  const [users, jobs] = await Promise.all([
+  query('select count(*)::int as total from users where is_demo = false'),
+  query('select count(*)::int as total from jobs where is_demo = false'),
   ]);
 
   res.json({
@@ -153,11 +155,9 @@ export async function dashboard(req, res) {
       jobs: jobs.rows[0].total,
       fundis: fundisApproved.rows[0].total,
       pendingFundis: fundisPending.rows[0].total,
-      // Use revenue_ledger (commission + fees) as the authoritative platform revenue.
-      // Falls back to payment sum if revenue_ledger has no entries (fresh install).
-      revenue: revenue.totals.lifetimeRevenue > 0
-        ? revenue.totals.lifetimeRevenue
-        : Number(payments.rows[0].total),
+      // Revenue is recognized only from the financial ledger, never from a
+      // payment volume or an estimated job price.
+      revenue: revenue.totals.lifetimeRevenue,
       platformRevenue: revenue.totals.lifetimeRevenue,
       netProfit: revenue.totals.netProfit,
       openDisputes: disputesOpen.rows[0].total,
@@ -183,9 +183,7 @@ export async function dashboard(req, res) {
       fraudAlerts: fraudAlertsOpen.rows[0].total,
       bypassAlerts: fraudAlertsOpen.rows[0].total,
       subscriptionRevenue: Number(subscriptionRevenue.rows[0].total || 0),
-      totalRevenue: revenue.totals.lifetimeRevenue > 0
-        ? revenue.totals.lifetimeRevenue
-        : Number(payments.rows[0].total),
+      totalRevenue: revenue.totals.lifetimeRevenue,
       staffAccounts: activeStaff.rows[0].total,
     },
     chartData: weeklyJobs.rows.map((r) => ({
@@ -215,12 +213,17 @@ export async function reports(req, res) {
     query(
       `select date_trunc('day', j.created_at) as date,
               count(*)::int as jobs,
-              coalesce(sum(p.amount), 0)::numeric as revenue,
+              coalesce(sum(rl.amount), 0)::numeric as revenue,
               count(distinct j.customer_id)::int as customers,
               count(distinct j.fundi_id) filter (where j.fundi_id is not null)::int as fundis
        from jobs j
-       left join payments p on p.job_id = j.id and p.status = 'completed'
-       where j.created_at > now() - interval '${interval}'
+       left join (
+         select job_id, sum(amount) as amount
+         from revenue_ledger
+         where is_demo = false and entry_type in ('commission', 'withdrawal_fee', 'subscription')
+         group by job_id
+       ) rl on rl.job_id = j.id
+       where j.is_demo = false and j.created_at > now() - interval '${interval}'
        group by 1 order by 1`,
     ),
     // Top fundis by completed jobs
@@ -228,25 +231,28 @@ export async function reports(req, res) {
       `select f.user_id, u.full_name as name,
               count(j.id)::int as job_count,
               coalesce(avg(r.rating), 0)::numeric(3,2) as rating,
-              coalesce(sum(coalesce(j.final_price, j.estimated_price, 0)), 0)::numeric as total_earnings
+              (select coalesce(sum(p.amount), 0)::numeric
+               from payouts p
+               where p.fundi_id = f.user_id and p.is_demo = false and p.status = 'completed') as total_earnings
        from fundis f
        join users u on u.id = f.user_id
-       left join jobs j on j.fundi_id = f.user_id and j.status = 'completed'
-       left join reviews r on r.job_id = j.id
-       where f.approval_status = 'approved'
+       left join jobs j on j.fundi_id = f.user_id and j.is_demo = false and j.status = 'completed'
+       left join reviews r on r.job_id = j.id and r.is_demo = false
+       where f.is_demo = false and u.is_demo = false and f.approval_status = 'approved'
        group by f.user_id, u.full_name
        order by job_count desc limit 10`,
     ),
     // Summary stats
     query(
       `select
-         (select count(*)::int from users) as total_users,
-         (select count(*)::int from users where created_at > now() - interval '${interval}') as new_users,
-         (select count(*)::int from fundis where approval_status = 'approved') as approved_fundis,
-         (select count(*)::int from jobs where created_at > now() - interval '${interval}') as total_jobs,
-         (select count(*)::int from jobs where status = 'completed' and created_at > now() - interval '${interval}') as completed_jobs,
-         (select coalesce(sum(amount), 0)::numeric from payments where status = 'completed' and created_at > now() - interval '${interval}') as total_revenue,
-         (select count(*)::int from disputes where status = 'open') as open_disputes`,
+         (select count(*)::int from users where is_demo = false) as total_users,
+         (select count(*)::int from users where is_demo = false and created_at > now() - interval '${interval}') as new_users,
+         (select count(*)::int from fundis where is_demo = false and approval_status = 'approved') as approved_fundis,
+         (select count(*)::int from jobs where is_demo = false and created_at > now() - interval '${interval}') as total_jobs,
+         (select count(*)::int from jobs where is_demo = false and status = 'completed' and created_at > now() - interval '${interval}') as completed_jobs,
+         (select coalesce(sum(amount) filter (where entry_type in ('commission', 'withdrawal_fee', 'subscription')), 0)::numeric
+            from revenue_ledger where is_demo = false and created_at > now() - interval '${interval}') as total_revenue,
+         (select count(*)::int from disputes where is_demo = false and status = 'open') as open_disputes`,
     ),
   ]);
 
@@ -289,6 +295,16 @@ export function listTable(table, key) {
 
     const params = [];
     const filters = [];
+    const demoFilters = {
+      fundis: 'f.is_demo = false and u.is_demo = false',
+      users: 'is_demo = false',
+      jobs: 'is_demo = false',
+      payments: 'is_demo = false',
+      escrow_transactions: 'is_demo = false',
+      fraud_alerts: 'is_demo = false',
+      notifications: 'is_demo = false',
+    };
+    if (demoFilters[table]) filters.push(demoFilters[table]);
 
     // Table-specific search columns
     const searchColumns = {
@@ -361,7 +377,7 @@ export async function listJobs(req, res) {
   const status = String(req.query.status || '').trim();
   const q = String(req.query.q || '').trim();
 
-  const filters = [];
+  const filters = ['j.is_demo = false'];
   const params = [];
   if (status) {
     params.push(status);
@@ -429,7 +445,7 @@ export async function listJobs(req, res) {
 
 export async function listCustomers(_req, res) {
   const result = await query(
-    `${tableSelects.users} where role = 'customer' order by created_at desc limit 100`,
+    `${tableSelects.users} where is_demo = false and role = 'customer' order by created_at desc limit 100`,
   );
   res.json({
     success: true,
@@ -448,14 +464,16 @@ export async function searchFundis(req, res) {
   const countResult = await query(
     `select count(*)::int as total
      from fundis f join users u on u.id = f.user_id
-     where ($1::text is null or f.approval_status = $1)
+     where f.is_demo = false and u.is_demo = false
+       and ($1::text is null or f.approval_status = $1)
        and ($2::text is null or lower(u.full_name) like $2 or lower(u.email) like $2 or u.phone like $2)`,
     [status, q],
   );
   const total = countResult.rows[0]?.total || 0;
   const result = await query(
     `${tableSelects.fundis}
-     where ($1::text is null or f.approval_status = $1)
+     where f.is_demo = false and u.is_demo = false
+       and ($1::text is null or f.approval_status = $1)
        and ($2::text is null or lower(u.full_name) like $2 or lower(u.email) like $2 or u.phone like $2)
      order by f.created_at desc limit ${limit} offset ${offset}`,
     [status, q],
@@ -470,7 +488,8 @@ export async function searchFundis(req, res) {
 
 export async function getFundi(req, res) {
   const result = await query(
-    `${tableSelects.fundis} where f.id = $1 or f.user_id = $1 limit 1`,
+    `${tableSelects.fundis} where f.is_demo = false and u.is_demo = false
+       and (f.id = $1 or f.user_id = $1) limit 1`,
     [req.params.id],
   );
   if (!result.rows[0]) throw notFound('Fundi not found');
@@ -487,6 +506,7 @@ export async function transactions(_req, res) {
      join jobs j on j.id = p.job_id
      join users cu on cu.id = p.customer_id
      left join users fu on fu.id = j.fundi_id
+     where p.is_demo = false and j.is_demo = false and cu.is_demo = false
      order by p.created_at desc limit 100`,
   );
   const transactions = result.rows.map((row) => {
@@ -530,7 +550,7 @@ async function revenueSummaryQuery() {
        coalesce(sum(amount) filter (where entry_type = 'withdrawal_fee'), 0)::numeric as withdrawal_fee_revenue,
        coalesce(sum(amount) filter (where entry_type = 'subscription'), 0)::numeric as subscription_revenue,
        coalesce(sum(amount) filter (where entry_type = 'refund'), 0)::numeric as refund_costs
-     from revenue_ledger`,
+     from revenue_ledger where is_demo = false`,
   );
   const row = result.rows[0] || {};
   const totals = {
@@ -563,7 +583,7 @@ export async function escrowQueue(_req, res) {
      join payments p on p.job_id = j.id and p.escrow_status in ('held', 'frozen')
      join users cu on cu.id = j.customer_id
      left join users fu on fu.id = j.fundi_id
-     where j.status = 'completed'
+     where j.is_demo = false and p.is_demo = false and j.status = 'completed'
      order by j.updated_at asc limit 100`,
   );
   res.json({
@@ -866,7 +886,9 @@ export async function listPayouts(req, res) {
   let where = '';
   if (status && status !== 'all') {
     params.push(status);
-    where = `where p.status = $${params.length}`;
+    where = `where p.is_demo = false and p.status = $${params.length}`;
+  } else {
+    where = 'where p.is_demo = false';
   }
   const result = await query(
     `select p.*, u.full_name as fundi_name, u.email as fundi_email, u.phone as fundi_phone,
@@ -878,7 +900,8 @@ export async function listPayouts(req, res) {
     params,
   );
   const stats = await query(
-    `select status, count(*)::int as count, coalesce(sum(amount), 0) as total from payouts group by status`,
+    `select status, count(*)::int as count, coalesce(sum(amount), 0) as total
+     from payouts where is_demo = false group by status`,
   );
   res.json({
     success: true,
@@ -898,11 +921,12 @@ export async function listSubscriptions(req, res) {
   const result = await query(
     `select s.*, u.full_name as subscriber_name, u.email as subscriber_email, u.role as subscriber_role
      from subscriptions s join users u on u.id = s.fundi_id
+     where s.is_demo = false and u.is_demo = false
      order by s.created_at desc limit 200`,
   );
   const stats = await query(
     `select subscriber_type, status, count(*)::int as count, coalesce(sum(amount), 0) as total
-     from subscriptions group by subscriber_type, status`,
+     from subscriptions where is_demo = false group by subscriber_type, status`,
   );
   res.json({ success: true, subscriptions: result.rows, stats: stats.rows });
 }
@@ -917,6 +941,8 @@ export async function listReviews(req, res) {
      join jobs j on j.id = r.job_id
      join users reviewer on reviewer.id = r.reviewer_id
      left join users reviewed on reviewed.id = j.fundi_id
+     where r.is_demo = false and j.is_demo = false and reviewer.is_demo = false
+       and (reviewed.is_demo = false or reviewed.id is null)
      order by r.created_at desc limit 200`,
   );
   res.json({ success: true, reviews: result.rows });

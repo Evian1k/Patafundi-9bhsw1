@@ -48,11 +48,11 @@ router.get('/health', (_req, res) => res.json({
 router.get('/platform/stats', asyncHandler(async (_req, res) => {
   const result = await query(`
     select
-      (select count(*)::int from users) as users,
-      (select count(*)::int from fundis where approval_status = 'approved') as verified_fundis,
-      (select count(*)::int from company_profiles where status = 'approved') as companies,
-      (select count(*)::int from jobs where status = 'completed') as jobs_completed,
-      (select coalesce(avg(rating), 0) from reviews) as average_rating
+      (select count(*)::int from users where is_demo = false) as users,
+      (select count(*)::int from fundis where is_demo = false and approval_status = 'approved') as verified_fundis,
+      (select count(*)::int from company_profiles where is_demo = false and status = 'approved') as companies,
+      (select count(*)::int from jobs where is_demo = false and status = 'completed') as jobs_completed,
+      (select coalesce(avg(rating), 0) from reviews where is_demo = false) as average_rating
   `);
   const s = result.rows[0] || {};
   res.json({
@@ -612,13 +612,16 @@ router.post('/subscriptions/activate', authRequired, paymentActionRateLimit, asy
   const planCode = LEGACY_PLAN_ALIASES[plan]?.[audience] || plan;
   const { query } = await import('./db.js');
   const planRow = await query(
-    `select code, price, duration_days, name from subscription_plans
+    `select code, price, currency, duration_days, name from subscription_plans
      where code = $1 and is_active = true and audience = $2`,
     [planCode, audience],
   );
   const planDef = planRow.rows[0];
   if (!planDef) {
     return res.status(400).json({ success: false, message: `Unknown subscription plan '${plan}'. Valid plans: monthly, yearly` });
+  }
+  if (String(planDef.currency || 'KES').toUpperCase() !== 'KES') {
+    return res.status(400).json({ success: false, message: 'M-Pesa subscription payments are only supported in KES' });
   }
   const amount = Number(planDef.price);
   const durationDays = planDef.duration_days;
@@ -674,7 +677,7 @@ router.post('/subscriptions/activate', authRequired, paymentActionRateLimit, asy
 router.get('/subscriptions/mine', authRequired, asyncHandler(async (req, res) => {
   const rows = await query(
     `select id, plan, amount, status, starts_at, expires_at, subscriber_type, created_at
-     from subscriptions where fundi_id = $1 order by created_at desc limit 24`,
+     from subscriptions where fundi_id = $1 and is_demo = false order by created_at desc limit 24`,
     [req.user.id],
   );
   res.json({ success: true, subscriptions: rows.rows });
@@ -683,7 +686,7 @@ router.get('/subscriptions/mine', authRequired, asyncHandler(async (req, res) =>
 router.get('/subscriptions/status', authRequired, asyncHandler(async (req, res) => {
   const row = await query(
     `select id, plan, expires_at from subscriptions
-     where fundi_id = $1 and status = 'active' and expires_at > now()
+     where fundi_id = $1 and is_demo = false and status = 'active' and expires_at > now()
      order by expires_at desc limit 1`,
     [req.user.id],
   );
@@ -701,7 +704,8 @@ router.post('/subscriptions/cancel', authRequired, asyncHandler(async (req, res)
   // until expires_at (standard marketplace behaviour, spec §22 "cancellation").
   const row = await query(
     `update subscriptions set status = 'cancelled'
-     where fundi_id = $1 and status in ('pending', 'active') returning id, status, expires_at`,
+     where fundi_id = $1 and is_demo = false and status in ('pending', 'active')
+     returning id, status, expires_at`,
     [req.user.id],
   );
   if (!row.rows[0]) {

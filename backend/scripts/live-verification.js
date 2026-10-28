@@ -4,11 +4,17 @@
  */
 import { io } from 'socket.io-client';
 import dotenv from 'dotenv';
+import { randomBytes } from 'node:crypto';
 
 dotenv.config();
 
 const BASE = process.env.VERIFY_API_URL || 'http://127.0.0.1:4000/api';
 const SOCKET_URL = process.env.VERIFY_SOCKET_URL || 'http://127.0.0.1:4000';
+const DEMO_PASSWORD = process.env.PATAFUNDI_DEMO_SEED_PASSWORD || '';
+const TEST_PASSWORD = randomBytes(24).toString('base64url');
+const CUSTOMER_EMAIL = process.env.VERIFY_CUSTOMER_EMAIL || 'demo@patafundi.com';
+const FUNDI_EMAIL = process.env.VERIFY_FUNDI_EMAIL || 'fundi@patafundi.com';
+const ADMIN_EMAIL = process.env.VERIFY_ADMIN_EMAIL || 'admin@patafundi.com';
 
 const results = { pass: [], fail: [], warn: [] };
 
@@ -97,7 +103,7 @@ async function verifyAuth() {
 
   let res = await customer.req('POST', '/auth/register', {
     email,
-    password: 'Verify@2024',
+    password: TEST_PASSWORD,
     fullName: 'Verify Customer',
     phone: '254712345678',
     role: 'customer',
@@ -142,9 +148,9 @@ async function verifyAuth() {
 
   // Demo accounts
   for (const [role, email, password] of [
-    ['customer', 'demo@patafundi.com', 'Demo@2024!'],
-    ['fundi', 'fundi@patafundi.com', 'Fundi@2024!'],
-    ['admin', 'admin@patafundi.com', 'Admin@2024!'],
+    ['customer', CUSTOMER_EMAIL, DEMO_PASSWORD],
+    ['fundi', FUNDI_EMAIL, DEMO_PASSWORD],
+    ['admin', ADMIN_EMAIL, DEMO_PASSWORD],
   ]) {
     const s = new Session();
     try {
@@ -162,7 +168,7 @@ async function verifyAuth() {
     }
   }
 
-  return { customerEmail: email, customerPassword: 'Verify@2024' };
+  return { customerEmail: email, customerPassword: TEST_PASSWORD };
 }
 
 async function verifyUserFlows() {
@@ -173,7 +179,7 @@ async function verifyUserFlows() {
   const email = `verify.user.${suffix}@test.patafundi.com`;
   let regRes = await customer.req('POST', '/auth/register', {
     email,
-    password: 'Verify@2024',
+    password: TEST_PASSWORD,
     fullName: 'Verify Customer',
     phone: '254712345678',
     role: 'customer',
@@ -210,7 +216,7 @@ async function verifyJobFlow() {
     const email = `verify.job.${suffix}@test.patafundi.com`;
     const r = await customer.req('POST', '/auth/register', {
       email,
-      password: 'Verify@2024',
+      password: TEST_PASSWORD,
       fullName: 'Job Verify Customer',
       phone: '254712345678',
       role: 'customer',
@@ -226,7 +232,7 @@ async function verifyJobFlow() {
     return null;
   }
   try {
-    await loginAs(fundi, 'fundi@patafundi.com', 'Fundi@2024!');
+    await loginAs(fundi, FUNDI_EMAIL, DEMO_PASSWORD);
   } catch (e) {
     fail('fundi demo login', e.message);
     return null;
@@ -317,7 +323,7 @@ async function verifyPaymentStateMachine(jobId) {
 
   const customer = new Session();
   try {
-    await loginAs(customer, 'demo@patafundi.com', 'Demo@2024!');
+    await loginAs(customer, CUSTOMER_EMAIL, DEMO_PASSWORD);
   } catch (e) {
     warn('Payment flow skipped', 'demo customer login locked');
     return;
@@ -365,7 +371,7 @@ async function verifyPaymentStateMachine(jobId) {
 
   // First create payment record by attempting stk (will fail without creds) - use direct DB approach via admin
   const admin = new Session();
-  await loginAs(admin, 'admin@patafundi.com', 'Admin@2024!');
+  await loginAs(admin, ADMIN_EMAIL, DEMO_PASSWORD);
 
   const escrowRes = await customer.req('GET', `/payments/escrow/${payJobId}`);
   if (escrowRes.ok) pass('GET /payments/escrow/:jobId');
@@ -383,7 +389,7 @@ async function verifyPaymentStateMachine(jobId) {
 async function verifyAdmin() {
   console.log('\n=== Phase 10: Admin Dashboard ===');
   const admin = new Session();
-  await loginAs(admin, 'admin@patafundi.com', 'Admin@2024!');
+  await loginAs(admin, ADMIN_EMAIL, DEMO_PASSWORD);
 
   const endpoints = [
     '/admin/dashboard',
@@ -446,7 +452,7 @@ async function verifyFrontendApiAlignment() {
   const s = new Session();
   // Ensure demo login works first — handles OTP fallback in loginAs
   try {
-    await loginAs(s, 'demo@patafundi.com', 'Demo@2024!');
+    await loginAs(s, CUSTOMER_EMAIL, DEMO_PASSWORD);
   } catch (e) {
     if (e.message && e.message.includes('Too many authentication attempts')) {
       warn('demo login (frontend alignment)', `locked: ${e.message}`);
@@ -540,6 +546,28 @@ async function verifyDatabaseTables() {
 }
 
 async function main() {
+  const target = new URL(BASE);
+  if (process.env.VERIFY_ALLOW_MUTATIONS !== 'true') {
+    console.error('Refusing mutating verification without VERIFY_ALLOW_MUTATIONS=true for an isolated test API');
+    process.exitCode = 1;
+    return;
+  }
+  if (!DEMO_PASSWORD) {
+    console.error('PATAFUNDI_DEMO_SEED_PASSWORD is required for the isolated test accounts');
+    process.exitCode = 1;
+    return;
+  }
+  if (!['localhost', '127.0.0.1', '::1'].includes(target.hostname)
+    && process.env.VERIFY_ALLOW_REMOTE_MUTATIONS !== 'true') {
+    console.error('Refusing to run mutating verification against a remote API');
+    process.exitCode = 1;
+    return;
+  }
+  if (['patafundi-9bhsw1.onrender.com', 'patafundi-9bhsw1.vercel.app'].includes(target.hostname)) {
+    console.error('Refusing to run mutating verification against a production hostname');
+    process.exitCode = 1;
+    return;
+  }
   console.log('PataFundi Live Verification');
   console.log(`API: ${BASE}`);
 

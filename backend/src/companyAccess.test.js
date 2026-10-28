@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { query } from './db.js';
+import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
+import { closeEmbeddedDb } from './pglite-instance.js';
 import {
   COMPANY_CAPABILITIES,
   COMPANY_ROLE_CAPABILITIES,
@@ -8,6 +11,14 @@ import {
   requireCompanyMember,
 } from './middleware/companyAccess.js';
 import { companyAvailableBalance } from './services/companyPayoutService.js';
+
+test.before(async () => {
+  await ensureDevDatabase();
+});
+
+test.after(async () => {
+  await closeEmbeddedDb();
+});
 
 // ── Capability matrix (spec §8 TEAM per-permission matrix) ──
 test('owner holds every company capability', () => {
@@ -40,12 +51,26 @@ function fakeReq(user, body = {}) {
 }
 
 test('requireCompanyMember rejects members without the required capability', async () => {
-  const middleware = requireCompanyMember({ companyId: 'c1', capability: 'view_finance' });
-  const req = fakeReq({ id: 'u1', role: 'customer' });
-  req.params.companyId = 'c1';
-  const errs = [];
-  await middleware(req, {}, (e) => errs.push(e));
-  assert.equal(errs[0]?.status || 403, 403, 'forbidden for non-member');
+  const middleware = requireCompanyMember({ capability: 'view_finance' });
+  const customer = (await query('select id from users where email = $1', ['demo@patafundi.com'])).rows[0];
+  const owner = (await query('select id from users where email = $1', ['admin@patafundi.com'])).rows[0];
+  const company = (await query(
+    `insert into company_profiles
+      (owner_user_id, company_name, legal_name, contact_name, contact_email, contact_phone)
+     values ($1, 'Access Test', 'Access Test Ltd', 'Test Owner', 'access@test.local', '254700000000')
+     returning id`,
+    [owner.id],
+  )).rows[0];
+
+  try {
+    const req = fakeReq({ id: customer.id, role: 'customer' });
+    req.params.companyId = company.id;
+    const errs = [];
+    await middleware(req, {}, (e) => errs.push(e));
+    assert.equal(errs[0]?.status, 403, 'forbidden for non-member');
+  } finally {
+    await query('delete from company_profiles where id = $1', [company.id]);
+  }
 });
 
 // ── Company payout balance math ──

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from './demo-password.mjs';
 // patafundi-e2e.js — End-to-end API journey test for the PataFundi takeover.
 // Verifies the FULL company ecosystem: booking → dispatch → work → payment →
 // settlement → review → audit, plus security boundaries (IDOR/tampering).
@@ -33,7 +34,7 @@ async function login(email, password) {
   return { token, status: r.status, user: r.json?.user };
 }
 
-const PW = 'PataFundi#2026';
+const PW = getDemoPassword();
 
 async function main() {
   console.log('── 1. Demo account logins ──');

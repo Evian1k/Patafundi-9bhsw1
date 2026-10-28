@@ -4,13 +4,10 @@
 // dispatch success path that used to crash on the jobs_status_check constraint.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import { query, pool } from './db.js';
-import { getEmbeddedDb } from './pglite-instance.js';
+import { query } from './db.js';
+import { closeEmbeddedDb } from './pglite-instance.js';
+import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import {
   createPartnerApplication,
   approvePartnerApplication,
@@ -20,10 +17,6 @@ import {
 } from './controllers/companyController.js';
 import { requireCompanyMember } from './middleware/companyAccess.js';
 
-if (process.env.NODE_ENV !== 'production') dotenv.config();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 function mockRes() {
   return {
     statusCode: 0,
@@ -31,22 +24,6 @@ function mockRes() {
     status(code) { this.statusCode = code; return this; },
     json(payload) { this.payload = payload; this.statusCode = this.statusCode || 200; return payload; },
   };
-}
-
-async function ensureSchema() {
-  if (process.env.PATAFUNDI_EMBEDDED_DB === '1' || !process.env.DATABASE_URL) {
-    const db = await getEmbeddedDb();
-    const migrationsDir = path.join(__dirname, '../migrations');
-    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
-    const applied = await db.query('select filename from schema_migrations').catch(() => ({ rows: [] }));
-    const appliedSet = new Set(applied.rows.map((r) => r.filename));
-    for (const file of files) {
-      if (appliedSet.has(file)) continue;
-      const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-      await db.exec(sql).catch(() => { /* already applied via statements */ });
-      await db.query('insert into schema_migrations (filename) values ($1) on conflict do nothing', [file]).catch(() => {});
-    }
-  }
 }
 
 async function ensureUser(email, fullName, role) {
@@ -61,8 +38,15 @@ async function ensureUser(email, fullName, role) {
   return res.rows[0];
 }
 
+test.before(async () => {
+  await ensureDevDatabase();
+});
+
+test.after(async () => {
+  await closeEmbeddedDb();
+});
+
 test('company partnership: apply → approve → provisioned with owner; portal access enforced; dispatch works; cross-company denied', async () => {
-  await ensureSchema();
 
   const owner = await ensureUser('partner-owner-a@test.local', 'Partner Owner A', 'customer');
   const dispatcher = await ensureUser('partner-dispatcher-a@test.local', 'Partner Dispatcher A', 'customer');
@@ -218,15 +202,15 @@ test('company isolation prevents one company from accessing another company data
       company_name, legal_name, contact_name, contact_email, contact_phone,
       status, owner_user_id, service_areas, branches, business_categories, technician_count)
     values ('Alpha Build Works', 'Alpha Build Works Ltd', 'Alpha Contact', 'alpha-a@test.local', '+254700000010',
-      'approved', $1, $2, $3, $4, 6)
-    returning *`, [customerA.id, ['Nairobi'], [{ name: 'HQ' }], ['plumbing']])).rows[0];
+      'approved', $1, $2, $3::jsonb, $4, 6)
+    returning *`, [customerA.id, ['Nairobi'], JSON.stringify([{ name: 'HQ' }]), ['plumbing']])).rows[0];
 
   const companyB = (await query(`insert into company_profiles (
       company_name, legal_name, contact_name, contact_email, contact_phone,
       status, owner_user_id, service_areas, branches, business_categories, technician_count)
     values ('Beta Repairs Co', 'Beta Repairs Co Ltd', 'Beta Contact', 'beta-b@test.local', '+254700000011',
-      'approved', $1, $2, $3, $4, 4)
-    returning *`, [customerB.id, ['Mombasa'], [{ name: 'Mombasa Branch' }], ['electrical']])).rows[0];
+      'approved', $1, $2, $3::jsonb, $4, 4)
+    returning *`, [customerB.id, ['Mombasa'], JSON.stringify([{ name: 'Mombasa Branch' }]), ['electrical']])).rows[0];
 
   await query(`insert into company_members (company_id, user_id, role, status) values ($1, $2, 'owner', 'active')
     on conflict (company_id, user_id) do nothing`, [companyA.id, customerA.id]);

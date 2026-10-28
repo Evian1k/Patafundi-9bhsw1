@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { config, requireConfig } from './config.js';
-import { getEmbeddedDb, isEmbeddedDb } from './pglite-instance.js';
+import { getEmbeddedDb, isEmbeddedDb, closeEmbeddedDb } from './pglite-instance.js';
 import { getPgPoolConfig, isLocalDatabaseUrl } from './pg-config.js';
 import { logNonFatal, swallow } from './utils/logError.js';
 
@@ -18,6 +18,8 @@ async function initDriver() {
   if (pool || useEmbedded) return;
 
   const isProduction = process.env.NODE_ENV === 'production';
+  const explicitTestDatabase = process.env.NODE_ENV === 'test'
+    && Boolean(process.env.PATAFUNDI_TEST_DATABASE_URL);
 
   if (isProduction) {
     if (process.env.PATAFUNDI_EMBEDDED_DB === '1') {
@@ -68,9 +70,19 @@ async function initDriver() {
       pool = testPool;
       return;
     } catch (error) {
+      if (explicitTestDatabase) {
+        lastConnectionError = new Error(`Explicit test database connection failed: ${error.message}`);
+        await testPool.end().catch(swallow('db.poolEnd'));
+        return;
+      }
       logNonFatal('db.probe', error, { fallback: 'embedded' });
       await testPool.end().catch(swallow('db.poolEnd'));
     }
+  }
+
+  if (explicitTestDatabase) {
+    lastConnectionError = new Error('PATAFUNDI_TEST_DATABASE_URL is set but no PostgreSQL connection URL is available');
+    return;
   }
 
   useEmbedded = true;
@@ -226,6 +238,7 @@ export async function healthcheck() {
       if (!config.databaseUrl) {
         return { configured: false, ok: false, error: 'DATABASE_URL is not set' };
       }
+
       if (isLocalDatabaseUrl(config.databaseUrl)) {
         return { configured: true, ok: false, error: 'DATABASE_URL points to localhost' };
       }
@@ -269,4 +282,18 @@ export async function healthcheck() {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export async function closeDatabase() {
+  if (pool) {
+    const activePool = pool;
+    pool = null;
+    await activePool.end();
+  }
+  if (useEmbedded) {
+    await closeEmbeddedDb();
+    useEmbedded = false;
+  }
+  initPromise = null;
+  lastConnectionError = null;
 }

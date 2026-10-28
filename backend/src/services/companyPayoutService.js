@@ -24,10 +24,10 @@ export async function companyAvailableBalance(client, companyId) {
   const res = await runner.query(
     `select
        coalesce((select sum(net_amount) from company_settlements
-                 where company_id = $1 and status = 'pending'), 0)
+                 where company_id = $1 and is_demo = false and status = 'pending'), 0)
        -
        coalesce((select sum(amount) from payouts
-                 where company_id = $1 and status in ('requested', 'processing')), 0)
+                 where company_id = $1 and is_demo = false and status in ('requested', 'processing')), 0)
        as available`,
     [companyId],
   );
@@ -46,12 +46,15 @@ export async function requestCompanyWithdrawal({ companyId, actorId, actorRole, 
   }
   const payout = await transaction(async (client) => {
     // Serialize concurrent withdrawal requests per company (double-payout race).
-    await client.query('select id from company_profiles where id = $1 for update', [companyId]);
+    await client.query('select id from company_profiles where id = $1 and is_demo = false for update', [companyId]);
     if (idempotencyKey) {
       const duplicate = await client.query('select * from payouts where idempotency_key = $1', [idempotencyKey]);
-      if (duplicate.rows[0]) return { payout: duplicate.rows[0], idempotent: true };
+      if (duplicate.rows[0]) {
+        if (duplicate.rows[0].is_demo) throw badRequest('Idempotency key is already used');
+        return { payout: duplicate.rows[0], idempotent: true };
+      }
     }
-    const companyRes = await client.query('select * from company_profiles where id = $1', [companyId]);
+    const companyRes = await client.query('select * from company_profiles where id = $1 and is_demo = false', [companyId]);
     const company = companyRes.rows[0];
     if (!company) throw badRequest('Company not found');
     if (company.status !== 'approved') throw badRequest('Company is not approved for payouts');
@@ -122,6 +125,7 @@ export async function markSettlementsPaid(client, companyId, amount, providerRef
   const pending = await client.query(
     `select id, net_amount from company_settlements
      where company_id = $1 and status = 'pending'
+       and is_demo = false
      order by created_at asc`,
     [companyId],
   );
@@ -135,7 +139,7 @@ export async function markSettlementsPaid(client, companyId, amount, providerRef
         `update company_settlements
          set status = 'paid', paid_at = now(),
              payout_reference = coalesce($2, payout_reference), updated_at = now()
-         where id = $1`,
+         where id = $1 and is_demo = false`,
         [row.id, providerReference],
       );
       settled.push(row.id);

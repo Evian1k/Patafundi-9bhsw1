@@ -166,7 +166,7 @@ export async function login(req, res) {
   }
 
   const result = await query(
-    `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at, totp_enabled
+    `select id, email, password_hash, full_name, phone, role, status, trust_score, email_verified_at, totp_enabled, is_demo
      from users where lower(email) = lower($1)`,
     [email],
   );
@@ -184,6 +184,10 @@ export async function login(req, res) {
         throw forbidden('Account locked due to too many failed login attempts. Try again in 15 minutes.');
       }
     }
+    throw forbidden('Invalid email or password');
+  }
+
+  if (process.env.NODE_ENV === 'production' && user.is_demo) {
     throw forbidden('Invalid email or password');
   }
 
@@ -291,7 +295,7 @@ export async function refresh(req, res) {
   });
   const refreshHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const result = await query(
-    `select u.id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score, u.email_verified_at
+    `select u.id, u.email, u.full_name, u.phone, u.role, u.status, u.trust_score, u.email_verified_at, u.is_demo
      from refresh_tokens rt join users u on u.id = rt.user_id
      where rt.token_hash = $1 and rt.revoked_at is null and rt.expires_at > now() and u.id = $2`,
     [refreshHash, payload.sub],
@@ -299,6 +303,7 @@ export async function refresh(req, res) {
   const user = result.rows[0];
   if (!user) throw forbidden('Invalid refresh token');
   if (user.status !== 'active') throw forbidden('Account is not active');
+  if (process.env.NODE_ENV === 'production' && user.is_demo) throw forbidden('Invalid refresh token');
   if (!user.email_verified_at) throw forbidden('Email not verified');
   await query('update refresh_tokens set revoked_at = now() where token_hash = $1', [refreshHash]);
   const session = await issueSession(res, user);

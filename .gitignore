@@ -43,12 +43,13 @@ E2E_AUDIT_RESULTS.json
 FULL_AUDIT_RESULTS.json
 .vercel
 .env*
+deploy/compose/.env
+deploy/k8s/*-runtime.env
 
 # Mobile workspaces
 apps/*/.expo/
 apps/*/web-build/
 apps/*/node_modules/
-apps/*/package-lock.json
 packages/*/node_modules/
 .expo/
 *.tsbuildinfo

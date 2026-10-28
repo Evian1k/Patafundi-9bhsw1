@@ -6,6 +6,7 @@ import { query } from './db.js';
 import { authRequired, signAccessToken } from './middleware/auth.js';
 import { hasPermission } from './middleware/rbac.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
+import { closeEmbeddedDb } from './pglite-instance.js';
 import { createJob } from './controllers/jobController.js';
 import { calculateSurgePricing, findNearbyFundis } from './services/geoMatchingService.js';
 import { calculateCommission, calculateWithdrawalFee } from './services/financeService.js';
@@ -13,6 +14,21 @@ import { calculateCommission, calculateWithdrawalFee } from './services/financeS
 test.before(async () => {
   await ensureDevDatabase();
 });
+
+test.after(async () => {
+  await closeEmbeddedDb();
+});
+
+async function ensureWorkflowUser(email, fullName, role) {
+  const result = await query(
+    `insert into users (email, password_hash, full_name, role, status, email_verified_at)
+     values ($1, 'isolated-test-hash', $2, $3, 'active', now())
+     on conflict (email) do update set full_name = excluded.full_name, role = excluded.role
+     returning id`,
+    [email, fullName, role],
+  );
+  return result.rows[0];
+}
 
 test('embedded database bootstrap and JWT session flow work', async () => {
   const user = (await query('select id, email, role, status from users where email = $1', ['demo@patafundi.com'])).rows[0];
@@ -64,8 +80,9 @@ test('customer access is denied for protected permissions while super admin rema
 });
 
 test('job creation and matching use the real database-backed workflow', async () => {
-  const customer = (await query('select id from users where email = $1', ['demo@patafundi.com'])).rows[0];
-  const fundi = (await query('select id from users where email = $1', ['fundi@patafundi.com'])).rows[0];
+  const customer = await ensureWorkflowUser('workflow-customer@example.co.ke', 'Workflow Customer', 'customer');
+  const fundi = await ensureWorkflowUser('workflow-fundi@example.co.ke', 'Workflow Fundi', 'fundi');
+  const demoFundi = (await query('select id from users where email = $1', ['fundi@patafundi.com'])).rows[0];
 
   await query(
     `insert into fundis (user_id, skills, experience, mpesa_number, approval_status, online, latitude, longitude, rating, verification_badge)
@@ -118,6 +135,7 @@ test('job creation and matching use the real database-backed workflow', async ()
 
   assert.ok(matches.length >= 1);
   assert.equal(matches[0].user_id, fundi.id);
+  assert.ok(!matches.some((match) => match.user_id === demoFundi.id), 'demo fundis must not enter real customer matching');
 
   const jobRow = (await query('select status from jobs where id = $1', [res.payload.job.id])).rows[0];
   assert.equal(jobRow.status, 'matching');

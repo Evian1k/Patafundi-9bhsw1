@@ -10,7 +10,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { config, logProductionConfigWarnings } from './config.js';
 import { router } from './routes.js';
 import { attachRealtime } from './realtime.js';
-import { healthcheck, query } from './db.js';
+import { closeDatabase, healthcheck, query } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
 import { csrfProtection } from './middleware/auth.js';
 import { authRateLimit, otpRateLimit, paymentWebhookRateLimit, mapsRateLimit } from './middleware/rateLimit.js';
@@ -40,6 +40,25 @@ const io = new SocketIOServer(server, {
 });
 
 attachRealtime(io);
+const backgroundTimers = new Set();
+let shuttingDown = false;
+
+function scheduleInterval(callback, delay) {
+  if (shuttingDown) return null;
+  const timer = setInterval(callback, delay);
+  backgroundTimers.add(timer);
+  return timer;
+}
+
+function scheduleTimeout(callback, delay) {
+  if (shuttingDown) return null;
+  const timer = setTimeout(() => {
+    backgroundTimers.delete(timer);
+    callback();
+  }, delay);
+  backgroundTimers.add(timer);
+  return timer;
+}
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -356,19 +375,23 @@ if (!dbUrlSet && config.nodeEnv !== 'production') {
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('');
 
-try {
-  await ensureDevDatabase();
-} catch (error) {
-  console.error('[PataFundi API] Database bootstrap failed:', error.message);
-  if (config.nodeEnv === 'production') {
-    console.error('[PataFundi API] Starting anyway — /health will report database status.');
+if (process.env.PATAFUNDI_MANAGED_MIGRATIONS === 'true') {
+  console.log('[PataFundi API] Database migrations are managed separately');
+} else {
+  try {
+    await ensureDevDatabase();
+  } catch (error) {
+    console.error('[PataFundi API] Database bootstrap failed:', error.message);
+    if (config.nodeEnv === 'production') {
+      console.error('[PataFundi API] Starting anyway — /health will report database status.');
+    }
   }
 }
 
 // Dev-only: seed the full takeover demo ecosystem (company, jobs, wallets,
 // @patafundi.test accounts) so `npm run dev` works out of the box — Quick
 // Login on /demo needs these accounts. Idempotent upserts; refuses in prod.
-if (config.nodeEnv !== 'production') {
+if (config.nodeEnv === 'development' && process.env.PATAFUNDI_ENABLE_DEMO_SEED === 'true') {
   try {
     const { seedTakeover } = await import('../scripts/seed-takeover.js');
     await seedTakeover();
@@ -409,7 +432,7 @@ server.listen(port, host, () => {
     }
   };
   runFraudJobs();
-  setInterval(runFraudJobs, 15 * 60 * 1000);
+  scheduleInterval(runFraudJobs, 15 * 60 * 1000);
 
   // Scheduled job scheduler — activates scheduled jobs when their time arrives
   const runScheduledJobs = async () => {
@@ -431,7 +454,7 @@ server.listen(port, host, () => {
     }
   };
   runScheduledJobs();
-  setInterval(runScheduledJobs, 60 * 1000); // check every minute
+  scheduleInterval(runScheduledJobs, 60 * 1000);
 
   // ── Job expiry reaper (spec §17 failure states) ──────────────────
   // Offers not answered within 5 minutes return to matching so another
@@ -470,7 +493,7 @@ server.listen(port, host, () => {
     }
   };
   runJobExpiry();
-  setInterval(runJobExpiry, 60 * 1000);
+  scheduleInterval(runJobExpiry, 60 * 1000);
 
   // ── Scheduled maintenance checker ─────────────────────────────────
   // Runs every minute to check if the current time falls within a
@@ -478,8 +501,9 @@ server.listen(port, host, () => {
   // Auto-toggles the maintenance_mode feature flag.
   import('./services/scheduledMaintenanceService.js')
     .then(({ runScheduledMaintenanceCheck }) => {
+      if (shuttingDown) return;
       runScheduledMaintenanceCheck();
-      setInterval(runScheduledMaintenanceCheck, 60 * 1000);
+      scheduleInterval(runScheduledMaintenanceCheck, 60 * 1000);
       console.log('[maintenance] scheduled maintenance checker started (default: Wednesday 2-4 AM EAT)');
     })
     .catch((err) => {
@@ -490,9 +514,10 @@ server.listen(port, host, () => {
   // Runs daily to clean up expired data per Data Retention Policy
   import('./services/dataRetentionService.js')
     .then(({ runDataRetentionCleanup }) => {
+      if (shuttingDown) return;
       // Run cleanup after 5 minutes of startup, then every 24 hours
-      setTimeout(() => runDataRetentionCleanup(), 5 * 60 * 1000);
-      setInterval(runDataRetentionCleanup, 24 * 60 * 60 * 1000);
+      scheduleTimeout(() => runDataRetentionCleanup(), 5 * 60 * 1000);
+      scheduleInterval(runDataRetentionCleanup, 24 * 60 * 60 * 1000);
       console.log('[retention] data retention cleanup scheduled (daily)');
     })
     .catch((err) => {
@@ -505,6 +530,7 @@ server.listen(port, host, () => {
   // worker instances can run concurrently without double-processing.
   import('./queueWorker.js')
     .then(({ startQueueWorker, registerQueueHandler }) => {
+      if (shuttingDown) return;
       // Handler: send push notifications queued from controllers
       registerQueueHandler('push_notification', async (payload) => {
         const { sendPushNotification } = await import('./services/pushService.js');
@@ -559,3 +585,32 @@ server.on('error', (error) => {
   console.error('[PataFundi API] server error:', error.message);
   process.exit(1);
 });
+
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[PataFundi API] received ${signal}; shutting down`);
+  for (const timer of backgroundTimers) {
+    clearInterval(timer);
+    clearTimeout(timer);
+  }
+  backgroundTimers.clear();
+  const forceExit = setTimeout(() => {
+    console.error('[PataFundi API] graceful shutdown timed out');
+    process.exit(1);
+  }, 15_000);
+  try {
+    const { stopQueueWorker } = await import('./queueWorker.js');
+    await stopQueueWorker();
+    await new Promise((resolve) => io.close(resolve));
+    await closeDatabase();
+    clearTimeout(forceExit);
+  } catch (error) {
+    clearTimeout(forceExit);
+    console.error('[PataFundi API] shutdown failed:', error.message);
+    process.exitCode = 1;
+  }
+}
+
+process.once('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+process.once('SIGINT', () => { void gracefulShutdown('SIGINT'); });

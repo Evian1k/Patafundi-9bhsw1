@@ -1,62 +1,80 @@
-# PataFundi — one-command reproducible stack (spec §29: Docker first)
-#
-#   docker compose up -d --build
-#   web:    http://localhost:8080   (nginx SPA + same-origin /api proxy)
-#   api:    http://localhost:4000   (direct API access for tooling)
-#
-# The backend auto-applies migrations on start. Configure real credentials via
-# .env (see .env.example) — the defaults below are dev-only placeholders.
+# Local development stack. It never seeds demo accounts automatically.
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: patafundi-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-patafundi}
+      POSTGRES_USER: ${POSTGRES_USER:-patafundi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/compose/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-patafundi_dev}
     volumes:
       - patafundi_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-patafundi}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-patafundi} -d ${POSTGRES_DB:-patafundi_dev}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  backend:
+  migrate:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: patafundi-api
-    restart: unless-stopped
+    command: ["node", "backend/scripts/migrate.js"]
+    restart: "no"
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-patafundi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-patafundi_dev}
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
       PORT: 4000
-      # Compose injects POSTGRES_* into the standard postgres image; the app
-      # reads DATABASE_URL. No secrets belong in this file — override via .env.
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-patafundi}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
-      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-${JWT_SECRET}}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      PATAFUNDI_MANAGED_MIGRATIONS: "true"
+      PATAFUNDI_ENABLE_DEMO_SEED: "false"
+      DATABASE_URL: postgres://${POSTGRES_USER:-patafundi}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-patafundi_dev}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in deploy/compose/.env}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?Set REFRESH_TOKEN_SECRET in deploy/compose/.env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in deploy/compose/.env}
       FRONTEND_ORIGIN: http://localhost:8080
       CORS_ORIGINS: http://localhost:8080
+      COOKIE_SECURE: "false"
+    volumes:
+      - patafundi_uploads:/app/backend/uploads
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/ready"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    init: true
+    stop_grace_period: 20s
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: patafundi-web
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    init: true
 
 volumes:
   patafundi_pgdata:
+  patafundi_uploads:

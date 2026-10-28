@@ -142,35 +142,38 @@ export async function deleteAccount(req, res) {
 }
 
 export async function notifications(req, res) {
+  const includeDemo = req.user?.is_demo === true && process.env.NODE_ENV !== 'production';
   const result = await query(
     `select * from notifications
-     where user_id = $1
+     where user_id = $1 and ($2::boolean or is_demo = false)
      order by created_at desc
      limit 100`,
-    [req.user.id],
+    [req.user.id, includeDemo],
   );
   res.json({ success: true, notifications: result.rows, pagination: { page: 1, total: result.rows.length } });
 }
 
 export async function markNotificationRead(req, res) {
+  const includeDemo = req.user?.is_demo === true && process.env.NODE_ENV !== 'production';
   const result = await query(
     `update notifications
      set read_at = coalesce(read_at, now())
-     where id = $1 and user_id = $2
+     where id = $1 and user_id = $2 and ($3::boolean or is_demo = false)
      returning *`,
-    [req.params.id, req.user.id],
+    [req.params.id, req.user.id, includeDemo],
   );
   if (!result.rows[0]) throw notFound('Notification not found');
   res.json({ success: true, notification: result.rows[0] });
 }
 
 export async function markAllNotificationsRead(req, res) {
+  const includeDemo = req.user?.is_demo === true && process.env.NODE_ENV !== 'production';
   const result = await query(
     `update notifications
      set read_at = coalesce(read_at, now())
-     where user_id = $1 and read_at is null
+     where user_id = $1 and read_at is null and ($2::boolean or is_demo = false)
      returning id`,
-    [req.user.id],
+    [req.user.id, includeDemo],
   );
   res.json({ success: true, markedRead: result.rowCount || result.rows.length });
 }

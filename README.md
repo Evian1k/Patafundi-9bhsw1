@@ -11,7 +11,7 @@ patafundi/
 │   ├── src/routes.js         All /api/* routes
 │   ├── src/controllers/      Auth, jobs, payments, companies, staff, admin…
 │   ├── src/services/         Money, matching, fraud, errors, notifications…
-│   └── migrations/           33 SQL migrations (001–033)
+│   └── migrations/           SQL migrations (001–046)
 ├── frontend/                 React 18 + Vite + shadcn/ui + Tailwind — THE web app
 │   └── src/
 │       ├── pages/            Customer, Fundi, Company portal, Technician, Staff
@@ -57,12 +57,13 @@ rejects fundi accounts and vice-versa (wrong-app guard).
 
 ```bash
 npm install
-npm run db:push      # migrate + seed demo ecosystem (12 accounts, Apex company)
+npm run db:push      # migrations + demo seed; explicitly set a local-only seed password first
 npm run dev          # backend :4000 + frontend :3000 concurrently
 ```
 
-Demo login for every role (password `PataFundi#2026`):
-`customer.demo@` `fundi.demo@` `company.demo@` `dispatcher.demo@` `technician.demo@` `operations.demo@` `support.demo@` `finance.demo@` `fraud.demo@` `devops.demo@` `auditor.demo@` `admin.demo@patafundi.test` — full list in [DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md).
+Demo accounts are opt-in and require a unique `PATAFUNDI_DEMO_SEED_PASSWORD`
+in a local-only environment. They are not seeded at production startup. See
+[DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md) for the account roles and safe setup.
 
 ## The five experiences (one app, role-aware)
 
@@ -87,7 +88,7 @@ Staff triage everything in **Staff Portal → DevOps → Error Logs**.
 | Command | What it does |
 |---|---|
 | `npm run dev` | backend (:4000) + frontend (:3000) together |
-| `npm test` | backend unit suite (82 tests) |
+| `npm test` | backend unit and integration suite (uses isolated temporary PGlite databases) |
 | `npm run test:e2e` | end-to-end API suite |
 | `npm run typecheck` | TypeScript check for the frontend |
 | `npm run build` | production frontend bundle |
@@ -102,3 +103,5 @@ Staff triage everything in **Staff Portal → DevOps → Error Logs**.
 - [PATAFUNDI_E2E_TEST_REPORT.md](PATAFUNDI_E2E_TEST_REPORT.md) — latest test results
 - [PATAFUNDI_ROLE_SECURITY_AUDIT.md](PATAFUNDI_ROLE_SECURITY_AUDIT.md) — RBAC & isolation audit
 - [DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md) — demo ecosystem credentials
+- [INSTALLATION_AND_READINESS.md](INSTALLATION_AND_READINESS.md) — safe setup and verification commands
+- [PATAFUNDI_READINESS_REPORT.md](PATAFUNDI_READINESS_REPORT.md) — environment-specific validation results and remaining blockers

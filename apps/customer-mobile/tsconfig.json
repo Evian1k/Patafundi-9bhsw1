@@ -6,13 +6,7 @@
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@patafundi/shared": [
-        "../../packages/shared/src"
-      ],
-
-    }
+    "preserveSymlinks": true
   },
   "extends": "expo/tsconfig.base",
   "include": [

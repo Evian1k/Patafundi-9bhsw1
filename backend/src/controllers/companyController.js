@@ -215,12 +215,12 @@ export async function reviewPartnerApplication(req, res) {
              (application_id, owner_user_id, company_name, legal_name, contact_name,
               contact_email, contact_phone, registration_number, business_categories,
               service_areas, branches, technician_count, license_details, description, status)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'approved')
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,'approved')
            returning id`,
           [application.id, application.user_id, application.company_name, application.legal_name,
            application.contact_name, application.contact_email, application.contact_phone,
            application.company_registration_number, application.business_categories,
-           application.service_areas, application.branches, application.technician_count,
+           application.service_areas, JSON.stringify(Array.isArray(application.branches) ? application.branches : []), application.technician_count,
            application.license_details, application.description],
         );
         await client.query(
@@ -317,7 +317,7 @@ export async function publicCompanyDirectory(req, res) {
   // Spec section 47: a company must not appear bookable merely because it
   // exists. Bookability = approved + document-verified + (subscription when
   // required) + not suspended. Verification comes from the document workflow.
-  let where = `where cp.status = 'approved' and cp.verification_status = 'verified'`;
+  let where = `where cp.is_demo = false and cp.status = 'approved' and cp.verification_status = 'verified'`;
   if (category) {
     params.push(category);
     where += ` and $${params.length} = any(cp.business_categories)`;
@@ -339,7 +339,7 @@ export async function publicCompanyDirectory(req, res) {
       ${p} = any(cp.business_categories)
       or exists (
         select 1 from company_services cs
-        where cs.company_id = cp.id and cs.is_active = true
+        where cs.company_id = cp.id and cs.is_demo = false and cs.is_active = true
           and (cs.name ilike '%' || ${p} || '%' or cs.category ilike '%' || ${p} || '%')
       )
     )`;
@@ -348,7 +348,7 @@ export async function publicCompanyDirectory(req, res) {
     where += ` and exists (
       select 1 from subscriptions s
       where s.subscriber_type = 'company'
-        and s.status = 'active' and s.expires_at > now()
+        and s.is_demo = false and s.status = 'active' and s.expires_at > now()
         and s.fundi_id = cp.owner_user_id
     )`;
   }
@@ -356,10 +356,14 @@ export async function publicCompanyDirectory(req, res) {
   // asked for; it also decides who leads the featured area.
   const result = await query(
     `select cp.*,
-       (select count(*) from company_members cm where cm.company_id = cp.id and cm.role = 'technician' and cm.status = 'active') as active_technicians,
-       (select count(*) from jobs j where j.company_id = cp.id and j.status = 'completed') as completed_count,
-       (select count(r.id) from reviews r join jobs j2 on j2.id = r.job_id where j2.company_id = cp.id) as review_count,
-       (select coalesce(avg(r.rating), 0) from reviews r join jobs j2 on j2.id = r.job_id where j2.company_id = cp.id) as avg_rating
+       (select count(*) from company_members cm join users mu on mu.id = cm.user_id
+        where cm.company_id = cp.id and cm.is_demo = false and mu.is_demo = false
+          and cm.role = 'technician' and cm.status = 'active') as active_technicians,
+       (select count(*) from jobs j where j.company_id = cp.id and j.is_demo = false and j.status = 'completed') as completed_count,
+       (select count(r.id) from reviews r join jobs j2 on j2.id = r.job_id join users ru on ru.id = r.reviewer_id
+        where j2.company_id = cp.id and r.is_demo = false and j2.is_demo = false and ru.is_demo = false) as review_count,
+       (select coalesce(avg(r.rating), 0) from reviews r join jobs j2 on j2.id = r.job_id join users ru on ru.id = r.reviewer_id
+        where j2.company_id = cp.id and r.is_demo = false and j2.is_demo = false and ru.is_demo = false) as avg_rating
      from company_profiles cp ${where}
      order by completed_count desc, avg_rating desc nulls last limit 60`,
     params,
@@ -390,29 +394,31 @@ export async function publicCompanyDirectory(req, res) {
 }
 
 export async function publicCompanyProfileById(req, res) {
-  const companyRes = await query('select * from company_profiles where id = $1', [req.params.id]);
+  const companyRes = await query('select * from company_profiles where id = $1 and is_demo = false', [req.params.id]);
   const company = companyRes.rows[0];
   if (!company || company.status !== 'approved') throw notFound('Company not found');
   const services = await query(
     `select id, name, category, description, base_price, duration_minutes
-     from company_services where company_id = $1 and is_active = true order by category, name`,
+     from company_services where company_id = $1 and is_demo = false and is_active = true order by category, name`,
     [company.id],
   );
   const reviewsRes = await query(
     `select r.id, r.rating, r.comment, r.created_at, j.service_category,
        left(u.full_name, 1) || '****' as reviewer_name
      from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-     where j.company_id = $1 order by r.created_at desc limit 10`,
+     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false
+     order by r.created_at desc limit 10`,
     [company.id],
   );
   const stats = await query(
     `select count(*) filter (where status = 'completed') as completed,
        count(*) filter (where status in ('in_progress','on_the_way','arrived','accepted','assigned')) as active
-     from jobs where company_id = $1`,
+     from jobs where company_id = $1 and is_demo = false`,
     [company.id],
   );
   const reviewStats = await query(
-    `select count(*) as total from reviews r join jobs j on j.id = r.job_id where j.company_id = $1`,
+    `select count(*) as total from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
+     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false`,
     [company.id],
   );
   res.json({
@@ -477,22 +483,23 @@ export async function portalOverview(req, res) {
        count(*) filter (where status = 'completion_requested') as awaiting_confirmation,
        count(*) filter (where status in ('completed','closed')) as completed,
        count(*) filter (where status = 'cancelled') as cancelled
-     from jobs where company_id = $1`,
+     from jobs where company_id = $1 and is_demo = false`,
     [companyId],
   );
   const team = await query(
     `select count(*) as total, count(*) filter (where is_available and status = 'active' and role = 'technician') as available_technicians
-     from company_members where company_id = $1`,
+     from company_members where company_id = $1 and is_demo = false`,
     [companyId],
   );
   const finance = await query(
     `select coalesce(sum(net_amount), 0) as pending_settlements
-     from company_settlements where company_id = $1 and status = 'pending'`,
+     from company_settlements where company_id = $1 and is_demo = false and status = 'pending'`,
     [companyId],
   );
   const rating = await query(
     `select coalesce(avg(r.rating), 0) as avg_rating, count(r.id) as review_count
-     from reviews r join jobs j on j.id = r.job_id where j.company_id = $1`,
+     from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
+     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false`,
     [companyId],
   );
   const recent = await query(
@@ -502,7 +509,7 @@ export async function portalOverview(req, res) {
      from jobs j
      left join users u on u.id = j.customer_id
      left join users t on t.id = j.technician_user_id
-     where j.company_id = $1 order by j.created_at desc limit 8`,
+     where j.company_id = $1 and j.is_demo = false order by j.created_at desc limit 8`,
     [companyId],
   );
   const company = toCompanySummary({ ...req.company, team_size: team.rows[0]?.total });
@@ -564,7 +571,7 @@ export async function portalProfile(req, res) {
 // ── Services catalog ──
 export async function portalServices(req, res) {
   const result = await query(
-    `select * from company_services where company_id = $1 order by category, name`,
+    `select * from company_services where company_id = $1 and is_demo = false order by category, name`,
     [req.company.id],
   );
   res.json({ success: true, services: result.rows });
@@ -755,7 +762,7 @@ const JOB_LIST_FIELDS = `j.id, j.booking_number, j.status, j.provider_type, j.se
 export async function portalJobs(req, res) {
   const { scope = 'all' } = req.query || {};
   const params = [req.company.id];
-  let where = `where j.company_id = $1`;
+  let where = `where j.company_id = $1 and j.is_demo = false`;
   if (scope === 'incoming') where += ` and j.status in ('pending','matching','scheduled')`;
   else if (scope === 'dispatch') where += ` and j.status in ('accepted','offered')`;
   else if (scope === 'active') where += ` and j.status in ('assigned','on_the_way','arrived','in_progress')`;
@@ -816,7 +823,7 @@ export async function portalOpenPool(req, res) {
        j.location_name, j.estimated_price, j.scheduled_at, j.created_at,
        u.full_name as customer_name
      from jobs j left join users u on u.id = j.customer_id
-     where j.provider_type = 'company' and j.company_id is null
+     where j.provider_type = 'company' and j.company_id is null and j.is_demo = false
        and j.status in ('pending','matching','quote_requested')
        ${categoryFilter}
        ${areaFilter}
@@ -836,7 +843,7 @@ export async function portalQuotes(req, res) {
      from quotes q
      left join jobs j on j.id = q.job_id
      left join users u on u.id = q.customer_id
-     where q.company_id = $1
+     where q.company_id = $1 and (j.id is null or j.is_demo = false)
      order by q.created_at desc limit 100`,
     [company.id],
   );
@@ -847,7 +854,7 @@ export async function claimPoolJob(req, res) {
   if (!COMPANY_DISPATCH_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
   const result = await query(
     `update jobs set company_id = $2, updated_at = now()
-     where id = $1 and provider_type = 'company' and company_id is null
+     where id = $1 and is_demo = false and provider_type = 'company' and company_id is null
        and status in ('pending','matching')
      returning *`,
     [req.params.jobId, req.company.id],
@@ -1003,7 +1010,7 @@ export async function portalSchedule(req, res) {
      from jobs j
      left join users t on t.id = j.technician_user_id
      left join users u on u.id = j.customer_id
-     where j.company_id = $1 and j.scheduled_at is not null
+     where j.company_id = $1 and j.is_demo = false and j.scheduled_at is not null
        and j.status not in ('completed','cancelled','failed')
      order by j.scheduled_at asc limit 100`,
     [req.company.id],
@@ -1011,9 +1018,11 @@ export async function portalSchedule(req, res) {
   const availability = await query(
     `select cm.id, cm.user_id, u.full_name, cm.role, cm.is_available, cm.skills,
        (select count(*) from jobs j where j.technician_user_id = cm.user_id
-         and j.company_id = cm.company_id and j.status in ('assigned','on_the_way','arrived','in_progress')) as workload
+         and j.company_id = cm.company_id and j.is_demo = false
+         and j.status in ('assigned','on_the_way','arrived','in_progress')) as workload
      from company_members cm join users u on u.id = cm.user_id
-     where cm.company_id = $1 and cm.status = 'active' order by cm.role`,
+     where cm.company_id = $1 and cm.is_demo = false and u.is_demo = false
+       and cm.status = 'active' order by cm.role`,
     [req.company.id],
   );
   res.json({ success: true, scheduledJobs: result.rows, availability: availability.rows });
@@ -1025,13 +1034,14 @@ export async function portalReviews(req, res) {
     `select r.id, r.rating, r.comment, r.created_at, j.id as job_id,
        j.service_category, u.full_name as customer_name
      from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-     where j.company_id = $1 order by r.created_at desc limit 50`,
+     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false
+     order by r.created_at desc limit 50`,
     [req.company.id],
   );
   const stats = await query(
     `select coalesce(avg(r.rating),0) as avg_rating, count(*) as total,
        count(*) filter (where r.rating >= 4) as positive
-     from reviews r join jobs j on j.id = r.job_id where j.company_id = $1`,
+     from reviews r join jobs j on j.id = r.job_id where j.company_id = $1 and r.is_demo = false and j.is_demo = false`,
     [req.company.id],
   );
   res.json({
@@ -1057,19 +1067,19 @@ export async function portalFinance(req, res) {
        coalesce(sum(net_amount), 0) as net,
        coalesce(sum(net_amount) filter (where status = 'pending'), 0) as pending,
        coalesce(sum(net_amount) filter (where status = 'paid'), 0) as paid
-     from company_settlements where company_id = $1`,
+     from company_settlements where company_id = $1 and is_demo = false`,
     [req.company.id],
   );
   const settlements = await query(
     `select s.*, j.service_category, j.location_name
      from company_settlements s left join jobs j on j.id = s.job_id
-     where s.company_id = $1 order by s.created_at desc limit 100`,
+     where s.company_id = $1 and s.is_demo = false order by s.created_at desc limit 100`,
     [req.company.id],
   );
   const monthly = await query(
     `select date_trunc('month', created_at) as month,
        sum(gross_amount) as gross, sum(commission_amount) as commission, sum(net_amount) as net
-     from company_settlements where company_id = $1
+     from company_settlements where company_id = $1 and is_demo = false
      group by 1 order by 1 desc limit 12`,
     [req.company.id],
   );
@@ -1077,7 +1087,7 @@ export async function portalFinance(req, res) {
   const available = await companyAvailableBalance(null, req.company.id);
   const payoutRequests = await query(
     `select id, amount, mpesa_number, status, provider_reference, currency, created_at, updated_at
-     from payouts where company_id = $1 order by created_at desc limit 25`,
+     from payouts where company_id = $1 and is_demo = false order by created_at desc limit 25`,
     [req.company.id],
   );
   const company = await getCompany(req.company.id);
@@ -1223,7 +1233,7 @@ async function recordJobTimeline(jobId, eventType, actorId, actorRole, metadata 
 export async function adminListCompanies(req, res) {
   const { status, search } = req.query || {};
   const params = [];
-  let where = 'where 1=1';
+  let where = 'where cp.is_demo = false';
   if (status) { params.push(status); where += ` and cp.status = $${params.length}`; }
   if (search) {
     params.push(`%${search}%`);
@@ -1231,10 +1241,11 @@ export async function adminListCompanies(req, res) {
   }
   const result = await query(
     `select cp.*, u.full_name as owner_name, u.email as owner_email,
-       (select count(*) from company_members cm where cm.company_id = cp.id) as member_count,
-       (select count(*) from jobs j where j.company_id = cp.id) as job_count,
-       (select count(*) from company_settlements s where s.company_id = cp.id and s.status = 'pending') as pending_settlements,
-       (select coalesce(sum(s.net_amount), 0) from company_settlements s where s.company_id = cp.id and s.status = 'pending') as pending_settlements_kes
+       (select count(*) from company_members cm join users u on u.id = cm.user_id
+        where cm.company_id = cp.id and u.is_demo = false) as member_count,
+       (select count(*) from jobs j where j.company_id = cp.id and j.is_demo = false) as job_count,
+       (select count(*) from company_settlements s where s.company_id = cp.id and s.is_demo = false and s.status = 'pending') as pending_settlements,
+       (select coalesce(sum(s.net_amount), 0) from company_settlements s where s.company_id = cp.id and s.is_demo = false and s.status = 'pending') as pending_settlements_kes
      from company_profiles cp left join users u on u.id = cp.owner_user_id
      ${where} order by cp.created_at desc limit 200`,
     params,
@@ -1294,7 +1305,7 @@ export async function adminCompanyDetail(req, res) {
     ),
     query(
       `select id, name, category, description, base_price, duration_minutes, is_active, created_at
-       from company_services where company_id = $1 order by category, name`,
+       from company_services where company_id = $1 and is_demo = false order by category, name`,
       [companyId],
     ),
     query(
@@ -1304,7 +1315,7 @@ export async function adminCompanyDetail(req, res) {
        from jobs j
        left join users tech on tech.id = j.technician_user_id
        left join users cust on cust.id = j.customer_id
-       where j.company_id = $1 order by j.created_at desc limit 30`,
+       where j.company_id = $1 and j.is_demo = false order by j.created_at desc limit 30`,
       [companyId],
     ),
     query(
@@ -1314,18 +1325,18 @@ export async function adminCompanyDetail(req, res) {
               coalesce(sum(net_amount) filter (where status = 'pending'), 0) as pending,
               coalesce(sum(net_amount) filter (where status = 'paid'), 0) as paid,
               count(*) filter (where status = 'pending') as pending_count
-       from company_settlements where company_id = $1`,
+       from company_settlements where company_id = $1 and is_demo = false`,
       [companyId],
     ),
     query(
       `select s.*, j.service_category
        from company_settlements s left join jobs j on j.id = s.job_id
-       where s.company_id = $1 order by s.created_at desc limit 50`,
+       where s.company_id = $1 and s.is_demo = false order by s.created_at desc limit 50`,
       [companyId],
     ),
     query(
       `select id, amount, status, mpesa_number, provider_reference, currency, created_at, updated_at
-       from payouts where company_id = $1 order by created_at desc limit 25`,
+       from payouts where company_id = $1 and is_demo = false order by created_at desc limit 25`,
       [companyId],
     ),
     company.application_id

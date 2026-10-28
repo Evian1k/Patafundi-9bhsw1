@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 // Live verification of the company settlement payout loop (Task 18-b).
 // Run `node scripts/patafundi-e2e.mjs` FIRST — its booking flow leaves a
 // pending company settlement that this probe withdraws and completes:
@@ -27,7 +28,7 @@ const assert = (cond, label, extra = '') => {
 
 // Apex Home Services owner (from seed-takeover demo accounts)
 const owner = jar();
-let r = await req(owner, 'POST', '/auth/login', { email: 'company.demo@patafundi.test', password: 'PataFundi#2026' });
+let r = await req(owner, 'POST', '/auth/login', { email: 'company.demo@patafundi.test', password: getDemoPassword() });
 assert(r.status === 200, 'company owner login', JSON.stringify(r.json?.message || r.json));
 owner.token = r.json?.token;
 
@@ -64,7 +65,7 @@ assert(r.status !== 201, 'overdraft rejected', JSON.stringify(r.json));
 
 // Admin drill-down + completion
 const admin = jar();
-r = await req(admin, 'POST', '/auth/login', { email: 'operations.demo@patafundi.test', password: 'PataFundi#2026' });
+r = await req(admin, 'POST', '/auth/login', { email: 'operations.demo@patafundi.test', password: getDemoPassword() });
 assert(r.status === 200, 'admin login');
 admin.token = r.json?.token;
 

@@ -15,7 +15,7 @@ export async function listChargebacks(req, res) {
   const status = String(req.query.status || '').trim();
   const params = [];
   if (status) params.push(status);
-  const where = status ? 'where c.status = $1' : '';
+  const where = status ? 'where c.is_demo = false and c.status = $1' : 'where c.is_demo = false';
   const rows = await query(
     `select c.*, p.amount as payment_amount, p.status as payment_status,
             u.email as customer_email, j.id as job_id
@@ -33,13 +33,32 @@ export async function listChargebacks(req, res) {
 /** POST /api/admin/chargebacks — record a chargeback against a payment. */
 export async function createChargeback(req, res) {
   const { paymentId, amount, currency = 'KES', reason, provider = 'mpesa', providerReference = null } = req.body || {};
-  if (!paymentId || !amount || !reason) throw badRequest('paymentId, amount and reason are required');
-  const payment = await query(`select id, amount, status from payments where id = $1`, [paymentId]);
+  if (!paymentId || amount === undefined || amount === null || !String(reason || '').trim()) {
+    throw badRequest('paymentId, amount and reason are required');
+  }
+  const chargebackAmount = Number(amount);
+  if (!Number.isFinite(chargebackAmount) || chargebackAmount <= 0) throw badRequest('Chargeback amount must be greater than zero');
+  const chargebackCurrency = String(currency).trim().toUpperCase();
+  const chargebackProvider = String(provider).trim().toLowerCase();
+  if (!['mpesa', 'stripe', 'manual'].includes(chargebackProvider)) throw badRequest('Unsupported chargeback provider');
+  const payment = await query(
+    `select id, amount, currency, status from payments where id = $1 and is_demo = false`,
+    [paymentId],
+  );
   if (!payment.rows[0]) throw notFound('Payment not found');
+  if (!['completed', 'refunded'].includes(payment.rows[0].status)) {
+    throw badRequest('Chargebacks require a completed payment');
+  }
+  if (chargebackCurrency !== String(payment.rows[0].currency).toUpperCase()) {
+    throw badRequest('Chargeback currency must match the payment currency');
+  }
+  if (chargebackAmount > Number(payment.rows[0].amount) + 0.001) {
+    throw badRequest('Chargeback amount exceeds the payment amount');
+  }
   const inserted = await query(
     `insert into payment_chargebacks (payment_id, provider, provider_reference, amount, currency, reason)
      values ($1, $2, $3, $4, $5, $6) returning *`,
-    [paymentId, provider, providerReference, amount, currency, reason],
+    [paymentId, chargebackProvider, providerReference, chargebackAmount, chargebackCurrency, String(reason).trim()],
   );
   await auditLog({
     userId: req.user.id,
@@ -57,7 +76,7 @@ export async function decideChargeback(req, res) {
   if (!CHARGEBACK_STATUSES.includes(status)) {
     throw badRequest(`Valid statuses: ${CHARGEBACK_STATUSES.join(', ')}`);
   }
-  const current = await query(`select id from payment_chargebacks where id = $1`, [req.params.id]);
+  const current = await query(`select id from payment_chargebacks where id = $1 and is_demo = false`, [req.params.id]);
   if (!current.rows[0]) throw notFound('Chargeback not found');
   const updated = await query(
     `update payment_chargebacks set
@@ -67,7 +86,7 @@ export async function decideChargeback(req, res) {
        decided_by = $5,
        decided_at = now(),
        updated_at = now()
-     where id = $1 returning *`,
+     where id = $1 and is_demo = false returning *`,
     [req.params.id, status, notes, evidence ? JSON.stringify(evidence) : null, req.user.id],
   );
   await auditLog({

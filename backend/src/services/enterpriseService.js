@@ -23,11 +23,11 @@ export async function calculateQualityScore(fundiId) {
        f.face_match_score, f.fraud_risk_score, f.verification_badge, f.trust_score,
        f.created_at
      from fundis f
-     left join jobs j on j.fundi_id = f.user_id
-     left join reviews r on r.job_id = j.id
+     left join jobs j on j.fundi_id = f.user_id and j.is_demo = false
+     left join reviews r on r.job_id = j.id and r.is_demo = false
      left join job_timeline jt_accepted on jt_accepted.job_id = j.id and jt_accepted.event_type = 'fundi_accepted'
      left join job_timeline jt_arrived on jt_arrived.job_id = j.id and jt_arrived.event_type = 'fundi_arrived'
-     where f.id = $1
+     where f.id = $1 and f.is_demo = false
      group by f.id`,
     [fundiId],
   );

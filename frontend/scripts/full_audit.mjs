@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from '../../scripts/demo-password.mjs';
 /**
  * PataFundi FULL certification audit — covers every route + attack vectors.
  *
@@ -95,7 +96,7 @@ async function setupUsers() {
   const fundiEmail = `fundi-${Date.now()}@x.com`;
   const fundiForm = [
     { name: 'email', value: fundiEmail },
-    { name: 'password', value: 'Fundi@2024' },
+    { name: 'password', value: getDemoPassword() },
     { name: 'fullName', value: 'F' },
     { name: 'phone', value: '254712000222' },
     { name: 'skills', value: JSON.stringify(['plumbing']) },
@@ -114,7 +115,7 @@ async function setupUsers() {
 
   // Admin
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: getDemoPassword() } });
   saveJar('admin');
 
   // Approve the fundi
@@ -302,7 +303,7 @@ async function main() {
   r = await request('POST', '/api/auth/register/fundi', {
     formData: [
       { name: 'email', value: pendEmail },
-      { name: 'password', value: 'Fundi@2024' },
+      { name: 'password', value: getDemoPassword() },
       { name: 'fullName', value: 'P' },
       { name: 'phone', value: '254712000333' },
       { name: 'skills', value: JSON.stringify(['electrical']) },

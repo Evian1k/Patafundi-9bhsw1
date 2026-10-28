@@ -73,9 +73,9 @@ ensureDevEnvFile();
 // Load .env with override: true so .env values beat inherited env vars.
 // Repo-root .env loads first; a cwd-local .env (backend/ dev override) layers on top.
 if (!isProduction) {
-  dotenv.config({ override: true, path: ROOT_ENV_PATH });
+  dotenv.config({ override: process.env.NODE_ENV !== 'test', path: ROOT_ENV_PATH });
   if (CWD_ENV_PATH !== ROOT_ENV_PATH && fs.existsSync(CWD_ENV_PATH)) {
-    dotenv.config({ override: true, path: CWD_ENV_PATH });
+    dotenv.config({ override: process.env.NODE_ENV !== 'test', path: CWD_ENV_PATH });
   }
 }
 

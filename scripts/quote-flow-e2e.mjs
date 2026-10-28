@@ -1,3 +1,4 @@
+import { getDemoPassword } from './demo-password.mjs';
 // Live E2E: full quote workflow against the running dev API (spec section 53).
 // Customer creates a booking -> company sends a quote -> verify the booking is
 // NOT completed -> customer accepts -> booking_confirmed -> work runs ->
@@ -30,14 +31,14 @@ const ok = (cond, label) => {
 async function main() {
   // 1) customer login (demo account)
   const login = await req('POST', '/auth/login', {
-    body: { email: 'customer.demo@patafundi.test', password: 'PataFundi#2026' },
+    body: { email: 'customer.demo@patafundi.test', password: getDemoPassword() },
   });
   ok(login.status === 200 && login.json.token, 'customer login');
   const customerToken = login.json.token;
 
   // 2) resolve the demo company and create a company-targeted booking
   const clogin0 = await req('POST', '/auth/login', {
-    body: { email: 'company.demo@patafundi.test', password: 'PataFundi#2026' },
+    body: { email: 'company.demo@patafundi.test', password: getDemoPassword() },
   });
   ok(clogin0.status === 200 && clogin0.json.token, 'company login (pre-flight)');
   const profile = await req('GET', '/company/portal/profile', { token: clogin0.json.token });
@@ -48,7 +49,7 @@ async function main() {
   // upload required documents -> submit for verification -> admin verifies
   // both documents -> the company becomes bookable.
   const adminLogin = await req('POST', '/auth/login', {
-    body: { email: 'admin.demo@patafundi.test', password: 'PataFundi#2026' },
+    body: { email: 'admin.demo@patafundi.test', password: getDemoPassword() },
   });
   ok(adminLogin.status === 200 && adminLogin.json.token, 'admin login');
   const adminToken = adminLogin.json.token;

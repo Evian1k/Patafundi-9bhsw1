@@ -49,7 +49,10 @@ export async function createDispute(req, res) {
   const { jobId, reason, evidenceUrls = [] } = req.body || {};
   if (!jobId || !reason) throw badRequest('Job and reason are required');
   const dispute = await transaction(async (client) => {
-    const job = await client.query('select customer_id, fundi_id, company_id, technician_user_id from jobs where id = $1 for update', [jobId]);
+    const job = await client.query(
+      'select customer_id, fundi_id, company_id, technician_user_id from jobs where id = $1 and is_demo = false for update',
+      [jobId],
+    );
     if (!job.rows[0]) throw notFound('Job not found');
     if (!(await canAccessJob(req.user, job.rows[0]))) throw forbidden('Not allowed to dispute this job');
     const existing = await client.query(
@@ -82,7 +85,8 @@ export async function listDisputes(req, res) {
   const result = await query(
     `select d.*, j.booking_number, j.service_category
      from disputes d join jobs j on j.id = d.job_id
-     where ($2::text is null or d.status = $2)
+     where d.is_demo = false and j.is_demo = false
+       and ($2::text is null or d.status = $2)
        and (
          $3::text in ('admin', 'super_admin')
          or j.customer_id = $1
@@ -103,7 +107,7 @@ export async function uploadEvidence(req, res) {
   const dispute = await query(
     `select d.*, j.customer_id, j.fundi_id, j.company_id, j.technician_user_id
      from disputes d join jobs j on j.id = d.job_id
-     where d.id = $1`,
+     where d.id = $1 and d.is_demo = false and j.is_demo = false`,
     [req.params.id],
   );
   if (!dispute.rows[0]) throw notFound('Dispute not found');
@@ -150,13 +154,13 @@ export async function resolveDispute(req, res) {
   const { resolution, refundAmount = 0 } = req.body || {};
   if (!resolution) throw badRequest('Resolution is required');
   const dispute = await transaction(async (client) => {
-    const d = await client.query('select * from disputes where id = $1 for update', [req.params.id]);
+    const d = await client.query('select * from disputes where id = $1 and is_demo = false for update', [req.params.id]);
     if (!d.rows[0]) throw notFound('Dispute not found');
     if (!['open', 'under_review'].includes(d.rows[0].status)) throw badRequest('Dispute is already closed');
     const refund = Number(refundAmount || 0);
     if (!Number.isFinite(refund) || refund < 0) throw badRequest('Refund amount must be zero or greater');
     const payment = await client.query(
-      `select * from payments where job_id = $1 and escrow_status in ('held', 'frozen') order by created_at desc limit 1 for update`,
+      `select * from payments where job_id = $1 and is_demo = false and escrow_status in ('held', 'frozen') order by created_at desc limit 1 for update`,
       [d.rows[0].job_id],
     );
     if (refund > 0) {

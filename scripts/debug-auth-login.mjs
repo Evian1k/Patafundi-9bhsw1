@@ -1,9 +1,10 @@
+import { getDemoPassword } from './demo-password.mjs';
 import { login } from '../backend/src/controllers/authController.js';
 import { query } from '../backend/src/db.js';
 import bcrypt from 'bcryptjs';
 
 const email = 'demo@patafundi.com';
-const password = 'Demo@2024!';
+const password = getDemoPassword();
 console.log('starting debug-auth-login');
 
 const row = await query('select id, email, password_hash, status, email_verified_at, failed_login_attempts, locked_until from users where lower(email)=lower($1)', [email]);

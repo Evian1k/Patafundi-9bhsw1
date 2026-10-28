@@ -7,11 +7,12 @@
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import { getEmbeddedDb } from '../src/pglite-instance.js';
+import { canSeedDemoData } from '../src/demoDataPolicy.js';
 import pg from 'pg';
 
 if (process.env.NODE_ENV !== 'production') dotenv.config();
 
-export const DEMO_PASSWORD = 'PataFundi#2026';
+export const DEMO_PASSWORD = process.env.PATAFUNDI_DEMO_SEED_PASSWORD || '';
 
 const DEMO_USERS = [
   { email: 'customer.demo@patafundi.test', fullName: 'Amina Customer (Demo)', role: 'customer', phone: '254730000001' },
@@ -29,17 +30,19 @@ const DEMO_USERS = [
 ];
 
 async function getDb() {
-  // Mirror ensure-dev-db logic: try real PostgreSQL first, fall back to the
-  // embedded database when no DATABASE_URL is configured or it is unreachable.
+  // An explicitly configured database must never silently redirect seeding to
+  // an unrelated embedded database.
   if (process.env.DATABASE_URL && process.env.PATAFUNDI_EMBEDDED_DB !== '1') {
+    let pool;
     try {
       const { getPgPoolConfig } = await import('../src/pg-config.js');
-      const pool = new pg.Pool(getPgPoolConfig(process.env.DATABASE_URL, { connectionTimeoutMillis: 3000 }));
+      pool = new pg.Pool(getPgPoolConfig(process.env.DATABASE_URL, { connectionTimeoutMillis: 3000 }));
       await pool.query('select 1');
       console.log('[seed-takeover] using PostgreSQL from DATABASE_URL');
       return pool;
-    } catch {
-      console.warn('[seed-takeover] DATABASE_URL unreachable - falling back to embedded PostgreSQL (PGlite)');
+    } catch (error) {
+      await pool?.end();
+      throw new Error(`[seed-takeover] configured DATABASE_URL is unreachable: ${error.message}`);
     }
   }
   process.env.PATAFUNDI_EMBEDDED_DB = '1';
@@ -48,20 +51,32 @@ async function getDb() {
 
 async function upsertUser(db, { email, fullName, role, phone }, hash) {
   const res = await db.query(
-    `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
-     values (lower($1), $2, $3, $4, $5, 'active', now())
-     on conflict (email) do update set password_hash = excluded.password_hash,
-       full_name = excluded.full_name, role = excluded.role, email_verified_at = now()
+    `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at, is_demo)
+     values (lower($1), $2, $3, $4, $5, 'active', now(), true)
+     on conflict (email) do nothing
      returning id, email, role`,
     [email, hash, fullName, phone, role],
   );
-  return res.rows[0];
+  if (res.rows[0]) return res.rows[0];
+  const existing = await db.query(
+    `select id, email, role, is_demo from users where lower(email) = lower($1)`,
+    [email],
+  );
+  const row = existing.rows[0];
+  if (!row) throw new Error(`[seed-takeover] conflicting account ${email} disappeared during lookup`);
+  if (row.is_demo !== true || row.role !== role) {
+    throw new Error(`[seed-takeover] refusing to modify existing non-demo or mismatched account ${email}`);
+  }
+  return row;
 }
 
 export async function seedTakeover() {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('[seed-takeover] refusing to run in production');
-    return;
+  if (!canSeedDemoData()) {
+    console.log('[seed-takeover] skipped; demo data is restricted to isolated embedded storage or an allowlisted local test database');
+    return false;
+  }
+  if (!DEMO_PASSWORD) {
+    throw new Error('PATAFUNDI_DEMO_SEED_PASSWORD is required to seed demo accounts');
   }
   const db = await getDb();
   const hash = await bcrypt.hash(DEMO_PASSWORD, 12);
@@ -356,6 +371,7 @@ export async function seedTakeover() {
   );
 
   console.log('[seed-takeover] DEMO ecosystem ready - see DEMO_ACCOUNTS.md for credentials');
+  return true;
 }
 
 const isDirectRun = process.argv[1] && process.argv[1].includes('seed-takeover');

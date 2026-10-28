@@ -566,7 +566,7 @@ export async function calculateBehavioralRisk(userId) {
   ] = await Promise.all([
     query('select count(*)::int as n from login_history where user_id = $1 and created_at > now() - interval \'30 days\'', [userId]),
     query('select count(*)::int as n from payments where user_id = $1 and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0 }] })),
-    query('select count(*)::int as n, avg(rating)::numeric as avg_rating from reviews where reviewer_id = $1 and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0, avg_rating: 0 }] })),
+    query('select count(*)::int as n, avg(rating)::numeric as avg_rating from reviews where reviewer_id = $1 and is_demo = false and created_at > now() - interval \'30 days\'', [userId]).catch(() => ({ rows: [{ n: 0, avg_rating: 0 }] })),
     query(`select
              count(*)::int as total,
              count(*) filter (where status = 'cancelled')::int as cancelled,

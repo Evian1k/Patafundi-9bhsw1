@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from './demo-password.mjs';
 /**
  * security-battery.mjs — PHASE 10 security evidence battery (master spec §38).
  * Runs against a LIVE server (default http://127.0.0.1:4000) seeded by
@@ -11,7 +12,7 @@
  * access denial.
  */
 const BASE = process.env.PATAFUNDI_BATTERY_BASE || 'http://127.0.0.1:4000';
-const PASSWORD = 'PataFundi#2026';
+const PASSWORD = getDemoPassword();
 
 let passed = 0, failed = 0;
 const results = [];

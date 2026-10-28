@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from '../../scripts/demo-password.mjs';
 /**
  * PataFundi realtime security tests — uses real socket.io-client connections
  * to verify room hijack protection, event spoofing, and unauthorized tracking.
@@ -58,9 +59,9 @@ async function main() {
     });
   }
 
-  const admin = await login('admin@patafundi.com', 'Admin@2024!');
-  const fundi = await login('fundi@patafundi.com', 'Fundi@2024!');
-  const customer = await login('demo@patafundi.com', 'Demo@2024!');
+  const admin = await login('admin@patafundi.com', getDemoPassword());
+  const fundi = await login('fundi@patafundi.com', getDemoPassword());
+  const customer = await login('demo@patafundi.com', getDemoPassword());
 
   const adminToken = admin.json?.token;
   const fundiToken = fundi.json?.token;

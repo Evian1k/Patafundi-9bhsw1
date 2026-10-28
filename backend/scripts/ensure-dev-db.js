@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import pg from 'pg';
 import { getEmbeddedDb, closeEmbeddedDb } from '../src/pglite-instance.js';
 import { getPgPoolConfig, isLocalDatabaseUrl } from '../src/pg-config.js';
+import { canSeedDemoData } from '../src/demoDataPolicy.js';
 import { maybeBootstrapOwnerFromEnv } from '../src/ownerBootstrap.js';
 
 if (process.env.NODE_ENV !== 'production') {
@@ -16,42 +17,37 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(__dirname, '../migrations');
 
 const OWNER_EMAIL = 'emmanuelevian@gmail.com';
-// Local-development default for the owner account. Never valid in production:
-// production demo seeding requires an explicit OWNER_PASSWORD (fail-closed),
-// and the only scripted production path for the owner remains
-// scripts/bootstrap-owner.js (OWNER_PASSWORD env / auto-generate opt-in).
-const DEV_OWNER_PASSWORD = 'PataFundiOwner@2026';
 
 const demoUsers = [
   // Platform owner (spec §3): the authorized owner account, always provisioned.
   // In production use scripts/bootstrap-owner.js instead (env-controlled password).
-  { email: OWNER_EMAIL, password: DEV_OWNER_PASSWORD, fullName: 'Emmanuel Evian', role: 'super_admin', phone: '254712000000' },
+  { email: OWNER_EMAIL, fullName: 'Emmanuel Evian', role: 'super_admin', phone: '254712000000' },
   // Public platform users — PataFundi-branded demo set (legacy @patafundi.com
   // twins below are kept seeded for backward compatibility).
-  { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712100001' },
-  { email: 'company@patafundi.com', password: 'Company@2024!', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712100002' },
-  { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712100003' },
+  { email: 'demo@patafundi.com', fullName: 'Demo Customer', role: 'customer', phone: '254712100001' },
+  { email: 'company@patafundi.com', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712100002' },
+  { email: 'fundi@patafundi.com', fullName: 'Demo Fundi', role: 'fundi', phone: '254712100003' },
   // Internal staff (enterprise RBAC — see migration 009)
-  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Super Admin', role: 'super_admin', phone: '254712100004' },
-  { email: 'ops@patafundi.com', password: 'Ops@2024!', fullName: 'Ops Manager', role: 'admin', phone: '254712100005' },
-  { email: 'support@patafundi.com', password: 'Support@2024!', fullName: 'Support Agent', role: 'support_agent', phone: '254712100006' },
-  { email: 'fraud@patafundi.com', password: 'Fraud@2024!', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712100007' },
-  { email: 'finance@patafundi.com', password: 'Finance@2024!', fullName: 'Finance Team', role: 'finance_team', phone: '254712100008' },
-  { email: 'dispatch@patafundi.com', password: 'Dispatch@2024!', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712100009' },
-  { email: 'devops@patafundi.com', password: 'Devops@2024!', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712100010' },
-  { email: 'auditor@patafundi.com', password: 'Auditor@2024!', fullName: 'Auditor', role: 'auditor', phone: '254712100011' },
+  { email: 'admin@patafundi.com', fullName: 'Super Admin', role: 'super_admin', phone: '254712100004' },
+  { email: 'ops@patafundi.com', fullName: 'Ops Manager', role: 'admin', phone: '254712100005' },
+  { email: 'support@patafundi.com', fullName: 'Support Agent', role: 'support_agent', phone: '254712100006' },
+  { email: 'fraud@patafundi.com', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712100007' },
+  { email: 'finance@patafundi.com', fullName: 'Finance Team', role: 'finance_team', phone: '254712100008' },
+  { email: 'dispatch@patafundi.com', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712100009' },
+  { email: 'devops@patafundi.com', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712100010' },
+  { email: 'auditor@patafundi.com', fullName: 'Auditor', role: 'auditor', phone: '254712100011' },
   // ── Legacy PataFundi-branded set (still seeded; not shown on the demo page) ──
-  { email: 'demo@patafundi.com', password: 'Demo@2024!', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },
-  { email: 'company@patafundi.com', password: 'Company@2024!', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712000002' },
-  { email: 'fundi@patafundi.com', password: 'Fundi@2024!', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000003' },
-  { email: 'admin@patafundi.com', password: 'Admin@2024!', fullName: 'Super Admin', role: 'super_admin', phone: '254712000004' },
-  { email: 'ops@patafundi.com', password: 'Ops@2024!', fullName: 'Ops Manager', role: 'admin', phone: '254712000005' },
-  { email: 'support@patafundi.com', password: 'Support@2024!', fullName: 'Support Agent', role: 'support_agent', phone: '254712000006' },
-  { email: 'fraud@patafundi.com', password: 'Fraud@2024!', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712000007' },
-  { email: 'finance@patafundi.com', password: 'Finance@2024!', fullName: 'Finance Team', role: 'finance_team', phone: '254712000008' },
-  { email: 'dispatch@patafundi.com', password: 'Dispatch@2024!', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712000009' },
-  { email: 'devops@patafundi.com', password: 'Devops@2024!', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712000010' },
-  { email: 'auditor@patafundi.com', password: 'Auditor@2024!', fullName: 'Auditor', role: 'auditor', phone: '254712000011' },
+  { email: 'demo@patafundi.com', fullName: 'Demo Customer', role: 'customer', phone: '254712000001' },
+  { email: 'company@patafundi.com', fullName: 'Demo Company Admin', role: 'company_admin', phone: '254712000002' },
+  { email: 'fundi@patafundi.com', fullName: 'Demo Fundi', role: 'fundi', phone: '254712000003' },
+  { email: 'admin@patafundi.com', fullName: 'Super Admin', role: 'super_admin', phone: '254712000004' },
+  { email: 'ops@patafundi.com', fullName: 'Ops Manager', role: 'admin', phone: '254712000005' },
+  { email: 'support@patafundi.com', fullName: 'Support Agent', role: 'support_agent', phone: '254712000006' },
+  { email: 'fraud@patafundi.com', fullName: 'Fraud Analyst', role: 'fraud_analyst', phone: '254712000007' },
+  { email: 'finance@patafundi.com', fullName: 'Finance Team', role: 'finance_team', phone: '254712000008' },
+  { email: 'dispatch@patafundi.com', fullName: 'Dispatch Team', role: 'dispatch_team', phone: '254712000009' },
+  { email: 'devops@patafundi.com', fullName: 'DevOps Engineer', role: 'devops_engineer', phone: '254712000010' },
+  { email: 'auditor@patafundi.com', fullName: 'Auditor', role: 'auditor', phone: '254712000011' },
 ];
 
 /**
@@ -216,14 +212,11 @@ async function ensureCustomersTable(db) {
   else await db.query(sql);
 }
 
-async function seedIfEmpty(db) {
+export async function seedIfEmpty(db) {
   if (!(await tableExists(db, 'users'))) return;
 
-  // Demo accounts use passwords that are published in this repository, and
-  // include staff roles up to super_admin. Never create them on a production
-  // database — an explicit opt-in is required for demo/staging deployments.
-  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_USERS !== 'true') {
-    console.log('[seed] demo accounts skipped in production (set SEED_DEMO_USERS=true to override)');
+  if (!canSeedDemoData()) {
+    console.log('[seed] demo accounts skipped; use isolated embedded storage or an explicitly allowlisted local test database');
     return;
   }
 
@@ -231,28 +224,26 @@ async function seedIfEmpty(db) {
     const existing = await db.query('select id from users where lower(email) = lower($1)', [user.email]);
     if (existing.rows[0]) continue;
 
-    let password = user.password;
-    if (process.env.NODE_ENV === 'production' && user.email === OWNER_EMAIL) {
-      // Fail-closed: the public dev default must never create a production owner.
-      password = process.env.OWNER_PASSWORD || '';
-      if (!password) {
-        console.warn(`[seed] production demo seeding: skipping owner account ${OWNER_EMAIL} (set OWNER_PASSWORD) — dev default is never used in production`);
-        continue;
+    const password = user.email === OWNER_EMAIL
+      ? process.env.OWNER_PASSWORD
+      : process.env.PATAFUNDI_DEMO_SEED_PASSWORD;
+    if (!password) {
+      if (user.email === demoUsers[0].email) {
+        console.info('[seed] owner/demo accounts skipped; set OWNER_PASSWORD and/or PATAFUNDI_DEMO_SEED_PASSWORD for this isolated environment');
       }
+      continue;
     }
 
     const hash = await bcrypt.hash(password, 12);
     const inserted = await db.query(
-      `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at)
-       values (lower($1), $2, $3, $4, $5, 'active', now())
-       on conflict (email) do update set
-        password_hash = excluded.password_hash,
-        full_name = excluded.full_name,
-        email_verified_at = coalesce(users.email_verified_at, now())
+      `insert into users (email, password_hash, full_name, phone, role, status, email_verified_at, is_demo)
+       values (lower($1), $2, $3, $4, $5, 'active', now(), true)
+       on conflict (email) do nothing
        returning id, email, role`,
       [user.email, hash, user.fullName, user.phone, user.role],
     );
     const row = inserted.rows[0];
+    if (!row) continue;
     await db.query(
       `insert into trust_scores (user_id, score, level) values ($1, 85, 'trusted')
        on conflict (user_id) do nothing`,
@@ -339,45 +330,57 @@ export async function bootstrapPostgresDatabase({ required = false } = {}) {
     return false;
   }
   const pool = new pg.Pool(getPgPoolConfig(databaseUrl));
+  let client;
+  let lockAcquired = false;
   try {
-    await pool.query('select 1');
-    await pool.query(`
+    client = await pool.connect();
+    await client.query('select pg_advisory_lock(1380013902, 47)');
+    lockAcquired = true;
+    await client.query(`
       create table if not exists schema_migrations (
         id serial primary key,
         filename text not null unique,
         applied_at timestamptz not null default now()
       )
     `);
-    const applied = await pool.query('select filename from schema_migrations order by filename');
+    const applied = await client.query('select filename from schema_migrations order by filename');
     const appliedSet = new Set(applied.rows.map((row) => row.filename));
     const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
     for (const file of files) {
       if (appliedSet.has(file)) continue;
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
       console.log(`[migrate] apply ${file}`);
-      await pool.query('BEGIN');
+      await client.query('BEGIN');
       try {
-        await pool.query(sql);
-        await pool.query('insert into schema_migrations (filename) values ($1)', [file]);
-        await pool.query('COMMIT');
+        await client.query(sql);
+        await client.query('insert into schema_migrations (filename) values ($1)', [file]);
+        await client.query('COMMIT');
       } catch (error) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         throw error;
       }
     }
-    await ensureCustomersTable(pool);
-    await seedIfEmpty(pool);
+    await ensureCustomersTable(client);
+    await seedIfEmpty(client);
     // Platform owner (spec §3/§39): when OWNER_PASSWORD is set, create/heal the
     // owner account on every boot. Idempotent — existing passwords are untouched.
-    await maybeBootstrapOwnerFromEnv(pool);
-    await pool.end();
+    await maybeBootstrapOwnerFromEnv(client);
     console.log('[PataFundi] PostgreSQL database ready');
     return true;
   } catch (error) {
-    await pool.end().catch(() => {});
     if (required) throw error;
     console.warn(`[PataFundi] PostgreSQL unavailable (${error.message}); falling back to embedded DB`);
     return false;
+  } finally {
+    if (client) {
+      if (lockAcquired) {
+        await client.query('select pg_advisory_unlock(1380013902, 47)').catch((error) => {
+          console.error(`[PataFundi] Failed to release migration lock: ${error.message}`);
+        });
+      }
+      client.release();
+    }
+    await pool.end();
   }
 }
 
@@ -392,7 +395,8 @@ export async function ensureDevDatabase() {
   }
 
   // Try real Postgres first (DATABASE_URL or Docker).
-  if (await bootstrapPostgresDatabase()) return;
+  const explicitTestDatabase = Boolean(process.env.PATAFUNDI_TEST_DATABASE_URL);
+  if (await bootstrapPostgresDatabase({ required: explicitTestDatabase })) return;
 
   // Fall back to PGlite (embedded Postgres). On some platforms (notably
   // Windows with certain Node.js versions) PGlite's WASM runtime aborts

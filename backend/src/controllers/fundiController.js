@@ -112,9 +112,11 @@ export async function publicFundi(req, res) {
     `select f.id, f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score, f.approval_status,
             f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge,
             f.bio, f.experience,
-            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'completed') as completed_jobs,
-            (select count(*)::int from reviews r join jobs j2 on j2.id = r.job_id where j2.fundi_id = f.user_id) as review_count
-     from fundis f join users u on u.id = f.user_id where f.id = $1 or f.user_id = $1`,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.is_demo = false and j.status = 'completed') as completed_jobs,
+            (select count(*)::int from reviews r join jobs j2 on j2.id = r.job_id join users ru on ru.id = r.reviewer_id
+             where j2.fundi_id = f.user_id and r.is_demo = false and j2.is_demo = false and ru.is_demo = false) as review_count
+     from fundis f join users u on u.id = f.user_id
+     where f.is_demo = false and u.is_demo = false and (f.id = $1 or f.user_id = $1)`,
     [req.params.id],
   );
   const row = result.rows[0];
@@ -141,17 +143,19 @@ export async function searchFundis(req, res) {
       f.latitude, f.longitude, f.location_accuracy,
       f.profile_photo_url, f.profile_photo_thumb_url, f.verification_badge,
       f.updated_at as last_active,
-      (select count(*) from jobs j where j.fundi_id = f.user_id and j.status = 'completed')::int as completed_jobs,
+      (select count(*) from jobs j where j.fundi_id = f.user_id and j.is_demo = false and j.status = 'completed')::int as completed_jobs,
       coalesce(qs.overall_score, 0) as quality_score,
       qs.tier as quality_tier,
       (select 1 from subscriptions s
-        where s.fundi_id = f.user_id and s.status = 'active' and s.expires_at > now()
+        where s.fundi_id = f.user_id and s.is_demo = false and s.status = 'active' and s.expires_at > now()
         order by s.expires_at desc limit 1) as pro_active
      from fundis f
      join users u on u.id = f.user_id
      left join fundi_quality_scores qs on qs.fundi_id = f.id
      where u.role = 'fundi'
        and u.status = 'active'
+       and u.is_demo = false
+       and f.is_demo = false
        and f.approval_status = 'approved'
        and f.online = true
        and f.latitude is not null
@@ -205,16 +209,17 @@ export async function searchFundis(req, res) {
 
 export async function dashboard(req, res) {
   const [jobs, fundi, wallet, ratings, offers, earnings] = await Promise.all([
-    query(`select * from jobs where fundi_id = $1 order by updated_at desc limit 10`, [req.user.id]),
+    query(`select * from jobs where fundi_id = $1 and is_demo = false order by updated_at desc limit 10`, [req.user.id]),
     query(`select * from fundis where user_id = $1`, [req.user.id]),
     query(
       `select coalesce(sum(case when status in ('requested','processing','completed') then amount else 0 end),0) as balance
-       from payouts where fundi_id = $1`,
+       from payouts where fundi_id = $1 and is_demo = false`,
       [req.user.id],
     ),
     query(
       `select coalesce(avg(r.rating),0) as average, count(*)::int as total
-       from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1`,
+       from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
+       where j.fundi_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false`,
       [req.user.id],
     ),
     // Real pending-offer count (migration 038) — offers made in the last
@@ -232,7 +237,8 @@ export async function dashboard(req, res) {
          coalesce(sum(case when et.created_at >= now() - interval '30 days' then et.amount else 0 end), 0) as month
        from escrow_transactions et
        join jobs j on j.id = et.job_id
-       where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'`,
+       where j.fundi_id = $1 and j.is_demo = false and et.is_demo = false
+         and et.type = 'release' and et.status = 'released'`,
       [req.user.id],
     ),
   ]);
@@ -393,7 +399,7 @@ export async function location(req, res) {
 
 export async function walletTransactions(req, res) {
   const result = await query(
-    `select * from payouts where fundi_id = $1 order by created_at desc limit $2 offset $3`,
+    `select * from payouts where fundi_id = $1 and is_demo = false order by created_at desc limit $2 offset $3`,
     [req.user.id, Number(req.query.limit || 20), Number(req.query.offset || 0)],
   );
   res.json({ success: true, transactions: result.rows });
@@ -406,7 +412,9 @@ export async function ratings(req, res) {
 
   if (fundiId) {
     const result = await query(
-      `select r.* from reviews r join jobs j on j.id = r.job_id where j.fundi_id = $1 order by r.created_at desc limit $2 offset $3`,
+      `select r.* from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
+       where j.fundi_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false
+       order by r.created_at desc limit $2 offset $3`,
       [fundiId, limit, offset],
     );
     return res.json({ success: true, ratings: result.rows });
@@ -416,6 +424,7 @@ export async function ratings(req, res) {
     `select r.rating, r.comment, u.full_name as "customerName", r.created_at
      from reviews r
      join users u on u.id = r.reviewer_id
+     where r.is_demo = false and u.is_demo = false
      order by r.created_at desc
      limit $1 offset $2`,
     [limit, offset],

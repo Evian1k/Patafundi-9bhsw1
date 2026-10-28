@@ -20,13 +20,15 @@ async function availablePayoutBalance(client, fundiId) {
          select sum(et.amount)
          from escrow_transactions et
          join jobs j on j.id = et.job_id
-         where j.fundi_id = $1 and et.type = 'release' and et.status = 'released'
+         where j.fundi_id = $1 and j.is_demo = false and et.is_demo = false
+           and et.type = 'release' and et.status = 'released'
        ), 0)
        -
        coalesce((
          select sum(p.amount)
          from payouts p
-         where p.fundi_id = $1 and p.status in ('requested', 'processing', 'completed')
+         where p.fundi_id = $1 and p.is_demo = false
+           and p.status in ('requested', 'processing', 'completed')
        ), 0) as available`,
     [fundiId],
   );
@@ -45,19 +47,24 @@ export async function requestPayout(req, res) {
     await client.query('select id from fundis where user_id = $1 for update', [req.user.id]);
     if (idempotencyKey) {
       const duplicate = await client.query('select * from payouts where idempotency_key = $1', [idempotencyKey]);
-      if (duplicate.rows[0]) return duplicate.rows[0];
+      if (duplicate.rows[0]) {
+        if (duplicate.rows[0].is_demo) throw badRequest('Idempotency key is already used');
+        return duplicate.rows[0];
+      }
     }
     const [available, settings, fundi, disputes, fraud] = await Promise.all([
       availablePayoutBalance(client, req.user.id),
       getPaymentSettings(client),
       client.query(
         `select f.payout_frozen, f.wallet_frozen, f.trust_score, u.trust_score as user_trust_score
-         from fundis f join users u on u.id = f.user_id where f.user_id = $1`,
+         from fundis f join users u on u.id = f.user_id
+         where f.user_id = $1 and f.is_demo = false and u.is_demo = false`,
         [req.user.id],
       ),
       client.query(
         `select d.id from disputes d join jobs j on j.id = d.job_id
-         where j.fundi_id = $1 and d.status in ('open', 'under_review') limit 1`,
+         where j.fundi_id = $1 and j.is_demo = false and d.is_demo = false
+           and d.status in ('open', 'under_review') limit 1`,
         [req.user.id],
       ),
       client.query(
@@ -164,11 +171,12 @@ export async function releaseEscrow(req, res) {
 
 export async function freezeEscrow(req, res) {
   await query(
-    `update payments set escrow_status = 'frozen', updated_at = now() where job_id = $1 and escrow_status = 'held'`,
+    `update payments set escrow_status = 'frozen', updated_at = now()
+     where job_id = $1 and is_demo = false and escrow_status = 'held'`,
     [req.params.jobId],
   );
-  await query(`update jobs set escrow_status = 'frozen' where id = $1`, [req.params.jobId]);
-  await query(`update escrow_accounts set status = 'frozen', updated_at = now() where job_id = $1`, [req.params.jobId]);
+  await query(`update jobs set escrow_status = 'frozen' where id = $1 and is_demo = false`, [req.params.jobId]);
+  await query(`update escrow_accounts set status = 'frozen', updated_at = now() where job_id = $1 and is_demo = false`, [req.params.jobId]);
   await auditLog({ userId: req.user.id, action: 'escrow.freeze', entityType: 'job', entityId: req.params.jobId });
   res.json({ success: true });
 }
@@ -176,19 +184,27 @@ export async function freezeEscrow(req, res) {
 export async function completePayout(req, res) {
   const { providerReference = null } = req.body || {};
   const result = await transaction(async (client) => {
-    const payout = await client.query('select * from payouts where id = $1 for update', [req.params.id]);
+    const payout = await client.query('select * from payouts where id = $1 and is_demo = false for update', [req.params.id]);
     if (!payout.rows[0]) throw badRequest('Payout not found');
     const row = payout.rows[0];
     if (row.status === 'completed') return row;
     const updated = await client.query(
       `update payouts set status = 'completed', provider_reference = coalesce($2, provider_reference), updated_at = now()
-       where id = $1 returning *`,
+       where id = $1 and is_demo = false returning *`,
       [req.params.id, providerReference],
     );
     if (updated.rows[0].company_id) {
       // ── Company settlement payout: mark pending settlements paid FIFO ──
       const { markSettlementsPaid } = await import('../services/companyPayoutService.js');
-      await markSettlementsPaid(client, updated.rows[0].company_id, Number(updated.rows[0].amount), providerReference);
+      const settlement = await markSettlementsPaid(
+        client,
+        updated.rows[0].company_id,
+        Number(updated.rows[0].amount),
+        providerReference,
+      );
+      if (Math.abs(settlement.settledAmount - Number(updated.rows[0].amount)) > 0.001) {
+        throw badRequest('Payout amount does not match whole pending settlements');
+      }
     } else if (updated.rows[0].job_id) {
       await client.query(`update jobs set payment_status = 'payout_completed', updated_at = now() where id = $1`, [updated.rows[0].job_id]);
       await client.query(`update escrow_accounts set status = 'payout_completed', updated_at = now() where job_id = $1`, [updated.rows[0].job_id]);

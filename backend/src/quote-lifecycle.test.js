@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { query } from './db.js';
 import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
+import { closeEmbeddedDb } from './pglite-instance.js';
 import { portalOpenPool } from './controllers/companyController.js';
 import { transitionJob, assertTransitionAllowed, JOB_TRANSITIONS } from './services/jobStateMachine.js';
 import { createQuote, decideQuote, getLiveQuoteForJob } from './services/quoteService.js';
@@ -14,6 +15,10 @@ import { getJobStats } from './controllers/jobController.js';
 
 test.before(async () => {
   await ensureDevDatabase();
+});
+
+test.after(async () => {
+  await closeEmbeddedDb();
 });
 
 function mockRes() {

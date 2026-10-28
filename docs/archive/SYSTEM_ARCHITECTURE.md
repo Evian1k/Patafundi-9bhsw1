@@ -814,22 +814,26 @@ npm run build
 
 ## 18. Demo Accounts (Dev Only)
 
-**Note:** These are visible ONLY in development mode (`npm run dev`). Production builds tree-shake demo credentials out of the bundle.
+**Historical note:** Static demo passwords have been removed and must not be
+used. Production startup does not seed demo accounts. For isolated development,
+set `PATAFUNDI_DEMO_SEED_PASSWORD` outside source control and follow the
+current [demo account guide](../../DEMO_ACCOUNTS.md).
 
-| Role | Email | Password |
-|------|-------|----------|
-| Customer | demo@patafundi.com | Demo@2024! |
-| Fundi (approved) | fundi@patafundi.com | Fundi@2024! |
-| Admin | admin@patafundi.com | Admin@2024! |
-| Super Admin | superadmin@patafundi.com | SuperAdmin@2024! |
-| Ops Manager | ops@patafundi.com | Ops@2024! |
-| Support Agent | support@patafundi.com | Support@2024! |
-| Fraud Analyst | fraud@patafundi.com | Fraud@2024! |
-| Finance Team | finance@patafundi.com | Finance@2024! |
-| Dispatch | dispatch@patafundi.com | Dispatch@2024! |
-| Auditor | auditor@patafundi.com | Auditor@2024! |
+| Role | Email |
+|------|-------|
+| Customer | demo@patafundi.com |
+| Fundi (approved) | fundi@patafundi.com |
+| Admin | admin@patafundi.com |
+| Super Admin | superadmin@patafundi.com |
+| Ops Manager | ops@patafundi.com |
+| Support Agent | support@patafundi.com |
+| Fraud Analyst | fraud@patafundi.com |
+| Finance Team | finance@patafundi.com |
+| Dispatch | dispatch@patafundi.com |
+| Auditor | auditor@patafundi.com |
 
-Visit `/demo` in dev mode for one-click login to any account.
+The historical `/demo` one-click login references may not reflect current
+configuration or seed behavior.
 
 ---
 

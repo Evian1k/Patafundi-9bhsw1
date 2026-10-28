@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from '../../scripts/demo-password.mjs';
 /**
  * Payment flow E2E — verifies the full money lifecycle without real M-Pesa.
  *
@@ -98,7 +99,7 @@ async function main() {
   r = await request('POST', '/api/auth/register/fundi', {
     formData: [
       { name: 'email', value: fundiEmail },
-      { name: 'password', value: 'Fundi@2024' },
+      { name: 'password', value: getDemoPassword() },
       { name: 'fullName', value: 'PayFundi' },
       { name: 'phone', value: '254712000555' },
       { name: 'skills', value: JSON.stringify(['plumbing']) },
@@ -112,7 +113,7 @@ async function main() {
 
   // Admin approves
   cookies = {};
-  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: 'Admin@2024!' } });
+  await request('POST', '/api/auth/login', { body: { email: 'admin@patafundi.com', password: getDemoPassword() } });
   saveJar('admin');
   loadJar('admin');
   await request('POST', `/api/admin/fundis/${fundiId}/approve`);

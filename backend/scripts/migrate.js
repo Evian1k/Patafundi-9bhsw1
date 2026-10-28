@@ -20,37 +20,43 @@ async function main() {
   }
 
   const pool = new pg.Pool(getPgPoolConfig(databaseUrl));
-  await pool.query(`
-    create table if not exists schema_migrations (
-      id serial primary key,
-      filename text not null unique,
-      applied_at timestamptz not null default now()
-    )
-  `);
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query('select pg_advisory_lock(1380013902, 47)');
+    await client.query(`
+      create table if not exists schema_migrations (
+        id serial primary key,
+        filename text not null unique,
+        applied_at timestamptz not null default now()
+      )
+    `);
 
-  const applied = await pool.query('select filename from schema_migrations order by filename');
-  const appliedSet = new Set(applied.rows.map((row) => row.filename));
+    const applied = await client.query('select filename from schema_migrations order by filename');
+    const appliedSet = new Set(applied.rows.map((row) => row.filename));
 
-  const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
-  for (const file of files) {
-    if (appliedSet.has(file)) {
-      console.log(`[migrate] skip ${file}`);
-      continue;
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+    for (const file of files) {
+      if (appliedSet.has(file)) {
+        console.log(`[migrate] skip ${file}`);
+        continue;
+      }
+      const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+      console.log(`[migrate] apply ${file}`);
+      await client.query('BEGIN');
+      try {
+        await client.query(sql);
+        await client.query('insert into schema_migrations (filename) values ($1)', [file]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
     }
-    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-    console.log(`[migrate] apply ${file}`);
-    await pool.query('BEGIN');
-    try {
-      await pool.query(sql);
-      await pool.query('insert into schema_migrations (filename) values ($1)', [file]);
-      await pool.query('COMMIT');
-    } catch (error) {
-      await pool.query('ROLLBACK');
-      throw error;
-    }
+  } finally {
+    client?.release();
+    await pool.end();
   }
-
-  await pool.end();
   console.log('[migrate] done');
 }
 

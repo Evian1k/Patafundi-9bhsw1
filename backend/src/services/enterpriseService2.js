@@ -468,7 +468,7 @@ export async function getSystemHealth() {
   const [dbHealth, apiHealth, storageHealth, paymentHealth] = await Promise.all([
     query('select count(*)::int as users, count(*) filter (where status = $1)::int as active from users', ['active']),
     query('select count(*)::int as jobs, count(*) filter (where status = $1)::int as active_jobs from jobs', ['matching']),
-    query('select count(*)::int as payments, coalesce(sum(amount), 0)::numeric as total_revenue from payments where status = $1', ['completed']),
+    query('select count(*)::int as payments, coalesce(sum(amount), 0)::numeric as total_revenue from payments where is_demo = false and status = $1', ['completed']),
     query('select count(*)::int as open_disputes from disputes where status = $1', ['open']),
   ]);
 

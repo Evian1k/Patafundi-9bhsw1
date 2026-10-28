@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { getDemoPassword } from './demo-password.mjs';
 /**
  * PataFundi load test — simulates concurrent users hitting the API.
  * Measures latency percentiles, error rate, and throughput.
@@ -98,7 +99,7 @@ async function main() {
     // Login attempt (bcrypt + DB)
     allResults.push(await loadTest(
       'POST /api/auth/login (valid)',
-      () => request('POST', '/api/auth/login', { email: 'admin@patafundi.com', password: 'Admin@2024!' }),
+      () => request('POST', '/api/auth/login', { email: 'admin@patafundi.com', password: getDemoPassword() }),
       concurrency,
     ));
 

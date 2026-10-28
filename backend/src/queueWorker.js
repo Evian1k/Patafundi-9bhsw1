@@ -10,6 +10,7 @@
  */
 
 import { query } from './db.js';
+import { logNonFatal } from './utils/logError.js';
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_RETRIES = 3;
@@ -19,7 +20,9 @@ const RETRY_DELAYS = [60_000, 300_000, 1_800_000]; // 1min, 5min, 30min
 const handlers = new Map();
 
 let pollTimer = null;
-let processing = false;
+let startupTimer = null;
+let currentTick = null;
+let stopping = false;
 
 export function registerQueueHandler(queueName, handler) {
   handlers.set(queueName, handler);
@@ -81,42 +84,56 @@ async function processOne() {
   return true;
 }
 
-async function tick() {
-  if (processing) return;
-  processing = true;
+async function runTick() {
   try {
     // Expire stale quotes (sent/viewed past their expiry): the quote flips to
     // 'expired' and the booking re-opens for other quotes (spec section 5).
     try {
       const { expireStaleQuotes } = await import('./services/quoteService.js');
       await expireStaleQuotes();
-    } catch {
-      // quote expiry is best-effort; the lazy read path also expires quotes
+    } catch (error) {
+      logNonFatal('queue.expireStaleQuotes', error);
     }
     // Process up to 10 jobs per tick to avoid hogging the event loop
     for (let i = 0; i < 10; i++) {
       const hadJob = await processOne();
       if (!hadJob) break;
     }
-  } catch (err) {
-    // Don't let a polling error kill the worker — log and continue
-  } finally {
-    processing = false;
+  } catch (error) {
+    logNonFatal('queue.poll', error);
   }
+}
+
+function tick() {
+  if (stopping || currentTick) return currentTick;
+  currentTick = runTick().finally(() => {
+    currentTick = null;
+  });
+  return currentTick;
 }
 
 export function startQueueWorker() {
   if (pollTimer) return;
+  stopping = false;
   pollTimer = setInterval(tick, POLL_INTERVAL_MS);
   // Don't keep the process alive just for the worker
   if (pollTimer.unref) pollTimer.unref();
   // Run one tick immediately on startup (after a short delay to let the server bind)
-  setTimeout(tick, 3000);
+  startupTimer = setTimeout(() => {
+    startupTimer = null;
+    void tick();
+  }, 3000);
 }
 
-export function stopQueueWorker() {
+export async function stopQueueWorker() {
+  stopping = true;
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  if (startupTimer) {
+    clearTimeout(startupTimer);
+    startupTimer = null;
+  }
+  await currentTick;
 }

@@ -415,7 +415,8 @@ export async function service(req, res) {
       const fundis = await query(
         `select f.user_id, u.full_name as name, f.skills, f.rating, f.trust_score
          from fundis f join users u on u.id = f.user_id
-         where f.approval_status = 'approved' and $1 = any(f.skills)
+         where f.approval_status = 'approved' and f.is_demo = false
+           and u.is_demo = false and u.status = 'active' and $1 = any(f.skills)
          limit 10`,
         [result.rows[0].title],
       );

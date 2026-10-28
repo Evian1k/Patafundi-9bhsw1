@@ -26,7 +26,7 @@ export async function createRefundRequest(req, res) {
   if (!jobId) throw badRequest('Job ID is required');
   if (!reason) throw badRequest('A refund reason is required');
 
-  const jobRes = await query('select * from jobs where id = $1', [jobId]);
+  const jobRes = await query('select * from jobs where id = $1 and is_demo = false', [jobId]);
   const job = jobRes.rows[0];
   if (!job) throw notFound('Job not found');
   if (job.customer_id !== req.user.id && !req.user.isAdmin) {
@@ -35,7 +35,7 @@ export async function createRefundRequest(req, res) {
 
   // The job must have a completed payment — refunds apply to real money in.
   const paymentRes = await query(
-    `select id, amount, status, currency from payments where job_id = $1 and status = 'completed' order by created_at desc limit 1`,
+    `select id, amount, status, currency from payments where job_id = $1 and is_demo = false and status = 'completed' order by created_at desc limit 1`,
     [jobId],
   );
   const payment = paymentRes.rows[0];
@@ -43,7 +43,8 @@ export async function createRefundRequest(req, res) {
 
   // One open request per job; a completed refund blocks new requests.
   const existing = await query(
-    `select id, status from refund_requests where job_id = $1 order by created_at desc limit 1`,
+    `select id, status from refund_requests
+     where job_id = $1 and is_demo = false order by created_at desc limit 1`,
     [jobId],
   );
   if (existing.rows[0] && OPEN_STATUSES.includes(existing.rows[0].status)) {
@@ -77,11 +78,13 @@ export async function createRefundRequest(req, res) {
 }
 
 export async function listMyRefundRequests(req, res) {
+  const includeDemo = req.user?.is_demo === true && process.env.NODE_ENV !== 'production';
   const result = await query(
     `select rr.*, j.service_category, j.status as job_status
      from refund_requests rr join jobs j on j.id = rr.job_id
-     where rr.customer_id = $1 order by rr.created_at desc`,
-    [req.user.id],
+     where rr.customer_id = $1 and ($2::boolean or (rr.is_demo = false and j.is_demo = false))
+     order by rr.created_at desc`,
+    [req.user.id, includeDemo],
   );
   res.json({ success: true, refundRequests: result.rows });
 }
@@ -89,10 +92,10 @@ export async function listMyRefundRequests(req, res) {
 export async function listRefundRequests(req, res) {
   const status = req.query?.status || null;
   const params = [];
-  let where = '';
+  let where = 'where rr.is_demo = false';
   if (status && status !== 'all') {
     params.push(status);
-    where = `where rr.status = $${params.length}`;
+    where += ` and rr.status = $${params.length}`;
   }
   const result = await query(
     `select rr.*, j.service_category, j.status as job_status,
@@ -115,7 +118,7 @@ export async function decideRefundRequest(req, res) {
 
   const decision = await transaction(async (client) => {
     const rr = await client.query(
-      `select * from refund_requests where id = $1 for update`,
+      `select * from refund_requests where id = $1 and is_demo = false for update`,
       [req.params.id],
     );
     const request = rr.rows[0];
@@ -147,7 +150,7 @@ export async function decideRefundRequest(req, res) {
     // Approve: re-validate the payment is still completed, then run the
     // existing atomic reversal path. The override amount must stay within bounds.
     const payment = await client.query(
-      `select * from payments where id = $1 for update`,
+      `select * from payments where id = $1 and is_demo = false for update`,
       [request.payment_id],
     );
     if (!payment.rows[0] || payment.rows[0].status !== 'completed') {

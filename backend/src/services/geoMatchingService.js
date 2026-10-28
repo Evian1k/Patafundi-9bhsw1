@@ -74,10 +74,10 @@ export async function findNearbyFundis({
             u.full_name as name, u.role, u.status,
             coalesce(qs.overall_score, 0) as quality_score,
             qs.tier as quality_tier,
-            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'completed') as completed_jobs,
-            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status not in ('completed','cancelled','failed')) as active_jobs,
-            (select count(*)::int from jobs j where j.fundi_id = f.user_id) as total_jobs,
-            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.status = 'cancelled') as cancelled_jobs,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.is_demo = false and j.status = 'completed') as completed_jobs,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.is_demo = false and j.status not in ('completed','cancelled','failed')) as active_jobs,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.is_demo = false) as total_jobs,
+            (select count(*)::int from jobs j where j.fundi_id = f.user_id and j.is_demo = false and j.status = 'cancelled') as cancelled_jobs,
             coalesce(fts.max_travel_km, 20) as max_travel_km,
             coalesce(fts.emergency_available, false) as emergency_available
      from fundis f
@@ -86,6 +86,8 @@ export async function findNearbyFundis({
      left join fundi_travel_settings fts on fts.fundi_id = f.user_id
      where f.approval_status = 'approved'
        and u.status = 'active'
+       and u.is_demo = false
+       and f.is_demo = false
        and f.online = true
        and f.latitude is not null
        and f.longitude is not null

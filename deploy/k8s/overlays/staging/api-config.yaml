@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patafundi-api-config
+data:
+  FRONTEND_ORIGIN: https://staging.patafundi.example.invalid
+  CORS_ORIGINS: https://staging.patafundi.example.invalid
