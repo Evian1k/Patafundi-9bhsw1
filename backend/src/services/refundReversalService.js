@@ -18,11 +18,15 @@ import { query, transaction } from '../db.js';
 import { badRequest } from '../utils/http.js';
 import { auditLog } from './auditService.js';
 
-export async function executeRefundReversal({ jobId, reason, amount: customAmount = null, actorId, actorRole = 'admin', notifyCustomer = true }) {
+export async function executeRefundReversal({ jobId, reason, amount: customAmount = null, actorId, actorRole = 'admin', notifyCustomer = true, client: existingClient = null }) {
   if (!jobId) throw badRequest('Job ID is required');
   if (!reason) throw badRequest('Refund reason is required');
 
-  const result = await transaction(async (client) => {
+  // Runs on the caller's transaction when one is supplied (e.g. the refund
+  // request approval flow already holds locks on the payment row) so the
+  // reversal stays atomic WITH the caller's writes and can never self-deadlock
+  // by opening a second transaction against the same rows.
+  const run = async (client) => {
     // Lock the payment row
     const payment = await client.query(
       `select * from payments where job_id = $1 and is_demo = false and status = 'completed' order by created_at desc limit 1 for update`,
@@ -91,7 +95,9 @@ export async function executeRefundReversal({ jobId, reason, amount: customAmoun
     );
 
     return { refundAmount, paymentId: payment.rows[0].id, customerId: payment.rows[0].customer_id };
-  });
+  };
+
+  const result = existingClient ? await run(existingClient) : await transaction(run);
 
   if (notifyCustomer && result.customerId) {
     const { notify } = await import('./notificationService.js');

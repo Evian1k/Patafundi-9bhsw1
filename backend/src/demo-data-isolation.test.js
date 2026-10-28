@@ -102,7 +102,20 @@ test('demo seed policy fails closed for production and unsafe database targets',
   }), true);
 });
 
-test('production seed invocation does not insert development accounts', async () => {
+test('production seed invocation does not insert development accounts', async (t) => {
+  // This is a REAL integration test: it needs a live Postgres (CI's
+  // postgres-integration job provides one via PATAFUNDI_TEST_DATABASE_URL).
+  // Without infrastructure, skip honestly instead of reporting a false pass
+  // or a confusing connection error.
+  const probe = new pg.Pool(getPgPoolConfig(process.env.PATAFUNDI_TEST_DATABASE_URL));
+  try {
+    await probe.query('select 1');
+  } catch (err) {
+    await probe.end().catch(() => {});
+    t.skip(`requires a reachable Postgres (PATAFUNDI_TEST_DATABASE_URL) — ${err.code || err.message}; covered by the CI postgres-integration job`);
+    return;
+  }
+  await probe.end().catch(() => {});
   const oldNodeEnv = process.env.NODE_ENV;
   const oldAllowDemoSeed = process.env.PATAFUNDI_ALLOW_DEMO_SEED;
   process.env.NODE_ENV = 'production';

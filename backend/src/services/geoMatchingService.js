@@ -39,7 +39,7 @@ const MATCHING_WEIGHTS = {
  * Returns array of fundis sorted by weighted score (highest first).
  */
 export async function findNearbyFundis({
-  latitude, longitude, serviceCategory, isEmergency = false, customerId,
+  latitude, longitude, serviceCategory, isEmergency = false, customerId, includeDemo = false,
 }) {
   // Get CEO geo controls
   const controls = await getGeoControls();
@@ -86,8 +86,8 @@ export async function findNearbyFundis({
      left join fundi_travel_settings fts on fts.fundi_id = f.user_id
      where f.approval_status = 'approved'
        and u.status = 'active'
-       and u.is_demo = false
-       and f.is_demo = false
+       and ($7::boolean or u.is_demo = false)
+       and ($7::boolean or f.is_demo = false)
        and f.online = true
        and f.latitude is not null
        and f.longitude is not null
@@ -101,6 +101,7 @@ export async function findNearbyFundis({
       latitude - latRange, latitude + latRange,
       longitude - lngRange, longitude + lngRange,
       serviceCategory || '', customerId || '00000000-0000-0000-0000-000000000000',
+      Boolean(includeDemo),
     ],
   );
 

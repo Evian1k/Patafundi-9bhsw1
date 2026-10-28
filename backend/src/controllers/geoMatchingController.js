@@ -10,6 +10,7 @@ import {
   createInternationalBookingRequest, reviewInternationalBooking, listInternationalBookings,
   listGeoZones, createGeoZone,
 } from '../services/geoMatchingService.js';
+import { includeDemoFor } from '../demoDataPolicy.js';
 
 function badRequest(msg) { const e = new Error(msg); e.status = 400; return e; }
 
@@ -20,6 +21,7 @@ export async function findFundisHandler(req, res) {
   const fundis = await findNearbyFundis({
     latitude: Number(latitude), longitude: Number(longitude),
     serviceCategory, isEmergency: Boolean(isEmergency), customerId: req.user.id,
+    includeDemo: includeDemoFor(req.user),
   });
   res.json({ success: true, count: fundis.length, fundis });
 }

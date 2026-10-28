@@ -8,6 +8,8 @@ import { badRequest, forbidden, notFound } from '../utils/http.js';
 import { auditLog } from '../services/auditService.js';
 import { emitEvent } from '../realtime.js';
 import { createQuote, listQuotesForJob } from '../services/quoteService.js';
+import { transitionJob } from '../services/jobStateMachine.js';
+import { includeDemoFor } from '../demoDataPolicy.js';
 import {
   requireCompanyMember,
   getMembership,
@@ -474,6 +476,8 @@ export async function portalOverview(req, res) {
     return res.status(400).json({ success: false, message: 'companyId is required to load a company portal overview' });
   }
   const companyId = req.company.id;
+  // Demo actors count their demo universe; real actors count genuine rows.
+  const includeDemo = includeDemoFor(req.user);
   const stats = await query(
     `select
        count(*) filter (where status in ('pending','matching','quote_requested','scheduled','booking_confirmed')) as incoming,
@@ -483,24 +487,24 @@ export async function portalOverview(req, res) {
        count(*) filter (where status = 'completion_requested') as awaiting_confirmation,
        count(*) filter (where status in ('completed','closed')) as completed,
        count(*) filter (where status = 'cancelled') as cancelled
-     from jobs where company_id = $1 and is_demo = false`,
-    [companyId],
+     from jobs where company_id = $1 and ($2::boolean or is_demo = false)`,
+    [companyId, includeDemo],
   );
   const team = await query(
     `select count(*) as total, count(*) filter (where is_available and status = 'active' and role = 'technician') as available_technicians
-     from company_members where company_id = $1 and is_demo = false`,
-    [companyId],
+     from company_members where company_id = $1 and ($2::boolean or is_demo = false)`,
+    [companyId, includeDemo],
   );
   const finance = await query(
     `select coalesce(sum(net_amount), 0) as pending_settlements
-     from company_settlements where company_id = $1 and is_demo = false and status = 'pending'`,
-    [companyId],
+     from company_settlements where company_id = $1 and ($2::boolean or is_demo = false) and status = 'pending'`,
+    [companyId, includeDemo],
   );
   const rating = await query(
     `select coalesce(avg(r.rating), 0) as avg_rating, count(r.id) as review_count
      from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false`,
-    [companyId],
+     where j.company_id = $1 and ($2::boolean or (r.is_demo = false and j.is_demo = false and u.is_demo = false))`,
+    [companyId, includeDemo],
   );
   const recent = await query(
     `select j.id, j.status, j.service_category, j.urgency, j.estimated_price, j.final_price,
@@ -509,8 +513,8 @@ export async function portalOverview(req, res) {
      from jobs j
      left join users u on u.id = j.customer_id
      left join users t on t.id = j.technician_user_id
-     where j.company_id = $1 and j.is_demo = false order by j.created_at desc limit 8`,
-    [companyId],
+     where j.company_id = $1 and ($2::boolean or (j.is_demo = false and u.is_demo = false)) order by j.created_at desc limit 8`,
+    [companyId, includeDemo],
   );
   const company = toCompanySummary({ ...req.company, team_size: team.rows[0]?.total });
   res.json({
@@ -571,8 +575,8 @@ export async function portalProfile(req, res) {
 // ── Services catalog ──
 export async function portalServices(req, res) {
   const result = await query(
-    `select * from company_services where company_id = $1 and is_demo = false order by category, name`,
-    [req.company.id],
+    `select * from company_services where company_id = $1 and ($2::boolean or is_demo = false) order by category, name`,
+    [req.company.id, includeDemoFor(req.user)],
   );
   res.json({ success: true, services: result.rows });
 }
@@ -761,8 +765,8 @@ const JOB_LIST_FIELDS = `j.id, j.booking_number, j.status, j.provider_type, j.se
 
 export async function portalJobs(req, res) {
   const { scope = 'all' } = req.query || {};
-  const params = [req.company.id];
-  let where = `where j.company_id = $1 and j.is_demo = false`;
+  const params = [req.company.id, includeDemoFor(req.user)];
+  let where = `where j.company_id = $1 and ($2::boolean or j.is_demo = false)`;
   if (scope === 'incoming') where += ` and j.status in ('pending','matching','scheduled')`;
   else if (scope === 'dispatch') where += ` and j.status in ('accepted','offered')`;
   else if (scope === 'active') where += ` and j.status in ('assigned','on_the_way','arrived','in_progress')`;
@@ -802,7 +806,8 @@ export async function portalOpenPool(req, res) {
   // no context, so prepare failed with "could not determine data type of
   // parameter $1". Only parameters that are actually referenced are bound now,
   // each with an explicit ::text[] cast so empty arrays infer cleanly.
-  const params = [];
+  const params = [includeDemoFor(req.user)];
+  const demoFlag = `$${params.length}::boolean`;
   let categoryFilter = '';
   if (categories.length) {
     params.push(categories);
@@ -823,7 +828,7 @@ export async function portalOpenPool(req, res) {
        j.location_name, j.estimated_price, j.scheduled_at, j.created_at,
        u.full_name as customer_name
      from jobs j left join users u on u.id = j.customer_id
-     where j.provider_type = 'company' and j.company_id is null and j.is_demo = false
+     where j.provider_type = 'company' and j.company_id is null and (${demoFlag} or j.is_demo = false)
        and j.status in ('pending','matching','quote_requested')
        ${categoryFilter}
        ${areaFilter}
@@ -843,23 +848,27 @@ export async function portalQuotes(req, res) {
      from quotes q
      left join jobs j on j.id = q.job_id
      left join users u on u.id = q.customer_id
-     where q.company_id = $1 and (j.id is null or j.is_demo = false)
+     where q.company_id = $1 and ($2::boolean or j.is_demo = false)
      order by q.created_at desc limit 100`,
-    [company.id],
+    [company.id, includeDemoFor(req.user)],
   );
   res.json({ success: true, quotes: rows.rows });
 }
 
 export async function claimPoolJob(req, res) {
   if (!COMPANY_DISPATCH_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
+  // Atomic claim: only wins while the job is still unclaimed. Not a status
+  // transition — the booking stays in its matching phase; a timeline entry
+  // records the claim for auditability.
   const result = await query(
     `update jobs set company_id = $2, updated_at = now()
-     where id = $1 and is_demo = false and provider_type = 'company' and company_id is null
+     where id = $1 and ($3::boolean or is_demo = false) and provider_type = 'company' and company_id is null
        and status in ('pending','matching')
      returning *`,
-    [req.params.jobId, req.company.id],
+    [req.params.jobId, req.company.id, includeDemoFor(req.user)],
   );
   if (!result.rows[0]) throw badRequest('Job is no longer available');
+  await recordJobTimeline(req.params.jobId, 'company_claimed_pool', req.user.id, req.user.role, { companyId: req.company.id });
   await auditLog({
     userId: req.user.id, action: 'company.job.claim', entityType: 'job', entityId: req.params.jobId,
     metadata: { companyId: req.company.id },
@@ -869,14 +878,23 @@ export async function claimPoolJob(req, res) {
 
 export async function acceptCompanyJob(req, res) {
   if (!COMPANY_DISPATCH_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
-  const result = await query(
-    `update jobs set status = 'accepted', updated_at = now()
-     where id = $1 and company_id = $2 and status in ('pending','matching','scheduled')
-     returning *`,
-    [req.params.jobId, req.company.id],
+  // Company-scoped load (tenant guard) BEFORE the central machine transition —
+  // the machine re-validates the edge + guards against concurrent changes.
+  const own = await query(
+    `select * from jobs where id = $1 and company_id = $2
+       and ($3::boolean or is_demo = false)
+       and status in ('pending','matching','scheduled')`,
+    [req.params.jobId, req.company.id, includeDemoFor(req.user)],
   );
-  if (!result.rows[0]) throw badRequest('Job cannot be accepted in its current state');
-  const job = result.rows[0];
+  if (!own.rows[0]) throw badRequest('Job cannot be accepted in its current state');
+  const job = await transitionJob({
+    jobId: own.rows[0].id,
+    toStatus: 'accepted',
+    actor: req.user,
+    job: own.rows[0],
+    skipActorCheck: true,
+    metadata: { via: 'companyPortal', companyName: req.company.company_name },
+  });
   await query(
     `insert into notifications (user_id, type, title, body, data)
      values ($1, 'job_accepted', 'Job Accepted', $2, $3::jsonb)`,
@@ -891,13 +909,24 @@ export async function acceptCompanyJob(req, res) {
 
 export async function rejectCompanyJob(req, res) {
   if (!COMPANY_DISPATCH_ROLES.includes(req.companyMembership.role)) throw forbidden('Not authorized');
-  const result = await query(
-    `update jobs set company_id = null, status = 'matching', updated_at = now()
-     where id = $1 and company_id = $2 and status in ('pending','accepted','scheduled')
-     returning id`,
-    [req.params.jobId, req.company.id],
+  // Company-scoped load, then release the booking back to the open pool via
+  // the central machine (accepted/scheduled → matching release edges).
+  const own = await query(
+    `select * from jobs where id = $1 and company_id = $2
+       and ($3::boolean or is_demo = false)
+       and status in ('pending','accepted','scheduled')`,
+    [req.params.jobId, req.company.id, includeDemoFor(req.user)],
   );
-  if (!result.rows[0]) throw badRequest('Job cannot be rejected in its current state');
+  if (!own.rows[0]) throw badRequest('Job cannot be rejected in its current state');
+  await transitionJob({
+    jobId: own.rows[0].id,
+    toStatus: 'matching',
+    actor: req.user,
+    job: own.rows[0],
+    skipActorCheck: true,
+    extraSet: { company_id: null },
+    metadata: { via: 'companyReject', reason: req.body?.reason || null },
+  });
   await auditLog({
     userId: req.user.id, action: 'company.job.reject', entityType: 'job', entityId: req.params.jobId,
     metadata: { reason: req.body?.reason || null },
@@ -1010,20 +1039,20 @@ export async function portalSchedule(req, res) {
      from jobs j
      left join users t on t.id = j.technician_user_id
      left join users u on u.id = j.customer_id
-     where j.company_id = $1 and j.is_demo = false and j.scheduled_at is not null
+     where j.company_id = $1 and ($2::boolean or j.is_demo = false) and j.scheduled_at is not null
        and j.status not in ('completed','cancelled','failed')
      order by j.scheduled_at asc limit 100`,
-    [req.company.id],
+    [req.company.id, includeDemoFor(req.user)],
   );
   const availability = await query(
     `select cm.id, cm.user_id, u.full_name, cm.role, cm.is_available, cm.skills,
        (select count(*) from jobs j where j.technician_user_id = cm.user_id
-         and j.company_id = cm.company_id and j.is_demo = false
+         and j.company_id = cm.company_id and ($3::boolean or j.is_demo = false)
          and j.status in ('assigned','on_the_way','arrived','in_progress')) as workload
      from company_members cm join users u on u.id = cm.user_id
-     where cm.company_id = $1 and cm.is_demo = false and u.is_demo = false
+     where cm.company_id = $1 and ($2::boolean or (cm.is_demo = false and u.is_demo = false))
        and cm.status = 'active' order by cm.role`,
-    [req.company.id],
+    [req.company.id, includeDemoFor(req.user), includeDemoFor(req.user)],
   );
   res.json({ success: true, scheduledJobs: result.rows, availability: availability.rows });
 }
@@ -1034,15 +1063,15 @@ export async function portalReviews(req, res) {
     `select r.id, r.rating, r.comment, r.created_at, j.id as job_id,
        j.service_category, u.full_name as customer_name
      from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-     where j.company_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false
+     where j.company_id = $1 and ($2::boolean or (r.is_demo = false and j.is_demo = false and u.is_demo = false))
      order by r.created_at desc limit 50`,
-    [req.company.id],
+    [req.company.id, includeDemoFor(req.user)],
   );
   const stats = await query(
     `select coalesce(avg(r.rating),0) as avg_rating, count(*) as total,
        count(*) filter (where r.rating >= 4) as positive
-     from reviews r join jobs j on j.id = r.job_id where j.company_id = $1 and r.is_demo = false and j.is_demo = false`,
-    [req.company.id],
+     from reviews r join jobs j on j.id = r.job_id where j.company_id = $1 and ($2::boolean or (r.is_demo = false and j.is_demo = false))`,
+    [req.company.id, includeDemoFor(req.user)],
   );
   res.json({
     success: true,
@@ -1067,28 +1096,28 @@ export async function portalFinance(req, res) {
        coalesce(sum(net_amount), 0) as net,
        coalesce(sum(net_amount) filter (where status = 'pending'), 0) as pending,
        coalesce(sum(net_amount) filter (where status = 'paid'), 0) as paid
-     from company_settlements where company_id = $1 and is_demo = false`,
-    [req.company.id],
+     from company_settlements where company_id = $1 and ($2::boolean or is_demo = false)`,
+    [req.company.id, includeDemoFor(req.user)],
   );
   const settlements = await query(
     `select s.*, j.service_category, j.location_name
      from company_settlements s left join jobs j on j.id = s.job_id
-     where s.company_id = $1 and s.is_demo = false order by s.created_at desc limit 100`,
-    [req.company.id],
+     where s.company_id = $1 and ($2::boolean or s.is_demo = false) order by s.created_at desc limit 100`,
+    [req.company.id, includeDemoFor(req.user)],
   );
   const monthly = await query(
     `select date_trunc('month', created_at) as month,
        sum(gross_amount) as gross, sum(commission_amount) as commission, sum(net_amount) as net
-     from company_settlements where company_id = $1 and is_demo = false
+     from company_settlements where company_id = $1 and ($2::boolean or is_demo = false)
      group by 1 order by 1 desc limit 12`,
-    [req.company.id],
+    [req.company.id, includeDemoFor(req.user)],
   );
   const { companyAvailableBalance } = await import('../services/companyPayoutService.js');
   const available = await companyAvailableBalance(null, req.company.id);
   const payoutRequests = await query(
     `select id, amount, mpesa_number, status, provider_reference, currency, created_at, updated_at
-     from payouts where company_id = $1 and is_demo = false order by created_at desc limit 25`,
-    [req.company.id],
+     from payouts where company_id = $1 and ($2::boolean or is_demo = false) order by created_at desc limit 25`,
+    [req.company.id, includeDemoFor(req.user)],
   );
   const company = await getCompany(req.company.id);
   res.json({

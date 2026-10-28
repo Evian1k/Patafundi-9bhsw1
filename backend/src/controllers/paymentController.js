@@ -498,21 +498,90 @@ export async function stripeWebhook(req, res) {
     const intent = event.data?.object || {};
     const paymentId = intent.metadata?.paymentId;
     if (paymentId) {
-      const paid = await query(
-        `update payments set status = 'completed', escrow_status = 'held', updated_at = now()
-          where id = $1 and status = 'pending'
-          returning *`,
-        [paymentId],
-      );
-      const row = await query(`select job_id, customer_id from payments where id = $1`, [paymentId]);
-      const job = row.rows[0];
-      if (paid.rows[0] && job?.job_id) {
-        await query(`update jobs set payment_status = 'escrow_held', updated_at = now() where id = $1`, [job.job_id]);
-        await query(
-          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
-           values ($1, $2, 'hold', (select amount from payments where id = $2), 'held')`,
-          [job.job_id, paymentId],
+      // Full ledger parity with the M-Pesa webhook (same escrow path, same
+      // double-entry accounting, same commission marking) in ONE transaction.
+      // amount_received arrives in minor units — reconcile against the
+      // server-computed payment row before confirming.
+      await transaction(async (client) => {
+        const pending = await client.query(
+          `select * from payments where id = $1 and status = 'pending' for update`,
+          [paymentId],
         );
+        const row = pending.rows[0];
+        if (!row) return; // already processed (replay) — idempotent success
+        const paidAmount = Number(intent.amount_received ?? intent.amount ?? 0) / 100;
+        if (Number.isFinite(paidAmount) && paidAmount > 0 && Math.abs(paidAmount - Number(row.amount)) > 0.01) {
+          throw badRequest('Stripe webhook amount does not match pending payment');
+        }
+        const updated = await client.query(
+          `update payments set status = 'completed', escrow_status = 'held',
+            provider_response = $2, paid_at = now(), updated_at = now()
+           where id = $1 and status = 'pending' returning *`,
+          [row.id, JSON.stringify({ intentId: intent.id, amountReceived: intent.amount_received ?? null })],
+        );
+        if (!updated.rows[0]) return;
+        await client.query(
+          `insert into escrow_transactions (job_id, payment_id, type, amount, status)
+           select $1, $2, 'hold', $3, 'held'
+           where not exists (
+             select 1 from escrow_transactions where payment_id = $2 and type = 'hold'
+           )`,
+          [row.job_id, row.id, row.amount],
+        );
+        await client.query(
+          `insert into escrow_accounts (job_id, customer_id, fundi_id, balance, status)
+           select j.id, j.customer_id, j.fundi_id, $2, 'escrow_held' from jobs j where j.id = $1
+           on conflict (job_id) do update set balance = excluded.balance, status = 'escrow_held', updated_at = now()`,
+          [row.job_id, row.amount],
+        );
+        await client.query(
+          `insert into revenue_ledger (payment_id, job_id, user_id, entry_type, amount, currency, metadata)
+           values ($1, $2, $3, 'commission', $4, $5, $6::jsonb)`,
+          [
+            row.id,
+            row.job_id,
+            row.customer_id,
+            row.platform_commission || 0,
+            row.currency || 'KES',
+            JSON.stringify({ source: 'stripe_webhook', commissionRate: row.commission_rate, commissionType: row.commission_type }),
+          ],
+        );
+        await client.query(
+          `insert into accounting_ledger (source_type, source_id, debit_account, credit_account, amount, currency, metadata)
+           values
+            ('payment', $1, 'customer_cash', 'escrow_liability', $2, $4, $5::jsonb),
+            ('payment', $1, 'escrow_liability', 'platform_revenue', $3, $4, $5::jsonb)`,
+          [
+            row.id,
+            row.amount,
+            row.platform_commission || 0,
+            row.currency || 'KES',
+            JSON.stringify({ jobId: row.job_id, fundiAmount: row.fundi_amount || 0, provider: 'stripe' }),
+          ],
+        );
+        await client.query(`update jobs set payment_status = 'escrow_held', escrow_status = 'held', updated_at = now() where id = $1`, [row.job_id]);
+        await markCommissionPaymentReceived(row.job_id, client);
+        await client.query(
+          `insert into job_timeline (job_id, event_type, metadata)
+           values ($1, 'payment_made', $2::jsonb)`,
+          [row.job_id, JSON.stringify({ paymentId: row.id, amount: row.amount, provider: 'stripe' })],
+        );
+        emitEvent('payment:confirmed', { jobId: row.job_id, payment: updated.rows[0] }, `job:${row.job_id}`);
+        emitEvent('escrow:held', { jobId: row.job_id, paymentId: row.id, amount: row.amount }, `job:${row.job_id}`);
+      });
+    }
+  } else if (event.type === 'payment_intent.payment_failed') {
+    const intent = event.data?.object || {};
+    const paymentId = intent.metadata?.paymentId;
+    if (paymentId) {
+      await query(
+        `update payments set status = 'failed', failure_reason = $2, provider_response = $3, updated_at = now()
+         where id = $1 and status = 'pending'`,
+        [paymentId, String(intent.last_payment_error?.message || 'Stripe payment failed').slice(0, 500), JSON.stringify({ intentId: intent.id })],
+      );
+      const row = await query(`select job_id from payments where id = $1`, [paymentId]);
+      if (row.rows[0]?.job_id) {
+        emitEvent('payment:failed', { jobId: row.rows[0].job_id }, `job:${row.rows[0].job_id}`);
       }
     }
   }

@@ -148,7 +148,9 @@ export async function decideRefundRequest(req, res) {
     }
 
     // Approve: re-validate the payment is still completed, then run the
-    // existing atomic reversal path. The override amount must stay within bounds.
+    // existing atomic reversal path ON THIS SAME TRANSACTION (passing our
+    // client avoids a second transaction taking FOR UPDATE on the payment row
+    // we already locked — which would self-deadlock until the timeout).
     const payment = await client.query(
       `select * from payments where id = $1 and is_demo = false for update`,
       [request.payment_id],
@@ -160,6 +162,13 @@ export async function decideRefundRequest(req, res) {
     if (finalAmount <= 0 || finalAmount > Number(payment.rows[0].amount) + 0.001) {
       throw badRequest('Refund amount is invalid');
     }
+    // Align with the atomic reversal service's established policy (see
+    // refundReversalService + demo-data-isolation tests): partial refunds are
+    // not supported — fail fast here with the same message instead of
+    // approving a request the reversal would then reject.
+    if (finalAmount + 0.001 < Number(payment.rows[0].amount)) {
+      throw badRequest('Partial refunds are not supported; refund the full payment amount');
+    }
 
     await client.query(
       `update refund_requests set status = 'approved', reviewed_by = $2, reviewed_at = now(), review_notes = $3, amount = $4, updated_at = now()
@@ -168,7 +177,8 @@ export async function decideRefundRequest(req, res) {
     );
 
     // Execute the real reversal using the battle-tested processRefund service
-    // logic (wallet debit + settlement void + revenue ledger + audit).
+    // logic (wallet debit + settlement void + revenue ledger + audit) inside
+    // the SAME transaction as the approval write.
     const { executeRefundReversal } = await import('../services/refundReversalService.js');
     const refundResult = await executeRefundReversal({
       jobId: request.job_id,
@@ -176,6 +186,7 @@ export async function decideRefundRequest(req, res) {
       amount: finalAmount,
       actorId: req.user.id,
       actorRole: req.user.role,
+      client,
     });
 
     const completed = await client.query(

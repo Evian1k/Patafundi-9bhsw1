@@ -3,6 +3,7 @@
 // company and rejects cross-company access. Never rely on frontend hiding.
 import { query } from '../db.js';
 import { forbidden, notFound } from '../utils/http.js';
+import { includeDemoFor } from '../demoDataPolicy.js';
 
 export const COMPANY_MEMBER_ROLES = ['owner', 'manager', 'admin', 'dispatcher', 'finance', 'support', 'technician'];
 // roles allowed to administer the company (profile, team, services, finance)
@@ -106,12 +107,17 @@ export function requireCompanyMember(options = {}) {
       let membership = null;
       let company = null;
       if (primary) {
+        // Provenance-scoped primary resolution: real users resolve real
+        // companies only; demo actors (isolated dev storage only) resolve
+        // their demo company — otherwise the authorized demo fixture can
+        // never reach its own portal.
         const rows = await query(
           `select cm.*, cp.id as company_id from company_members cm
            join company_profiles cp on cp.id = cm.company_id
-           where cm.user_id = $1 and cm.status = 'active' and cp.is_demo = false
+           where cm.user_id = $1 and cm.status = 'active'
+             and ($2::boolean or cp.is_demo = false)
            order by cm.joined_at asc limit 1`,
-          [req.user.id],
+          [req.user.id, includeDemoFor(req.user)],
         );
         membership = rows.rows[0] || null;
         // Self-heal (root-cause fix for the reported /company/portal/overview
@@ -121,8 +127,9 @@ export function requireCompanyMember(options = {}) {
         // membership instead of hard-failing their whole portal.
         if (!membership && req.user?.role === 'company_admin') {
           const owned = await query(
-            `select id from company_profiles where owner_user_id = $1 and is_demo = false order by created_at asc limit 1`,
-            [req.user.id],
+            `select id from company_profiles where owner_user_id = $1
+               and ($2::boolean or is_demo = false) order by created_at asc limit 1`,
+            [req.user.id, includeDemoFor(req.user)],
           );
           if (owned.rows[0]) {
             await query(
@@ -142,7 +149,9 @@ export function requireCompanyMember(options = {}) {
         membership = await getMembership(companyId, req.user.id);
       }
       if (!membership || !company) throw forbidden('You are not a member of this company');
-      if (company.is_demo) throw notFound('Company not found');
+      // Synthetic provenance guard: genuine actors get a clean 404 for demo
+      // companies; demo actors keep operating their isolated fixture.
+      if (company.is_demo && !includeDemoFor(req.user)) throw notFound('Company not found');
       if (membership.status !== 'active') throw forbidden('Your company membership is suspended');
       if (roles && !roles.includes(membership.role)) {
         throw forbidden('Your company role is not authorized for this action');
@@ -163,7 +172,9 @@ export function requireCompanyMember(options = {}) {
 export async function canAccessCompanyJob(user, job) {
   if (!user || !job) return false;
   if (isPlatformStaff(user)) return true;
-  if (job.is_demo) return false;
+  // Demo jobs stay reachable for demo actors (isolated dev fixture) and are
+  // invisible to everyone else.
+  if (job.is_demo && !includeDemoFor(user)) return false;
   if (job.technician_user_id && job.technician_user_id === user.id) return true;
   if (job.company_id) {
     const membership = await getMembership(job.company_id, user.id);

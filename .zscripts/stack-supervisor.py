@@ -10,7 +10,7 @@ import time
 import subprocess
 import socket
 
-PROJECT = "/home/z/my-project"
+PROJECT = "/home/z/patafundi"
 LOG = os.path.join(PROJECT, ".zscripts", "supervisor.log")
 MONITOR_INTERVAL = 5
 BACKEND_PORT = 4000

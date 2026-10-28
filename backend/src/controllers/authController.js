@@ -221,12 +221,15 @@ export async function login(req, res) {
   await recordSuccessfulLogin(user.id, ip);
 
   // ── Fraud Prevention: Device + IP + Impossible Travel ───────────
-  // Non-blocking — failures here don't prevent login
+  // Non-blocking — failures here don't prevent login.
+  // deviceId is hoisted so the staff_login_history insert below can always
+  // reference it even when the fraud-prevention probes fail early.
+  let deviceId = null;
   try {
     const { recordDeviceFingerprint, checkIpReputation, recordLoginEvent, checkBlacklistBatch } = await import('../services/fraudPreventionService.js');
     const userAgent = req.get('User-Agent');
     const deviceFingerprint = req.get('X-Device-Fingerprint');
-    const deviceId = deviceFingerprint || crypto.createHash('sha256').update(userAgent || 'unknown').digest('hex').substring(0, 32);
+    deviceId = deviceFingerprint || crypto.createHash('sha256').update(userAgent || 'unknown').digest('hex').substring(0, 32);
 
     // Check blacklist (email, IP, device)
     const blacklistHits = await checkBlacklistBatch([
@@ -373,9 +376,15 @@ export async function otpResend(req, res) {
     [email],
   );
   const user = userResult.rows[0];
-  if (!user) throw badRequest('Account not found');
+  // Anti-enumeration: unknown accounts and already-verified addresses get the
+  // same generic affirmative response as forgot-password — never confirm
+  // whether an email exists on the platform.
+  const genericMessage = 'If the account exists and needs verification, a new code has been sent to your email';
+  if (!user) {
+    return res.json({ success: true, message: genericMessage });
+  }
   if (purpose === 'register' && user.email_verified_at) {
-    throw badRequest('Email is already verified');
+    return res.json({ success: true, message: genericMessage });
   }
   const code = String(crypto.randomInt(100000, 999999));
   await storeOtp(user.id, purpose, code);

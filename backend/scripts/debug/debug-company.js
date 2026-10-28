@@ -1,6 +1,6 @@
-import { ensureDevDatabase } from '../scripts/ensure-dev-db.js';
-import { query } from './db.js';
-import { createPartnerApplication, approvePartnerApplication } from './controllers/companyController.js';
+import { ensureDevDatabase } from '../ensure-dev-db.js';
+import { query } from '../src/db.js';
+import { createPartnerApplication, approvePartnerApplication } from '../src/controllers/companyController.js';
 
 await ensureDevDatabase();
 

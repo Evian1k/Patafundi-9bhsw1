@@ -438,17 +438,25 @@ server.listen(port, host, () => {
   const runScheduledJobs = async () => {
     try {
       const { query } = await import('./db.js');
+      const { transitionJob } = await import('./services/jobStateMachine.js');
       const due = await query(
-        `update jobs set status = 'matching' where status = 'scheduled' and scheduled_at <= now() returning id, customer_id`,
+        `select * from jobs where status = 'scheduled' and scheduled_at <= now()`,
       );
-      if (due.rows.length > 0) {
-        console.log(`[scheduler] Activated ${due.rows.length} scheduled job(s)`);
-        for (const job of due.rows) {
-          const { emitEvent } = await import('./realtime.js');
-          emitEvent('job:status', { jobId: job.id, status: 'matching' }, `job:${job.id}`);
-          emitEvent('job:created', { jobId: job.id, status: 'matching' }, `user:${job.customer_id}`);
-        }
+      for (const job of due.rows) {
+        // Central machine (scheduled → matching is a canonical edge); system
+        // actor — the reaper already determined eligibility.
+        const updated = await transitionJob({
+          jobId: job.id, toStatus: 'matching', actor: null, job,
+          skipActorCheck: true, metadata: { via: 'scheduled_activator' },
+        }).catch((err) => {
+          console.warn(`[scheduler] job ${job.id} activation failed:`, err.message);
+          return null;
+        });
+        if (!updated) continue;
+        const { emitEvent } = await import('./realtime.js');
+        emitEvent('job:created', { jobId: job.id, status: 'matching' }, `user:${job.customer_id}`);
       }
+      if (due.rows.length > 0) console.log(`[scheduler] Activated ${due.rows.length} scheduled job(s)`);
     } catch (err) {
       console.error('[scheduler] error:', err.message);
     }
@@ -463,21 +471,38 @@ server.listen(port, host, () => {
     try {
       const { query } = await import('./db.js');
       const { emitEvent } = await import('./realtime.js');
-      const requeued = await query(
-        `update jobs set status = 'matching', updated_at = now()
-         where status = 'offered' and updated_at < now() - interval '5 minutes'
-         returning id, customer_id`,
+      const { transitionJob } = await import('./services/jobStateMachine.js');
+      // Offers not answered within 5 minutes return to matching (offered →
+      // matching is canonical); the machine writes the timeline entry.
+      const stale = await query(
+        `select * from jobs where status = 'offered' and updated_at < now() - interval '5 minutes'`,
       );
-      for (const job of requeued.rows) {
-        emitEvent('job:status', { jobId: job.id, status: 'matching', reason: 'offer_expired' }, `job:${job.id}`);
+      const requeued = { rows: [] };
+      for (const job of stale.rows) {
+        const updated = await transitionJob({
+          jobId: job.id, toStatus: 'matching', actor: null, job,
+          skipActorCheck: true, metadata: { reason: 'offer_expired' },
+        }).catch(() => null);
+        if (updated) {
+          requeued.rows.push(updated);
+          emitEvent('job:status', { jobId: job.id, status: 'matching', reason: 'offer_expired' }, `job:${job.id}`);
+        }
       }
-      const expired = await query(
-        `update jobs set status = 'expired', updated_at = now()
+      // Requests unmatched after 24h expire (pending/matching → expired are
+      // canonical system edges).
+      const staleUnmatched = await query(
+        `select * from jobs
          where status in ('pending', 'matching')
-           and created_at < now() - interval '24 hours'
-         returning id, customer_id`,
+           and created_at < now() - interval '24 hours'`,
       );
-      for (const job of expired.rows) {
+      const expired = { rows: [] };
+      for (const job of staleUnmatched.rows) {
+        const done = await transitionJob({
+          jobId: job.id, toStatus: 'expired', actor: null, job,
+          skipActorCheck: true, metadata: { via: 'expiry_reaper' },
+        }).catch(() => null);
+        if (!done) continue;
+        expired.rows.push(done);
         await query(
           `insert into notifications (user_id, type, title, body, data)
            values ($1, 'job_expired', 'Request expired', 'No provider accepted your request within 24 hours. You can book again any time.', $2::jsonb)`,

@@ -71,3 +71,4 @@ dev.log
 .zscripts/*.log
 .zscripts/sup-*.log
 :memory:
+.zscripts/demo-pw.txt

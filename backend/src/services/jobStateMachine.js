@@ -34,17 +34,22 @@ export const TERMINAL_JOB_STATES = ['completed', 'closed', 'cancelled', 'failed'
 //   offered → accepted/booking_confirmed: customer accepts the quote
 //   offered → matching/pending: customer declines or quote expires (booking
 //             stays available for another quote - spec §5)
+//   accepted/scheduled → matching: provider RELEASES the booking back to the
+//             open pool (company reject / reassignment) - the work has not
+//             started, so the request returns to matching (spec §23)
+//   pending/matching → expired: the 24h system reaper expires requests no
+//             provider accepted (system-actor, skipActorCheck)
 //   completion_requested → customer_confirmed_completion: customer verified
 //     the work (OTP) - completion_requested → completed stays as the direct
 //     edge for flows where payment is already settled.
 export const JOB_TRANSITIONS = {
-  pending: ['matching', 'quote_requested', 'offered', 'accepted', 'assigned', 'scheduled', 'booking_confirmed', 'cancelled'],
-  matching: ['pending', 'quote_requested', 'offered', 'accepted', 'assigned', 'scheduled', 'booking_confirmed', 'cancelled'],
+  pending: ['matching', 'quote_requested', 'offered', 'accepted', 'assigned', 'scheduled', 'booking_confirmed', 'expired', 'cancelled'],
+  matching: ['pending', 'quote_requested', 'offered', 'accepted', 'assigned', 'scheduled', 'booking_confirmed', 'expired', 'cancelled'],
   quote_requested: ['matching', 'pending', 'offered', 'cancelled'],
   offered: ['accepted', 'booking_confirmed', 'matching', 'pending', 'cancelled'],
-  accepted: ['booking_confirmed', 'assigned', 'scheduled', 'on_the_way', 'cancelled'],
+  accepted: ['booking_confirmed', 'assigned', 'scheduled', 'on_the_way', 'matching', 'cancelled'],
   booking_confirmed: ['assigned', 'scheduled', 'on_the_way', 'cancelled'],
-  scheduled: ['accepted', 'assigned', 'on_the_way', 'booking_confirmed', 'cancelled'],
+  scheduled: ['accepted', 'assigned', 'on_the_way', 'booking_confirmed', 'matching', 'cancelled'],
   assigned: ['on_the_way', 'arrived', 'accepted', 'scheduled', 'cancelled'],
   on_the_way: ['arrived', 'cancelled'],
   arrived: ['in_progress', 'on_the_way', 'cancelled'],
@@ -174,11 +179,19 @@ export function assertTransitionAllowed(fromStatus, toStatus) {
  * @param {boolean} [opts.skipActorCheck] system callers (webhooks/reapers) that
  *        have already authorized the transition
  * @param {object} [opts.metadata]     extra timeline metadata
+ * @param {object} [opts.extraSet]     additional job columns to update in the
+ *        SAME atomic UPDATE (e.g. cancellation_reason, fundi_latitude).
+ *        Keys must be plain snake_case column names (code-controlled), values
+ *        are parameterized. Keeps endpoints from doing a second, racy write.
+ * @param {boolean} [opts.skipNotifications] caller delivers its own richer
+ *        notifications (e.g. check-in milestones with GPS context) — machine
+ *        skips its generic in-app side effects.
  */
 export async function transitionJob(opts) {
   const {
     jobId, toStatus, actor, actorKind, job: preloaded,
     expectedFrom, skipActorCheck = false, metadata = {},
+    extraSet = null, skipNotifications = false,
   } = opts;
   if (!jobId) throw badRequest('jobId is required');
   if (!toStatus) throw badRequest('Target status is required');
@@ -199,10 +212,22 @@ export async function transitionJob(opts) {
 
   // Race protection: the UPDATE only succeeds when the status is still the
   // value we validated. Two concurrent transitions cannot both win.
-  const result = await query(
-    'update jobs set status = $2, updated_at = now() where id = $1 and status = $3 returning *',
-    [jobId, toStatus, current.status],
-  );
+  // extraSet columns ride along in the same statement so callers never need a
+  // second (racy) status-adjacent write.
+  let sql = 'update jobs set status = $2, updated_at = now()';
+  const params = [jobId, toStatus];
+  if (extraSet && typeof extraSet === 'object') {
+    for (const [col, value] of Object.entries(extraSet)) {
+      if (!/^[a-z_][a-z0-9_]*$/.test(col)) {
+        throw badRequest(`Invalid column name in extraSet: ${col}`);
+      }
+      params.push(value);
+      sql += `, ${col} = $${params.length}`;
+    }
+  }
+  params.push(current.status);
+  sql += ` where id = $1 and status = $${params.length} returning *`;
+  const result = await query(sql, params);
   if (!result.rows[0]) {
     const row = await query('select status from jobs where id = $1', [jobId]);
     throw conflict(`Job status changed concurrently (now ${row.rows[0]?.status || 'unknown'}) - reload and try again`);
@@ -218,7 +243,9 @@ export async function transitionJob(opts) {
   });
   emitEvent('job:status', { jobId: job.id, status: toStatus, job: publicStatus(job) }, `job:${job.id}`);
 
-  await maybeNotifySideEffects(job, current.status, toStatus, actor);
+  if (!skipNotifications) {
+    await maybeNotifySideEffects(job, current.status, toStatus, actor);
+  }
   return job;
 }
 

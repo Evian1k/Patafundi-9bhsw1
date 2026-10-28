@@ -9,9 +9,13 @@
  *
  * Usage in server.js:
  *   import { maintenanceCheck } from './middleware/maintenanceMode.js';
- *   app.use('/api', maintenanceCheck, router);
+ *   app.use(maintenanceCheck);
+ *
+ * This gate is mounted globally BEFORE any auth middleware, so it resolves
+ * the caller itself via optionalAuth() — req.user cannot be relied upon here.
  */
 import { isFeatureEnabled } from '../services/securityService.js';
+import { optionalAuth } from './auth.js';
 
 const STAFF_ROLES = new Set(['super_admin', 'admin', 'support_agent', 'fraud_analyst', 'finance_team', 'dispatch_team', 'devops_engineer', 'auditor']);
 
@@ -43,6 +47,14 @@ export async function maintenanceCheck(req, res, next) {
 
   // Always allow auth endpoints (login, register, OTP — users need to authenticate)
   if (req.path.startsWith('/api/auth/') || req.path.startsWith('/auth/')) return next();
+
+  // This gate runs before any route-level auth middleware, so resolve the
+  // caller first (anonymous requests stay anonymous — never blocks).
+  if (!req.user) {
+    await new Promise((resolve) => {
+      optionalAuth(req, res, () => resolve());
+    });
+  }
 
   // Check if maintenance mode is on
   const isOn = await isMaintenanceMode();

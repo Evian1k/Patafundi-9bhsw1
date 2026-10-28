@@ -7,6 +7,7 @@ import { logNonFatal } from '../utils/logError.js';
 import { recordTimelineEvent, recordJobStatusTimeline } from '../services/timelineService.js';
 import { transitionJob, assertTransitionAllowed, JOB_TRANSITIONS, ACTIVE_JOB_STATES, COMPLETED_JOB_STATES, STATUS_LABELS } from '../services/jobStateMachine.js';
 import { createQuote, decideQuote as decideQuoteEntity, getLiveQuoteForJob, addQuoteQuestion } from '../services/quoteService.js';
+import { includeDemoFor } from '../demoDataPolicy.js';
 import {
   createExpectedCommission,
   markCommissionCustomerConfirmed,
@@ -233,9 +234,12 @@ export async function createJob(req, res) {
   // ── Direct company booking (spec §5): customer books a specific company ──
   let companyId = body.companyId || body.company_id || null;
   if (companyId) {
+    // Provenance-scoped: demo actors may book their isolated demo company;
+    // genuine actors only ever reach verified genuine companies.
     const companyRes = await query(
-      `select id, company_name, status, verification_status from company_profiles where id = $1 and is_demo = false`,
-      [companyId],
+      `select id, company_name, status, verification_status from company_profiles
+       where id = $1 and ($2::boolean or is_demo = false)`,
+      [companyId, includeDemoFor(req.user)],
     );
     const co = companyRes.rows[0];
     // Spec section 47: bookable = approved + verified + not suspended.
@@ -415,6 +419,7 @@ export async function createJob(req, res) {
         serviceCategory,
         isEmergency: (body.urgency || 'normal') === 'emergency',
         customerId: req.user.id,
+        includeDemo: includeDemoFor(req.user),
       });
       if (scored.length) {
         scoredCandidates = scored.slice(0, 8).map((c) => ({
@@ -647,13 +652,19 @@ export async function cancelJob(req, res) {
   if (!req.user.isAdmin && !['pending', 'matching', 'quote_requested', 'offered', 'accepted', 'booking_confirmed', 'scheduled'].includes(job.status)) {
     throw badRequest('Job can no longer be cancelled');
   }
-  const result = await query('update jobs set status = $2, cancellation_reason = $3, updated_at = now() where id = $1 and status = $4 returning *', [
-    req.params.id,
-    'cancelled',
-    req.body?.reason || null,
-    job.status,
-  ]);
-  if (!result.rows[0]) throw badRequest('Job status changed, reload and try again');
+  // Central machine performs the transition (edge validation + timeline event
+  // + realtime emit). requireJobAccess already authorized the caller, so the
+  // machine's actor re-check is skipped; the allowlist above still restricts
+  // non-admins to pre-work states.
+  const result = await transitionJob({
+    jobId: job.id,
+    toStatus: 'cancelled',
+    actor: req.user,
+    skipActorCheck: true,
+    job,
+    extraSet: { cancellation_reason: req.body?.reason || null },
+    metadata: { via: 'cancelJob' },
+  });
   // Any live quote dies with the booking.
   await query(
     "update quotes set status = 'cancelled', decided_at = now(), updated_at = now() where job_id = $1 and status in ('draft','sent','viewed')",
@@ -661,7 +672,7 @@ export async function cancelJob(req, res) {
   );
   emitEvent('job:request:declined', { jobId: req.params.id, reason: req.body?.reason || null }, `job:${req.params.id}`);
   emitEvent('job:cancelled', { jobId: req.params.id, status: 'cancelled', reason: req.body?.reason || null }, `job:${req.params.id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]) });
+  res.json({ success: true, job: publicJob(result) });
 }
 
 /**
@@ -687,11 +698,13 @@ export async function checkIn(req, res) {
   const job = await loadJob(req.params.id);
   requireAssignedFundi(req.user, job);
   // ── State-machine enforcement (spec §17): check-in may only advance the
-  // lifecycle forward — never skip backwards or resurrect a finished job.
+  // lifecycle along edges the central machine allows. This map is derived
+  // from JOB_TRANSITIONS (accepted/booking_confirmed/assigned/scheduled →
+  // on_the_way → arrived → in_progress) — no skips, no backwards moves.
   const CHECKIN_TRANSITIONS = {
     on_the_way: ['accepted', 'booking_confirmed', 'assigned', 'scheduled'],
-    arrived: ['on_the_way', 'accepted', 'booking_confirmed', 'assigned'],
-    in_progress: ['arrived', 'on_the_way', 'accepted', 'booking_confirmed', 'assigned'],
+    arrived: ['on_the_way', 'assigned'],
+    in_progress: ['arrived'],
   };
   if (!CHECKIN_TRANSITIONS[status].includes(job.status)) {
     throw badRequest(`Invalid status transition: ${job.status} → ${status}`);
@@ -722,22 +735,28 @@ export async function checkIn(req, res) {
       }
     }
   }
-  const result = await transaction(async (client) => {
-    await client.query(
-      `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
-       values ($1, $2, $3, $4, $5)`,
-      [req.params.id, req.user.id, latitude, longitude, accuracy],
-    );
-    return client.query(
-      `update jobs set status = $2, fundi_latitude = $3, fundi_longitude = $4, updated_at = now()
-       where id = $1 returning *`,
-      [req.params.id, status, latitude, longitude],
-    );
+  // Central machine performs the transition (edge validation + timeline event
+  // + concurrency guard) with the GPS fix riding along in the same atomic
+  // write. requireAssignedFundi already authorized the caller and checkIn
+  // delivers its own GPS-context milestone notifications, so the machine's
+  // generic in-app side effects are skipped to avoid duplicates.
+  const result = await transitionJob({
+    jobId: job.id,
+    toStatus: status,
+    actor: req.user,
+    job,
+    extraSet: { fundi_latitude: latitude, fundi_longitude: longitude },
+    skipNotifications: true,
+    metadata: { via: 'checkin', accuracy },
   });
+  await query(
+    `insert into gps_history (job_id, fundi_id, latitude, longitude, accuracy)
+     values ($1, $2, $3, $4, $5)`,
+    [req.params.id, req.user.id, latitude, longitude, accuracy],
+  );
   emitEvent('fundi:location:update', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
   emitEvent('job:checkin', { jobId: req.params.id, latitude, longitude, accuracy, status }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  if (status === 'in_progress') emitEvent('job:started', { jobId: req.params.id, status, job: publicJob(result) }, `job:${req.params.id}`);
   // Spec §35: lifecycle milestones must reach the customer beyond the job room
   // (in-app + queued push), not just live sockets. Non-blocking by contract.
   try {
@@ -754,7 +773,7 @@ export async function checkIn(req, res) {
   } catch (err) {
     logNonFatal('job.checkinNotify', err, { jobId: req.params.id });
   }
-  res.json({ success: true, job: publicJob(result.rows[0]) });
+  res.json({ success: true, job: publicJob(result) });
 }
 
 export async function completeJob(req, res) {
@@ -790,13 +809,22 @@ export async function completeJob(req, res) {
     if (finalPrice > maxAllowed) finalPrice = maxAllowed;
     if (finalPrice < minAllowed) finalPrice = minAllowed;
   }
-  const result = await query(
-    `update jobs set status = 'completion_requested', completion_otp_hash = $2,
-      final_price = coalesce($3, final_price, estimated_price), updated_at = now()
-     where id = $1 and status = 'in_progress' returning *`,
-    [req.params.id, otpHash, finalPrice],
-  );
-  if (!result.rows[0]) throw badRequest('Job status changed concurrently - reload and try again');
+  // Central machine performs the transition (in_progress → completion_requested
+  // is a canonical edge) with the OTP hash and final price riding along in the
+  // SAME atomic write. checkIn's richer OTP notification below carries the
+  // code, so the machine's generic completion notification is skipped.
+  const result = await transitionJob({
+    jobId: req.params.id,
+    toStatus: 'completion_requested',
+    actor: req.user,
+    job,
+    skipNotifications: true,
+    extraSet: {
+      completion_otp_hash: otpHash,
+      final_price: finalPrice != null ? finalPrice : (job.final_price ?? job.estimated_price),
+    },
+    metadata: { via: 'completeJob' },
+  });
   await recordTimelineEvent({
     jobId: req.params.id,
     eventType: 'work_completed',
@@ -817,9 +845,8 @@ export async function completeJob(req, res) {
     ],
   );
   emitEvent('job:completion:requested', { jobId: req.params.id }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'completion_requested', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
   emitEvent('job:completion:otp', { jobId: req.params.id, otp }, `user:${job.customer_id}`);
-  res.json({ success: true, job: publicJob(result.rows[0]), completionOtpIssued: true });
+  res.json({ success: true, job: publicJob(result), completionOtpIssued: true });
 }
 
 // ── Resend completion code (customer-only): re-issues a fresh OTP while the
@@ -871,21 +898,45 @@ export async function confirmCompletion(req, res) {
   });
   if (!otpResult.ok) throw forbidden(otpResult.error);
   // Clear the OTP hash so it can't be reused (one-time use). The customer
-  // verified the work: completion_requested (or legacy completed) ->
-  // customer_confirmed_completion via the central machine.
-  const result = await query(
-    `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
-      escrow_status = 'completion_requested', completion_otp_hash = null,
-      status = 'customer_confirmed_completion', updated_at = now()
-     where id = $1 and customer_completion_confirmed = false
-       and status in ('completion_requested', 'completed') returning *`,
-    [req.params.id],
-  );
+  // verified the work: completion_requested -> customer_confirmed_completion
+  // via the central machine. Legacy rows stuck at 'completed' (pre-machine
+  // data) keep a guarded direct write — 'completed' has no machine edge back.
+  let result;
+  if (job.status === 'completed') {
+    result = await query(
+      `update jobs set customer_completion_confirmed = true, payment_status = 'customer_confirmed',
+        escrow_status = 'completion_requested', completion_otp_hash = null, updated_at = now()
+       where id = $1 and customer_completion_confirmed = false and status = 'completed' returning *`,
+      [req.params.id],
+    );
+  } else {
+    // transitionJob resolves to the updated ROW (not a {rows} result) — wrap it
+    // so both branches share the same downstream result.rows[0] handling.
+    result = {
+      rows: [
+        await transitionJob({
+          jobId: req.params.id,
+          toStatus: 'customer_confirmed_completion',
+          actor: req.user,
+          actorKind: 'completion',
+          job,
+          extraSet: {
+            customer_completion_confirmed: true,
+            payment_status: 'customer_confirmed',
+            escrow_status: 'completion_requested',
+            completion_otp_hash: null,
+          },
+          metadata: { via: 'confirmCompletion' },
+        }),
+      ],
+    };
+  }
   // If no rows updated, another request confirmed it concurrently - return idempotent success
-  if (!result.rows[0]) {
+  if (!result || !result.rows?.[0]) {
     const current = await query('select * from jobs where id = $1', [req.params.id]);
     return res.json({ success: true, job: publicJob(current.rows[0]), alreadyConfirmed: true });
   }
+  const confirmedJob = result.rows[0];
   await markCommissionCustomerConfirmed(req.params.id);
   await recordTimelineEvent({
     jobId: req.params.id,
@@ -893,8 +944,7 @@ export async function confirmCompletion(req, res) {
     actorId: req.user.id,
     actorRole: req.user.role,
   });
-  emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
-  emitEvent('job:status', { jobId: req.params.id, status: 'customer_confirmed_completion', job: publicJob(result.rows[0]) }, `job:${req.params.id}`);
+  emitEvent('job:completion:confirmed', { jobId: req.params.id, job: publicJob(confirmedJob) }, `job:${req.params.id}`);
 
   // ── Auto-release escrow via the shared settlement service ─────────
   // Server-authoritative split, fundi wallet credit OR company settlement,
@@ -911,21 +961,27 @@ export async function confirmCompletion(req, res) {
   } catch (err) {
     console.warn('[escrow] auto-release failed (non-blocking, admin can release manually):', err.message);
   }
-  let finalJob = result.rows[0];
+  let finalJob = confirmedJob;
   if (paymentFinalized) {
-    const done = await query(
-      `update jobs set status = 'completed', payment_status = 'payout_completed', updated_at = now()
-       where id = $1 and status = 'customer_confirmed_completion' returning *`,
-      [req.params.id],
-    );
-    if (done.rows[0]) {
-      finalJob = done.rows[0];
-      emitEvent('job:status', { jobId: req.params.id, status: 'completed', job: publicJob(finalJob) }, `job:${req.params.id}`);
+    // Central machine closes the loop (customer_confirmed_completion →
+    // completed is canonical). The escrow release above already authorized
+    // this continuation; its side effects notify the customer.
+    const done = await transitionJob({
+      jobId: req.params.id,
+      toStatus: 'completed',
+      actor: req.user,
+      job: confirmedJob,
+      skipActorCheck: true,
+      extraSet: { payment_status: 'payout_completed' },
+      metadata: { via: 'confirmCompletion:escrow_released' },
+    }).catch(async (err) => {
+      console.warn('[lifecycle] final completed transition failed:', err.message);
+      const current = await query('select * from jobs where id = $1', [req.params.id]);
+      return current.rows[0];
+    });
+    if (done && done.status === 'completed') {
+      finalJob = done;
       emitEvent('job:completed', { jobId: req.params.id }, `job:${req.params.id}`);
-      await recordTimelineEvent({
-        jobId: req.params.id, eventType: 'status_completed', actorId: req.user.id,
-        actorRole: req.user.role, metadata: { from: 'customer_confirmed_completion', to: 'completed' },
-      });
     }
   }
 

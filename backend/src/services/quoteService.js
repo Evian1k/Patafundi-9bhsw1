@@ -313,11 +313,14 @@ export async function expireStaleQuotes() {
      returning job_id`,
   );
   for (const row of res.rows) {
-    await query(
-      `update jobs set status = 'matching', updated_at = now()
-       where id = $1 and status = 'offered'`,
-      [row.job_id],
-    ).catch(() => {});
+    // Re-open matching via the central machine (offered → matching is a
+    // canonical edge); failures never break the quote-expiry sweep.
+    const jobRes = await query('select * from jobs where id = $1 and status = \'offered\'', [row.job_id]).catch(() => ({ rows: [] }));
+    if (!jobRes.rows[0]) continue;
+    await transitionJob({
+      jobId: row.job_id, toStatus: 'matching', actor: null, job: jobRes.rows[0],
+      skipActorCheck: true, metadata: { reason: 'quote_expired', quoteId: row.job_id },
+    }).catch(() => {});
   }
   return res.rows.length;
 }

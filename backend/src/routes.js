@@ -30,7 +30,7 @@ import {
   requireDisputeAccess,
   requireProfilePhotoAccess,
 } from './middleware/storageAccess.js';
-import { asyncHandler } from './utils/http.js';
+import { asyncHandler, badRequest } from './utils/http.js';
 import { aiRateLimit, supportRateLimit, paymentActionRateLimit, disputeRateLimit, sosRateLimit, publicSubmitRateLimit, clientErrorRateLimit } from './middleware/rateLimit.js';
 import { auditLog } from './services/auditService.js';
 

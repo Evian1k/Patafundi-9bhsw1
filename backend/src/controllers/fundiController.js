@@ -3,6 +3,7 @@ import { badRequest, forbidden } from '../utils/http.js';
 import { emitEvent } from '../realtime.js';
 import { getSignedAccessUrl, getSignedThumbUrl } from '../services/storageService.js';
 import { createFundiRegistration } from '../services/fundiRegistrationService.js';
+import { includeDemoFor } from '../demoDataPolicy.js';
 import { auditLog } from '../services/auditService.js';
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -208,19 +209,22 @@ export async function searchFundis(req, res) {
 }
 
 export async function dashboard(req, res) {
+  // Provenance-scoped: demo actors see their isolated fixture, real actors
+  // see genuine rows only (same pattern as userController.notifications).
+  const includeDemo = includeDemoFor(req.user);
   const [jobs, fundi, wallet, ratings, offers, earnings] = await Promise.all([
-    query(`select * from jobs where fundi_id = $1 and is_demo = false order by updated_at desc limit 10`, [req.user.id]),
+    query(`select * from jobs where fundi_id = $1 and ($2::boolean or is_demo = false) order by updated_at desc limit 10`, [req.user.id, includeDemo]),
     query(`select * from fundis where user_id = $1`, [req.user.id]),
     query(
       `select coalesce(sum(case when status in ('requested','processing','completed') then amount else 0 end),0) as balance
-       from payouts where fundi_id = $1 and is_demo = false`,
-      [req.user.id],
+       from payouts where fundi_id = $1 and ($2::boolean or is_demo = false)`,
+      [req.user.id, includeDemo],
     ),
     query(
       `select coalesce(avg(r.rating),0) as average, count(*)::int as total
        from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-       where j.fundi_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false`,
-      [req.user.id],
+       where j.fundi_id = $1 and ($2::boolean or (r.is_demo = false and j.is_demo = false and u.is_demo = false))`,
+      [req.user.id, includeDemo],
     ),
     // Real pending-offer count (migration 038) — offers made in the last
     // 15 minutes that this fundi has not responded to yet.
@@ -237,9 +241,9 @@ export async function dashboard(req, res) {
          coalesce(sum(case when et.created_at >= now() - interval '30 days' then et.amount else 0 end), 0) as month
        from escrow_transactions et
        join jobs j on j.id = et.job_id
-       where j.fundi_id = $1 and j.is_demo = false and et.is_demo = false
+       where j.fundi_id = $1 and ($2::boolean or (j.is_demo = false and et.is_demo = false))
          and et.type = 'release' and et.status = 'released'`,
-      [req.user.id],
+      [req.user.id, includeDemo],
     ),
   ]);
   const profile = fundi.rows[0] || null;
@@ -399,8 +403,8 @@ export async function location(req, res) {
 
 export async function walletTransactions(req, res) {
   const result = await query(
-    `select * from payouts where fundi_id = $1 and is_demo = false order by created_at desc limit $2 offset $3`,
-    [req.user.id, Number(req.query.limit || 20), Number(req.query.offset || 0)],
+    `select * from payouts where fundi_id = $1 and ($2::boolean or is_demo = false) order by created_at desc limit $3 offset $4`,
+    [req.user.id, includeDemoFor(req.user), Number(req.query.limit || 20), Number(req.query.offset || 0)],
   );
   res.json({ success: true, transactions: result.rows });
 }
@@ -411,11 +415,14 @@ export async function ratings(req, res) {
   const fundiId = req.params.id || req.user?.id;
 
   if (fundiId) {
+    // Self-view (no :id param) is provenance-scoped for the demo fixture;
+    // public views of a specific fundi stay genuine-only.
+    const includeDemo = !req.params.id && includeDemoFor(req.user);
     const result = await query(
       `select r.* from reviews r join jobs j on j.id = r.job_id join users u on u.id = r.reviewer_id
-       where j.fundi_id = $1 and r.is_demo = false and j.is_demo = false and u.is_demo = false
-       order by r.created_at desc limit $2 offset $3`,
-      [fundiId, limit, offset],
+       where j.fundi_id = $1 and ($2::boolean or (r.is_demo = false and j.is_demo = false and u.is_demo = false))
+       order by r.created_at desc limit $3 offset $4`,
+      [fundiId, includeDemo, limit, offset],
     );
     return res.json({ success: true, ratings: result.rows });
   }
