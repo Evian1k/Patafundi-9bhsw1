@@ -59,7 +59,7 @@ const SECTIONS: InfoSection[] = [
   },
 ];
 
-export function SafetyPromiseScreen({ navigation }: any): JSX.Element {
+export function SafetyPromiseScreen({ navigation }: any): React.JSX.Element {
   return (
     <View style={styles.outer}>
       <ScreenHeader title="Safety Promise" onBack={() => navigation.goBack()} />

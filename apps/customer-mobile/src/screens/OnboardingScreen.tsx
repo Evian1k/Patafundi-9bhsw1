@@ -55,7 +55,7 @@ interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
-export function OnboardingScreen({ onComplete }: OnboardingScreenProps): JSX.Element {
+export function OnboardingScreen({ onComplete }: OnboardingScreenProps): React.JSX.Element {
   const [active, setActive] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 

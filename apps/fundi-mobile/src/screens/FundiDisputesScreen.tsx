@@ -33,7 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
  * report problems themselves. The dispute system is shared with customers -
  * both sides are heard before escrow is released or refunded.
  */
-export function FundiDisputesScreen({ navigation }: any): JSX.Element {
+export function FundiDisputesScreen({ navigation }: any): React.JSX.Element {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,7 +56,7 @@ export function FundiDisputesScreen({ navigation }: any): JSX.Element {
     }, [load]),
   );
 
-  const renderItem = ({ item }: { item: Dispute }): JSX.Element => {
+  const renderItem = ({ item }: { item: Dispute }): React.JSX.Element => {
     const statusColor = STATUS_COLORS[item.status] ?? colors.textSecondary;
     return (
       <View style={styles.card}>

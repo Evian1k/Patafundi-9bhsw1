@@ -36,7 +36,7 @@ interface HelpData {
   sections?: FaqSection[];
 }
 
-export function FundiHelpCenterScreen({ navigation }: any): JSX.Element {
+export function FundiHelpCenterScreen({ navigation }: any): React.JSX.Element {
   const [sections, setSections] = useState<FaqSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

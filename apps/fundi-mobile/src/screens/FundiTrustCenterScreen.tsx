@@ -13,7 +13,7 @@ const TRUST_CARDS: TrustCard[] = [
   ...LEGAL_TRUST_CARDS,
 ];
 
-export function FundiTrustCenterScreen({ navigation }: any): JSX.Element {
+export function FundiTrustCenterScreen({ navigation }: any): React.JSX.Element {
   return (
     <TrustCenterScreen
       navigation={navigation}

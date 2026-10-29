@@ -47,7 +47,7 @@ function emptyAvailability(): AvailabilityMap {
   return map;
 }
 
-export function AvailabilityScreen({ navigation }: any): JSX.Element {
+export function AvailabilityScreen({ navigation }: any): React.JSX.Element {
   const [avail, setAvail] = useState<AvailabilityMap>(emptyAvailability);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

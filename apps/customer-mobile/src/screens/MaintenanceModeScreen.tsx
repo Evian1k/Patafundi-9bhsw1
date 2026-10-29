@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const STATUS_PAGE_URL = 'https://patafundi-9bhsw1.vercel.app/status';
 const SUPPORT_EMAIL_URL = 'mailto:support@patafundi.com?subject=PataFundi%20Maintenance';
 
-export function MaintenanceModeScreen({ route, navigation }: any): JSX.Element {
+export function MaintenanceModeScreen({ route, navigation }: any): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const message: string = route?.params?.message ?? '';
   const estimatedCompletion: string = route?.params?.estimatedCompletion ?? '';

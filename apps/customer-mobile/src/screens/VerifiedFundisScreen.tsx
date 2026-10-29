@@ -68,7 +68,7 @@ const STATIC_SECTIONS: InfoSection[] = [
   },
 ];
 
-export function VerifiedFundisScreen({ navigation }: any): JSX.Element {
+export function VerifiedFundisScreen({ navigation }: any): React.JSX.Element {
   return (
     <InfoPageScreen
       heroIcon="ribbon"

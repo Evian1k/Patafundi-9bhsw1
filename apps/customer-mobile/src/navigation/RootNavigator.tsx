@@ -10,7 +10,7 @@ interface RootNavigatorProps {
   linking?: LinkingOptions<RootParamList>;
 }
 
-export function RootNavigator({ linking }: RootNavigatorProps): JSX.Element {
+export function RootNavigator({ linking }: RootNavigatorProps): React.JSX.Element {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   return (
     <NavigationContainer linking={linking as LinkingOptions<Record<string, unknown>>}>

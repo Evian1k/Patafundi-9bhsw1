@@ -24,7 +24,7 @@ import {
  * Fundi password reset (spec §52): request a reset email. Completes the auth
  * story for fundis - previously this app had no way to recover an account.
  */
-export function FundiForgotPasswordScreen({ navigation }: any): JSX.Element {
+export function FundiForgotPasswordScreen({ navigation }: any): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);

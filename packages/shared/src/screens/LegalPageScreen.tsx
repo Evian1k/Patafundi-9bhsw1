@@ -19,7 +19,7 @@ interface PolicyData {
   updatedAt?: string;
 }
 
-export function LegalPageScreen({ route, navigation }: any): JSX.Element {
+export function LegalPageScreen({ route, navigation }: any): React.JSX.Element {
   const slug: string = route?.params?.slug ?? '';
   const routeTitle: string = route?.params?.title ?? 'Legal';
   const [policy, setPolicy] = useState<PolicyData | null>(null);

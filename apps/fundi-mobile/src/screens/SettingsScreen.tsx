@@ -35,7 +35,7 @@ const LEGAL_LINKS: LegalLink[] = [
   { label: 'Community Guidelines', slug: 'community-guidelines' },
 ];
 
-export function SettingsScreen({ navigation }: any): JSX.Element {
+export function SettingsScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 

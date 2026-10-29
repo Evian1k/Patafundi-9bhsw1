@@ -43,7 +43,7 @@ const REASONS = [
   'Other',
 ];
 
-export function FundiCreateDisputeScreen({ route, navigation }: any): JSX.Element {
+export function FundiCreateDisputeScreen({ route, navigation }: any): React.JSX.Element {
   const fixedJobId: string | undefined = route?.params?.jobId;
   // Job picker: fundis pick from their OWN jobs - never a typed Job ID.
   const [jobs, setJobs] = useState<Array<{ id: string; description?: string; status?: string; created_at?: string }>>([]);

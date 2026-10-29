@@ -22,7 +22,7 @@ import {
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function OtpScreen({ navigation, route }: any): JSX.Element {
+export function OtpScreen({ navigation, route }: any): React.JSX.Element {
   const email: string = route?.params?.email ?? '';
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [cooldown, setCooldown] = useState(0);

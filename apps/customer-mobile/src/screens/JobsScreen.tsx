@@ -33,7 +33,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
-export function JobsScreen({ navigation }: any): JSX.Element {
+export function JobsScreen({ navigation }: any): React.JSX.Element {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -72,7 +72,7 @@ export function JobsScreen({ navigation }: any): JSX.Element {
     return ['cancelled', 'failed', 'expired'].includes(s);
   });
 
-  const renderItem = ({ item }: { item: Job }): JSX.Element => {
+  const renderItem = ({ item }: { item: Job }): React.JSX.Element => {
     const statusColor = JOB_STATUS_COLORS[item.status] ?? colors.textSecondary;
     const statusText = jobStatusLabel(item.status);
     return (

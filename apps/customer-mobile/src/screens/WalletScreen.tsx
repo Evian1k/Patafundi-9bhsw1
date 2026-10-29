@@ -19,7 +19,7 @@ import {
 } from '@patafundi/shared';
 import type { Payment } from '@patafundi/shared';
 
-export function WalletScreen(): JSX.Element {
+export function WalletScreen(): React.JSX.Element {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

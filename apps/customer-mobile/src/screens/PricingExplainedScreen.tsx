@@ -67,7 +67,7 @@ const SURGE_SECTION: InfoSection = {
   color: colors.warning,
 };
 
-export function PricingExplainedScreen({ navigation }: any): JSX.Element {
+export function PricingExplainedScreen({ navigation }: any): React.JSX.Element {
   return (
     <ScrollView
       style={styles.container}

@@ -25,7 +25,7 @@ import {
 import type { Message } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function ChatScreen({ route, navigation }: any): JSX.Element {
+export function ChatScreen({ route, navigation }: any): React.JSX.Element {
   const jobId: string = route?.params?.jobId;
   const user = useAuthStore((s) => s.user);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -80,7 +80,7 @@ export function ChatScreen({ route, navigation }: any): JSX.Element {
     }
   };
 
-  const renderItem = ({ item }: { item: Message }): JSX.Element => {
+  const renderItem = ({ item }: { item: Message }): React.JSX.Element => {
     const mine = item.senderId === user?.id;
     if (item.type === 'system') {
       return (

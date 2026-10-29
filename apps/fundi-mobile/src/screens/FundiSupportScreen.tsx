@@ -30,7 +30,7 @@ const CATEGORIES = ['Payments', 'Job issue', 'Account', 'Verification', 'Dispute
  * Fundi support (spec §71): real support tickets filed to the platform queue -
  * replaces the old mailto-only link so help never leaves the app.
  */
-export function FundiSupportScreen({ navigation }: any): JSX.Element {
+export function FundiSupportScreen({ navigation }: any): React.JSX.Element {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');

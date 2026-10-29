@@ -36,7 +36,7 @@ interface HelpData {
   sections?: FaqSection[];
 }
 
-export function HelpCenterScreen({ navigation }: any): JSX.Element {
+export function HelpCenterScreen({ navigation }: any): React.JSX.Element {
   const [sections, setSections] = useState<FaqSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

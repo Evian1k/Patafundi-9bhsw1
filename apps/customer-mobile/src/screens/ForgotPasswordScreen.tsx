@@ -22,7 +22,7 @@ import {
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function ForgotPasswordScreen({ navigation }: any): JSX.Element {
+export function ForgotPasswordScreen({ navigation }: any): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);

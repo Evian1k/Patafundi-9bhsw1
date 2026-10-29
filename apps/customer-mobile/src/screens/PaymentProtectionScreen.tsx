@@ -68,7 +68,7 @@ const STATIC_SECTIONS: InfoSection[] = [
   },
 ];
 
-export function PaymentProtectionScreen({ navigation }: any): JSX.Element {
+export function PaymentProtectionScreen({ navigation }: any): React.JSX.Element {
   return (
     <View style={styles.outer}>
       <ScreenHeader title="Payment Protection" onBack={() => navigation.goBack()} />

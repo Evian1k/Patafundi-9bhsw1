@@ -26,7 +26,7 @@ type Phase = 'idle' | 'starting' | 'capture' | 'submitting' | 'finishing';
 
 const TOTAL_CHALLENGES = 3;
 
-export function VerificationScreen({ navigation }: any): JSX.Element {
+export function VerificationScreen({ navigation }: any): React.JSX.Element {
   const [status, setStatus] = useState<string>('unknown');
   const [level, setLevel] = useState<string>('');
   const [loading, setLoading] = useState(true);

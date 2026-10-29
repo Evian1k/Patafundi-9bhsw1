@@ -34,7 +34,7 @@ interface AnalyticsData {
   total?: number;
 }
 
-export function WalletScreen({ navigation }: any): JSX.Element {
+export function WalletScreen({ navigation }: any): React.JSX.Element {
   const [balance, setBalance] = useState<WalletBalanceResponse | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);

@@ -31,7 +31,7 @@ const METHODS: Array<{ key: PayoutMethod; label: string }> = [
   { key: 'bank', label: 'Bank Transfer' },
 ];
 
-export function RequestPayoutScreen({ navigation }: any): JSX.Element {
+export function RequestPayoutScreen({ navigation }: any): React.JSX.Element {
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PayoutMethod>('mpesa');

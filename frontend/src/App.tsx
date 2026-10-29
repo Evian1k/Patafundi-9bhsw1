@@ -26,7 +26,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner richColors position="top-center" />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter>
           {/* reducedMotion="user" honors the OS "reduce motion" setting for
               EVERY framer-motion animation in the app (accessibility §61). */}
           <MotionConfig reducedMotion="user">

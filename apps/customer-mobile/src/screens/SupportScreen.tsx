@@ -24,7 +24,7 @@ import {
 
 const CATEGORIES = ['General', 'Payment', 'Job issue', 'Account', 'Safety', 'Other'];
 
-export function SupportScreen({ navigation }: any): JSX.Element {
+export function SupportScreen({ navigation }: any): React.JSX.Element {
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [message, setMessage] = useState('');

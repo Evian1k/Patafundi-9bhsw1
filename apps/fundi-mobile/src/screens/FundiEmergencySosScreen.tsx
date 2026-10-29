@@ -100,7 +100,7 @@ const STATIC_SECTIONS: InfoSection[] = [
   },
 ];
 
-export function FundiEmergencySosScreen({ navigation }: any): JSX.Element {
+export function FundiEmergencySosScreen({ navigation }: any): React.JSX.Element {
   const [sosState, setSosState] = React.useState<'idle' | 'sending' | 'sent'>('idle');
 
   const callNumber = (number: string): void => {

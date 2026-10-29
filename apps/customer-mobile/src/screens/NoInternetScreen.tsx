@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RETRY_INTERVAL_SECONDS = 10;
 
-export function NoInternetScreen({ navigation }: any): JSX.Element {
+export function NoInternetScreen({ navigation }: any): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const [checking, setChecking] = useState(false);
   const [countdown, setCountdown] = useState(RETRY_INTERVAL_SECONDS);

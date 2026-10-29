@@ -14,7 +14,7 @@ export type AuthStackParamList = {
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-export function AuthNavigator(): JSX.Element {
+export function AuthNavigator(): React.JSX.Element {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Login">
       <Stack.Screen name="Login" component={LoginScreen} />

@@ -102,7 +102,7 @@ const WalletStack = createNativeStackNavigator<WalletStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function HomeStackScreen(): JSX.Element {
+function HomeStackScreen(): React.JSX.Element {
   return (
     <HomeStack.Navigator>
       <HomeStack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
@@ -115,7 +115,7 @@ function HomeStackScreen(): JSX.Element {
   );
 }
 
-function JobsStackScreen(): JSX.Element {
+function JobsStackScreen(): React.JSX.Element {
   return (
     <JobsStack.Navigator>
       <JobsStack.Screen name="Jobs" component={JobsScreen} options={{ headerShown: false }} />
@@ -127,7 +127,7 @@ function JobsStackScreen(): JSX.Element {
   );
 }
 
-function WalletStackScreen(): JSX.Element {
+function WalletStackScreen(): React.JSX.Element {
   return (
     <WalletStack.Navigator>
       <WalletStack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
@@ -135,7 +135,7 @@ function WalletStackScreen(): JSX.Element {
   );
 }
 
-function ProfileStackScreen(): JSX.Element {
+function ProfileStackScreen(): React.JSX.Element {
   return (
     <ProfileStack.Navigator>
       <ProfileStack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
@@ -175,7 +175,7 @@ function ProfileStackScreen(): JSX.Element {
   );
 }
 
-export function MainNavigator(): JSX.Element {
+export function MainNavigator(): React.JSX.Element {
   return (
     <Tab.Navigator
       screenOptions={{

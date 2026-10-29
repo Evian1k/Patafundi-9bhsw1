@@ -46,7 +46,7 @@ type SectionState =
   | { status: 'error'; message: string }
   | { status: 'ready' };
 
-export function SecurityCenterScreen({ navigation }: any): JSX.Element {
+export function SecurityCenterScreen({ navigation }: any): React.JSX.Element {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [history, setHistory] = useState<LoginHistoryItem[]>([]);
   const [sessionsState, setSessionsState] = useState<SectionState>({ status: 'loading' });

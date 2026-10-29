@@ -56,7 +56,7 @@ const linking: LinkingOptions<RootParamList> = {
 
 type AppMode = 'auth' | 'checking' | 'pending' | 'main';
 
-export function RootNavigator(): JSX.Element {
+export function RootNavigator(): React.JSX.Element {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [mode, setMode] = useState<AppMode>('checking');
 

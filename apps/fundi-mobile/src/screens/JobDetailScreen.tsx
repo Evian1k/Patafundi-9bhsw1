@@ -43,7 +43,7 @@ interface FundiLocation {
   longitude: number;
 }
 
-export function JobDetailScreen({ navigation, route }: any): JSX.Element {
+export function JobDetailScreen({ navigation, route }: any): React.JSX.Element {
   const jobId: string = route?.params?.jobId;
   const [job, setJob] = useState<Job | null>(null);
   const [fundiLoc, setFundiLoc] = useState<FundiLocation | null>(null);

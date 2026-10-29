@@ -50,7 +50,7 @@ const PRIOR_APPEALS: AppealRecord[] = [
   // (filtered by category=appeal). Shown as an empty state until a list endpoint is wired.
 ];
 
-export function AppealScreen({ route, navigation }: any): JSX.Element {
+export function AppealScreen({ route, navigation }: any): React.JSX.Element {
   const caseId: string = route?.params?.caseId ?? '';
   const [reason, setReason] = useState<string>(REASON_OPTIONS[0].value);
   const [explanation, setExplanation] = useState('');

@@ -24,7 +24,7 @@ import { apiClient, colors, gradients, fonts, spacing, fontSize, borderRadius } 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 60;
 
-export function FundiOtpScreen({ route, navigation }: any): JSX.Element {
+export function FundiOtpScreen({ route, navigation }: any): React.JSX.Element {
   const { email, devOtp } = route.params || {};
   const [code, setCode] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);

@@ -38,7 +38,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Profile', icon: 'person-outline', tab: 'ProfileTab' },
 ];
 
-export function DashboardScreen({ navigation }: any): JSX.Element {
+export function DashboardScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [dashboard, setDashboard] = useState<FundiDashboard | null>(null);
   const [activeJob, setActiveJob] = useState<Job | null>(null);

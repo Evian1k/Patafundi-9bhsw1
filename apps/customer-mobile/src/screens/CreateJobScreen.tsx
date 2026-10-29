@@ -50,7 +50,7 @@ const COMPLEXITY_OPTIONS = [
   { value: 'expert',  label: 'Expert',  desc: 'Advanced expertise required',       mult: '2.5x' },
 ] as const;
 
-export function CreateJobScreen({ navigation, route }: any): JSX.Element {
+export function CreateJobScreen({ navigation, route }: any): React.JSX.Element {
   const preselected: string | undefined = route?.params?.category;
   const [category, setCategory] = useState<string | null>(preselected ?? null);
   const [description, setDescription] = useState('');

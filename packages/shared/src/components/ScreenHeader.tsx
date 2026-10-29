@@ -10,7 +10,7 @@ export interface ScreenHeaderProps {
   style?: ViewStyle;
 }
 
-export function ScreenHeader({ title, onBack, right, style }: ScreenHeaderProps): JSX.Element {
+export function ScreenHeader({ title, onBack, right, style }: ScreenHeaderProps): React.JSX.Element {
   return (
     <View style={[styles.headerBar, style]}>
       {onBack ? (

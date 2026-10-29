@@ -8,7 +8,7 @@ export type PendingApprovalStackParamList = {
 
 const Stack = createNativeStackNavigator<PendingApprovalStackParamList>();
 
-export function PendingApprovalNavigator(): JSX.Element {
+export function PendingApprovalNavigator(): React.JSX.Element {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="PendingApproval">
       <Stack.Screen name="PendingApproval" component={PendingApprovalScreen} />

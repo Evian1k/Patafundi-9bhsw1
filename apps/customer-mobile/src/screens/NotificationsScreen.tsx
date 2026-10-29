@@ -21,7 +21,7 @@ import {
 } from '@patafundi/shared';
 import type { Notification } from '@patafundi/shared';
 
-export function NotificationsScreen({ navigation }: any): JSX.Element {
+export function NotificationsScreen({ navigation }: any): React.JSX.Element {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,7 +82,7 @@ export function NotificationsScreen({ navigation }: any): JSX.Element {
     }
   };
 
-  const renderItem = ({ item }: { item: Notification }): JSX.Element => (
+  const renderItem = ({ item }: { item: Notification }): React.JSX.Element => (
     <TouchableOpacity
       style={[styles.card, item.isRead ? styles.cardRead : null]}
       onPress={() => void handleTap(item)}

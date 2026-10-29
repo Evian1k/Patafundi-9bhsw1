@@ -101,7 +101,7 @@ const STATIC_SECTIONS: InfoSection[] = [
   },
 ];
 
-export function EmergencySosScreen({ navigation }: any): JSX.Element {
+export function EmergencySosScreen({ navigation }: any): React.JSX.Element {
   const [sosState, setSosState] = React.useState<'idle' | 'sending' | 'sent'>('idle');
 
   const callNumber = (number: string): void => {

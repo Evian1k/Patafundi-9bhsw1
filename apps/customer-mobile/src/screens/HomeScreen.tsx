@@ -53,7 +53,7 @@ function formatKes(value: number | null): string {
   return `from KSh ${Math.round(value).toLocaleString('en-KE')}`;
 }
 
-export function HomeScreen({ navigation }: any): JSX.Element {
+export function HomeScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [priceMap, setPriceMap] = useState<Record<string, ServicePrice>>({});

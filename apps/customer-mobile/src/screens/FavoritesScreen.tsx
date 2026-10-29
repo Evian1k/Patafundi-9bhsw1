@@ -37,7 +37,7 @@ function categoryLabel(slug: string): string {
   return CATEGORY_LABELS[slug] ?? slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
-export function FavoritesScreen({ navigation }: any): JSX.Element {
+export function FavoritesScreen({ navigation }: any): React.JSX.Element {
   const [favorites, setFavorites] = useState<FundiPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -104,7 +104,7 @@ export function FavoritesScreen({ navigation }: any): JSX.Element {
     });
   };
 
-  const renderItem = ({ item }: { item: FundiPublic }): JSX.Element => {
+  const renderItem = ({ item }: { item: FundiPublic }): React.JSX.Element => {
     const initial = (item.fullName?.trim()?.[0] ?? 'F').toUpperCase();
     const isRemoving = removingId === item.id;
     return (

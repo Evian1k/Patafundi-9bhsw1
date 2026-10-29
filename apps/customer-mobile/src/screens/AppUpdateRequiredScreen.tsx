@@ -24,7 +24,7 @@ const APP_STORE_URL = 'https://apps.apple.com/app/patafundi';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.patafundi.app';
 const APP_VERSION = '1.0.0';
 
-export function AppUpdateRequiredScreen({ route, navigation }: any): JSX.Element {
+export function AppUpdateRequiredScreen({ route, navigation }: any): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const mandatory: boolean = route?.params?.mandatory ?? true;
   const version: string = route?.params?.version ?? '';

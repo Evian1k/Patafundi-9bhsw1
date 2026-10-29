@@ -22,7 +22,7 @@ import {
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function RegisterScreen({ navigation }: any): JSX.Element {
+export function RegisterScreen({ navigation }: any): React.JSX.Element {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('+254');

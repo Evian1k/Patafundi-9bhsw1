@@ -36,7 +36,7 @@ export interface TrustCenterScreenProps {
   heroSubtitle: string;
 }
 
-export function TrustCenterScreen({ navigation, cards, heroSubtitle }: TrustCenterScreenProps): JSX.Element {
+export function TrustCenterScreen({ navigation, cards, heroSubtitle }: TrustCenterScreenProps): React.JSX.Element {
   const handlePress = (card: TrustCard): void => {
     if (card.params) {
       navigation.navigate(card.route, card.params);

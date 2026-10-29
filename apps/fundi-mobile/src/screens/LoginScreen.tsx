@@ -21,7 +21,7 @@ import {
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function LoginScreen({ navigation }: any): JSX.Element {
+export function LoginScreen({ navigation }: any): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const login = useAuthStore((s) => s.login);

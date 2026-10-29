@@ -52,7 +52,7 @@ interface FundiOnboardingScreenProps {
   onComplete: () => void;
 }
 
-export function FundiOnboardingScreen({ onComplete }: FundiOnboardingScreenProps): JSX.Element {
+export function FundiOnboardingScreen({ onComplete }: FundiOnboardingScreenProps): React.JSX.Element {
   const [active, setActive] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 

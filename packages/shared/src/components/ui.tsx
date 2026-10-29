@@ -22,7 +22,7 @@ interface PrimaryButtonProps {
   style?: ViewStyle;
 }
 
-export function PrimaryButton({ label, onPress, loading, disabled, style }: PrimaryButtonProps): JSX.Element {
+export function PrimaryButton({ label, onPress, loading, disabled, style }: PrimaryButtonProps): React.JSX.Element {
   return (
     <TouchableOpacity onPress={onPress} disabled={disabled || loading} activeOpacity={0.85}>
       <LinearGradient
@@ -51,7 +51,7 @@ interface OutlineButtonProps {
   textStyle?: TextStyle;
 }
 
-export function OutlineButton({ label, onPress, loading, disabled, color, style, textStyle }: OutlineButtonProps): JSX.Element {
+export function OutlineButton({ label, onPress, loading, disabled, color, style, textStyle }: OutlineButtonProps): React.JSX.Element {
   const borderColor = color || colors.accent;
   return (
     <TouchableOpacity
@@ -74,7 +74,7 @@ interface InputProps extends TextInputProps {
   error?: string;
 }
 
-export function Input({ label, error, style, ...rest }: InputProps): JSX.Element {
+export function Input({ label, error, style, ...rest }: InputProps): React.JSX.Element {
   return (
     <View style={styles.inputWrap}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -93,7 +93,7 @@ interface CardProps {
   style?: ViewStyle;
 }
 
-export function Card({ children, style }: CardProps): JSX.Element {
+export function Card({ children, style }: CardProps): React.JSX.Element {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -102,7 +102,7 @@ interface HeadingProps {
   style?: RNTextStyle;
 }
 
-export function Heading({ children, style }: HeadingProps): JSX.Element {
+export function Heading({ children, style }: HeadingProps): React.JSX.Element {
   return <Text style={[styles.heading, style]}>{children}</Text>;
 }
 

@@ -23,7 +23,7 @@ import {
 } from '@patafundi/shared';
 import { useAuthStore } from '../store/authStore';
 
-export function EditProfileScreen({ navigation }: any): JSX.Element {
+export function EditProfileScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const fetchUser = useAuthStore((s) => s.fetchUser);
   const [fullName, setFullName] = useState(user?.fullName ?? '');

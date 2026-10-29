@@ -37,7 +37,7 @@ export interface InfoPageScreenProps {
   contentContainerStyle?: ViewStyle;
 }
 
-export function InfoSectionCard({ section }: { section: InfoSection }): JSX.Element {
+export function InfoSectionCard({ section }: { section: InfoSection }): React.JSX.Element {
   const tint = section.color ?? colors.primary;
   return (
     <View style={styles.sectionCard}>
@@ -72,7 +72,7 @@ export function InfoHero({
   heroTitle: string;
   heroSubtitle?: string;
   heroGradient?: keyof typeof gradients;
-}): JSX.Element {
+}): React.JSX.Element {
   const gradient = gradients[heroGradient];
   return (
     <View style={styles.heroWrap}>
@@ -99,7 +99,7 @@ export function InfoPageScreen({
   footer,
   children,
   contentContainerStyle,
-}: InfoPageScreenProps): JSX.Element {
+}: InfoPageScreenProps): React.JSX.Element {
   return (
     <ScrollView
       style={styles.container}

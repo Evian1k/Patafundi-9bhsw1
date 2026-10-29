@@ -26,7 +26,7 @@ interface ReviewWithMeta extends Review {
   reviewerName?: string;
 }
 
-export function ReviewsScreen({ navigation }: any): JSX.Element {
+export function ReviewsScreen({ navigation }: any): React.JSX.Element {
   const [reviews, setReviews] = useState<ReviewWithMeta[]>([]);
   const [average, setAverage] = useState(0);
   const [count, setCount] = useState(0);

@@ -40,7 +40,7 @@ const REASONS = [
   'Other',
 ];
 
-export function CreateDisputeScreen({ route, navigation }: any): JSX.Element {
+export function CreateDisputeScreen({ route, navigation }: any): React.JSX.Element {
   const fixedJobId: string | undefined = route?.params?.jobId;
   // When opened without a job, the user picks from their REAL jobs - nobody
   // should ever have to find and type a Job ID (web parity, user directive).

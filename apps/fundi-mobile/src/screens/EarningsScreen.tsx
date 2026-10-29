@@ -36,7 +36,7 @@ interface AnalyticsData {
   topCustomers?: Array<{ name?: string; total?: number; count?: number }>;
 }
 
-export function EarningsScreen({ navigation }: any): JSX.Element {
+export function EarningsScreen({ navigation }: any): React.JSX.Element {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

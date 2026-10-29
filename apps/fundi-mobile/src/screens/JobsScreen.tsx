@@ -25,7 +25,7 @@ import {
 
 type Segment = 'available' | 'mine';
 
-export function JobsScreen({ navigation }: any): JSX.Element {
+export function JobsScreen({ navigation }: any): React.JSX.Element {
   const [segment, setSegment] = useState<Segment>('available');
   const [available, setAvailable] = useState<Job[]>([]);
   const [mine, setMine] = useState<Job[]>([]);
@@ -81,7 +81,7 @@ export function JobsScreen({ navigation }: any): JSX.Element {
     }
   };
 
-  const renderItem = ({ item }: { item: Job }): JSX.Element => {
+  const renderItem = ({ item }: { item: Job }): React.JSX.Element => {
     const isAvailable = segment === 'available';
     return (
       <View style={styles.jobCard}>

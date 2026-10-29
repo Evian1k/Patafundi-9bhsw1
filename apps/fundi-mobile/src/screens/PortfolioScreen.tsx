@@ -38,7 +38,7 @@ const NUM_COLUMNS = 3;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - spacing.lg * 2 - (NUM_COLUMNS - 1) * 8) / NUM_COLUMNS);
 
-export function PortfolioScreen({ navigation }: any): JSX.Element {
+export function PortfolioScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);

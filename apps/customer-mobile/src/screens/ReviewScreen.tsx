@@ -23,7 +23,7 @@ import {
   gradients,
 } from '@patafundi/shared';
 
-export function ReviewScreen({ route, navigation }: any): JSX.Element {
+export function ReviewScreen({ route, navigation }: any): React.JSX.Element {
   const jobId: string = route?.params?.jobId;
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');

@@ -52,7 +52,7 @@ const KENYAN_COUNTIES = [
   'Eldoret', 'Thika', 'Kitale', 'Garissa', 'Nanyuki', 'Kericho',
 ];
 
-export function FundiRegisterScreen({ navigation }: any): JSX.Element {
+export function FundiRegisterScreen({ navigation }: any): React.JSX.Element {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 

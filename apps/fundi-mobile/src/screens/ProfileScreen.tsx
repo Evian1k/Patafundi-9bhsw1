@@ -45,7 +45,7 @@ const MENU: MenuItem[] = [
   { label: 'Settings', icon: 'settings-outline', route: 'Settings' },
 ];
 
-export function ProfileScreen({ navigation }: any): JSX.Element {
+export function ProfileScreen({ navigation }: any): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [dashboard, setDashboard] = useState<FundiDashboard | null>(null);

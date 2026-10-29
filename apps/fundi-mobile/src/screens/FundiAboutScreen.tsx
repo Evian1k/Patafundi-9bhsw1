@@ -44,7 +44,7 @@ interface LinkItem {
   action: () => void;
 }
 
-export function FundiAboutScreen({ navigation }: any): JSX.Element {
+export function FundiAboutScreen({ navigation }: any): React.JSX.Element {
   const openUrl = async (url: string): Promise<void> => {
     try {
       const supported = await Linking.canOpenURL(url);

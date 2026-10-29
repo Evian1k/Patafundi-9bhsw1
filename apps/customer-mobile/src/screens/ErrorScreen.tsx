@@ -66,7 +66,7 @@ const ERROR_CONFIG: Record<ErrorType, ErrorConfig> = {
   },
 };
 
-export function ErrorScreen({ route, navigation }: any): JSX.Element {
+export function ErrorScreen({ route, navigation }: any): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const type: ErrorType = (route?.params?.type as ErrorType) ?? 'generic';
   const message: string = route?.params?.message ?? '';

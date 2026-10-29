@@ -35,7 +35,7 @@ interface FundiLocation {
   longitude: number;
 }
 
-export function JobTrackingScreen({ navigation, route }: any): JSX.Element {
+export function JobTrackingScreen({ navigation, route }: any): React.JSX.Element {
   const jobId: string = route?.params?.jobId;
   const user = useAuthStore((s) => s.user);
   const [job, setJob] = useState<Job | null>(null);

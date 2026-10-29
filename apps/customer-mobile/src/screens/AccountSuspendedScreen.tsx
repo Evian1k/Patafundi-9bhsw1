@@ -19,7 +19,7 @@ import {
 } from '@patafundi/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export function AccountSuspendedScreen({ route, navigation }: any): JSX.Element {
+export function AccountSuspendedScreen({ route, navigation }: any): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const reason: string = route?.params?.reason ?? 'Account activity that violates our policies';
   const caseId: string = route?.params?.caseId ?? '';

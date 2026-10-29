@@ -15,7 +15,7 @@ import { useAuthStore } from '../store/authStore';
 
 type ApprovalState = 'checking' | 'pending' | 'rejected' | 'error';
 
-export function PendingApprovalScreen(): JSX.Element {
+export function PendingApprovalScreen(): React.JSX.Element {
   const logout = useAuthStore((s) => s.logout);
   const [state, setState] = useState<ApprovalState>('checking');
   const [message, setMessage] = useState<string>('');

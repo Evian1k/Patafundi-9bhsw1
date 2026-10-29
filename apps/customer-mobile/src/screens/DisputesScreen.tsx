@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
   dismissed: colors.textSecondary,
 };
 
-export function DisputesScreen({ navigation }: any): JSX.Element {
+export function DisputesScreen({ navigation }: any): React.JSX.Element {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,7 +55,7 @@ export function DisputesScreen({ navigation }: any): JSX.Element {
     load();
   }, [load]);
 
-  const renderItem = ({ item }: { item: Dispute }): JSX.Element => {
+  const renderItem = ({ item }: { item: Dispute }): React.JSX.Element => {
     const statusColor = STATUS_COLORS[item.status] ?? colors.textSecondary;
     return (
       <View style={styles.card}>

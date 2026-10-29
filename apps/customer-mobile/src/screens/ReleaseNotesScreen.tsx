@@ -66,7 +66,7 @@ function formatDate(post: ReleasePost): string {
   }
 }
 
-export function ReleaseNotesScreen({ navigation }: any): JSX.Element {
+export function ReleaseNotesScreen({ navigation }: any): React.JSX.Element {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});

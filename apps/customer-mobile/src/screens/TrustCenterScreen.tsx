@@ -15,7 +15,7 @@ const TRUST_CARDS: TrustCard[] = [
   ...LEGAL_TRUST_CARDS,
 ];
 
-export function TrustCenterScreen({ navigation }: any): JSX.Element {
+export function TrustCenterScreen({ navigation }: any): React.JSX.Element {
   return (
     <SharedTrustCenterScreen
       navigation={navigation}

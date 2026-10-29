@@ -43,7 +43,7 @@ function timeAgo(iso?: string): string {
  * Fundi notifications (spec §35): booking updates, payments, payouts and
  * dispute news. Polls on focus; tapping an unread row marks it read.
  */
-export function FundiNotificationsScreen({ navigation }: any): JSX.Element {
+export function FundiNotificationsScreen({ navigation }: any): React.JSX.Element {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,7 +86,7 @@ export function FundiNotificationsScreen({ navigation }: any): JSX.Element {
     }
   };
 
-  const renderItem = ({ item }: { item: NotificationRow }): JSX.Element => (
+  const renderItem = ({ item }: { item: NotificationRow }): React.JSX.Element => (
     <TouchableOpacity
       style={[styles.row, !item.read_at ? styles.rowUnread : null]}
       onPress={() => !item.read_at && markOne(item.id)}

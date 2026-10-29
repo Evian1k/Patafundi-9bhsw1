@@ -24,7 +24,7 @@ import {
 import type { SavedPlace } from '@patafundi/shared';
 import { useFocusEffect } from '@react-navigation/native';
 
-export function SavedPlacesScreen({ navigation }: any): JSX.Element {
+export function SavedPlacesScreen({ navigation }: any): React.JSX.Element {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [label, setLabel] = useState('');
@@ -96,7 +96,7 @@ export function SavedPlacesScreen({ navigation }: any): JSX.Element {
     ]);
   };
 
-  const renderItem = ({ item }: { item: SavedPlace }): JSX.Element => (
+  const renderItem = ({ item }: { item: SavedPlace }): React.JSX.Element => (
     <View style={styles.placeCard}>
       <View style={styles.placeLeft}>
         <View style={styles.iconWrap}>
